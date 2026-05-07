@@ -1,0 +1,51 @@
+import type { Appointment } from "@/types/domain"
+
+export const initialAppointmentsList: Appointment[] = [
+  {
+    id: "ap-1",
+    clientName: "Anna Kowalska",
+    phone: "+48 501 234 567",
+    email: "anna@example.com",
+    serviceLabel: "Konsultacja",
+    startsAt: "2026-04-28T09:00:00.000Z",
+    status: "confirmed",
+    notes: "Preferuje okno poranne.",
+    noShowRisk: "none",
+  },
+  {
+    id: "ap-2",
+    clientName: "Piotr Nowak",
+    phone: "+48 602 111 222",
+    serviceLabel: "Zabieg podstawowy",
+    startsAt: "2026-04-28T11:30:00.000Z",
+    status: "booked",
+    noShowRisk: "medium",
+  },
+  {
+    id: "ap-3",
+    clientName: "Magdalena Wiśniewska",
+    phone: "+48 793 444 555",
+    email: "mw@firma.pl",
+    serviceLabel: "Pierwsza wizyta",
+    startsAt: "2026-04-29T14:00:00.000Z",
+    status: "booked",
+    notes: "Proponuje wtorek po 15:00.",
+    noShowRisk: "low",
+  },
+  {
+    id: "ap-4",
+    clientName: "Tomasz Zieliński",
+    phone: "+48 881 000 321",
+    serviceLabel: "Przegląd",
+    startsAt: "2026-04-26T16:15:00.000Z",
+    status: "no_show",
+  },
+  {
+    id: "ap-5",
+    clientName: "Karolina Jabłońska",
+    phone: "+48 512 888 999",
+    serviceLabel: "Masaż",
+    startsAt: "2026-05-02T10:00:00.000Z",
+    status: "cancelled",
+  },
+]

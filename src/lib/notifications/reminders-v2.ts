@@ -1,0 +1,340 @@
+import { sendReminderEmail } from "@/lib/notifications/email"
+import { sendReminderSms } from "@/lib/notifications/sms"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { TablesInsert, TablesUpdate } from "@/types/database"
+
+type BusinessProfileJoin = {
+  reminder_channel: string | null
+} | null
+
+type DueBookingRow = {
+  id: string
+  business_id: string
+  confirmation_token: string
+  client_name: string
+  client_phone: string | null
+  client_email: string | null
+  service_name: string
+  appointment_date: string
+  appointment_time: string
+  status: string
+  first_reminder_due_at: string | null
+  first_reminder_sent_at: string | null
+  first_reminder_status: string | null
+  second_reminder_due_at: string | null
+  second_reminder_sent_at: string | null
+  second_reminder_status: string | null
+  business_profiles: BusinessProfileJoin
+}
+
+type ReminderKind = "appointment_reminder_24h" | "appointment_reminder_short"
+
+function getPublicAppOrigin(): string {
+  const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (explicit) return explicit.replace(/\/$/, "")
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
+  return "http://localhost:3000"
+}
+
+function reminderLocale(): "pl" | "en" {
+  return process.env.REMINDER_LOCALE?.trim().toLowerCase() === "en" ? "en" : "pl"
+}
+
+function formatTimeHmFromDb(t: string): string {
+  const m = String(t).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return "09:00"
+  return `${String(Number(m[1])).padStart(2, "0")}:${m[2]}`
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+}
+
+function buildMessage(
+  kind: ReminderKind,
+  lang: "pl" | "en",
+  payload: { clientName: string; serviceName: string; dateLabel: string; timeHm: string; confirmUrl: string }
+) {
+  if (kind === "appointment_reminder_short") {
+    if (lang === "en") {
+      return {
+        subject: "Appointment reminder",
+        text: `Hi ${payload.clientName},\n\nthis is a reminder about your appointment today at ${payload.timeHm}.\n\nService: ${payload.serviceName}\nDate: ${payload.dateLabel} at ${payload.timeHm}\n\nSee you soon,\nYour business`,
+        html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder about your appointment today at ${escapeHtml(payload.timeHm)}.</p><p>Service: <strong>${escapeHtml(payload.serviceName)}</strong><br/>Date: ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}</p><p>See you soon,<br/>Your business</p>`,
+        sms: `Hi ${payload.clientName}, this is a reminder about your appointment today at ${payload.timeHm} - ${payload.serviceName}. See you soon!`,
+      }
+    }
+    return {
+      subject: "Przypomnienie o wizycie",
+      text: `Cześć ${payload.clientName},\n\nprzypominamy o Twojej wizycie dziś o ${payload.timeHm}.\n\nUsługa: ${payload.serviceName}\nTermin: ${payload.dateLabel} o ${payload.timeHm}\n\nDo zobaczenia,\nTwoja firma`,
+      html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o Twojej wizycie dziś o ${escapeHtml(payload.timeHm)}.</p><p>Usługa: <strong>${escapeHtml(payload.serviceName)}</strong><br/>Termin: ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}</p><p>Do zobaczenia,<br/>Twoja firma</p>`,
+      sms: `Cześć ${payload.clientName}, przypominamy o wizycie dziś o ${payload.timeHm} - ${payload.serviceName}. Do zobaczenia!`,
+    }
+  }
+  if (lang === "en") {
+    return {
+      subject: "Appointment reminder",
+      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. Confirm, reschedule or cancel here: ${payload.confirmUrl}`,
+      html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Confirm, reschedule or cancel</a></p>`,
+      sms: `Reminder: ${payload.serviceName} ${payload.dateLabel} at ${payload.timeHm}. Confirm, reschedule or cancel: ${payload.confirmUrl}`,
+    }
+  }
+  return {
+    subject: "Przypomnienie o wizycie",
+    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Potwierdź obecność, zmień termin lub anuluj wizytę tutaj: ${payload.confirmUrl}`,
+    html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Potwierdź obecność, zmień termin lub anuluj wizytę</a></p>`,
+    sms: `Przypomnienie: ${payload.serviceName} ${payload.dateLabel} o ${payload.timeHm}. Potwierdź, zmień lub anuluj: ${payload.confirmUrl}`,
+  }
+}
+
+async function insertNotificationLog(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  row: {
+    business_id: string
+    booking_id: string
+    channel: "sms" | "email"
+    type: "appointment_reminder_24h" | "appointment_reminder_short"
+    status: string
+    recipient: string | null
+    subject: string | null
+    body: string | null
+    provider: string | null
+    provider_message_id: string | null
+    error: string | null
+    sent_at: string | null
+  }
+) {
+  const ins: TablesInsert<"notification_logs"> = { ...row }
+  await admin.from("notification_logs").insert(ins)
+}
+
+function appointmentStartsAtMs(row: DueBookingRow): number {
+  return new Date(`${String(row.appointment_date).slice(0, 10)}T${String(row.appointment_time).slice(0, 8)}`).getTime()
+}
+
+async function updateBookingReminderStatus(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  row: DueBookingRow,
+  kind: ReminderKind,
+  status: "sent" | "failed" | "skipped" | "not_configured",
+  nowIso: string,
+  error: string | null,
+  promoteToPending: boolean
+) {
+  let patch: TablesUpdate<"bookings">
+  if (kind === "appointment_reminder_24h") {
+    patch = {
+      first_reminder_sent_at: nowIso,
+      first_reminder_status: status,
+      reminder_sent_at: nowIso,
+      reminder_status: status,
+      reminder_error: error,
+      last_updated_by: "system",
+      updated_at: nowIso,
+    }
+    if (promoteToPending && row.status === "booked") {
+      patch.status = "pending"
+      patch.last_change_type = "reminder_24h_sent"
+      patch.last_status_change_source = "automatic_24h_reminder"
+    }
+  } else {
+    patch = {
+      second_reminder_sent_at: nowIso,
+      second_reminder_status: status,
+      second_reminder_error: error,
+      last_updated_by: "system",
+      updated_at: nowIso,
+    }
+  }
+  await admin.from("bookings").update(patch).eq("id", row.id)
+}
+
+async function processSingleReminder(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  row: DueBookingRow,
+  kind: ReminderKind
+): Promise<"processed" | "failed" | "skipped"> {
+  const nowIso = new Date().toISOString()
+  const lang = reminderLocale()
+  const origin = getPublicAppOrigin()
+  const confirmUrl = `${origin}/confirm/${encodeURIComponent(row.confirmation_token)}`
+  const timeHm = formatTimeHmFromDb(row.appointment_time)
+  const dateLabel = String(row.appointment_date).slice(0, 10)
+  const message = buildMessage(kind, lang, {
+    clientName: row.client_name,
+    serviceName: row.service_name,
+    dateLabel,
+    timeHm,
+    confirmUrl,
+  })
+  const type = kind === "appointment_reminder_24h" ? "appointment_reminder_24h" : "appointment_reminder_short"
+  const hasEmail = Boolean(row.client_email?.trim())
+  const hasPhone = Boolean(row.client_phone?.trim())
+
+  if (!hasEmail && !hasPhone) {
+    await insertNotificationLog(admin, {
+      business_id: row.business_id,
+      booking_id: row.id,
+      channel: "email",
+      type,
+      status: "skipped",
+      recipient: null,
+      subject: message.subject,
+      body: message.text,
+      provider: null,
+      provider_message_id: null,
+      error: "Missing client contact details",
+      sent_at: nowIso,
+    })
+    await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "Missing client contact details", false)
+    return "skipped"
+  }
+
+  const ch = row.business_profiles?.reminder_channel ?? "both"
+  const wantEmail = ch === "email" || ch === "both"
+  const wantSms = ch === "sms" || ch === "both"
+  const statuses: string[] = []
+  const errors: string[] = []
+
+  if (wantEmail && hasEmail) {
+    const { data: existingEmail } = await admin
+      .from("notification_logs")
+      .select("id")
+      .eq("booking_id", row.id)
+      .eq("type", type)
+      .eq("channel", "email")
+      .limit(1)
+      .maybeSingle()
+    if (existingEmail?.id) {
+      statuses.push("skipped")
+    } else {
+    const res = await sendReminderEmail({
+      to: row.client_email!.trim(),
+      subject: message.subject,
+      textBody: message.text,
+      htmlBody: message.html,
+    })
+    const status = res.ok ? "sent" : res.code === "not_configured" || res.code === "simulated_dev" ? res.code : "failed"
+    statuses.push(status)
+    if (!res.ok) errors.push(res.error ?? res.code)
+    await insertNotificationLog(admin, {
+      business_id: row.business_id,
+      booking_id: row.id,
+      channel: "email",
+      type,
+      status,
+      recipient: row.client_email!.trim(),
+      subject: message.subject,
+      body: message.text,
+      provider: res.ok ? res.provider : null,
+      provider_message_id: res.ok ? res.messageId ?? null : null,
+      error: res.ok ? null : res.error ?? res.code,
+      sent_at: nowIso,
+    })
+    }
+  }
+
+  if (wantSms && hasPhone) {
+    const { data: existingSms } = await admin
+      .from("notification_logs")
+      .select("id")
+      .eq("booking_id", row.id)
+      .eq("type", type)
+      .eq("channel", "sms")
+      .limit(1)
+      .maybeSingle()
+    if (existingSms?.id) {
+      statuses.push("skipped")
+    } else {
+    const res = await sendReminderSms({ to: row.client_phone!.trim(), body: message.sms })
+    const status = res.ok ? "sent" : res.code === "not_configured" || res.code === "simulated_dev" ? res.code : "failed"
+    statuses.push(status)
+    if (!res.ok) errors.push(res.error ?? res.code)
+    await insertNotificationLog(admin, {
+      business_id: row.business_id,
+      booking_id: row.id,
+      channel: "sms",
+      type,
+      status,
+      recipient: row.client_phone!.trim(),
+      subject: null,
+      body: message.sms,
+      provider: res.ok ? res.provider : null,
+      provider_message_id: res.ok ? res.messageId ?? null : null,
+      error: res.ok ? null : res.error ?? res.code,
+      sent_at: nowIso,
+    })
+    }
+  }
+
+  if (statuses.includes("sent")) {
+    await updateBookingReminderStatus(admin, row, kind, "sent", nowIso, null, true)
+    return "processed"
+  }
+  if (statuses.some((s) => s === "failed")) {
+    await updateBookingReminderStatus(admin, row, kind, "failed", nowIso, errors.join("; ") || "send_failed", false)
+    return "failed"
+  }
+  await updateBookingReminderStatus(admin, row, kind, "not_configured", nowIso, errors.join("; ") || "not_configured", false)
+  return "skipped"
+}
+
+export async function processDueBookingReminders(): Promise<{
+  ok: boolean
+  firstReminderProcessed: number
+  secondReminderProcessed: number
+  failed: number
+  skipped: number
+  error?: string
+}> {
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    return { ok: false, firstReminderProcessed: 0, secondReminderProcessed: 0, failed: 0, skipped: 0, error: "service_role_or_url_missing" }
+  }
+
+  const nowIso = new Date().toISOString()
+  const { data, error } = await admin
+    .from("bookings")
+    .select(
+      "id,business_id,confirmation_token,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,business_profiles(reminder_channel)"
+    )
+    .in("status", ["booked", "pending", "confirmed"])
+    .or(
+      [
+        `and(first_reminder_due_at.not.is.null,first_reminder_due_at.lte.${nowIso},first_reminder_sent_at.is.null,or(first_reminder_status.eq.pending,first_reminder_status.is.null))`,
+        `and(second_reminder_due_at.not.is.null,second_reminder_due_at.lte.${nowIso},second_reminder_sent_at.is.null,second_reminder_status.eq.pending)`,
+      ].join(",")
+    )
+
+  if (error) {
+    return { ok: false, firstReminderProcessed: 0, secondReminderProcessed: 0, failed: 0, skipped: 0, error: error.message }
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as unknown as DueBookingRow[]
+  let firstReminderProcessed = 0
+  let secondReminderProcessed = 0
+  let failed = 0
+  let skipped = 0
+
+  for (const row of rows) {
+    if (!(appointmentStartsAtMs(row) > Date.now())) {
+      skipped += 1
+      continue
+    }
+    if (row.first_reminder_due_at && row.first_reminder_sent_at == null && (row.first_reminder_status == null || row.first_reminder_status === "pending")) {
+      const result = await processSingleReminder(admin, row, "appointment_reminder_24h")
+      if (result === "processed") firstReminderProcessed += 1
+      else if (result === "failed") failed += 1
+      else skipped += 1
+    }
+    if (row.second_reminder_due_at && row.second_reminder_sent_at == null && row.second_reminder_status === "pending") {
+      const result = await processSingleReminder(admin, row, "appointment_reminder_short")
+      if (result === "processed") secondReminderProcessed += 1
+      else if (result === "failed") failed += 1
+      else skipped += 1
+    }
+  }
+
+  return { ok: true, firstReminderProcessed, secondReminderProcessed, failed, skipped }
+}

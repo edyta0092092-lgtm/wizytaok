@@ -1,0 +1,108 @@
+import type { Client } from "@/types/domain"
+
+export const initialClientsList: Client[] = [
+  {
+    id: "c-1",
+    fullName: "Anna Kowalska",
+    phone: "+48 501 234 567",
+    email: "anna.kowalska@example.com",
+    visitCount: 12,
+    confirmedVisitCount: 10,
+    noShowCount: 0,
+    notes: "Preferuje SMS rano. Stała bywalczyni.",
+    riskScore: 18,
+    riskTier: "low",
+    visitHistory: [
+      {
+        id: "h-1",
+        startsAt: "2026-04-20T10:00:00.000Z",
+        serviceLabel: "Konsultacja",
+        status: "confirmed",
+      },
+      {
+        id: "h-2",
+        startsAt: "2026-04-06T14:30:00.000Z",
+        serviceLabel: "Przegląd",
+        status: "completed",
+      },
+      {
+        id: "h-3",
+        startsAt: "2026-03-15T09:00:00.000Z",
+        serviceLabel: "Konsultacja",
+        status: "confirmed",
+      },
+    ],
+  },
+  {
+    id: "c-2",
+    fullName: "Piotr Nowak",
+    phone: "+48 602 111 222",
+    email: "p.nowak@firma.pl",
+    visitCount: 8,
+    confirmedVisitCount: 5,
+    noShowCount: 1,
+    notes: "",
+    riskScore: 52,
+    riskTier: "medium",
+    visitHistory: [
+      {
+        id: "h-4",
+        startsAt: "2026-04-25T11:30:00.000Z",
+        serviceLabel: "Zabieg podstawowy",
+        status: "booked",
+      },
+      {
+        id: "h-5",
+        startsAt: "2026-04-10T11:30:00.000Z",
+        serviceLabel: "Zabieg podstawowy",
+        status: "no_show",
+      },
+    ],
+  },
+  {
+    id: "c-3",
+    fullName: "Magdalena Wiśniewska",
+    phone: "+48 793 444 555",
+    email: "mwisniewska@gmail.com",
+    visitCount: 4,
+    confirmedVisitCount: 1,
+    noShowCount: 2,
+    notes: "Często prosi o zmianę terminu.",
+    riskScore: 78,
+    riskTier: "high",
+    visitHistory: [
+      {
+        id: "h-6",
+        startsAt: "2026-04-28T14:00:00.000Z",
+        serviceLabel: "Pierwsza wizyta",
+        status: "pending",
+      },
+      {
+        id: "h-7",
+        startsAt: "2026-04-12T14:00:00.000Z",
+        serviceLabel: "Pierwsza wizyta",
+        status: "no_show",
+      },
+    ],
+  },
+  {
+    id: "c-4",
+    fullName: "Tomasz Zieliński",
+    phone: "+48 881 000 321",
+    email: "t.zielinski@outlook.com",
+    visitCount: 6,
+    confirmedVisitCount: 6,
+    noShowCount: 0,
+    notes: "Zawsze potwierdza SMS-em.",
+    riskScore: 22,
+    riskTier: "low",
+    visitHistory: [
+      {
+        id: "h-8",
+        startsAt: "2026-04-18T16:15:00.000Z",
+        serviceLabel: "Przegląd",
+        status: "confirmed",
+      },
+    ],
+  },
+]
