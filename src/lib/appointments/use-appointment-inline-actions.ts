@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { updateAppointmentStatus } from "@/lib/appointments/appointments-store"
+import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appointments/manual-appointments"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
@@ -412,5 +413,48 @@ export function useAppointmentInlineActions(args: {
     ],
   )
 
-  return { saveDirectVisitChange, executeCancelVisit }
+  const handleCancelVisitFromEditForm = React.useCallback(
+    (row: Appointment) => {
+      void (async () => {
+        setIsCancellingVisit(true)
+        try {
+          const result = await cancelAppointmentFromRemove(row.id, language, true)
+          console.info("[appointment.cancel.update.result]", {
+            bookingId: row?.id,
+            data: result.data ?? null,
+            error: result.error ?? null,
+          })
+          if (!result.ok) {
+            setActionNotice(labels.cancelVisitCouldNotComplete)
+            return
+          }
+          window.dispatchEvent(new Event("pw-bookings"))
+          setProposeForId(null)
+          setProposeValidationError("")
+          setProposeResolvedServiceId("")
+          setProposeStaffListForService(null)
+          setConfirmCancelVisitForId(null)
+          setActionNotice(labels.visitCancelledLocal)
+        } finally {
+          setIsCancellingVisit(false)
+        }
+      })()
+    },
+    [
+      language,
+      labels.cancelVisitCouldNotComplete,
+      labels.visitCancelledLocal,
+      setActionNotice,
+      setConfirmCancelVisitForId,
+      setIsCancellingVisit,
+      setProposeForId,
+      setProposeResolvedServiceId,
+      setProposeStaffListForService,
+      setProposeValidationError,
+    ],
+  )
+
+  const executeRemoveVisit = handleCancelVisitFromEditForm
+
+  return { saveDirectVisitChange, executeCancelVisit, executeRemoveVisit, handleCancelVisitFromEditForm }
 }

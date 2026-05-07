@@ -512,8 +512,8 @@ export default function SettingsPage() {
                 {t("settings.remindersCardDesc")}
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-6 pt-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
+            <CardContent className="grid grid-cols-2 gap-4 pt-4 md:gap-6">
+              <div className="flex min-w-0 flex-col gap-2">
                 <Label htmlFor="reminder-lead" className="text-sm leading-snug">
                   {t("settings.reminderLeadLabel")}
                 </Label>
@@ -538,7 +538,7 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
+              <div className="flex min-w-0 flex-col gap-2">
                 <Label htmlFor="reminder-channel" className="text-sm leading-snug">
                   {t("settings.reminderChannelLabel")}
                 </Label>
@@ -563,7 +563,7 @@ export default function SettingsPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2 sm:col-span-2">
+              <div className="col-span-2 flex min-w-0 flex-col gap-2">
                 <Label htmlFor="second-reminder-lead" className="text-sm leading-snug">
                   {t("settings.secondReminderLeadLabel")}
                 </Label>

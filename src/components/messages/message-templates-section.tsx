@@ -1,81 +1,138 @@
 "use client"
 
 import * as React from "react"
-import {
-  Check,
-  Mail,
-  MessageSquareText,
-  Pencil,
-  Smartphone,
-  Trash2,
-} from "lucide-react"
+import { Check, Pencil } from "lucide-react"
 
-import { EmptyState } from "@/components/shared/empty-state"
-import { FormActions } from "@/components/shared/form-actions"
-import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  templateChannelOrder,
-  templateStatusOrder,
-  templateTypeOrder,
-} from "@/config/message-templates"
-import { buildInitialMessageTemplates } from "@/lib/i18n/template-defaults"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import { cn } from "@/lib/utils"
-import type {
-  MessageTemplate,
-  MessageTemplateChannel,
-  MessageTemplateStatus,
-  MessageTemplateType,
-} from "@/types/domain"
+import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import type { Tables } from "@/types/database"
 
-type FormState = {
+type TemplateType =
+  | "reminder_24h"
+  | "reminder_before_visit"
+  | "booking_confirmation"
+  | "booking_cancelled_by_company"
+  | "booking_cancelled_by_client"
+  | "no_show_follow_up"
+
+type GroupedTemplate = {
+  type: TemplateType
   title: string
-  type: MessageTemplateType
-  channel: MessageTemplateChannel
-  body: string
-  status: MessageTemplateStatus
+  smsEnabled: boolean
+  emailEnabled: boolean
+  smsBody: string
+  emailSubject: string
+  emailBody: string
+  timingMinutesBefore: number | null
+  smsRowId: string | null
+  emailRowId: string | null
 }
 
-const emptyForm = (): FormState => ({
-  title: "",
-  type: "reminder",
-  channel: "sms",
-  body: "",
-  status: "draft",
-})
+const TEMPLATE_ORDER: TemplateType[] = [
+  "reminder_24h",
+  "reminder_before_visit",
+  "booking_confirmation",
+  "booking_cancelled_by_company",
+  "booking_cancelled_by_client",
+  "no_show_follow_up",
+]
 
-function formFromTemplate(tpl: MessageTemplate): FormState {
-  return {
-    title: tpl.title,
-    type: tpl.type,
-    channel: tpl.channel,
-    body: tpl.body,
-    status: tpl.status,
-  }
+const TEMPLATE_LABELS: Record<TemplateType, string> = {
+  reminder_24h: "Przypomnienie 24h przed wizytą",
+  reminder_before_visit: "Przypomnienie przed wizytą",
+  booking_confirmation: "Potwierdzenie wizyty",
+  booking_cancelled_by_company: "Firma anuluje wizytę",
+  booking_cancelled_by_client: "Klient anuluje wizytę",
+  no_show_follow_up: "Follow-up po nieobecności klienta",
 }
 
-function statusBadgeClass(status: MessageTemplateStatus) {
-  return semanticStatusBadgeClass(status === "active" ? "success" : "neutral")
+const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
+  reminder_24h: ["reminder_24h", "reminder", "first_reminder_24h", "appointment_reminder_24h"],
+  reminder_before_visit: ["reminder_before_visit", "second_reminder", "appointment_reminder_short"],
+  booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed"],
+  booking_cancelled_by_company: ["booking_cancelled_by_company", "company_cancelled_booking"],
+  booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
+  no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
+}
+
+function isMissingMessageTemplatesTableError(message: string | null | undefined): boolean {
+  const m = String(message ?? "")
+  return (
+    /Could not find the table 'public\.message_templates' in the schema cache/i.test(m) ||
+    /relation ["']?message_templates["']? does not exist/i.test(m)
+  )
+}
+
+function defaultTiming(type: TemplateType): number | null {
+  if (type === "reminder_24h") return 1440
+  if (type === "reminder_before_visit") return 60
+  return null
+}
+
+function formatTimingLabel(minutes: number | null): string {
+  if (minutes == null || Number.isNaN(minutes)) return ""
+  const safe = Math.max(0, Math.floor(minutes))
+  if (safe === 0) return "0 min"
+  const h = Math.floor(safe / 60)
+  const min = safe % 60
+  if (h > 0 && min > 0) return `${h}h ${min}min`
+  if (h > 0) return `${h}h`
+  return `${min}min`
+}
+
+function parseTimingInput(raw: string): number | null {
+  const value = raw.trim().toLowerCase()
+  if (!value) return null
+  const onlyDigits = value.match(/^\d+$/)
+  if (onlyDigits) return Number(onlyDigits[0])
+  const normalized = value
+    .replace(/godzin(y|a|)?/g, "h")
+    .replace(/godz\./g, "h")
+    .replace(/minut(y|a|)?/g, "min")
+    .replace(/\s+/g, " ")
+  const hMatch = normalized.match(/(\d+)\s*h/)
+  const mMatch = normalized.match(/(\d+)\s*min/)
+  if (!hMatch && !mMatch) return null
+  const h = hMatch ? Number(hMatch[1]) : 0
+  const m = mMatch ? Number(mMatch[1]) : 0
+  return h * 60 + m
+}
+
+function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplate[] {
+  return TEMPLATE_ORDER.map((type) => {
+    const aliases = TEMPLATE_TYPE_ALIASES[type]
+    const matched = rows.filter((row) => aliases.includes(String(row.type)))
+    const sms = matched.find((row) => row.channel === "sms")
+    const email = matched.find((row) => row.channel === "email")
+    const timingSource = (sms ?? email) as (Tables<"message_templates"> & { timing_minutes_before?: number | null }) | undefined
+    return {
+      type,
+      title: TEMPLATE_LABELS[type],
+      smsEnabled: sms?.status === "active",
+      emailEnabled: email?.status === "active",
+      smsBody: sms?.content ?? "",
+      emailSubject: email?.title ?? "",
+      emailBody: email?.content ?? "",
+      timingMinutesBefore:
+        typeof timingSource?.timing_minutes_before === "number"
+          ? timingSource.timing_minutes_before
+          : defaultTiming(type),
+      smsRowId: sms?.id ?? null,
+      emailRowId: email?.id ?? null,
+    }
+  })
 }
 
 export type MessageTemplatesSectionProps = {
@@ -85,130 +142,173 @@ export type MessageTemplatesSectionProps = {
 export function MessageTemplatesSection({
   onRegisterPrimaryAction,
 }: MessageTemplatesSectionProps) {
-  const { t, language } = useTranslations()
-  const [templates, setTemplates] = React.useState<MessageTemplate[]>(() =>
-    buildInitialMessageTemplates(language)
-  )
-  const [userPreviewId, setUserPreviewId] = React.useState<string | null>(() => {
-    const initial = buildInitialMessageTemplates(language)
-    return initial[0]?.id ?? null
-  })
-
-  const defaultTemplatesPL = React.useMemo(
-    () => buildInitialMessageTemplates("pl"),
-    []
-  )
-  const defaultTemplatesEN = React.useMemo(
-    () => buildInitialMessageTemplates("en"),
-    []
-  )
-
-  const defaultByIdPL = React.useMemo(() => {
-    return Object.fromEntries(defaultTemplatesPL.map((tpl) => [tpl.id, tpl]))
-  }, [defaultTemplatesPL])
-  const defaultByIdEN = React.useMemo(() => {
-    return Object.fromEntries(defaultTemplatesEN.map((tpl) => [tpl.id, tpl]))
-  }, [defaultTemplatesEN])
-
-  const templatesAreEqual = React.useCallback(
-    (a: MessageTemplate, b: MessageTemplate) =>
-      a.id === b.id &&
-      a.title === b.title &&
-      a.type === b.type &&
-      a.channel === b.channel &&
-      a.status === b.status &&
-      a.body === b.body,
-    []
-  )
-
-  const displayTemplates = React.useMemo(() => {
-    return templates.map((tpl) => {
-      const pl = defaultByIdPL[tpl.id]
-      const en = defaultByIdEN[tpl.id]
-      if (pl && templatesAreEqual(tpl, pl)) {
-        return language === "pl" ? pl : en ?? pl
-      }
-      if (en && templatesAreEqual(tpl, en)) {
-        return language === "en" ? en : pl ?? en
-      }
-      return tpl
-    })
-  }, [templates, language, defaultByIdPL, defaultByIdEN, templatesAreEqual])
-
-  const previewId = React.useMemo(() => {
-    if (displayTemplates.length === 0) return null
-    if (
-      userPreviewId &&
-      displayTemplates.some((t) => t.id === userPreviewId)
-    ) {
-      return userPreviewId
-    }
-    return displayTemplates[0].id
-  }, [displayTemplates, userPreviewId])
+  const { t } = useTranslations()
+  const [templates, setTemplates] = React.useState<GroupedTemplate[]>([])
+  const [businessId, setBusinessId] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [loadError, setLoadError] = React.useState<string | null>(null)
+  const [templatesUnavailable, setTemplatesUnavailable] = React.useState(false)
   const [sheetOpen, setSheetOpen] = React.useState(false)
-  const [editingId, setEditingId] = React.useState<string | null>(null)
-  const [form, setForm] = React.useState<FormState>(emptyForm)
+  const [editingType, setEditingType] = React.useState<TemplateType | null>(null)
+  const [form, setForm] = React.useState<GroupedTemplate | null>(null)
   const [showSaved, setShowSaved] = React.useState(false)
-
-  const previewTemplate = React.useMemo(
-    () =>
-      previewId
-        ? displayTemplates.find((t) => t.id === previewId) ?? null
-        : null,
-    [displayTemplates, previewId]
-  )
+  const [timingInput, setTimingInput] = React.useState("")
+  const [timingInputError, setTimingInputError] = React.useState<string | null>(null)
 
   const openCreate = React.useCallback(() => {
-    setEditingId(null)
-    setForm(emptyForm())
+    const first = templates[0]
+    if (!first) return
+    setEditingType(first.type)
+    setForm(first)
     setSheetOpen(true)
-  }, [])
+  }, [templates])
 
   React.useEffect(() => {
     onRegisterPrimaryAction?.(openCreate)
   }, [onRegisterPrimaryAction, openCreate])
 
-  const openEdit = (tpl: MessageTemplate) => {
-    setEditingId(tpl.id)
-    setForm(formFromTemplate(tpl))
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setLoading(true)
+      const client = getBrowserClient()
+      if (!client || !isSupabaseConfigured()) {
+        if (!cancelled) {
+          setTemplates(toGroupedTemplates([]))
+          setBusinessId(null)
+          setLoadError(null)
+          setLoading(false)
+        }
+        return
+      }
+      const bid = await getCurrentBusinessProfileIdForClient(client)
+      if (!bid) {
+        if (!cancelled) {
+          setTemplates(toGroupedTemplates([]))
+          setBusinessId(null)
+          setLoadError("no_business_id")
+          setLoading(false)
+        }
+        return
+      }
+      const { data, error } = await client
+        .from("message_templates")
+        .select("*")
+        .eq("business_id", bid)
+        .order("updated_at", { ascending: false })
+      if (cancelled) return
+      if (error) {
+        if (isMissingMessageTemplatesTableError(error.message)) {
+          setTemplatesUnavailable(true)
+          setLoadError(null)
+          setTemplates(toGroupedTemplates([]))
+        } else {
+          setLoadError(error.message)
+        }
+      } else {
+        setTemplatesUnavailable(false)
+        setLoadError(null)
+        setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[]))
+      }
+      setBusinessId(bid)
+      setLoading(false)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const openEdit = (tpl: GroupedTemplate) => {
+    setEditingType(tpl.type)
+    setForm(tpl)
+    setTimingInput(formatTimingLabel(tpl.timingMinutesBefore))
+    setTimingInputError(null)
     setSheetOpen(true)
   }
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      title: form.title.trim(),
-      type: form.type,
-      channel: form.channel,
-      body: form.body.trim(),
-      status: form.status,
-    }
-    if (editingId) {
-      setTemplates((prev) =>
-        prev.map((x) =>
-          x.id === editingId ? { ...x, ...payload } : x
-        )
-      )
-    } else {
-      const next: MessageTemplate = {
-        id: crypto.randomUUID(),
-        ...payload,
+    if (!form || !businessId || templatesUnavailable) return
+    let submitFormData = form
+    if (form.type === "reminder_24h" || form.type === "reminder_before_visit") {
+      const parsed = parseTimingInput(timingInput)
+      if (parsed == null) {
+        setTimingInputError("Podaj czas w formacie np. 24h albo 1h 30min.")
+        return
       }
-      setTemplates((prev) => [next, ...prev])
-      setUserPreviewId(next.id)
+      setTimingInputError(null)
+      submitFormData = { ...form, timingMinutesBefore: Math.max(0, parsed) }
     }
-    setSheetOpen(false)
-    setShowSaved(true)
+    void (async () => {
+      const client = getBrowserClient()
+      if (!client || !isSupabaseConfigured()) return
+      const typeDb = submitFormData.type
+      const commonPatch = {
+        business_id: businessId,
+        type: typeDb as never,
+        timing_minutes_before: submitFormData.timingMinutesBefore,
+      }
+      const smsPayload = {
+        ...commonPatch,
+        channel: "sms",
+        title: submitFormData.title,
+        content: submitFormData.smsBody,
+        status: submitFormData.smsEnabled ? "active" : "draft",
+      }
+      const emailPayload = {
+        ...commonPatch,
+        channel: "email",
+        title: submitFormData.emailSubject || submitFormData.title,
+        content: submitFormData.emailBody,
+        status: submitFormData.emailEnabled ? "active" : "draft",
+      }
+      if (submitFormData.smsRowId) {
+        const res = await client
+          .from("message_templates")
+          .update(smsPayload as never)
+          .eq("id", submitFormData.smsRowId)
+        if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
+          setTemplatesUnavailable(true)
+          setLoadError(null)
+          setSheetOpen(false)
+          return
+        }
+      } else {
+        const res = await client.from("message_templates").insert(smsPayload as never)
+        if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
+          setTemplatesUnavailable(true)
+          setLoadError(null)
+          setSheetOpen(false)
+          return
+        }
+      }
+      if (submitFormData.emailRowId) {
+        const res = await client
+          .from("message_templates")
+          .update(emailPayload as never)
+          .eq("id", submitFormData.emailRowId)
+        if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
+          setTemplatesUnavailable(true)
+          setLoadError(null)
+          setSheetOpen(false)
+          return
+        }
+      } else {
+        const res = await client.from("message_templates").insert(emailPayload as never)
+        if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
+          setTemplatesUnavailable(true)
+          setLoadError(null)
+          setSheetOpen(false)
+          return
+        }
+      }
+      setTemplates((prev) =>
+        prev.map((row) => (row.type === submitFormData.type ? submitFormData : row)),
+      )
+      setShowSaved(true)
+      setSheetOpen(false)
+    })()
   }
-
-  const removeTemplate = (id: string) => {
-    if (!window.confirm(t("messages.deleteConfirm"))) {
-      return
-    }
-    setTemplates((prev) => prev.filter((t) => t.id !== id))
-  }
-
-  const isEmpty = templates.length === 0
 
   return (
     <>
@@ -230,171 +330,43 @@ export function MessageTemplatesSection({
           </div>
         ) : null}
 
-        {isEmpty ? (
-          <div className="mt-2 min-w-0">
-            <EmptyState
-              icon={MessageSquareText}
-              title={t("messages.emptyTitle")}
-              description={t("messages.emptyDescription")}
-              actionLabel={t("common.addTemplate")}
-              onAction={openCreate}
-            />
-          </div>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">{t("messagesLog.loading")}</p>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">{loadError}</p>
         ) : (
-          <div className="mt-2 grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start">
-            <ul
-              className="flex min-w-0 flex-col gap-3 lg:col-span-5"
-              data-tour="messages-list"
-            >
-              {displayTemplates.map((row) => {
-                const active = previewId === row.id
-                const snippet =
-                  row.body.length > 140
-                    ? `${row.body.slice(0, 140).trim()}...`
-                    : row.body
-                return (
-                  <li key={row.id}>
-                    <div
-                      className={cn(
-                        "rounded-2xl border border-border bg-card p-0 text-sm shadow-sm shadow-slate-900/5",
-                        active
-                          ? "border-primary/25 bg-[color:var(--nav-active-bg)]"
-                          : ""
-                      )}
+          <div className="mt-2 grid min-w-0 gap-2 md:grid-cols-2">
+            {templatesUnavailable ? (
+              <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+                Szablony wiadomości są tymczasowo niedostępne (brak tabeli `message_templates` w bazie). Panel działa bez błędu, ale edycja szablonów jest wyłączona do czasu migracji.
+              </p>
+            ) : null}
+            {templates.map((row) => (
+              <Card key={row.type} className="rounded-xl border border-border bg-card shadow-sm shadow-slate-900/5">
+                <CardHeader className="space-y-1 px-4 py-3">
+                  <CardTitle className="text-[13px] leading-snug">{row.title}</CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0">
+                  <p className="text-[11px] text-muted-foreground">
+                    SMS: {row.smsEnabled ? "on" : "off"} · E-mail: {row.emailEnabled ? "on" : "off"}
+                    {row.timingMinutesBefore != null ? ` · ${formatTimingLabel(row.timingMinutesBefore)}` : ""}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openEdit(row)}
+                      disabled={templatesUnavailable}
+                      className="h-8 rounded-lg px-2.5 text-xs"
                     >
-                      <div className="flex min-h-[5.5rem] flex-col gap-2 p-3 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                        <div className="min-w-0 flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setUserPreviewId(row.id)}
-                            className="w-full text-left"
-                          >
-                            <p className="font-medium text-foreground">
-                              {row.title}
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {row.channel === "sms" ? (
-                                <span className="inline-flex items-center gap-0.5">
-                                  <Smartphone className="size-3" aria-hidden />
-                                  {t("messages.sms")}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-0.5">
-                                  <Mail className="size-3" aria-hidden />
-                                  {t("messages.email")}
-                                </span>
-                              )}{" "}
-                              -{" "}
-                              {t(`labels.templateType.${row.type}` as "labels.templateType.reminder")}
-                            </p>
-                            <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
-                              {snippet}
-                            </p>
-                          </button>
-                          <div className="mt-2">
-                            <span className={cn("text-xs font-medium", statusBadgeClass(row.status))}>
-                              {t(`labels.templateStatus.${row.status}` as "labels.templateStatus.active")}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 gap-2 sm:flex-col sm:items-stretch sm:pl-0">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-9 rounded-xl"
-                            onClick={() => openEdit(row)}
-                          >
-                            <Pencil className="size-3" />
-                            {t("common.edit")}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-9 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => removeTemplate(row.id)}
-                          >
-                            <Trash2 className="size-3" />
-                            {t("common.delete")}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-
-            <div className="min-w-0 lg:col-span-7">
-              {previewTemplate ? (
-                <Card className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:sticky lg:top-20">
-                  <CardHeader className="space-y-1 border-b border-border py-4">
-                    <p className="text-xs text-muted-foreground">
-                      {t("messages.preview")}
-                    </p>
-                    <CardTitle className="text-sm font-semibold leading-snug">
-                      {previewTemplate.title}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="min-w-0 pt-4">
-                    {previewTemplate.channel === "sms" ? (
-                      <div className="max-w-md rounded-2xl border border-border bg-muted/60 p-4 text-sm shadow-sm shadow-slate-900/5">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs font-semibold text-muted-foreground">
-                            {t("messages.sms")}
-                          </p>
-                          <span className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-primary">
-                            {t("messages.preview")}
-                          </span>
-                        </div>
-                        <div className="mt-3 rounded-2xl border border-border bg-card px-4 py-3">
-                          <p className="whitespace-pre-wrap break-words leading-relaxed text-foreground">
-                            {previewTemplate.body}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-                        <div className="border-b border-border bg-muted/60 px-4 py-2 text-xs font-semibold text-muted-foreground">
-                          {t("messages.email")}
-                        </div>
-                        <div className="border-b border-border px-4 py-2 text-sm">
-                          <span className="text-muted-foreground">
-                            {t("messages.subject")}:{" "}
-                          </span>
-                          <span className="font-semibold text-foreground">
-                            {previewTemplate.title}
-                          </span>
-                        </div>
-                        <div className="px-4 py-4">
-                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                            {previewTemplate.body}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {t("messages.previewVariablesHint")}
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-8"
-                        onClick={() => {
-                          openEdit(previewTemplate)
-                        }}
-                      >
-                        <Pencil className="size-3" />
-                        {t("messages.previewEditShortcut")}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-            </div>
+                      <Pencil className="size-3" />
+                      Edytuj
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
       </section>
@@ -402,124 +374,98 @@ export function MessageTemplatesSection({
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col border-border/80 bg-card p-0 sm:max-w-lg"
+          className="flex w-full flex-col overflow-hidden border-border/80 bg-card p-0 sm:max-w-xl"
           showCloseButton
         >
           <SheetHeader className="space-y-1 border-b border-border/70 px-6 py-6 text-left">
             <SheetTitle className="font-heading text-xl">
-              {editingId ? t("messages.sheetEditTitle") : t("messages.sheetCreateTitle")}
+              {editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
             </SheetTitle>
-            <SheetDescription className="text-sm text-muted-foreground">
-              {editingId ? t("messages.sheetEditHint") : t("messages.sheetCreateHint")}
-            </SheetDescription>
           </SheetHeader>
           <form
             onSubmit={submitForm}
-            className="premium-scrollbar flex flex-1 flex-col overflow-y-auto"
+            className="premium-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
           >
             <div className="flex-1 space-y-5 px-6 py-6">
-              <div className="space-y-2">
-                <Label htmlFor="tpl-title">{t("messages.fieldTitle")}</Label>
-                <Input
-                  id="tpl-title"
-                  required
-                  value={form.title}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, title: e.target.value }))
-                  }
-                  placeholder={t("messages.fieldTitlePlaceholder")}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tpl-type">{t("messages.fieldType")}</Label>
-                <Select
-                  value={form.type}
-                  onValueChange={(v) =>
-                    setForm((f) => ({ ...f, type: v as MessageTemplateType }))
-                  }
-                >
-                  <SelectTrigger id="tpl-type" className="h-10 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templateTypeOrder.map((tplType) => (
-                      <SelectItem key={tplType} value={tplType}>
-                        {t(`labels.templateType.${tplType}` as "labels.templateType.reminder")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tpl-channel">{t("messages.fieldChannel")}</Label>
-                <Select
-                  value={form.channel}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      channel: v as MessageTemplateChannel,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="tpl-channel" className="h-10 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templateChannelOrder.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c === "sms"
-                          ? t("messages.sms")
-                          : t("messages.email")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tpl-body">{t("messages.fieldBody")}</Label>
+              <div className="space-y-2 rounded-xl border border-border p-3">
+                <Label className="font-medium">Kanał SMS</Label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form?.smsEnabled)}
+                    onChange={(e) => setForm((prev) => (prev ? { ...prev, smsEnabled: e.target.checked } : prev))}
+                  />
+                  Aktywny
+                </label>
                 <Textarea
-                  id="tpl-body"
-                  required
-                  rows={10}
-                  value={form.body}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, body: e.target.value }))
-                  }
-                  placeholder={t("messages.bodyPlaceholder")}
-                  className="resize-none font-mono text-[13px] leading-relaxed"
+                  rows={6}
+                  value={form?.smsBody ?? ""}
+                  onChange={(e) => setForm((prev) => (prev ? { ...prev, smsBody: e.target.value } : prev))}
+                  placeholder="Treść SMS"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="tpl-status">{t("messages.fieldStatus")}</Label>
-                <Select
-                  value={form.status}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      status: v as MessageTemplateStatus,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="tpl-status" className="h-10 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templateStatusOrder.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {t(`labels.templateStatus.${s}` as "labels.templateStatus.active")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2 rounded-xl border border-border p-3">
+                <Label className="font-medium">Kanał E-mail</Label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form?.emailEnabled)}
+                    onChange={(e) => setForm((prev) => (prev ? { ...prev, emailEnabled: e.target.checked } : prev))}
+                  />
+                  Aktywny
+                </label>
+                <Input
+                  value={form?.emailSubject ?? ""}
+                  onChange={(e) => setForm((prev) => (prev ? { ...prev, emailSubject: e.target.value } : prev))}
+                  placeholder="Temat e-maila"
+                />
+                <Textarea
+                  rows={8}
+                  value={form?.emailBody ?? ""}
+                  onChange={(e) => setForm((prev) => (prev ? { ...prev, emailBody: e.target.value } : prev))}
+                  placeholder="Treść e-maila"
+                />
+              </div>
+              {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
+                <div className="space-y-2">
+                  <Label>Wyślij ile czasu przed wizytą</Label>
+                  <Input
+                    type="text"
+                    value={timingInput}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setTimingInput(next)
+                      const parsed = parseTimingInput(next)
+                      if (parsed == null) {
+                        setTimingInputError("Użyj formatu np. 24h albo 1h 30min.")
+                        return
+                      }
+                      setTimingInputError(null)
+                      setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
+                    }}
+                    placeholder="np. 24h lub 1h 30min"
+                  />
+                  {timingInputError ? (
+                    <p className="text-xs text-destructive">{timingInputError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Obsługiwane formaty: `24h`, `1h 30min`, `90min`.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+              <div className="text-xs text-muted-foreground">
+                Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{nazwa_firmy}}"}
               </div>
             </div>
-            <SheetFooter className="mt-auto border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <FormActions
-                cancelLabel={t("messages.cancel")}
-                submitLabel={editingId ? t("common.saveChanges") : t("messages.saveDraft")}
-                onCancel={() => setSheetOpen(false)}
-              />
-            </SheetFooter>
+            <div className="mt-auto flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+                Anuluj
+              </Button>
+              <Button type="submit" disabled={templatesUnavailable}>
+                Zapisz szablon
+              </Button>
+            </div>
           </form>
         </SheetContent>
       </Sheet>

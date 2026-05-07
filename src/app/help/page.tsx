@@ -378,6 +378,7 @@ function HelpPageContent() {
     if (statusFilter === "all") return conversations
     return conversations.filter((conversation) => conversation.status === statusFilter)
   }, [conversations, statusFilter])
+  const activePreview = activeConversationId ? lastMessageByConversation[activeConversationId] : null
 
   const handleSetConversationStatus = async (conversationId: string, status: "open" | "closed") => {
     const client = getBrowserClient()
@@ -694,14 +695,29 @@ function HelpPageContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex gap-2">
-                  <Button type="button" size="sm" variant={statusFilter === "all" ? "default" : "outline"} onClick={() => setStatusFilter("all")}>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={statusFilter === "all" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("all")}
+                  >
                     {t("help.filterAll")}
                   </Button>
-                  <Button type="button" size="sm" variant={statusFilter === "open" ? "default" : "outline"} onClick={() => setStatusFilter("open")}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={statusFilter === "open" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("open")}
+                  >
                     {t("help.filterOpen")}
                   </Button>
-                  <Button type="button" size="sm" variant={statusFilter === "closed" ? "default" : "outline"} onClick={() => setStatusFilter("closed")}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={statusFilter === "closed" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("closed")}
+                  >
                     {t("help.filterClosed")}
                   </Button>
                 </div>
@@ -714,51 +730,76 @@ function HelpPageContent() {
               {errorText ? <p className="text-sm text-destructive">{errorText}</p> : null}
               {infoText ? <p className="text-sm text-emerald-700 dark:text-emerald-300">{infoText}</p> : null}
 
-              <div className="space-y-2">
-                {visibleConversations.length === 0 ? (
-                  <p className="rounded-xl border border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
-                    {t("help.noConversationsForFilter")}
-                  </p>
-                ) : null}
-                {visibleConversations.map((conversation) => {
-                  const preview = lastMessageByConversation[conversation.id]
-                  const isActive = conversation.id === activeConversationId
-                  const closed = conversation.status === "closed"
-                  return (
-                    <div key={conversation.id} className="space-y-2">
-                      <div
-                        onClick={() => setActiveConversationId(conversation.id)}
-                        className={`cursor-pointer rounded-xl border p-3 ${isActive ? "border-primary/60 bg-muted/20 shadow-sm" : "border-border/70"}`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="text-sm font-medium">{conversation.subject || "Pomoc techniczna"}</p>
-                          <Badge variant={isActive ? "default" : "outline"}>
-                            {isActive ? `${statusLabel(t, conversation.status)} • Aktywna` : statusLabel(t, conversation.status)}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {preview?.created_at ? dateLabel(preview.created_at, language) : dateLabel(conversation.updated_at, language)}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {preview?.body || t("help.emptyStateDescription")}
-                        </p>
-                        {closed ? (
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {closedBySupportConversationIds[conversation.id]
-                              ? t("help.closedBySupportTitle")
-                              : t("help.closedConversationTitle")}
+              <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
+                <aside className="premium-scrollbar max-h-[620px] space-y-2 overflow-y-auto rounded-xl border border-border/80 bg-muted/15 p-2">
+                  {visibleConversations.length === 0 ? (
+                    <p className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
+                      {t("help.noConversationsForFilter")}
+                    </p>
+                  ) : (
+                    visibleConversations.map((conversation) => {
+                      const preview = lastMessageByConversation[conversation.id]
+                      const isActive = conversation.id === activeConversationId
+                      return (
+                        <button
+                          key={conversation.id}
+                          type="button"
+                          onClick={() => setActiveConversationId(conversation.id)}
+                          className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                            isActive
+                              ? "border-primary/60 bg-primary/5"
+                              : "border-border/70 bg-background hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-medium">
+                              {conversation.subject || "Pomoc techniczna"}
+                            </p>
+                            <Badge variant={isActive ? "default" : "outline"} className="shrink-0">
+                              {statusLabel(t, conversation.status)}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {preview?.created_at
+                              ? dateLabel(preview.created_at, language)
+                              : dateLabel(conversation.updated_at, language)}
                           </p>
-                        ) : null}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {closed ? (
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                            {preview?.body || t("help.emptyStateDescription")}
+                          </p>
+                        </button>
+                      )
+                    })
+                  )}
+                </aside>
+
+                <section className="flex min-h-[460px] flex-col rounded-xl border border-border/80 bg-muted/10">
+                  {!activeConversation ? (
+                    <div className="grid flex-1 place-items-center p-4 text-sm text-muted-foreground">
+                      {t("help.selectConversation")}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/70 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">
+                            {activeConversation.subject || "Pomoc techniczna"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {activePreview?.created_at
+                              ? dateLabel(activePreview.created_at, language)
+                              : dateLabel(activeConversation.updated_at, language)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {activeConversation.status === "closed" ? (
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                void handleSetConversationStatus(conversation.id, "open")
-                              }}
+                              onClick={() =>
+                                void handleSetConversationStatus(activeConversation.id, "open")
+                              }
                             >
                               {t("help.reopenConversation")}
                             </Button>
@@ -767,10 +808,9 @@ function HelpPageContent() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                void handleSetConversationStatus(conversation.id, "closed")
-                              }}
+                              onClick={() =>
+                                void handleSetConversationStatus(activeConversation.id, "closed")
+                              }
                             >
                               {t("help.closeConversation")}
                             </Button>
@@ -779,115 +819,108 @@ function HelpPageContent() {
                             type="button"
                             size="sm"
                             variant="destructive"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              void handleDeleteConversation(conversation.id)
-                            }}
+                            onClick={() => void handleDeleteConversation(activeConversation.id)}
                           >
                             {t("help.deleteConversation")}
                           </Button>
                         </div>
                       </div>
 
-                      {isActive ? (
-                        <>
-                          <div
-                            ref={scrollRef}
-                            className="premium-scrollbar max-h-[420px] min-h-56 space-y-2 overflow-y-auto rounded-xl border border-border/80 bg-muted/20 p-3 lg:max-h-[520px]"
-                          >
-                            {messages.length === 0 ? (
-                              <div className="space-y-1 py-6 text-center text-sm text-muted-foreground">
-                                <p>{t("help.emptyStateTitle")}</p>
-                                <p>{t("help.emptyStateDescription")}</p>
-                              </div>
-                            ) : null}
-                            {messages.map((message) => {
-                              const senderRole = (message.sender_role ?? message.sender_type ?? "user").toString()
-                              const isUser = senderRole === "user"
-                              const isSupport = senderRole === "support"
-                              return (
+                      <div
+                        ref={scrollRef}
+                        className="premium-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3"
+                      >
+                        {messages.length === 0 ? (
+                          <div className="space-y-1 py-6 text-center text-sm text-muted-foreground">
+                            <p>{t("help.emptyStateTitle")}</p>
+                            <p>{t("help.emptyStateDescription")}</p>
+                          </div>
+                        ) : (
+                          messages.map((message) => {
+                            const senderRole = (
+                              message.sender_role ??
+                              message.sender_type ??
+                              "user"
+                            ).toString()
+                            const isUser = senderRole === "user"
+                            const isSupport = senderRole === "support"
+                            return (
+                              <div
+                                key={message.id}
+                                className={
+                                  isUser
+                                    ? "ml-auto max-w-[88%]"
+                                    : isSupport
+                                      ? "mr-auto max-w-[88%]"
+                                      : "mx-auto max-w-[92%]"
+                                }
+                              >
                                 <div
-                                  key={message.id}
                                   className={
                                     isUser
-                                      ? "ml-auto max-w-[88%]"
+                                      ? "rounded-2xl rounded-br-md bg-teal-600 px-3 py-2 text-sm text-white"
                                       : isSupport
-                                        ? "mr-auto max-w-[88%]"
-                                        : "mx-auto max-w-[92%]"
+                                        ? "rounded-2xl rounded-bl-md border border-border bg-card px-3 py-2 text-sm text-foreground"
+                                        : "rounded-xl border border-border/70 bg-muted px-3 py-2 text-center text-sm text-muted-foreground"
                                   }
                                 >
-                                  <div
-                                    className={
-                                      isUser
-                                        ? "rounded-2xl rounded-br-md bg-teal-600 px-3 py-2 text-sm text-white"
-                                        : isSupport
-                                          ? "rounded-2xl rounded-bl-md border border-border bg-card px-3 py-2 text-sm text-foreground"
-                                          : "rounded-xl border border-border/70 bg-muted px-3 py-2 text-center text-sm text-muted-foreground"
-                                    }
-                                  >
-                                    <p className="mb-1 text-[0.7rem] opacity-80">
-                                      {isUser ? t("help.youLabel") : isSupport ? t("help.supportLabel") : t("help.systemLabel")}
-                                    </p>
-                                    <p>{message.body}</p>
-                                    <p className="mt-1 text-[0.7rem] opacity-80">{dateLabel(message.created_at, language)}</p>
-                                  </div>
+                                  <p className="mb-1 text-[0.7rem] opacity-80">
+                                    {isUser
+                                      ? t("help.youLabel")
+                                      : isSupport
+                                        ? t("help.supportLabel")
+                                        : t("help.systemLabel")}
+                                  </p>
+                                  <p>{message.body}</p>
+                                  <p className="mt-1 text-[0.7rem] opacity-80">
+                                    {dateLabel(message.created_at, language)}
+                                  </p>
                                 </div>
-                              )
-                            })}
-                          </div>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
 
-                          {closed ? (
-                            <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
-                              <p className="text-sm font-medium">{t("help.closedConversationTitle")}</p>
-                              <p className="mt-1 text-sm text-muted-foreground">{t("help.closedConversationHint")}</p>
-                              <div className="mt-3 flex gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() => void handleSetConversationStatus(conversation.id, "open")}
-                                >
-                                  {t("help.reopenConversation")}
-                                </Button>
-                                <Button type="button" size="sm" variant="outline" onClick={() => void handleCreateNewConversation()}>
-                                  {t("help.createNewConversation")}
-                                </Button>
-                              </div>
+                      <div className="border-t border-border/70 px-3 py-3">
+                        {isClosed ? (
+                          <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                            <p className="text-sm font-medium">{t("help.closedConversationTitle")}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {closedBySupportConversationIds[activeConversation.id]
+                                ? t("help.closedBySupportTitle")
+                                : t("help.closedConversationHint")}
+                            </p>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleSend} className="flex items-end gap-2">
+                            <div className="flex-1">
+                              <Label htmlFor="support-message-input" className="sr-only">
+                                {t("help.message")}
+                              </Label>
+                              <Input
+                                id="support-message-input"
+                                value={draft}
+                                onChange={(event) => {
+                                  setDraft(event.target.value)
+                                  if (errorText) setErrorText(null)
+                                  if (infoText) setInfoText(null)
+                                }}
+                                placeholder={t("help.messagePlaceholder")}
+                                disabled={sending}
+                              />
                             </div>
-                          ) : (
-                            <form onSubmit={handleSend} className="flex items-end gap-2">
-                              <div className="flex-1">
-                                <Label htmlFor="support-message-input" className="sr-only">
-                                  {t("help.message")}
-                                </Label>
-                                <Input
-                                  id="support-message-input"
-                                  value={draft}
-                                  onChange={(event) => {
-                                    setDraft(event.target.value)
-                                    if (errorText) setErrorText(null)
-                                    if (infoText) setInfoText(null)
-                                  }}
-                                  placeholder={t("help.messagePlaceholder")}
-                                  disabled={sending}
-                                />
-                              </div>
-                              <Button type="submit" disabled={sending} className="h-10 min-w-24">
-                                <Send className="mr-1 size-4" aria-hidden />
-                                {t("help.sendMessage")}
-                              </Button>
-                            </form>
-                          )}
-                        </>
-                      ) : null}
-                    </div>
-                  )
-                })}
+                            <Button type="submit" disabled={sending} className="h-10 min-w-24">
+                              <Send className="mr-1 size-4" aria-hidden />
+                              {t("help.sendMessage")}
+                            </Button>
+                          </form>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </section>
               </div>
-              {!activeConversation ? (
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
-                  {t("help.selectConversation")}
-                </div>
-              ) : null}
             </CardContent>
           </Card>
         </section>

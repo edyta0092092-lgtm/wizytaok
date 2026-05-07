@@ -76,9 +76,28 @@ export async function POST(req: Request) {
     updated_at: now,
   }
 
-  const { error: upErr } = await supabase.from("bookings").update(patch).eq("id", bookingUuid)
-  if (upErr) {
-    return NextResponse.json({ ok: false, error: upErr.message }, { status: 400 })
+  const applyPatchSafely = async (base: TablesUpdate<"bookings">): Promise<string | null> => {
+    let current: TablesUpdate<"bookings"> = { ...base }
+    for (let i = 0; i < 4; i += 1) {
+      const { error } = await supabase.from("bookings").update(current).eq("id", bookingUuid)
+      if (!error) return null
+      const msg = String(error.message ?? "")
+      const m = msg.match(/column\s+([a-zA-Z0-9_\."]+)\s+does not exist/i)
+      if (!m) return msg
+      const raw = m[1] ?? ""
+      const missing = raw.replace(/"/g, "").split(".").pop()?.trim() ?? ""
+      if (!missing) return msg
+      const next = { ...current } as Record<string, unknown>
+      if (!(missing in next)) return msg
+      delete next[missing]
+      current = next as TablesUpdate<"bookings">
+    }
+    return "update_failed"
+  }
+
+  const upErrMsg = await applyPatchSafely(patch)
+  if (upErrMsg) {
+    return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
   }
 
   const shouldNotifyClient = body.notifyClient !== false

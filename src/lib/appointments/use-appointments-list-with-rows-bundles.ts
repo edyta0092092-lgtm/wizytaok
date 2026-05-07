@@ -45,6 +45,7 @@ export type AppointmentsListWithRowsBundlesParams = {
   setConfirmCancelVisitForId: (v: string | null) => void
   saveDirectVisitChange: (row: Appointment) => void
   executeCancelVisit: (row: Appointment) => void
+  executeRemoveVisit: (row: Appointment) => void
   isSavingDirectEdit: boolean
   isCancellingVisit: boolean
   confirmCancelVisitForId: string | null
@@ -86,6 +87,7 @@ export function useAppointmentsListWithRowsBundles({
   setConfirmCancelVisitForId,
   saveDirectVisitChange,
   executeCancelVisit,
+  executeRemoveVisit,
   isSavingDirectEdit,
   isCancellingVisit,
   confirmCancelVisitForId,
@@ -146,14 +148,21 @@ export function useAppointmentsListWithRowsBundles({
         },
         saveDirectVisitChange,
         executeCancelVisit,
+        executeRemoveVisit,
         isSavingDirectEdit,
         isCancellingVisit,
         confirmCancelVisitForId,
         onCancelVisitPress: (row: Appointment) => {
+          console.info("[appointment.cancel.button.clicked]", {
+            bookingId: row?.id,
+            currentStatus: row?.status,
+          })
           setConfirmCancelVisitForId(row.id)
           setProposeValidationError("")
         },
-        onCancelVisitDismiss: () => setConfirmCancelVisitForId(null),
+        onCancelVisitDismiss: () => {
+          setConfirmCancelVisitForId(null)
+        },
       },
     }),
     [
@@ -192,6 +201,7 @@ export function useAppointmentsListWithRowsBundles({
       setConfirmCancelVisitForId,
       saveDirectVisitChange,
       executeCancelVisit,
+      executeRemoveVisit,
       isSavingDirectEdit,
       isCancellingVisit,
       confirmCancelVisitForId,

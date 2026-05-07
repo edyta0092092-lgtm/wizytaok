@@ -2,9 +2,8 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Building2, CalendarClock, CalendarDays, ClipboardList, Link2, type LucideIcon, Search, Users } from "lucide-react"
+import { Building2, CalendarClock, CalendarDays, ClipboardList, Link2, type LucideIcon, Users } from "lucide-react"
 
-import { GuideExpandable } from "@/components/guide/guide-expandable"
 import { GuideFinalChecklist } from "@/components/guide/guide-final-checklist"
 import { GuideHero } from "@/components/guide/guide-hero"
 import { GuideQuickStartCard } from "@/components/guide/guide-quick-start-card"
@@ -12,7 +11,8 @@ import { GuideSetupProgress } from "@/components/guide/guide-setup-progress"
 import { GuideTip } from "@/components/guide/guide-tip"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { fetchGuideSetupAutoProgress, type GuideSetupStepId } from "@/lib/guide/fetch-guide-setup"
 import {
   GUIDE_SETUP_MANUAL_KEY,
@@ -108,21 +108,6 @@ function badgeClass(status: ChecklistStatus) {
   return "border-success/40 bg-success/10 text-[color:rgb(21_128_61)] dark:text-success"
 }
 
-function LabelledBlock({
-  label,
-  text,
-}: {
-  label: string
-  text: string
-}) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <div className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{text}</div>
-    </div>
-  )
-}
-
 function labelsForAria(labels: Record<GuideSetupStepId, string>, id: GuideSetupStepId): string {
   return labels[id]
 }
@@ -138,7 +123,6 @@ export default function GuidePage() {
     ReturnType<typeof fetchGuideSetupAutoProgress>
   > | null>(null)
   const [manualSetup, setManualSetup] = React.useState<GuideSetupManual>({})
-  const [moduleQuery, setModuleQuery] = React.useState("")
 
   const [progress, setProgress] = React.useState<Record<string, ChecklistStatus>>(() => ({}))
 
@@ -306,38 +290,52 @@ export default function GuidePage() {
     { q: "guide.faqQ4", a: "guide.faqA4" },
     { q: "guide.faqQ5", a: "guide.faqA5" },
     { q: "guide.faqQ6", a: "guide.faqA6" },
-    { q: "guide.faqQ7", a: "guide.faqA7" },
-    { q: "guide.faqQ8", a: "guide.faqA8" },
-    { q: "guide.faqQ9", a: "guide.faqA9" },
-    { q: "guide.faqQ10", a: "guide.faqA10" },
-    { q: "guide.faqQ11", a: "guide.faqA11" },
   ] as const
 
-  const topicDefs = React.useMemo(
-    () =>
-      [
-        { id: "t1", titleKey: "guide.modBusinessTitle" },
-        { id: "t2", titleKey: "guide.modServicesTitle" },
-        { id: "t3", titleKey: "guide.modAvailTitle" },
-        { id: "t4", titleKey: "guide.modAvailExTitle" },
-        { id: "t5", titleKey: "guide.modTeamTitle" },
-        { id: "t6", titleKey: "guide.modBookingTitle" },
-        { id: "t7", titleKey: "guide.modApptTitle" },
-        { id: "t8", titleKey: "guide.modNeedsActionTitle" },
-        { id: "t9", titleKey: "guide.modRemindersTitle" },
-        { id: "t10", titleKey: "guide.modMsgsTitle" },
-        { id: "t11", titleKey: "guide.modClientsTitle" },
-        { id: "t12", titleKey: "guide.modSettingsGuideTitle" },
-        { id: "t13", titleKey: "guide.modLegalInfoTitle" },
-      ] as const,
-    []
-  )
-
-  const visibleTopics = React.useMemo(() => {
-    const q = moduleQuery.trim().toLowerCase()
-    if (!q) return topicDefs
-    return topicDefs.filter((d) => t(d.titleKey).toLowerCase().includes(q))
-  }, [moduleQuery, t, topicDefs])
+  const playbook = [
+    {
+      id: "pb1",
+      title: t("guide.modBusinessTitle"),
+      body: t("guide.modBusinessLead"),
+      href: "/settings",
+      cta: t("guide.navSettings"),
+    },
+    {
+      id: "pb2",
+      title: t("guide.modServicesTitle"),
+      body: t("guide.modServicesLead"),
+      href: "/services",
+      cta: t("guide.navServices"),
+    },
+    {
+      id: "pb3",
+      title: t("guide.modAvailTitle"),
+      body: t("guide.modAvailLead"),
+      href: "/availability",
+      cta: t("guide.navAvailability"),
+    },
+    {
+      id: "pb4",
+      title: t("guide.modTeamTitle"),
+      body: t("guide.modTeamLead"),
+      href: "/team",
+      cta: t("guide.navTeam"),
+    },
+    {
+      id: "pb5",
+      title: t("guide.modBookingTitle"),
+      body: t("guide.modBookingLead"),
+      href: bookingPath,
+      cta: t("guide.navBooking"),
+    },
+    {
+      id: "pb6",
+      title: t("guide.modMsgsTitle"),
+      body: t("guide.modMsgsLead"),
+      href: "/messages",
+      cta: t("guide.navMessages"),
+    },
+  ]
 
   const whatsNextItems = ([1, 2, 3, 4] as const).map((n) => ({
     id: `chk${n}`,
@@ -391,6 +389,7 @@ export default function GuidePage() {
               <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
                 {t("guide.sectionQuickStart")}
               </h2>
+              <p className="text-sm text-muted-foreground">{t("guide.tipInteractiveChecklist")}</p>
             </div>
             <GuideTip icon={<ClipboardList className="size-4" />} title={t("guide.labelTip")}>
               {t("guide.tipInteractiveChecklist")}
@@ -419,366 +418,26 @@ export default function GuidePage() {
           </section>
 
           <section className="space-y-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="space-y-1">
-                <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-                  {t("guide.sectionCoreModules")}
-                </h2>
-                <p className="text-sm text-muted-foreground">{t("guide.description")}</p>
-              </div>
-              <div className="relative w-full sm:max-w-xs">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={moduleQuery}
-                  onChange={(e) => setModuleQuery(e.target.value)}
-                  placeholder={t("guide.moduleSearchPlaceholder")}
-                  className="h-11 rounded-xl pl-9"
-                  aria-label={t("guide.moduleSearchPlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {visibleTopics.map((topic) => (
-                <div key={topic.id} className={topic.id === "t1" ? "scroll-mt-24" : undefined}>
-                  {topic.id === "t1" ? (
-                    <GuideExpandable title={t(topic.titleKey)} defaultOpen>
-                      <p className="text-sm text-foreground/95">{t("guide.modBusinessLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modBusinessBullets")} />
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modBusinessSteps")} />
-                      <p className="text-sm text-muted-foreground">{t("guide.modBusinessTip")}</p>
-                      <Link
-                        href="/settings"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border bg-card px-3 text-center text-sm font-semibold text-primary sm:w-fit"
-                      >
-                        {t("guide.navSettings")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t2" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modServicesLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modServicesExplain")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modServicesSteps")} />
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("guide.modServicesHoursTitle")}
-                      </p>
-                      <p className="text-sm">{t("guide.modServicesHoursLead")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modServicesHoursSteps")} />
-                      <Link
-                        href="/services"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navServices")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t3" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modAvailLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modAvailCalendarInfo")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modAvailBullets")} />
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modAvailSteps")} />
-                      <Link
-                        href="/availability"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navAvailability")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t4" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modAvailExLead")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modAvailExSteps")} />
-                      <p className="text-sm text-muted-foreground">{t("guide.modAvailExExample")}</p>
-                      <Link
-                        href="/availability"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navAvailability")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t5" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modTeamLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modTeamBullets")} />
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modTeamSteps")} />
-                      <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/30 p-4 sm:grid-cols-2">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{t("guide.panelOwnerTitle")}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{t("guide.panelOwnerDesc")}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{t("guide.staffRoleTitle")}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{t("guide.staffRoleDesc")}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{t("guide.modRolesLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modRolesBullets")} />
-                      <Link
-                        href="/team"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navTeam")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t6" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modBookingLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modBookingFlow")} />
-                      <p className="text-sm text-muted-foreground">{t("guide.modBookingSourceOnline")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modBookingSourceManual")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modBookingTip")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modBookingSteps")} />
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        {t("guide.modManageTitle")}
-                      </p>
-                      <p className="text-sm">{t("guide.modManageLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modManageFlow")} />
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        {t("guide.modSlotsTitle")}
-                      </p>
-                      <p className="text-sm">{t("guide.modSlotsLead")}</p>
-                      <p className="text-sm">{t("guide.modSlotsBlocking")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modSlotsNonBlocking")}</p>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Link
-                          href={bookingPath}
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border border-primary/30 bg-muted/40 px-4 text-center text-sm font-medium text-primary sm:h-10"
-                        >
-                          {t("guide.navBooking")}
-                        </Link>
-                        <Link
-                          href="/settings"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border px-4 text-center text-sm font-medium sm:h-10"
-                        >
-                          {t("guide.navSettings")}
-                        </Link>
-                      </div>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t7" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modApptLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modApptBookingSource")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modApptStatuses")} />
-                      <p className="text-sm text-muted-foreground">{t("guide.modApptStatusNote")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modApptSteps")} />
-                      <p className="text-xs font-semibold uppercase text-muted-foreground">
-                        {t("guide.modChangesTitle")}
-                      </p>
-                      <p className="text-sm">{t("guide.modChangesLead")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modChangesSteps")} />
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Link
-                          href="/appointments"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                        >
-                          {t("guide.navAppointments")}
-                        </Link>
-                        <Link
-                          href="/dashboard"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                        >
-                          {t("guide.navDashboard")}
-                        </Link>
-                      </div>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t8" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modNeedsActionLead")}</p>
-                      <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modNeedsActionBullets")} />
-                      <Link
-                        href="/dashboard"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navDashboard")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t9" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modRemindersLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modRemindersBody")}</p>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Link
-                          href="/settings"
-                          className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                        >
-                          {t("guide.navSettings")}
-                        </Link>
-                        <Link
-                          href="/messages"
-                          className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                        >
-                          {t("guide.navMessages")}
-                        </Link>
-                      </div>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t10" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modMsgsLead")}</p>
-                      <LabelledBlock label={t("guide.labelSteps")} text={t("guide.modMsgsSteps")} />
-                      <p className="text-xs text-muted-foreground">{t("guide.modMsgsMvp")}</p>
-                      <Link
-                        href="/messages"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navMessages")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t11" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modClientsLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modClientsFoot")}</p>
-                      <Link
-                        href="/clients"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navClients")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t12" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modSettingsGuideLead")}</p>
-                      <Link
-                        href="/settings"
-                        className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-                      >
-                        {t("guide.navSettings")}
-                      </Link>
-                    </GuideExpandable>
-                  ) : null}
-
-                  {topic.id === "t13" ? (
-                    <GuideExpandable title={t(topic.titleKey)}>
-                      <p className="text-sm">{t("guide.modLegalInfoLead")}</p>
-                      <p className="text-sm text-muted-foreground">{t("guide.modLaunchLegalBullets")}</p>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                        <Link
-                          href="/terms"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border border-primary/30 bg-muted/40 px-4 text-center text-sm font-medium text-primary sm:h-10 sm:flex-none"
-                        >
-                          {t("footer.terms")}
-                        </Link>
-                        <Link
-                          href="/developer-contact"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border px-4 text-center text-sm font-medium sm:h-10 sm:flex-none"
-                        >
-                          {t("footer.developer")}
-                        </Link>
-                        <Link
-                          href="/settings"
-                          className="inline-flex h-11 flex-1 items-center justify-center rounded-xl border px-4 text-center text-sm font-medium sm:h-10 sm:flex-none"
-                        >
-                          {t("guide.navSettings")}
-                        </Link>
-                      </div>
-                    </GuideExpandable>
-                  ) : null}
-                </div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+              {t("guide.sectionCoreModules")}
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {playbook.map((item, idx) => (
+                <Card key={item.id} className="rounded-2xl border border-border/70 bg-card/95 shadow-sm shadow-slate-900/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">
+                      {idx + 1}. {item.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{item.body}</p>
+                    <Button asChild className="h-9 w-full">
+                      <Link href={item.href}>{item.cta}</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {t("guide.sectionStatuses")}
-            </h2>
-            <GuideExpandable title={t("guide.modApptTitle")}>
-              <p className="text-sm">{t("guide.modApptLead")}</p>
-              <p className="text-sm text-muted-foreground">{t("guide.modApptBookingSource")}</p>
-              <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modApptStatuses")} />
-              <p className="text-sm text-muted-foreground">{t("guide.modApptStatusNote")}</p>
-              <Link
-                href="/appointments"
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-              >
-                {t("guide.navAppointments")}
-              </Link>
-            </GuideExpandable>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {t("guide.sectionAutoReminders")}
-            </h2>
-            <GuideExpandable title={t("guide.modRemindersTitle")}>
-              <p className="text-sm">{t("guide.modRemindersLead")}</p>
-              <p className="text-sm text-muted-foreground">{t("guide.modRemindersBody")}</p>
-              <Link
-                href="/settings"
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-              >
-                {t("guide.navSettings")}
-              </Link>
-            </GuideExpandable>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {t("guide.sectionAvailabilityLogic")}
-            </h2>
-            <GuideExpandable title={t("guide.availabilityLogicTitle")}>
-              <p className="text-sm">{t("guide.availabilityLogicLead")}</p>
-              <LabelledBlock label={t("guide.labelBullets")} text={t("guide.availabilityLogicRules")} />
-              <p className="text-sm font-medium text-foreground">{t("guide.modSlotsBlocking")}</p>
-              <p className="text-sm text-muted-foreground">{t("guide.modSlotsNonBlocking")}</p>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Link
-                  href="/services"
-                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                >
-                  {t("guide.navServices")}
-                </Link>
-                <Link
-                  href="/team"
-                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                >
-                  {t("guide.navTeam")}
-                </Link>
-                <Link
-                  href="/availability"
-                  className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border px-4 text-sm font-medium sm:h-10"
-                >
-                  {t("guide.navAvailability")}
-                </Link>
-              </div>
-            </GuideExpandable>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {t("guide.sectionSupportChat")}
-            </h2>
-            <GuideExpandable title={t("guide.modHelpTitle")}>
-              <p className="text-sm">{t("guide.modHelpLead")}</p>
-              <LabelledBlock label={t("guide.labelBullets")} text={t("guide.modHelpBullets")} />
-              <Link
-                href="/help"
-                className="inline-flex h-10 w-full items-center justify-center rounded-xl border px-4 text-sm font-medium sm:w-fit"
-              >
-                {t("navigation.help")}
-              </Link>
-            </GuideExpandable>
           </section>
 
           <section className="space-y-3">

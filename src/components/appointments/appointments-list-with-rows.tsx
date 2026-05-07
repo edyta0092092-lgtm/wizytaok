@@ -8,10 +8,11 @@ import { AppointmentsListEmpty } from "@/components/appointments/appointments-li
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
-import {
-  supabaseBookingReminderLine,
-  type SupabaseBookingReminderLineLabels,
-} from "@/lib/appointments/supabase-booking-reminder-line"
+import { getBookingReminderStatus, type ReminderUiStatus } from "@/lib/appointments/booking-reminder-status"
+import type { SupabaseBookingReminderLineLabels } from "@/lib/appointments/supabase-booking-reminder-line"
+import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import type { Tables } from "@/types/database"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
@@ -57,6 +58,7 @@ export type AppointmentsListProposePanelBundle = {
   onCloseEditPanel: () => void
   saveDirectVisitChange: (row: Appointment) => void
   executeCancelVisit: (row: Appointment) => void
+  executeRemoveVisit: (row: Appointment) => void
   isSavingDirectEdit: boolean
   isCancellingVisit: boolean
   confirmCancelVisitForId: string | null
@@ -83,9 +85,72 @@ export function AppointmentsListWithRows({
     staffFilter,
     listFilter,
     formatWhen,
-    reminderLineLabels,
+    reminderLineLabels: _reminderLineLabels,
     listUiLanguage,
   } = presentation
+
+  const [reminderLogsByBookingId, setReminderLogsByBookingId] = React.useState<
+    Record<string, Array<Pick<Tables<"notification_logs">, "status" | "type" | "channel">>>
+  >({})
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      if (!isSupabaseConfigured()) return
+      const client = getBrowserClient()
+      if (!client) return
+      const bookingIds = Object.values(grouped)
+        .flat()
+        .filter((row) => row.id.startsWith("sb-"))
+        .map((row) => row.id.slice(3))
+      if (bookingIds.length === 0) {
+        if (!cancelled) setReminderLogsByBookingId({})
+        return
+      }
+      const businessId = await getCurrentBusinessProfileIdForClient(client)
+      if (!businessId) return
+      const { data, error } = await client
+        .from("notification_logs")
+        .select("booking_id,status,type,channel,created_at")
+        .eq("business_id", businessId)
+        .in("booking_id", bookingIds)
+        .order("created_at", { ascending: false })
+      if (error) return
+      if (cancelled) return
+      const groupedLogs: Record<
+        string,
+        Array<Pick<Tables<"notification_logs">, "status" | "type" | "channel">>
+      > = {}
+      for (const row of data ?? []) {
+        const bookingId = String(row.booking_id ?? "")
+        if (!bookingId) continue
+        if (!groupedLogs[bookingId]) groupedLogs[bookingId] = []
+        groupedLogs[bookingId]!.push({
+          status: row.status,
+          type: row.type,
+          channel: row.channel,
+        })
+      }
+      setReminderLogsByBookingId(groupedLogs)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [grouped])
+
+  const statusLabel = React.useCallback(
+    (status: ReminderUiStatus): string => {
+      if (status === "failed") return "nieudane"
+      if (status === "sent") return "wysłane"
+      if (status === "partial") return "częściowo wysłane"
+      if (status === "unsent") return "niewysłane"
+      if (status === "disabled") return "wyłączone"
+      return "zaplanowane"
+    },
+    []
+  )
+
+  void _reminderLineLabels
 
   const {
     staffByService,
@@ -118,7 +183,7 @@ export function AppointmentsListWithRows({
     proposeStaffListForService,
     onCloseEditPanel,
     saveDirectVisitChange,
-    executeCancelVisit,
+    executeRemoveVisit,
     isSavingDirectEdit,
     isCancellingVisit,
     confirmCancelVisitForId,
@@ -135,7 +200,27 @@ export function AppointmentsListWithRows({
       grouped={grouped}
       renderRow={({ row, indexInGroup, groupLength }) => {
         const { date, time } = formatWhen(row.startsAt)
-        const reminderLine = supabaseBookingReminderLine(row, reminderLineLabels)
+        const reminderLines: string[] = []
+        if (row.id.startsWith("sb-")) {
+          const bookingId = row.id.slice(3)
+          const resolved = getBookingReminderStatus(
+            bookingId,
+            row,
+            reminderLogsByBookingId[bookingId] ?? [],
+            true
+          )
+          if (resolved.overall === "disabled") {
+            reminderLines.push("Przypomnienia wyłączone")
+          } else {
+            for (const line of resolved.lines) {
+              if (line.kind === "reminder24h") {
+                reminderLines.push(`Przypomnienie 24h: ${statusLabel(line.status)}`)
+              } else {
+                reminderLines.push(`Przypomnienie przed wizytą: ${statusLabel(line.status)}`)
+              }
+            }
+          }
+        }
         const saveEditDisabled =
           isSavingDirectEdit ||
           isCancellingVisit ||
@@ -149,7 +234,7 @@ export function AppointmentsListWithRows({
             isLastInSection={indexInGroup === groupLength - 1}
             dateLabel={date}
             timeLabel={time}
-            reminderLine={reminderLine}
+            reminderLines={reminderLines}
             showNeedsActionReason={listFilter === "needs_action"}
             language={listUiLanguage}
             staffByService={staffByService}
@@ -181,8 +266,8 @@ export function AppointmentsListWithRows({
             isSavingDirectEdit={isSavingDirectEdit}
             confirmCancelVisitOpen={confirmCancelVisitForId === row.id}
             onCancelVisitPress={() => onCancelVisitPress(row)}
-            onCancelVisitDismiss={onCancelVisitDismiss}
-            onCancelVisitConfirm={() => executeCancelVisit(row)}
+            onCancelVisitConfirm={onCancelVisitDismiss}
+            onRemoveVisitConfirm={() => executeRemoveVisit(row)}
             isCancellingVisit={isCancellingVisit}
           />
         )

@@ -138,7 +138,7 @@ export function useProposeVisitPanel(args: {
     [t],
   )
 
-  const { saveDirectVisitChange, executeCancelVisit } = useAppointmentInlineActions({
+  const { saveDirectVisitChange, executeCancelVisit, executeRemoveVisit } = useAppointmentInlineActions({
     labels: appointmentInlineLabels,
     language,
     proposeDate,
@@ -185,5 +185,6 @@ export function useProposeVisitPanel(args: {
     openProposeAnotherTime,
     saveDirectVisitChange,
     executeCancelVisit,
+    executeRemoveVisit,
   }
 }

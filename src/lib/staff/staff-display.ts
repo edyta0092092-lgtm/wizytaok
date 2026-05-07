@@ -13,6 +13,37 @@ export type BookingStaffLike = {
 /** Wartość filtra osób na liście wizyt: `all`, `unassigned` lub `staff_members.id`. */
 export type StaffAppointmentFilterValue = "all" | "unassigned" | string
 
+type StaffLike = {
+  name?: string | null
+  email?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  full_name?: string | null
+}
+
+export function getStaffDisplayName(staff: StaffLike | null | undefined): string {
+  if (!staff) return "Osoba bez nazwy"
+  const full = (staff.full_name ?? "").trim()
+  if (full) return full
+  const first = (staff.first_name ?? "").trim()
+  const last = (staff.last_name ?? "").trim()
+  const split = `${first} ${last}`.trim()
+  if (split) return split
+  const name = (staff.name ?? "").trim()
+  if (name) return name
+  const email = (staff.email ?? "").trim()
+  if (email) return email
+  return "Osoba bez nazwy"
+}
+
+export function getStaffFirstName(staff: StaffLike | null | undefined): string {
+  if (!staff) return ""
+  const first = (staff.first_name ?? "").trim()
+  if (first) return first
+  const name = getStaffDisplayName(staff)
+  return name.split(/\s+/)[0] ?? name
+}
+
 /**
  * Uzupełnienie wyświetlanej osoby dla wizyty: snapshot `staff_name`, nazwa po `staff_id` z listy usługi,
  * albo jedyna osoba przypisana do usługi.
@@ -27,10 +58,11 @@ export function inferBookingStaffDisplayName(
   const sid = typeof staffId === "string" ? staffId.trim() : ""
   const list = serviceStaff ?? []
   if (sid && list.some((x) => x.id === sid)) {
-    return list.find((x) => x.id === sid)?.name.trim()
+    const row = list.find((x) => x.id === sid)
+    return row ? getStaffDisplayName(row) : undefined
   }
   if (!sid && list.length === 1) {
-    return list[0]!.name.trim()
+    return getStaffDisplayName(list[0]!)
   }
   return undefined
 }

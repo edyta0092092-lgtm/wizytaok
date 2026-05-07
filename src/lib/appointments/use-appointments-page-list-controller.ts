@@ -50,6 +50,7 @@ export type UseAppointmentsPageListControllerParams = {
   | "setConfirmCancelVisitForId"
   | "saveDirectVisitChange"
   | "executeCancelVisit"
+  | "executeRemoveVisit"
   | "isSavingDirectEdit"
   | "isCancellingVisit"
   | "confirmCancelVisitForId"
@@ -91,6 +92,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     setConfirmCancelVisitForId,
     saveDirectVisitChange,
     executeCancelVisit,
+    executeRemoveVisit,
     isSavingDirectEdit,
     isCancellingVisit,
     confirmCancelVisitForId,
@@ -143,6 +145,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     setConfirmCancelVisitForId,
     saveDirectVisitChange,
     executeCancelVisit,
+    executeRemoveVisit,
     isSavingDirectEdit,
     isCancellingVisit,
     confirmCancelVisitForId,

@@ -2,7 +2,14 @@
 
 import * as React from "react"
 
-import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
+import { deleteManualAppointment, unwrapManualAppointmentId } from "@/lib/appointments/manual-appointments"
+import {
+  deleteBooking,
+  resolveSupabaseBookingRowUuidFromUiId,
+} from "@/lib/bookings/bookings-store"
+import { removePublicBooking, unwrapPublicAppointmentId } from "@/lib/bookings/public-bookings"
+import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Appointment } from "@/types/domain"
 
 export function useConfirmDeleteAppointmentHandler(args: {
@@ -21,12 +28,14 @@ export function useConfirmDeleteAppointmentHandler(args: {
     isDeletingAppointment,
     setIsDeletingAppointment,
     allowAppointmentDelete,
-    appointments,
-    language,
+    appointments: _appointments,
+    language: _language,
     t,
     setActionNotice,
     setConfirmDeleteAppointmentId,
   } = args
+  void _appointments
+  void _language
 
   return React.useCallback(() => {
     const deletingId = (confirmDeleteAppointmentIdRef.current ?? "").trim()
@@ -34,25 +43,53 @@ export function useConfirmDeleteAppointmentHandler(args: {
     void (async () => {
       setIsDeletingAppointment(true)
       try {
-        const row = appointments.find((a) => a.id === deletingId)
-        const result = await cancelAppointmentFromRemove(deletingId, language)
-        console.info("[appointments.cancelFromDelete]", {
-          bookingId: deletingId,
-          oldStatus: row?.status,
-          nextStatus: "cancelled",
-          error: result.ok ? undefined : result.error,
-        })
-        if (!result.ok) {
-          const detail =
-            result.error === "missing_appointment_id"
-              ? t("appointments.appointmentCancelFromRemoveMissingIdDetail")
-              : result.error === "unknown_appointment_id"
-                ? `${result.error} (id=${deletingId})`
-                : (result.error ?? "unknown")
-          setActionNotice(t("appointments.appointmentCancelFromRemoveFailed").replace("{detail}", detail))
+        const publicId = unwrapPublicAppointmentId(deletingId)
+        if (publicId) {
+          removePublicBooking(publicId)
+          setActionNotice(t("appointments.appointmentDeleted"))
+          setConfirmDeleteAppointmentId(null)
           return
         }
-        setActionNotice(t("appointments.appointmentCancelledFromRemove"))
+
+        const manualId = unwrapManualAppointmentId(deletingId)
+        if (manualId) {
+          deleteManualAppointment(manualId)
+          setActionNotice(t("appointments.appointmentDeleted"))
+          setConfirmDeleteAppointmentId(null)
+          return
+        }
+
+        const bookingUuid = resolveSupabaseBookingRowUuidFromUiId(deletingId)
+        if (!bookingUuid) {
+          const detail = `${t("appointments.appointmentDeleteMissingId")} (id=${deletingId})`
+          setActionNotice(
+            `${t("appointments.appointmentDeleteFailed")} ${t("appointments.appointmentDeleteFailedDetailLine").replace("{detail}", detail)}`,
+          )
+          return
+        }
+
+        const client = getBrowserClient()
+        if (!client || !isSupabaseConfigured()) {
+          setActionNotice(t("appointments.appointmentDeleteFailed"))
+          return
+        }
+        const businessId = await getCurrentBusinessProfileIdForClient(client)
+        if (!businessId) {
+          setActionNotice(t("appointments.appointmentDeleteFailed"))
+          return
+        }
+        const result = await deleteBooking(client, businessId, bookingUuid)
+        if (!result.ok) {
+          const detail =
+            result.error && result.error.trim().length > 0
+              ? result.error
+              : t("appointments.appointmentDeleteMissingId")
+          setActionNotice(
+            `${t("appointments.appointmentDeleteFailed")} ${t("appointments.appointmentDeleteFailedDetailLine").replace("{detail}", detail)}`,
+          )
+          return
+        }
+        setActionNotice(t("appointments.appointmentDeleted"))
         setConfirmDeleteAppointmentId(null)
       } finally {
         setIsDeletingAppointment(false)
@@ -60,10 +97,8 @@ export function useConfirmDeleteAppointmentHandler(args: {
     })()
   }, [
     allowAppointmentDelete,
-    appointments,
     confirmDeleteAppointmentIdRef,
     isDeletingAppointment,
-    language,
     setActionNotice,
     setConfirmDeleteAppointmentId,
     setIsDeletingAppointment,

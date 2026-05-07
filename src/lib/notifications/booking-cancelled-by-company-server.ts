@@ -1,6 +1,7 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { sendReminderSms } from "@/lib/notifications/sms"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import type { Tables, TablesInsert } from "@/types/database"
 
 export type CancelNotifyLanguage = "pl" | "en"
@@ -145,10 +146,17 @@ export async function notifyBookingCancelledByCompany(args: {
   const imie = firstToken(booking.client_name)
   const godzina = formatTimeHmFromDb(String(booking.appointment_time))
   const data = formatDateLabel(String(booking.appointment_date), language)
-  const osoba =
-    typeof booking.staff_name === "string" && booking.staff_name.trim().length > 0
-      ? booking.staff_name.trim()
-      : "—"
+  const staffId =
+    typeof (booking as { staff_id?: string | null }).staff_id === "string"
+      ? ((booking as { staff_id?: string | null }).staff_id ?? "").trim()
+      : ""
+  let staffNameRel: string | null = null
+  if (admin && staffId) {
+    const { data: staff } = await admin.from("staff_members").select("name").eq("id", staffId).maybeSingle()
+    staffNameRel = staff?.name?.trim() || null
+  }
+  const osoba = getStaffDisplayName({ name: staffNameRel ?? booking.staff_name ?? "" })
+  const imieOsoby = getStaffFirstName({ name: staffNameRel ?? booking.staff_name ?? "" })
 
   const baseVars: Record<string, string> = {
     imie,
@@ -159,6 +167,7 @@ export async function notifyBookingCancelledByCompany(args: {
     data,
     godzina,
     osoba,
+    imie_osoby: imieOsoby,
   }
 
   let smsTpl: string

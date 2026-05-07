@@ -23,7 +23,7 @@ export type AppointmentListRowProps = {
   isLastInSection: boolean
   dateLabel: string
   timeLabel: string
-  reminderLine: string | null
+  reminderLines: string[]
   showNeedsActionReason: boolean
   language: "pl" | "en"
   staffByService: Record<string, StaffMember[]>
@@ -55,8 +55,8 @@ export type AppointmentListRowProps = {
   isSavingDirectEdit: boolean
   confirmCancelVisitOpen: boolean
   onCancelVisitPress: () => void
-  onCancelVisitDismiss: () => void
   onCancelVisitConfirm: () => void
+  onRemoveVisitConfirm: () => void
   isCancellingVisit: boolean
 }
 
@@ -65,7 +65,7 @@ export function AppointmentListRow({
   isLastInSection,
   dateLabel,
   timeLabel,
-  reminderLine,
+  reminderLines,
   showNeedsActionReason,
   language,
   staffByService,
@@ -97,8 +97,8 @@ export function AppointmentListRow({
   isSavingDirectEdit,
   confirmCancelVisitOpen,
   onCancelVisitPress,
-  onCancelVisitDismiss,
   onCancelVisitConfirm,
+  onRemoveVisitConfirm,
   isCancellingVisit,
 }: AppointmentListRowProps) {
   const { t } = useTranslations()
@@ -171,11 +171,13 @@ export function AppointmentListRow({
               {t("appointments.remindersAutomatedPolicy")}
             </p>
           ) : null}
-          {row.id.startsWith("sb-") && reminderLine ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("appointments.reminderAutoCaption")}: {reminderLine}
-            </p>
-          ) : null}
+          {row.id.startsWith("sb-") && reminderLines.length > 0
+            ? reminderLines.map((line) => (
+                <p key={`${row.id}-${line}`} className="mt-0.5 text-xs text-muted-foreground">
+                  {line}
+                </p>
+              ))
+            : null}
           {row.id.startsWith("sb-") &&
           row.status === "pending" &&
           (row.lastStatusChangeSource === "auto_reminder_24h" ||
@@ -201,7 +203,6 @@ export function AppointmentListRow({
             <BookingSourceBadge source={row.source} variant="full" />
           </div>
           <AppointmentRowActions
-            row={row}
             statusOrder={statusOrder}
             onEditVisit={onEditVisit}
             onChangeStatus={onChangeStatus}
@@ -378,10 +379,10 @@ export function AppointmentListRow({
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="h-9 rounded-xl"
-                  onClick={onCancelVisitDismiss}
+                  onClick={onCancelVisitConfirm}
                   disabled={isCancellingVisit}
                 >
                   {t("appointments.cancelVisitConfirmBack")}
@@ -391,7 +392,7 @@ export function AppointmentListRow({
                   size="sm"
                   variant="destructive"
                   className="h-9 rounded-xl"
-                  onClick={onCancelVisitConfirm}
+                  onClick={onRemoveVisitConfirm}
                   disabled={isCancellingVisit}
                 >
                   {isCancellingVisit
@@ -401,7 +402,8 @@ export function AppointmentListRow({
               </div>
             </div>
           ) : null}
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {!confirmCancelVisitOpen ? (
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Button
               type="button"
               variant="destructive"
@@ -438,7 +440,8 @@ export function AppointmentListRow({
                   : t("appointments.saveVisitChange")}
               </Button>
             </div>
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </React.Fragment>

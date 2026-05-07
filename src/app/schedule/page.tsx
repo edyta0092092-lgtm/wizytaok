@@ -6,51 +6,51 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import type { AvailabilityExceptionRecord } from "@/lib/booking/effective-availability"
-import { indexExceptionsByDate } from "@/lib/booking/effective-availability"
-import { getPolishHolidayEntryForDateKey } from "@/lib/calendar/polish-holidays"
-import type { PolishHolidayEntry } from "@/lib/calendar/polish-holidays"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { getAvailabilityRules } from "@/lib/availability/availability-store"
-import {
-  getMonthSchedule,
-  getWeekdayFromYmd,
-  type StaffDaySchedule,
-  type StaffExceptionForDay,
-  type TeamScheduleDayCell,
-} from "@/lib/schedule/team-schedule"
-import { getStaffForBusiness } from "@/lib/staff/staff-store"
-import type { StaffAvailabilityRuleInput } from "@/lib/staff/staff-store"
-import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { bookingNeedsAction } from "@/lib/bookings/booking-needs-action"
+import { getPolishHolidayEntryForDateKey } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { getStaffForBusiness } from "@/lib/staff/staff-store"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import type { StaffMember } from "@/types/domain"
-import type { Tables } from "@/types/database"
+import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
-const PREVIEW_LINES = 3
+type CalendarEntry = {
+  id: string
+  appointment_date: string
+  appointment_time: string
+  client_name: string
+  client_phone: string
+  service_name: string
+  staff_id: string | null
+  staff_name: string | null
+  status: AppointmentStatus
+  customer_note: string | null
+  internal_note: string | null
+  reminder_status: string | null
+  second_reminder_status: string | null
+  reminder_sent_at: string | null
+}
 
-type StatusFilter = "all" | "working" | "off" | "special"
+type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
+
+const DAY_PREVIEW_LIMIT = 4
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0")
 }
 
-function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate()
-}
-
 function dateKey(year: number, month: number, day: number): string {
   return `${year}-${pad2(month)}-${pad2(day)}`
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate()
 }
 
 function weekMondayFirstCells(year: number, month: number): (number | null)[] {
@@ -65,171 +65,143 @@ function weekMondayFirstCells(year: number, month: number): (number | null)[] {
   return cells
 }
 
-function scheduleWeekdayTranslationKey(ymd: string): string {
-  const keys = [
-    "weekdaySunday",
-    "weekdayMonday",
-    "weekdayTuesday",
-    "weekdayWednesday",
-    "weekdayThursday",
-    "weekdayFriday",
-    "weekdaySaturday",
-  ] as const
-  return `schedule.${keys[getWeekdayFromYmd(ymd)]}`
+function normalizeStatus(raw: string): AppointmentStatus {
+  if (raw === "pending") return "pending"
+  if (raw === "confirmed") return "confirmed"
+  if (raw === "cancelled") return "cancelled"
+  if (raw === "no_show") return "no_show"
+  return "booked"
 }
 
-function formatDisplayDate(
-  ymd: string,
-  lang: "pl" | "en",
-  formatters: { long: Intl.DateTimeFormat; dayMo: Intl.DateTimeFormat },
-): string {
-  const [y, m, d] = ymd.split("-").map(Number)
-  const dt = new Date(y, m - 1, d)
-  return formatters.long.format(dt)
+function formatHm(raw: string): string {
+  const m = String(raw).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return "00:00"
+  return `${String(Number(m[1])).padStart(2, "0")}:${m[2]}`
 }
 
-function filterSchedules(
-  cell: TeamScheduleDayCell,
-  staffId: string | null,
-  statusFilter: StatusFilter,
-): StaffDaySchedule[] {
-  let rows = cell.schedules
-  if (staffId) {
-    rows = rows.filter((r) => r.staffId === staffId)
-  }
-  if (statusFilter === "working") {
-    return rows.filter((r) => r.status === "working")
-  }
-  if (statusFilter === "off") {
-    return rows.filter((r) => r.status === "off")
-  }
-  if (statusFilter === "special") {
-    return rows.filter((r) => r.status === "working" && r.isSpecialHours)
-  }
-  return rows
+function compareBookings(a: CalendarEntry, b: CalendarEntry): number {
+  const aCancelled = normalizeStatus(a.status) === "cancelled"
+  const bCancelled = normalizeStatus(b.status) === "cancelled"
+  if (aCancelled !== bCancelled) return aCancelled ? 1 : -1
+  return formatHm(a.appointment_time).localeCompare(formatHm(b.appointment_time))
 }
 
-function sourceLabelKey(src: StaffDaySchedule["source"]): string {
-  switch (src) {
-    case "business_hours":
-      return "schedule.sourceBusiness"
-    case "staff_hours":
-      return "schedule.sourceStaff"
-    case "exception_available":
-      return "schedule.sourceExceptionAvailable"
-    case "exception_unavailable":
-      return "schedule.sourceExceptionUnavailable"
-    case "holiday":
-      return "schedule.sourceHoliday"
-    case "business_closed":
-      return "schedule.sourceBusinessClosed"
-    case "inactive":
-      return "schedule.reasonInactive"
-    default:
-      return "schedule.sourceBusiness"
+function visitCountLabel(count: number): string {
+  if (count === 1) return "1 wizyta"
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${count} wizyty`
+  return `${count} wizyt`
+}
+
+function toAppointmentForNeedsAction(row: CalendarEntry): Appointment {
+  return {
+    id: `sb-${row.id}`,
+    clientName: row.client_name,
+    phone: row.client_phone,
+    serviceLabel: row.service_name,
+    startsAt: `${row.appointment_date}T${formatHm(row.appointment_time)}:00`,
+    status: normalizeStatus(row.status),
+    staffId: row.staff_id ?? undefined,
+    staffName: row.staff_name ?? undefined,
+    reminderStatus: row.reminder_status,
+    secondReminderStatus: row.second_reminder_status,
+    reminderSentAt: row.reminder_sent_at,
   }
+}
+
+function matchesViewFilter(row: CalendarEntry, filter: ViewFilter): boolean {
+  const status = normalizeStatus(row.status)
+  if (filter === "active") return status !== "cancelled"
+  if (filter === "cancelled") return status === "cancelled"
+  if (filter === "pending") return status === "pending"
+  if (filter === "confirmed") return status === "confirmed"
+  return true
+}
+
+function BookingStatusBadge({ row }: { row: CalendarEntry }) {
+  if (bookingNeedsAction(toAppointmentForNeedsAction(row))) {
+    return (
+      <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-100">
+        Wymaga reakcji
+      </span>
+    )
+  }
+  return <StatusBadge status={normalizeStatus(row.status)} />
 }
 
 export default function SchedulePage() {
   const { t, language } = useTranslations()
   const access = useBusinessAccess()
   const [ym, setYm] = React.useState(() => {
-    const n = new Date()
-    return { year: n.getFullYear(), month: n.getMonth() + 1 }
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() + 1 }
   })
+  const [bookings, setBookings] = React.useState<CalendarEntry[]>([])
   const [staffMembers, setStaffMembers] = React.useState<StaffMember[]>([])
-  const [baseDays, setBaseDays] = React.useState<Awaited<ReturnType<typeof getAvailabilityRules>>>([])
-  const [bizRows, setBizRows] = React.useState<Tables<"availability_exceptions">[]>([])
-  const [staffRuleRows, setStaffRuleRows] = React.useState<
-    Pick<
-      Tables<"staff_availability_rules">,
-      "staff_id" | "weekday" | "is_available" | "start_time" | "end_time"
-    >[]
-  >([])
-  const [staffExcRows, setStaffExcRows] = React.useState<Tables<"staff_availability_exceptions">[]>([])
   const [loading, setLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState(false)
   const [linkedStaffId, setLinkedStaffId] = React.useState<string | null | undefined>(undefined)
-  const [personFilter, setPersonFilter] = React.useState<string>("")
-  const [statusFilter, setStatusFilter] = React.useState<StatusFilter>("all")
+  const [personFilter, setPersonFilter] = React.useState("")
+  const [viewFilter, setViewFilter] = React.useState<ViewFilter>("all")
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
+  const [refreshTick, setRefreshTick] = React.useState(0)
+
+  const mapAppointmentToEntry = React.useCallback((row: Appointment): CalendarEntry | null => {
+    const dt = new Date(row.startsAt)
+    if (Number.isNaN(dt.getTime())) return null
+    return {
+      id: row.id,
+      appointment_date: dateKey(dt.getFullYear(), dt.getMonth() + 1, dt.getDate()),
+      appointment_time: `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`,
+      client_name: row.clientName || "Klient",
+      client_phone: row.phone || "",
+      service_name: row.serviceLabel || "Usługa",
+      staff_id: row.staffId ?? null,
+      staff_name: row.staffName ?? null,
+      status: normalizeStatus(row.status),
+      customer_note: row.customerNote ?? null,
+      internal_note: row.internalNote ?? row.businessNote ?? null,
+      reminder_status: row.reminderStatus ?? row.firstReminderStatus ?? null,
+      second_reminder_status: row.secondReminderStatus ?? null,
+      reminder_sent_at: row.reminderSentAt ?? row.firstReminderSentAt ?? null,
+    }
+  }, [])
 
   const formatters = React.useMemo(() => {
     const loc = language === "en" ? "en-GB" : "pl-PL"
     return {
-      long: new Intl.DateTimeFormat(loc, {
+      monthYear: new Intl.DateTimeFormat(loc, { month: "long", year: "numeric" }),
+      dayLong: new Intl.DateTimeFormat(loc, {
         weekday: "long",
         day: "numeric",
         month: "long",
         year: "numeric",
       }),
-      dayMo: new Intl.DateTimeFormat(loc, { day: "numeric", month: "long" }),
-      monthYear: new Intl.DateTimeFormat(loc, { month: "long", year: "numeric" }),
+      weekdayShort: new Intl.DateTimeFormat(loc, { weekday: "short" }),
     }
   }, [language])
 
+  const todayKey = React.useMemo(() => {
+    const n = new Date()
+    return dateKey(n.getFullYear(), n.getMonth() + 1, n.getDate())
+  }, [])
+
   const weekdayHeader = React.useMemo(() => {
     const start = new Date(2024, 0, 8)
-    const loc = language === "en" ? "en-GB" : "pl-PL"
-    const short = new Intl.DateTimeFormat(loc, { weekday: "short" })
     const out: string[] = []
     for (let i = 0; i < 7; i++) {
       const d = new Date(start)
       d.setDate(start.getDate() + i)
-      out.push(short.format(d))
+      out.push(formatters.weekdayShort.format(d))
     }
     return out
-  }, [language])
-
-  const reload = React.useCallback(async () => {
-    setLoadError(false)
-    setLoading(true)
-    const client = getBrowserClient()
-    const bid = client && isSupabaseConfigured() ? await getCurrentBusinessProfileIdForClient(client) : null
-    if (!client || !bid) {
-      setStaffMembers([])
-      setBaseDays([])
-      setBizRows([])
-      setStaffRuleRows([])
-      setStaffExcRows([])
-      setLoading(false)
-      return
-    }
-    try {
-      const [members, days, bizEx, rules, exc] = await Promise.all([
-        getStaffForBusiness(client, bid),
-        getAvailabilityRules(client, bid),
-        client.from("availability_exceptions").select("*").eq("business_id", bid),
-        client
-          .from("staff_availability_rules")
-          .select("staff_id, weekday, is_available, start_time, end_time")
-          .eq("business_id", bid),
-        client.from("staff_availability_exceptions").select("*").eq("business_id", bid),
-      ])
-      setStaffMembers(members)
-      setBaseDays(days)
-      setBizRows((bizEx.data as Tables<"availability_exceptions">[]) ?? [])
-      setStaffRuleRows((rules.data as Tables<"staff_availability_rules">[]) ?? [])
-      setStaffExcRows((exc.data as Tables<"staff_availability_exceptions">[]) ?? [])
-    } catch {
-      setLoadError(true)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  React.useEffect(() => {
-    queueMicrotask(() => {
-      void reload()
-    })
-  }, [reload])
+  }, [formatters])
 
   React.useEffect(() => {
     const client = getBrowserClient()
-    if (!client || !isSupabaseConfigured() || !access.businessId || access.effectiveRole !== "staff") {
-      queueMicrotask(() => setLinkedStaffId(null))
-      return
-    }
+    const businessId = access.businessId
+    if (!client || !isSupabaseConfigured() || !businessId || access.effectiveRole !== "staff") return
     let cancelled = false
     void (async () => {
       const {
@@ -239,146 +211,145 @@ export default function SchedulePage() {
       const { data } = await client
         .from("business_members")
         .select("staff_member_id")
-        .eq("business_id", access.businessId!)
+        .eq("business_id", businessId)
         .eq("user_id", user.id)
         .maybeSingle()
-      if (!cancelled) {
-        setLinkedStaffId(data?.staff_member_id?.trim() || null)
-      }
+      if (!cancelled) setLinkedStaffId(data?.staff_member_id?.trim() || null)
     })()
     return () => {
       cancelled = true
     }
   }, [access.businessId, access.effectiveRole])
 
-  const staffRulesByStaffId = React.useMemo(() => {
-    const m = new Map<string, StaffAvailabilityRuleInput[]>()
-    for (const row of staffRuleRows) {
-      const sid = row.staff_id.trim()
-      const arr = m.get(sid) ?? []
-      arr.push({
-        weekday: row.weekday,
-        isAvailable: row.is_available,
-        startTime: String(row.start_time).slice(0, 5),
-        endTime: String(row.end_time).slice(0, 5),
-      })
-      m.set(sid, arr)
+  React.useEffect(() => {
+    const forceReload = () => setRefreshTick((v) => v + 1)
+    window.addEventListener("pw-bookings", forceReload)
+    window.addEventListener("pw-public-bookings", forceReload)
+    window.addEventListener("pw-manual-appointments", forceReload)
+    window.addEventListener("focus", forceReload)
+    return () => {
+      window.removeEventListener("pw-bookings", forceReload)
+      window.removeEventListener("pw-public-bookings", forceReload)
+      window.removeEventListener("pw-manual-appointments", forceReload)
+      window.removeEventListener("focus", forceReload)
     }
-    return m
-  }, [staffRuleRows])
+  }, [])
 
-  const staffExceptionsByStaffAndDate = React.useMemo(() => {
-    const exMap = new Map<string, StaffExceptionForDay>()
-    for (const row of staffExcRows) {
-      const dk = String(row.exception_date).slice(0, 10)
-      const key = `${row.staff_id}|${dk}`
-      exMap.set(key, {
-        isUnavailable: row.is_unavailable,
-        startTime: row.start_time ? String(row.start_time).slice(0, 5) : null,
-        endTime: row.end_time ? String(row.end_time).slice(0, 5) : null,
-        reason: row.reason,
-      })
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setLoading(true)
+      setLoadError(false)
+      try {
+        const client = getBrowserClient()
+        if (!client || !isSupabaseConfigured()) {
+          if (!cancelled) {
+            setBookings([])
+            setStaffMembers([])
+          }
+          return
+        }
+        const [mergedAppointments, staff] = await Promise.all([
+          fetchMergedAppointments(),
+          access.businessId ? getStaffForBusiness(client, access.businessId) : Promise.resolve([]),
+        ])
+        const monthEntries = mergedAppointments
+          .map(mapAppointmentToEntry)
+          .filter((row): row is CalendarEntry => row != null)
+          .filter((row) => {
+            const year = Number(row.appointment_date.slice(0, 4))
+            const month = Number(row.appointment_date.slice(5, 7))
+            return year === ym.year && month === ym.month
+          })
+        if (!cancelled) {
+          setBookings(monthEntries)
+          setStaffMembers(staff)
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === "development") {
+          console.info("[schedule.calendar.bookings.error]", {
+            message: error instanceof Error ? error.message : "unknown_error",
+          })
+        }
+        if (!cancelled) setLoadError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    return exMap
-  }, [staffExcRows])
-
-  const businessExceptionsByDate = React.useMemo(() => {
-    const mapped: AvailabilityExceptionRecord[] = bizRows.map((row) => ({
-      id: row.id,
-      business_id: row.business_id,
-      exception_date: row.exception_date,
-      is_closed: row.is_closed,
-      start_time: row.start_time,
-      end_time: row.end_time,
-      reason: row.reason,
-    }))
-    return indexExceptionsByDate(mapped)
-  }, [bizRows])
+  }, [ym, access.businessId, mapAppointmentToEntry, refreshTick])
 
   const visibleStaff = React.useMemo(() => {
     if (access.effectiveRole !== "staff") return staffMembers
-    if (linkedStaffId) {
-      return staffMembers.filter((s) => s.id === linkedStaffId)
-    }
-    return []
-  }, [staffMembers, access.effectiveRole, linkedStaffId])
+    if (!linkedStaffId) return []
+    return staffMembers.filter((row) => row.id === linkedStaffId)
+  }, [staffMembers, linkedStaffId, access.effectiveRole])
 
-  const polishHolidayByDate = React.useMemo(() => {
-    const m = new Map<string, PolishHolidayEntry | null>()
-    const dim = daysInMonth(ym.year, ym.month)
-    for (let d = 1; d <= dim; d++) {
-      const key = dateKey(ym.year, ym.month, d)
-      m.set(key, getPolishHolidayEntryForDateKey(key))
-    }
-    return m
-  }, [ym.year, ym.month])
+  const effectivePersonFilter =
+    access.effectiveRole === "staff" && linkedStaffId ? linkedStaffId : personFilter
 
-  const monthCells = React.useMemo(
-    () => getMonthSchedule({
-      month: ym.month,
-      year: ym.year,
-      staffMembers: visibleStaff,
-      businessBaseDays: baseDays,
-      businessExceptionsByDate,
-      staffRulesByStaffId,
-      staffExceptionsByStaffAndDate,
-      polishHolidayByDate,
-    }),
-    [
-      ym.month,
-      ym.year,
-      visibleStaff,
-      baseDays,
-      businessExceptionsByDate,
-      staffRulesByStaffId,
-      staffExceptionsByStaffAndDate,
-      polishHolidayByDate,
-    ],
+  const staffNameById = React.useMemo(() => {
+    const map = new Map<string, string>()
+    for (const row of staffMembers) {
+      map.set(row.id, row.name)
+    }
+    return map
+  }, [staffMembers])
+
+  const filteredBookings = React.useMemo(() => {
+    const out = bookings
+      .filter((row) => matchesViewFilter(row, viewFilter))
+      .filter((row) => {
+        if (!effectivePersonFilter) return true
+        return (row.staff_id ?? "") === effectivePersonFilter
+      })
+    out.sort((a, b) => {
+      const byDate = a.appointment_date.localeCompare(b.appointment_date)
+      if (byDate !== 0) return byDate
+      return compareBookings(a, b)
+    })
+    return out
+  }, [bookings, viewFilter, effectivePersonFilter])
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      console.info("[schedule.calendar.bookings]", {
+        month: `${ym.year}-${pad2(ym.month)}`,
+        count: filteredBookings.length,
+        filters: { personFilter: effectivePersonFilter || "all", viewFilter },
+      })
+    }
+  }, [ym, filteredBookings.length, effectivePersonFilter, viewFilter])
+
+  const bookingsByDate = React.useMemo(() => {
+    const map = new Map<string, CalendarEntry[]>()
+    for (const row of filteredBookings) {
+      const arr = map.get(row.appointment_date) ?? []
+      arr.push(row)
+      map.set(row.appointment_date, arr)
+    }
+    for (const rows of map.values()) rows.sort(compareBookings)
+    return map
+  }, [filteredBookings])
+
+  const detailRows = React.useMemo(
+    () => (detailDate ? bookingsByDate.get(detailDate) ?? [] : []),
+    [detailDate, bookingsByDate]
   )
-
-  const cellByDate = React.useMemo(() => new Map(monthCells.map((c) => [c.date, c])), [monthCells])
-
-  const todayKey = React.useMemo(() => {
-    const n = new Date()
-    return dateKey(n.getFullYear(), n.getMonth() + 1, n.getDate())
-  }, [])
-
-  const goPrev = () =>
-    setYm((p) => {
-      if (p.month <= 1) return { year: p.year - 1, month: 12 }
-      return { year: p.year, month: p.month - 1 }
-    })
-
-  const goNext = () =>
-    setYm((p) => {
-      if (p.month >= 12) return { year: p.year + 1, month: 1 }
-      return { year: p.year, month: p.month + 1 }
-    })
-
-  const goToday = () => {
-    const n = new Date()
-    setYm({ year: n.getFullYear(), month: n.getMonth() + 1 })
-  }
-
-  const detailCell = detailDate ? cellByDate.get(detailDate) : null
-  /** W panelu szczegółów pełna lista wg wybranej osoby (filtre statusu tylko na siatce). */
-  const detailSchedules = React.useMemo(() => {
-    if (!detailCell) return []
-    if (personFilter.trim()) {
-      return detailCell.schedules.filter((s) => s.staffId === personFilter.trim())
+  React.useEffect(() => {
+    if (!detailDate) return
+    if (process.env.NODE_ENV === "development") {
+      console.info("[schedule.day.bookings]", { date: detailDate, bookings: detailRows })
     }
-    return detailCell.schedules
-  }, [detailCell, personFilter])
+  }, [detailDate, detailRows])
 
-  const deniedStaffNoLink =
-    access.ready &&
-    isSupabaseConfigured() &&
-    access.effectiveRole === "staff" &&
-    linkedStaffId === null
-
-  if (deniedStaffNoLink) {
+  const goPrev = () => setYm((p) => (p.month === 1 ? { year: p.year - 1, month: 12 } : { year: p.year, month: p.month - 1 }))
+  const goNext = () => setYm((p) => (p.month === 12 ? { year: p.year + 1, month: 1 } : { year: p.year, month: p.month + 1 }))
+  if (access.ready && access.effectiveRole === "staff" && linkedStaffId === null && isSupabaseConfigured()) {
     return (
-      <AppShell title={t("schedule.title")} pageDescription={t("schedule.description")}>
+      <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
         <PageShell>
           <p className="text-sm text-muted-foreground">{t("schedule.accessDeniedStaff")}</p>
         </PageShell>
@@ -386,38 +357,25 @@ export default function SchedulePage() {
     )
   }
 
-  if (access.ready && access.effectiveRole === "staff" && linkedStaffId === undefined) {
-    return (
-      <AppShell title={t("schedule.title")} pageDescription={t("schedule.description")}>
-        <PageShell>
-          <p className="text-sm text-muted-foreground">{t("schedule.loading")}</p>
-        </PageShell>
-      </AppShell>
-    )
-  }
-
   return (
-    <AppShell title={t("schedule.title")} pageDescription={t("schedule.description")}>
+    <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
       <PageShell>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goPrev} aria-label={t("schedule.prevMonth")}>
+            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goPrev}>
               <ChevronLeft className="size-4" />
             </Button>
-            <p className="min-w-[10rem] text-center text-sm font-semibold capitalize sm:min-w-[12rem]">
+            <p className="min-w-[12rem] text-center text-sm font-semibold capitalize">
               {formatters.monthYear.format(new Date(ym.year, ym.month - 1, 1))}
             </p>
-            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goNext} aria-label={t("schedule.nextMonth")}>
+            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goNext}>
               <ChevronRight className="size-4" />
-            </Button>
-            <Button type="button" variant="secondary" size="sm" className="rounded-xl" onClick={goToday}>
-              {t("schedule.today")}
             </Button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-1">
               <Label htmlFor="sch-person" className="text-xs text-muted-foreground">
-                {t("schedule.filterPerson")}
+                Osoba
               </Label>
               <select
                 id="sch-person"
@@ -426,316 +384,171 @@ export default function SchedulePage() {
                 onChange={(e) => setPersonFilter(e.target.value)}
                 disabled={access.effectiveRole === "staff"}
               >
-                <option value="">{t("schedule.filterPersonAll")}</option>
-                {visibleStaff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <option value="">Wszystkie osoby</option>
+                {visibleStaff.map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
                   </option>
                 ))}
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <Label htmlFor="sch-status" className="text-xs text-muted-foreground">
-                {t("schedule.filterStatus")}
+              <Label htmlFor="sch-view" className="text-xs text-muted-foreground">
+                Widok
               </Label>
               <select
-                id="sch-status"
-                className="h-9 min-w-[10rem] rounded-md border border-input bg-background px-2 text-sm"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                id="sch-view"
+                className="h-9 min-w-[12rem] rounded-md border border-input bg-background px-2 text-sm"
+                value={viewFilter}
+                onChange={(e) => setViewFilter(e.target.value as ViewFilter)}
               >
-                <option value="all">{t("schedule.filterStatusAll")}</option>
-                <option value="working">{t("schedule.filterStatusWorking")}</option>
-                <option value="off">{t("schedule.filterStatusOff")}</option>
-                <option value="special">{t("schedule.filterStatusSpecial")}</option>
+                <option value="all">Wszyscy</option>
+                <option value="active">Tylko aktywne</option>
+                <option value="cancelled">Tylko anulowane</option>
+                <option value="pending">Tylko do potwierdzenia</option>
+                <option value="confirmed">Tylko potwierdzone</option>
               </select>
             </div>
           </div>
         </div>
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">{t("schedule.loading")}</p>
+          <p className="text-sm text-muted-foreground">Ładowanie danych...</p>
         ) : loadError ? (
-          <p className="text-sm text-amber-800 dark:text-amber-200">{t("schedule.loadError")}</p>
-        ) : visibleStaff.length === 0 ? (
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm text-destructive">Nie udało się załadować danych grafiku.</p>
         ) : (
           <>
-            {/* Mobile: lista dni */}
-            <div className="space-y-2 md:hidden">
-              {monthCells.map((cell) => (
-                <DayCard
-                  key={cell.date}
-                  cell={cell}
-                  todayKey={todayKey}
-                  personFilter={personFilter}
-                  statusFilter={statusFilter}
-                  onOpenDetail={() => setDetailDate(cell.date)}
-                  t={t}
-                  weekdayLabel={(ymd) => t(scheduleWeekdayTranslationKey(ymd) as never)}
-                  formatDayTitle={(ymd) => formatDisplayDate(ymd, language === "en" ? "en" : "pl", formatters)}
-                />
+            <div className="mb-1 hidden grid-cols-7 gap-1 text-center text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground md:grid">
+              {weekdayHeader.map((w) => (
+                <div key={w}>{w}</div>
               ))}
             </div>
-
-            {/* Desktop */}
-            <div className="hidden md:block">
-              <div className="mb-1 grid grid-cols-7 gap-1 text-center text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
-                {weekdayHeader.map((w) => (
-                  <div key={w}>{w}</div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1.5">
-                {weekMondayFirstCells(ym.year, ym.month).map((dayNum, idx) => {
-                  if (dayNum == null) {
-                    return <div key={`e-${idx}`} className="min-h-[7rem] rounded-xl border border-transparent bg-muted/5" />
-                  }
-                  const key = dateKey(ym.year, ym.month, dayNum)
-                  const cell = cellByDate.get(key)
-                  if (!cell) return null
-                  const isToday = key === todayKey
-                  return (
-                    <button
-                      type="button"
-                      key={key}
-                      onClick={() => setDetailDate(key)}
-                      className={cn(
-                        "flex min-h-[7rem] flex-col rounded-xl border bg-card p-1.5 text-left text-xs shadow-sm transition-colors hover:bg-muted/30",
-                        isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80",
-                      )}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-0.5">
-                        <span className="font-semibold text-foreground">{dayNum}</span>
-                        {cell.holiday ? (
-                          <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[0.6rem] font-medium text-amber-900 dark:text-amber-100">
-                            {t("schedule.holidayBadge")}
-                          </span>
-                        ) : null}
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-7 md:gap-1.5">
+              {weekMondayFirstCells(ym.year, ym.month).map((dayNum, idx) => {
+                if (dayNum == null) {
+                  return <div key={`empty-${idx}`} className="hidden min-h-[8.5rem] rounded-xl border border-transparent bg-muted/5 md:block" />
+                }
+                const key = dateKey(ym.year, ym.month, dayNum)
+                const holiday = getPolishHolidayEntryForDateKey(key)
+                const rows = bookingsByDate.get(key) ?? []
+                const preview = rows.slice(0, DAY_PREVIEW_LIMIT)
+                const more = Math.max(0, rows.length - DAY_PREVIEW_LIMIT)
+                const isToday = key === todayKey
+                return (
+                  <button
+                    type="button"
+                    key={key}
+                    onClick={() => setDetailDate(key)}
+                    className={cn(
+                      "flex min-h-[8.5rem] flex-col rounded-xl border bg-card p-2 text-left shadow-sm transition-colors hover:bg-muted/20",
+                      isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{dayNum}</p>
+                        <p className="text-[11px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
                       </div>
-                      <DayPreviewLines
-                        cell={cell}
-                        personFilter={personFilter}
-        statusFilter={statusFilter}
-        t={t}
-        onMore={() => setDetailDate(key)}
-      />
-                    </button>
-                  )
-                })}
-              </div>
+                      {holiday ? (
+                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:text-amber-100">
+                          Święto
+                        </span>
+                      ) : null}
+                    </div>
+                    <ul className="mt-1.5 space-y-1 overflow-hidden">
+                      {preview.length === 0 ? (
+                        <li className="text-xs text-muted-foreground">Brak wizyt</li>
+                      ) : (
+                        preview.map((row) => (
+                          <li
+                            key={row.id}
+                            className={cn(
+                              "rounded-md border border-border/70 px-1.5 py-1 text-[11px] leading-tight",
+                              normalizeStatus(row.status) === "cancelled" && "opacity-60"
+                            )}
+                          >
+                            <p className="truncate font-medium text-foreground">
+                              {formatHm(row.appointment_time)} — {row.client_name}
+                            </p>
+                            <p className="truncate text-muted-foreground">
+                              {row.service_name} / {(row.staff_name?.trim() || (row.staff_id ? staffNameById.get(row.staff_id) : "")) || "Nie przypisano"}
+                            </p>
+                          </li>
+                        ))
+                      )}
+                      {more > 0 ? <li className="text-[11px] text-primary">+{more} więcej</li> : null}
+                    </ul>
+                  </button>
+                )
+              })}
             </div>
           </>
         )}
       </PageShell>
 
-      <Sheet open={detailDate != null} onOpenChange={(o) => !o && setDetailDate(null)}>
-        <SheetContent className="premium-scrollbar flex w-full max-w-md flex-col sm:max-w-lg" showCloseButton>
+      <Sheet open={detailDate != null} onOpenChange={(open) => !open && setDetailDate(null)}>
+        <SheetContent className="premium-scrollbar flex w-full max-w-xl flex-col" showCloseButton>
           <SheetHeader className="border-b border-border/70 text-left">
             <SheetTitle>
-              {detailCell
-                ? t("schedule.dayDetailTitle").replace(
-                    "{date}",
-                    formatDisplayDate(detailCell.date, language === "en" ? "en" : "pl", formatters),
-                  )
+              Szczegóły dnia
+              {detailDate
+                ? ` — ${formatters.dayLong.format(
+                    new Date(
+                      Number(detailDate.slice(0, 4)),
+                      Number(detailDate.slice(5, 7)) - 1,
+                      Number(detailDate.slice(8, 10))
+                    )
+                  )}`
                 : ""}
             </SheetTitle>
           </SheetHeader>
-          <div className="flex-1 space-y-5 overflow-y-auto px-1 py-4">
-            {detailCell ? (
-              <>
-                <section>
-                  <h3 className="text-sm font-semibold">{t("schedule.sectionHoliday")}</h3>
-                  {detailCell.holiday ? (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {language === "en" ? detailCell.holiday.nameEn : detailCell.holiday.namePl}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-sm text-muted-foreground">{t("schedule.noHoliday")}</p>
+          <div className="flex-1 space-y-3 overflow-y-auto py-4">
+            {detailRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
+            ) : (
+              detailRows.map((row) => (
+                <div
+                  key={row.id}
+                  className={cn(
+                    "rounded-xl border border-border p-3",
+                    normalizeStatus(row.status) === "cancelled" && "opacity-70"
                   )}
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold">{t("schedule.sectionWorking")}</h3>
-                  <ul className="mt-2 space-y-2">
-                    {detailSchedules
-                      .filter((r) => r.status === "working")
-                      .map((r) => (
-                        <li key={r.staffId} className="rounded-lg border border-primary/15 bg-primary/5 px-2 py-1.5 text-sm">
-                          <span className="font-medium text-foreground">{r.fullName}</span>
-                          <span className="text-muted-foreground">
-                            {" "}
-                            — {r.startTime}–{r.endTime}
-                          </span>
-                          <p className="text-[0.7rem] text-muted-foreground">
-                            {t(sourceLabelKey(r.source))}
-                            {r.isSpecialHours ? ` · ${t("schedule.offSpecial")}` : ""}
-                          </p>
-                          {access.effectiveRole !== "staff" ? (
-                            <Link href="/team" className="mt-1 inline-block text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
-                              {t("schedule.editStaffLink")}
-                            </Link>
-                          ) : null}
-                        </li>
-                      ))}
-                  </ul>
-                  {detailSchedules.filter((r) => r.status === "working").length === 0 ? (
-                    <p className="mt-1 text-sm text-muted-foreground">—</p>
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatHm(row.appointment_time)} · {row.client_name}
+                    </p>
+                    <BookingStatusBadge row={row} />
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">{row.service_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {(row.staff_name?.trim() || (row.staff_id ? staffNameById.get(row.staff_id) : "")) || "Nie przypisano osoby"}
+                  </p>
+                  {row.client_phone?.trim() ? (
+                    <p className="mt-1 text-xs text-muted-foreground">Tel: {row.client_phone.trim()}</p>
                   ) : null}
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold">{t("schedule.sectionUnavailable")}</h3>
-                  <ul className="mt-2 space-y-2">
-                    {detailSchedules
-                      .filter((r) => r.status !== "working")
-                      .map((r) => (
-                        <li
-                          key={r.staffId}
-                          className={cn(
-                            "rounded-lg border px-2 py-1.5 text-sm",
-                            r.status === "inactive"
-                              ? "border-border bg-muted/40 text-muted-foreground"
-                              : "border-destructive/15 bg-destructive/5",
-                          )}
-                        >
-                          <span className="font-medium">{r.fullName}</span>
-                          <p className="text-[0.75rem] text-muted-foreground">
-                            {r.status === "inactive"
-                              ? t("schedule.reasonInactive")
-                              : r.source === "holiday"
-                                ? t("schedule.reasonHoliday")
-                                : r.source === "exception_unavailable"
-                                  ? t("schedule.reasonException")
-                                  : t("schedule.reasonOff")}
-                          </p>
-                          {r.note ? <p className="mt-0.5 text-[0.7rem] text-muted-foreground">{r.note}</p> : null}
-                        </li>
-                      ))}
-                  </ul>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold">{t("schedule.sectionExceptions")}</h3>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                    {detailSchedules
-                      .map((r) => r.note?.trim())
-                      .filter(Boolean)
-                      .map((note, i) => (
-                        <li key={`${note}-${i}`}>{note}</li>
-                      ))}
-                  </ul>
-                  {detailSchedules.every((s) => !(s.note ?? "").trim()) ? (
-                    <p className="mt-1 text-sm text-muted-foreground">—</p>
+                  {(row.customer_note?.trim() || row.internal_note?.trim()) ? (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Notatka: {row.customer_note?.trim() || row.internal_note?.trim()}
+                    </p>
                   ) : null}
-                </section>
-              </>
-            ) : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link href="/appointments">Otwórz wizytę</Link>
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link href={`/appointments?edit=${encodeURIComponent(row.id)}`}>Edytuj wizytę</Link>
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link href={`/appointments?focus=${encodeURIComponent(row.id)}`}>Zmień status</Link>
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </SheetContent>
       </Sheet>
     </AppShell>
-  )
-}
-
-function DayPreviewLines({
-  cell,
-  personFilter,
-  statusFilter,
-  t,
-  onMore,
-}: {
-  cell: TeamScheduleDayCell
-  personFilter: string
-  statusFilter: StatusFilter
-  t: (k: string) => string
-  onMore: () => void
-}) {
-  const rows = filterSchedules(cell, personFilter || null, statusFilter)
-  const workingPreferred = [
-    ...rows.filter((r) => r.status === "working"),
-    ...rows.filter((r) => r.status !== "working"),
-  ]
-  const shown = workingPreferred.slice(0, PREVIEW_LINES)
-  const more = Math.max(0, workingPreferred.length - PREVIEW_LINES)
-
-  return (
-    <ul className="mt-1 flex-1 space-y-0.5 overflow-hidden text-[0.68rem] leading-tight">
-      {shown.map((r) => (
-        <li key={r.staffId} className="truncate text-muted-foreground">
-          {r.status === "working" ? (
-            <>
-              <span className="text-foreground">{r.fullName}</span> — {r.startTime}–{r.endTime}
-              {r.isSpecialHours ? ` · ${t("schedule.offSpecial")}` : ""}
-            </>
-          ) : r.status === "inactive" ? (
-            <>
-              <span className="text-muted-foreground/80">{r.fullName}</span> — {t("schedule.inactive")}
-            </>
-          ) : (
-            <>
-              <span className="text-foreground">{r.fullName}</span> — {t("schedule.offFree")}
-            </>
-          )}
-        </li>
-      ))}
-      {more > 0 ? (
-        <li>
-          <button type="button" className="text-primary underline-offset-2 hover:underline" onClick={onMore}>
-            {t("schedule.moreCount").replace("{count}", String(more))}
-          </button>
-        </li>
-      ) : null}
-    </ul>
-  )
-}
-
-function DayCard({
-  cell,
-  todayKey,
-  personFilter,
-  statusFilter,
-  onOpenDetail,
-  t,
-  weekdayLabel,
-  formatDayTitle,
-}: {
-  cell: TeamScheduleDayCell
-  todayKey: string
-  personFilter: string
-  statusFilter: StatusFilter
-  onOpenDetail: () => void
-  t: (k: string) => string
-  weekdayLabel: (ymd: string) => string
-  formatDayTitle: (ymd: string) => string
-}) {
-  const isToday = cell.date === todayKey
-  return (
-    <Card className={cn("rounded-xl border shadow-sm", isToday ? "border-primary/35" : "border-border/80")}>
-      <CardContent className="p-3">
-        <button type="button" className="flex w-full text-left" onClick={onOpenDetail}>
-          <div className="flex w-full items-start justify-between gap-2">
-            <div>
-              <p className="text-lg font-semibold leading-none">{cell.date.slice(8, 10)}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{weekdayLabel(cell.date)}</p>
-              <p className="text-[0.65rem] text-muted-foreground">{formatDayTitle(cell.date)}</p>
-            </div>
-            {cell.holiday ? (
-              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[0.65rem] font-medium text-amber-900 dark:text-amber-100">
-                {t("schedule.holidayBadge")}
-              </span>
-            ) : null}
-          </div>
-        </button>
-        <div className="mt-2">
-          <DayPreviewLines
-            cell={cell}
-            personFilter={personFilter}
-            statusFilter={statusFilter}
-            t={t}
-            onMore={onOpenDetail}
-          />
-        </div>
-      </CardContent>
-    </Card>
   )
 }

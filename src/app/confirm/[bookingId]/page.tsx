@@ -275,8 +275,13 @@ export default function PublicConfirmAppointmentPage() {
       if (dataSource === "supabase") {
         const client = getBrowserClient()
         if (!client) return
-        const r = await updateBookingByConfirmationToken(client, confirmToken, "cancel", {})
+        const r = await runConfirmRpcWithFallback("cancel", {})
         if (!r.ok) return
+        void fetch("/api/public/cancel-booking", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: confirmToken, language }),
+        }).catch(() => undefined)
         await refreshSupabaseBooking()
         setScreen("main")
         setSuccessMessage(t("confirmPublic.successCancelled"))

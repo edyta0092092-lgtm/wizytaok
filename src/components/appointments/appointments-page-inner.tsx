@@ -118,6 +118,7 @@ export function AppointmentsPageInner() {
     openProposeAnotherTime,
     saveDirectVisitChange,
     executeCancelVisit,
+    executeRemoveVisit,
   } = useProposeVisitPanel({
     appointments,
     manualServiceOptions,
@@ -167,6 +168,7 @@ export function AppointmentsPageInner() {
     setConfirmCancelVisitForId,
     saveDirectVisitChange,
     executeCancelVisit,
+    executeRemoveVisit,
     isSavingDirectEdit,
     isCancellingVisit,
     confirmCancelVisitForId,

@@ -1,6 +1,12 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { sendReminderSms } from "@/lib/notifications/sms"
+import {
+  applyTemplateVariables,
+  getTemplateRuntime,
+  type NotificationTemplateRuntime,
+} from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import type { TablesInsert, TablesUpdate } from "@/types/database"
 
 type BusinessProfileJoin = {
@@ -25,9 +31,12 @@ type DueBookingRow = {
   second_reminder_sent_at: string | null
   second_reminder_status: string | null
   business_profiles: BusinessProfileJoin
+  staff_name: string | null
+  staff_members?: { name: string | null } | null
 }
 
 type ReminderKind = "appointment_reminder_24h" | "appointment_reminder_short"
+type ReminderTemplateType = "reminder_24h" | "reminder_before_visit"
 
 function getPublicAppOrigin(): string {
   const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
@@ -88,6 +97,18 @@ function buildMessage(
   }
 }
 
+function reminderTemplateType(kind: ReminderKind): ReminderTemplateType {
+  return kind === "appointment_reminder_24h" ? "reminder_24h" : "reminder_before_visit"
+}
+
+function appointmentStartMs(row: DueBookingRow): number {
+  return new Date(`${String(row.appointment_date).slice(0, 10)}T${String(row.appointment_time).slice(0, 8)}`).getTime()
+}
+
+function defaultTimingMinutes(kind: ReminderKind): number {
+  return kind === "appointment_reminder_24h" ? 1440 : 60
+}
+
 async function insertNotificationLog(
   admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
   row: {
@@ -107,10 +128,6 @@ async function insertNotificationLog(
 ) {
   const ins: TablesInsert<"notification_logs"> = { ...row }
   await admin.from("notification_logs").insert(ins)
-}
-
-function appointmentStartsAtMs(row: DueBookingRow): number {
-  return new Date(`${String(row.appointment_date).slice(0, 10)}T${String(row.appointment_time).slice(0, 8)}`).getTime()
 }
 
 async function updateBookingReminderStatus(
@@ -161,13 +178,49 @@ async function processSingleReminder(
   const confirmUrl = `${origin}/confirm/${encodeURIComponent(row.confirmation_token)}`
   const timeHm = formatTimeHmFromDb(row.appointment_time)
   const dateLabel = String(row.appointment_date).slice(0, 10)
-  const message = buildMessage(kind, lang, {
+  const fallbackMessage = buildMessage(kind, lang, {
     clientName: row.client_name,
     serviceName: row.service_name,
     dateLabel,
     timeHm,
     confirmUrl,
   })
+  const templateType = reminderTemplateType(kind)
+  const runtime = await getTemplateRuntime(admin, row.business_id, templateType)
+  const staffDisplayName = getStaffDisplayName({
+    name: row.staff_members?.name ?? row.staff_name ?? "",
+  })
+  const staffFirstName = getStaffFirstName({
+    name: row.staff_members?.name ?? row.staff_name ?? "",
+  })
+  const templateVars: Record<string, string> = {
+    imie: row.client_name.split(/\s+/)[0] || row.client_name,
+    data: dateLabel,
+    godzina: timeHm,
+    usluga: row.service_name,
+    osoba: staffDisplayName,
+    imie_osoby: staffFirstName,
+    link_rezerwacji: "",
+    link_potwierdzenia: confirmUrl,
+    link_anulowania: confirmUrl,
+    telefon_firmy: "",
+    nazwa_firmy: "",
+  }
+  const message = {
+    subject:
+      runtime.emailSubject && runtime.emailSubject.trim().length > 0
+        ? applyTemplateVariables(runtime.emailSubject, templateVars)
+        : fallbackMessage.subject,
+    text:
+      runtime.emailBody && runtime.emailBody.trim().length > 0
+        ? applyTemplateVariables(runtime.emailBody, templateVars)
+        : fallbackMessage.text,
+    html: fallbackMessage.html,
+    sms:
+      runtime.smsBody && runtime.smsBody.trim().length > 0
+        ? applyTemplateVariables(runtime.smsBody, templateVars)
+        : fallbackMessage.sms,
+  }
   const type = kind === "appointment_reminder_24h" ? "appointment_reminder_24h" : "appointment_reminder_short"
   const hasEmail = Boolean(row.client_email?.trim())
   const hasPhone = Boolean(row.client_phone?.trim())
@@ -192,8 +245,12 @@ async function processSingleReminder(
   }
 
   const ch = row.business_profiles?.reminder_channel ?? "both"
-  const wantEmail = ch === "email" || ch === "both"
-  const wantSms = ch === "sms" || ch === "both"
+  const wantEmail = (ch === "email" || ch === "both") && runtime.emailEnabled
+  const wantSms = (ch === "sms" || ch === "both") && runtime.smsEnabled
+  if (!wantEmail && !wantSms) {
+    await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "template_disabled", false)
+    return "skipped"
+  }
   const statuses: string[] = []
   const errors: string[] = []
 
@@ -293,19 +350,13 @@ export async function processDueBookingReminders(): Promise<{
     return { ok: false, firstReminderProcessed: 0, secondReminderProcessed: 0, failed: 0, skipped: 0, error: "service_role_or_url_missing" }
   }
 
-  const nowIso = new Date().toISOString()
+  const nowMs = Date.now()
   const { data, error } = await admin
     .from("bookings")
     .select(
-      "id,business_id,confirmation_token,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,business_profiles(reminder_channel)"
+      "id,business_id,confirmation_token,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status,staff_name,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,business_profiles(reminder_channel),staff_members(name)"
     )
     .in("status", ["booked", "pending", "confirmed"])
-    .or(
-      [
-        `and(first_reminder_due_at.not.is.null,first_reminder_due_at.lte.${nowIso},first_reminder_sent_at.is.null,or(first_reminder_status.eq.pending,first_reminder_status.is.null))`,
-        `and(second_reminder_due_at.not.is.null,second_reminder_due_at.lte.${nowIso},second_reminder_sent_at.is.null,second_reminder_status.eq.pending)`,
-      ].join(",")
-    )
 
   if (error) {
     return { ok: false, firstReminderProcessed: 0, secondReminderProcessed: 0, failed: 0, skipped: 0, error: error.message }
@@ -316,19 +367,35 @@ export async function processDueBookingReminders(): Promise<{
   let secondReminderProcessed = 0
   let failed = 0
   let skipped = 0
+  const runtimeCache = new Map<string, { first: NotificationTemplateRuntime; second: NotificationTemplateRuntime }>()
 
   for (const row of rows) {
-    if (!(appointmentStartsAtMs(row) > Date.now())) {
+    const startMs = appointmentStartMs(row)
+    if (!(startMs > nowMs)) {
       skipped += 1
       continue
     }
-    if (row.first_reminder_due_at && row.first_reminder_sent_at == null && (row.first_reminder_status == null || row.first_reminder_status === "pending")) {
+
+    let businessRuntime = runtimeCache.get(row.business_id)
+    if (!businessRuntime) {
+      businessRuntime = {
+        first: await getTemplateRuntime(admin, row.business_id, "reminder_24h"),
+        second: await getTemplateRuntime(admin, row.business_id, "reminder_before_visit"),
+      }
+      runtimeCache.set(row.business_id, businessRuntime)
+    }
+    const firstTiming = businessRuntime.first.timingMinutesBefore ?? defaultTimingMinutes("appointment_reminder_24h")
+    const secondTiming = businessRuntime.second.timingMinutesBefore ?? defaultTimingMinutes("appointment_reminder_short")
+    const firstDue = startMs - firstTiming * 60_000 <= nowMs
+    const secondDue = startMs - secondTiming * 60_000 <= nowMs
+
+    if (firstDue && row.first_reminder_sent_at == null && (row.first_reminder_status == null || row.first_reminder_status === "pending")) {
       const result = await processSingleReminder(admin, row, "appointment_reminder_24h")
       if (result === "processed") firstReminderProcessed += 1
       else if (result === "failed") failed += 1
       else skipped += 1
     }
-    if (row.second_reminder_due_at && row.second_reminder_sent_at == null && row.second_reminder_status === "pending") {
+    if (secondDue && row.second_reminder_sent_at == null && row.second_reminder_status === "pending") {
       const result = await processSingleReminder(admin, row, "appointment_reminder_short")
       if (result === "processed") secondReminderProcessed += 1
       else if (result === "failed") failed += 1
@@ -337,4 +404,8 @@ export async function processDueBookingReminders(): Promise<{
   }
 
   return { ok: true, firstReminderProcessed, secondReminderProcessed, failed, skipped }
+}
+
+export async function processScheduledReminders() {
+  return processDueBookingReminders()
 }

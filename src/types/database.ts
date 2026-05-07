@@ -20,6 +20,11 @@ export type AppointmentStatusDb =
   | "no_show"
 
 export type MessageTemplateTypeDb =
+  | "reminder_24h"
+  | "reminder_before_visit"
+  | "booking_confirmation"
+  | "booking_cancelled_by_client"
+  | "no_show_follow_up"
   | "reminder"
   | "second_reminder"
   | "confirmation"
@@ -766,6 +771,7 @@ export interface Database {
           channel: MessageTemplateChannelDb
           title: string
           content: string
+          timing_minutes_before: number | null
           status: MessageTemplateStatusDb
           created_at: string
           updated_at: string
@@ -777,6 +783,7 @@ export interface Database {
           channel: MessageTemplateChannelDb
           title: string
           content: string
+          timing_minutes_before?: number | null
           status?: MessageTemplateStatusDb
           created_at?: string
           updated_at?: string
@@ -788,6 +795,7 @@ export interface Database {
           channel?: MessageTemplateChannelDb
           title?: string
           content?: string
+          timing_minutes_before?: number | null
           status?: MessageTemplateStatusDb
           created_at?: string
           updated_at?: string

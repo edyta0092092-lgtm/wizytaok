@@ -40,11 +40,14 @@ import {
   countAppointmentReminderIssues,
   countPendingConfirmationAppointments,
 } from "@/lib/dashboard/todo-metrics"
+import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
-const DASHBOARD_TIP_COUNT = 10
+const DASHBOARD_TIP_COUNT = 16
 
 const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = [
   "booked",
@@ -156,7 +159,7 @@ function TodoPanel({
             </Link>
           </li>
           <li>
-            <Link href="/messages" className={rowClass}>
+            <Link href="/messages?filter=failed" className={rowClass}>
               <span className="min-w-0 text-muted-foreground group-hover:text-foreground">
                 {t("dashboard.todoReminderIssuesLabel")}
               </span>
@@ -245,8 +248,17 @@ export default function DashboardPage() {
   } = useAppointmentsStore()
   const appToday = React.useMemo(() => getAppToday(), [])
   const [statusNotice, setStatusNotice] = React.useState("")
+  const [statsLoading, setStatsLoading] = React.useState(true)
+  const [statsError, setStatsError] = React.useState<string | null>(null)
+  const [stats, setStats] = React.useState<TodayDashboardStats>({
+    todayAppointmentsCount: 0,
+    confirmedTodayCount: 0,
+    pendingTodayCount: 0,
+    requiresActionCount: 0,
+    reminderErrorsCount: 0,
+  })
 
-  const statsReady = appointmentsReady && !appointmentsLoadError
+  const statsReady = appointmentsReady && !appointmentsLoadError && !statsLoading && !statsError
 
   const todaysList = React.useMemo(
     () => getAppointmentsForToday(allAppointments, appToday),
@@ -256,21 +268,25 @@ export default function DashboardPage() {
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a)),
     [todaysList]
   )
-  const visitsTodayComputed = plannedToday.length
-  const confirmedToday = todaysList.filter((a) => a.status === "confirmed").length
-  const toConfirm = todaysList.filter((a) => a.status === "pending").length
+  const visitsTodayComputed = stats.todayAppointmentsCount
+  const confirmedToday = stats.confirmedTodayCount
+  const toConfirm = stats.pendingTodayCount
   const needsActionAll = React.useMemo(() => {
     const rows = allAppointments.filter((a) => bookingNeedsAction(a))
     rows.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     return rows
   }, [allAppointments])
   const needsAttention = React.useMemo(() => needsActionAll.slice(0, 12), [needsActionAll])
-  const needsActionCount = React.useMemo(
-    () => countBookingsNeedingAction(allAppointments),
-    [allAppointments]
-  )
-  const pendingConfirmationAll = countPendingConfirmationAppointments(allAppointments)
-  const reminderIssuesAll = countAppointmentReminderIssues(allAppointments)
+  const needsActionCount = stats.requiresActionCount
+  const pendingConfirmationAll = React.useMemo(() => {
+    const todayStart = new Date(appToday)
+    todayStart.setHours(0, 0, 0, 0)
+    return allAppointments.filter((row) => {
+      if (row.status !== "pending") return false
+      return new Date(row.startsAt).getTime() >= todayStart.getTime()
+    }).length
+  }, [allAppointments, appToday])
+  const reminderIssuesAll = stats.reminderErrorsCount
 
   const timeFmt = React.useMemo(
     () =>
@@ -290,6 +306,54 @@ export default function DashboardPage() {
     if (rs === "not_configured" || rs === "simulated_dev") return t("appointments.reminderStatusNotConfigured")
     return t("appointments.reminderStatusScheduled")
   }
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      if (!appointmentsReady || appointmentsLoadError) return
+      setStatsLoading(true)
+      setStatsError(null)
+      try {
+        if (!isSupabaseConfigured()) {
+          const fallback = {
+            todayAppointmentsCount: plannedToday.length,
+            confirmedTodayCount: plannedToday.filter((a) => a.status === "confirmed").length,
+            pendingTodayCount: countPendingConfirmationAppointments(plannedToday),
+            requiresActionCount: countBookingsNeedingAction(allAppointments),
+            reminderErrorsCount: countAppointmentReminderIssues(allAppointments),
+          }
+          if (!cancelled) setStats(fallback)
+          return
+        }
+        const client = getBrowserClient()
+        if (!client) throw new Error("no_client")
+        const businessId = await getCurrentBusinessProfileIdForClient(client)
+        if (!businessId) throw new Error("no_business_id")
+        const nextStats = await getTodayDashboardStats(businessId)
+        if (!cancelled) {
+          setStats(nextStats)
+          if (process.env.NODE_ENV === "development") {
+            console.info("[dashboard.stats]", nextStats)
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "unknown_error"
+        if (!cancelled) {
+          setStatsError(message)
+        }
+        if (process.env.NODE_ENV === "development") {
+          console.info("[dashboard.stats.error]", message)
+        }
+      } finally {
+        if (!cancelled) {
+          setStatsLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [appointmentsReady, appointmentsLoadError, allAppointments, plannedToday])
 
   React.useEffect(() => {
     if (!statusNotice) return
@@ -333,10 +397,10 @@ export default function DashboardPage() {
               </p>
               <h2 className="mt-3 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
                 {!statsReady ? (
-                  appointmentsLoadError ? (
-                    <span className="text-destructive">{t("dashboard.statsLoadError")}</span>
+                  statsError ? (
+                    <span className="text-destructive">Nie udało się załadować podsumowania dnia.</span>
                   ) : (
-                    <span className="text-muted-foreground">{t("dashboard.statsLoading")}</span>
+                    <span className="text-muted-foreground">Ładowanie danych...</span>
                   )
                 ) : visitsTodayComputed === 0 ? (
                   t("dashboard.noAppointmentsTodayLong")
@@ -347,15 +411,15 @@ export default function DashboardPage() {
               <p className="mt-1.5 text-sm text-muted-foreground">
                 {statsReady ? (
                   t("dashboard.needsActionSummary").replace("{count}", String(needsActionCount))
-                ) : appointmentsLoadError ? null : (
-                  t("dashboard.statsLoading")
+                ) : statsError ? null : (
+                  "Ładowanie danych..."
                 )}
               </p>
             </div>
             <div className="grid min-h-[5.25rem] grid-cols-3 gap-2 sm:gap-3">
               {!statsReady ? (
                 <div className="col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
-                  {appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")}
+                  {statsError ? "Nie udało się załadować podsumowania dnia." : "Ładowanie danych..."}
                 </div>
               ) : (
                 <>

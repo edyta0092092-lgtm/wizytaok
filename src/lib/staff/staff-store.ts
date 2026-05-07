@@ -188,6 +188,9 @@ function mapStaffAnyRow(row: Record<string, unknown>): StaffMember | null {
   const businessId = typeof row.business_id === "string" ? row.business_id : ""
   if (!id || !businessId) return null
   const fullName = typeof row.full_name === "string" ? row.full_name.trim() : ""
+  const firstName = typeof row.first_name === "string" ? row.first_name.trim() : ""
+  const lastName = typeof row.last_name === "string" ? row.last_name.trim() : ""
+  const splitName = `${firstName} ${lastName}`.trim()
   const nameRaw = typeof row.name === "string" ? row.name.trim() : ""
   const roleRaw = typeof row.role === "string" ? row.role.trim() : ""
   const emailRaw = typeof row.email === "string" ? row.email.trim() : ""
@@ -197,7 +200,7 @@ function mapStaffAnyRow(row: Record<string, unknown>): StaffMember | null {
   return {
     id,
     businessId,
-    name: fullName || nameRaw || "Bez nazwy",
+    name: fullName || splitName || nameRaw || "Bez nazwy",
     role: roleRaw || undefined,
     email: emailRaw || undefined,
     phone: phoneRaw || undefined,
@@ -283,6 +286,8 @@ export async function addStaffMember(
   businessId: string | null,
   input: {
     name: string
+    firstName?: string
+    lastName?: string
     role?: string
     email?: string
     phone?: string
@@ -292,6 +297,9 @@ export async function addStaffMember(
 ): Promise<AddStaffMemberResult> {
   if (!isSupabaseStaffPath(client, businessId)) return { ok: false, error: "no_supabase" }
   const role = normalizeStaffRole(input.role)
+  const firstName = (input.firstName ?? "").trim()
+  const lastName = (input.lastName ?? "").trim()
+  const fullName = input.name.trim()
   const basePayload = {
     business_id: businessId!,
     role,
@@ -305,7 +313,7 @@ export async function addStaffMember(
       select: (fields: string) => { single: () => Promise<unknown> }
     }
   })
-    .insert({ ...basePayload, name: input.name.trim() })
+    .insert({ ...basePayload, name: fullName })
     .select("id")
     .single()
   const firstData = (firstAttempt as { data?: { id?: string }; error?: { message?: string } }).data
@@ -318,7 +326,12 @@ export async function addStaffMember(
         select: (fields: string) => { single: () => Promise<unknown> }
       }
     })
-      .insert({ ...basePayload, full_name: input.name.trim() })
+      .insert({
+        ...basePayload,
+        full_name: fullName,
+        first_name: firstName || null,
+        last_name: lastName || null,
+      })
       .select("id")
       .single()
     const fallbackData = (fallbackAttempt as { data?: { id?: string }; error?: { message?: string } }).data
@@ -382,6 +395,8 @@ export async function updateStaffMember(
   staffId: string,
   updates: {
     name?: string
+    firstName?: string
+    lastName?: string
     role?: string | null
     email?: string
     phone?: string
@@ -390,34 +405,69 @@ export async function updateStaffMember(
   }
 ): Promise<UpdateStaffMemberResult> {
   if (!isSupabaseStaffPath(client, businessId)) return { ok: false, error: "no_supabase" }
+  const firstName = (updates.firstName ?? "").trim()
+  const lastName = (updates.lastName ?? "").trim()
+  const fullName = updates.name?.trim() ?? `${firstName} ${lastName}`.trim()
   const patch: TablesUpdate<"staff_members"> = {}
-  if (updates.name !== undefined) patch.name = updates.name.trim()
+  if (updates.name !== undefined) patch.name = fullName
   if (updates.role !== undefined) patch.role = normalizeStaffRole(updates.role)
   if (updates.email !== undefined) patch.email = updates.email?.trim() || null
   if (updates.phone !== undefined) patch.phone = updates.phone?.trim() || null
   if (updates.isActive !== undefined) patch.is_active = updates.isActive
+
+  const updateAndVerify = async (payload: Record<string, unknown>) => {
+    // prefer scoping by business_id, but fall back for legacy schemas
+    const attemptScoped = await client!
+      .from("staff_members")
+      .update(payload as never)
+      .eq("id", staffId)
+      .eq("business_id", businessId!)
+      .select("id")
+      .maybeSingle()
+    if (attemptScoped.error && isMissingColumnError(attemptScoped.error.message, "business_id")) {
+      const attemptLoose = await client!
+        .from("staff_members")
+        .update(payload as never)
+        .eq("id", staffId)
+        .select("id")
+        .maybeSingle()
+      return attemptLoose
+    }
+    return attemptScoped
+  }
+
   if (Object.keys(patch).length > 0) {
-    const { error } = await client!.from("staff_members").update(patch).eq("id", staffId)
-    if (error) {
-      if (updates.name !== undefined && isMissingColumnError(error.message, "name")) {
+    const primary = await updateAndVerify(patch as unknown as Record<string, unknown>)
+    if (primary.error || !primary.data) {
+      if (
+        updates.name !== undefined &&
+        isMissingColumnError(primary.error?.message, "name")
+      ) {
         const fallbackPatch: Record<string, unknown> = {
-          full_name: updates.name.trim(),
+          full_name: fullName,
+          first_name: firstName || null,
+          last_name: lastName || null,
         }
         if (updates.role !== undefined) fallbackPatch.role = normalizeStaffRole(updates.role)
         if (updates.email !== undefined) fallbackPatch.email = updates.email?.trim() || null
         if (updates.phone !== undefined) fallbackPatch.phone = updates.phone?.trim() || null
         if (updates.isActive !== undefined) fallbackPatch.is_active = updates.isActive
-        const fallback = await (client!.from("staff_members") as unknown as {
-          update: (payload: Record<string, unknown>) => {
-            eq: (column: string, value: string) => Promise<unknown>
+        const fallback = await updateAndVerify(fallbackPatch)
+        if (fallback.error || !fallback.data) {
+          return {
+            ok: false,
+            error:
+              fallback.error?.message ??
+              "Brak rekordu po aktualizacji (RLS/ID/business_id).",
           }
-        })
-          .update(fallbackPatch)
-          .eq("id", staffId)
-        const fallbackError = (fallback as { error?: { message?: string } }).error
-        if (fallbackError) return { ok: false, error: fallbackError.message }
+        }
       } else {
-        return { ok: false, error: error.message }
+        return {
+          ok: false,
+          error:
+            primary.error?.message ??
+            "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+        }
       }
     }
   }

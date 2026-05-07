@@ -6,7 +6,12 @@ import { unwrapSupabaseBookingAppointmentId, updateBooking } from "@/lib/booking
 import { unwrapPublicAppointmentId, updatePublicBooking } from "@/lib/bookings/public-bookings"
 import { DEMO_BOOKING_SLUG, normalizePublicSlug } from "@/lib/business/slug"
 import { initialClientsList } from "@/data/mock-clients"
-import { normalizeEmail as normalizeEmailForMatch, normalizePhone as normalizePhoneForMatch } from "@/lib/clients/normalize"
+import {
+  normalizeEmail as normalizeEmailCanonical,
+  normalizeEmail as normalizeEmailForMatch,
+  normalizePhone as normalizePhoneCanonical,
+  normalizePhone as normalizePhoneForMatch,
+} from "@/lib/clients/normalize"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { getClients, updateClient } from "@/lib/supabase/repositories/clients.repository"
@@ -548,7 +553,7 @@ export async function persistClientUpdates(args: {
   businessProfileId: string | null
   businessSlugNormalized: string | null
   currentList: Client[]
-}): Promise<{ ok: true; clients: Client[] } | { ok: false }> {
+}): Promise<{ ok: true; clients: Client[] } | { ok: false; errorMessage?: string }> {
   const { mode, clientId, prior, nextFields, businessProfileId } = args
   const slugNormResolved = args.businessSlugNormalized
     ? normalizePublicSlug(args.businessSlugNormalized)
@@ -561,14 +566,33 @@ export async function persistClientUpdates(args: {
 
   const sb = getBrowserClient()
 
-  if (mode === "supabase_clients" && businessProfileId && sb && isLikelyUuidClientId(clientId)) {
-    const patchRes = await updateClient(sb, businessProfileId, clientId, {
+  if (mode === "supabase_clients" && businessProfileId && sb) {
+    const payload: TablesUpdate<"clients"> = {
       full_name: fullName,
-      phone,
+      phone: phone || "",
       email: emailRaw || "",
+      normalized_phone: normalizePhoneCanonical(phone),
+      normalized_email: normalizeEmailCanonical(emailRaw),
       notes: notesTrim.length > 0 ? notesTrim : null,
+      updated_at: new Date().toISOString(),
+    }
+    const patchRes = await updateClient(sb, businessProfileId, clientId, {
+      ...payload,
     })
-    if (patchRes.error || !patchRes.data) return { ok: false }
+    if (process.env.NODE_ENV === "development") {
+      console.info("[clients.update]", {
+        clientId,
+        businessId: businessProfileId,
+        payload,
+        error: patchRes.error?.message ?? null,
+      })
+    }
+    if (patchRes.error || !patchRes.data) {
+      return {
+        ok: false,
+        errorMessage: patchRes.error?.message ?? "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+      }
+    }
     await propagateContactToRelatedBookings(prior, { ...nextFields, fullName, phone, email: emailRaw }, businessProfileId, slugNormResolved)
     const reload = await loadClientsWorkspace()
     return { ok: true, clients: reload.clients }

@@ -192,87 +192,85 @@ export default function AvailabilityPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-4 py-3.5">
+            <CardContent className="px-3 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.workingDays")}
               </p>
-              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+              <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
                 {workingDays}
               </p>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-4 py-3.5">
+            <CardContent className="px-3 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.weeklyHours")}
               </p>
-              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+              <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
                 {weeklyHours} h
               </p>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-4 py-3.5">
+            <CardContent className="px-3 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.earliest")}
               </p>
-              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+              <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
                 {earliest}
               </p>
             </CardContent>
           </Card>
 
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-4 py-3.5">
+            <CardContent className="px-3 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.latest")}
               </p>
-              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+              <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
                 {latest}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <Card className="mt-5 rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+        <Card className="mt-4 rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
           <CardHeader className="border-b border-border/70 py-4">
             <CardTitle className="flex items-center gap-2 text-sm font-semibold">
               <CalendarDays className="size-4 text-primary" aria-hidden />
               {t("availability.workingHours")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4" data-tour="availability-list">
-            <ul className="flex min-w-0 flex-col gap-2.5">
+          <CardContent className="pt-3" data-tour="availability-list">
+            <ul className="flex min-w-0 flex-col gap-2">
               {days.map((day) => (
                 <li key={day.id} className="min-w-0">
-                  <div className="grid gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3 md:grid-cols-[1.2fr_auto_1fr_1fr] md:items-center">
+                  <div className="grid gap-2 rounded-2xl border border-border bg-muted/20 px-3 py-2.5 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-foreground">
+                      <p className="truncate text-sm font-semibold text-foreground">
                         {weekdayLabel(day.label)}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2 md:justify-start">
+                      <span className="text-xs text-muted-foreground md:hidden">
+                        {day.isOpen ? t("availability.open") : t("availability.closed")}
+                      </span>
                       <Switch
                         checked={day.isOpen}
-                        onCheckedChange={(checked) =>
-                          updateDay(day.id, { isOpen: Boolean(checked) })
-                        }
+                        onCheckedChange={(checked) => updateDay(day.id, { isOpen: Boolean(checked) })}
                         disabled={loading || loadError}
                         aria-label={day.isOpen ? t("availability.open") : t("availability.closed")}
                       />
-                      <span className="text-xs text-muted-foreground">
-                        {day.isOpen ? t("availability.open") : t("availability.closed")}
-                      </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor={`from-${day.id}`} className="text-xs">
+                      <div>
+                        <Label htmlFor={`from-${day.id}`} className="sr-only">
                           {t("availability.from")}
                         </Label>
                         <Input
@@ -280,14 +278,12 @@ export default function AvailabilityPage() {
                           type="time"
                           value={day.startTime}
                           disabled={!day.isOpen || loading || loadError}
-                          onChange={(e) =>
-                            updateDay(day.id, { startTime: e.target.value })
-                          }
-                          className="h-9 rounded-xl"
+                          onChange={(e) => updateDay(day.id, { startTime: e.target.value })}
+                          className="h-8 rounded-xl"
                         />
                       </div>
-                      <div className="space-y-1">
-                        <Label htmlFor={`to-${day.id}`} className="text-xs">
+                      <div>
+                        <Label htmlFor={`to-${day.id}`} className="sr-only">
                           {t("availability.to")}
                         </Label>
                         <Input
@@ -295,19 +291,15 @@ export default function AvailabilityPage() {
                           type="time"
                           value={day.endTime}
                           disabled={!day.isOpen || loading || loadError}
-                          onChange={(e) =>
-                            updateDay(day.id, { endTime: e.target.value })
-                          }
-                          className="h-9 rounded-xl"
+                          onChange={(e) => updateDay(day.id, { endTime: e.target.value })}
+                          className="h-8 rounded-xl"
                         />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-start gap-2 text-xs text-muted-foreground md:justify-end">
+                    <div className="hidden items-center justify-end gap-2 text-xs text-muted-foreground md:flex">
                       <Clock className="size-3.5" aria-hidden />
-                      {day.isOpen
-                        ? `${day.startTime} - ${day.endTime}`
-                        : t("availability.closed")}
+                      {day.isOpen ? `${day.startTime} - ${day.endTime}` : t("availability.closed")}
                     </div>
                   </div>
                 </li>

@@ -64,12 +64,16 @@ function toPgTimeHm(t: string): string {
 }
 
 function mapDbStatusToAppointmentStatus(s: string): AppointmentStatus {
-  switch (s) {
+  const status = String(s ?? "").trim().toLowerCase()
+  switch (status) {
     case "pending":
       return "pending"
     case "confirmed":
       return "confirmed"
     case "cancelled":
+    case "canceled":
+    case "anulowana":
+    case "anulowane":
       return "cancelled"
     case "no_show":
       return "no_show"

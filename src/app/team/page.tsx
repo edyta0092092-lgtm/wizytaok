@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, Copy, Pencil, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { applyStaffPanelAccess, syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
@@ -44,6 +45,7 @@ import {
   updateStaffMember,
   type StaffAvailabilityRuleInput,
 } from "@/lib/staff/staff-store"
+import { getStaffDisplayName } from "@/lib/staff/staff-display"
 import type { Service, StaffMember } from "@/types/domain"
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const
@@ -430,6 +432,11 @@ export default function TeamPage() {
     panelMemberRole: "staff",
   })
   const [savedServiceIds, setSavedServiceIds] = React.useState<string[]>([])
+  const [sidebarTab, setSidebarTab] = React.useState<"members" | "invites">("members")
+  const [formTab, setFormTab] = React.useState<
+    "profile" | "panel" | "services" | "schedule" | "exceptions"
+  >("profile")
+  const [staffQuery, setStaffQuery] = React.useState("")
 
   const dateTimeFmt = React.useMemo(
     () =>
@@ -817,7 +824,7 @@ export default function TeamPage() {
     const emailTrim = form.email.trim()
     const phoneNormalized = normalizePolishPhone(form.phone)
     if (!firstName || !name) {
-      setNotice(t("team.validationNameRequired"))
+      setNotice(language === "en" ? "First name is required." : "Imię jest wymagane.")
       setNoticeDetail(null)
       return false
     }
@@ -915,7 +922,7 @@ export default function TeamPage() {
       }
       const notices: string[] = []
       const msgAllSaved =
-        t("team.changesSaved")
+        language === "en" ? "Changes were saved." : "Zmiany zostały zapisane."
       const msgPartialSaved =
         language === "en"
           ? "Staff member was saved. Some additional settings need to be saved again."
@@ -933,8 +940,26 @@ export default function TeamPage() {
         }
       }
       if (!editing) {
+        if (process.env.NODE_ENV === "development") {
+          console.info("[team.staff.save]", {
+            staffId: null,
+            businessId: bid,
+            payload: {
+              firstName: form.firstName,
+              lastName: form.lastName,
+              fullName: name,
+              phone: phoneForSave,
+              email: form.email,
+              isActive: form.isActive,
+              role: form.panelMemberRole,
+            },
+            error: null,
+          })
+        }
         const created = await addStaffMember(client, bid, {
           name,
+          firstName: form.firstName,
+          lastName: form.lastName,
           role: form.panelMemberRole,
           email: form.email,
           phone: phoneForSave,
@@ -1037,11 +1062,39 @@ export default function TeamPage() {
         } else {
           setNotice(msgAllSaved)
           setNoticeDetail(null)
+          if (process.env.NODE_ENV === "development") {
+            console.info("[team.staff.saved]", {
+              saved: {
+                id: newStaffId,
+                fullName: name,
+                firstName: form.firstName.trim(),
+                lastName: form.lastName.trim(),
+              },
+            })
+          }
         }
         return
       }
+      if (process.env.NODE_ENV === "development") {
+        console.info("[team.staff.save]", {
+          staffId: editing.id,
+          businessId: bid,
+          payload: {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            fullName: name,
+            phone: phoneForSave,
+            email: form.email,
+            isActive: form.isActive,
+            role: form.panelMemberRole,
+          },
+          error: null,
+        })
+      }
       const out = await updateStaffMember(client, bid, editing.id, {
         name,
+        firstName: form.firstName,
+        lastName: form.lastName,
         role: form.panelMemberRole,
         email: form.email,
         phone: phoneForSave,
@@ -1049,6 +1102,18 @@ export default function TeamPage() {
         serviceIds: form.serviceIds,
       })
       if (!out.ok) {
+        if (process.env.NODE_ENV === "development") {
+          console.info("[team.staff.save]", {
+            staffId: editing.id,
+            businessId: bid,
+            payload: {
+              firstName: form.firstName,
+              lastName: form.lastName,
+              fullName: name,
+            },
+            error: out.error ?? null,
+          })
+        }
         setSaveErrorWithDetail(t("team.saveError"), out.error)
         return
       }
@@ -1144,6 +1209,16 @@ export default function TeamPage() {
       } else {
         setNotice(msgAllSaved)
         setNoticeDetail(null)
+        if (process.env.NODE_ENV === "development") {
+          console.info("[team.staff.saved]", {
+            saved: {
+              id: editing.id,
+              fullName: name,
+              firstName: form.firstName.trim(),
+              lastName: form.lastName.trim(),
+            },
+          })
+        }
       }
       const [{ rules: refreshedRules, exceptions: refreshedExceptions }, refreshedServiceIds] = await Promise.all([
         getStaffAvailabilityContextForBusiness(client, bid, editing.id),
@@ -1271,6 +1346,14 @@ export default function TeamPage() {
     () => panelInvites.filter((inv) => inv.status === "pending"),
     [panelInvites],
   )
+  const filteredStaff = React.useMemo(() => {
+    const q = staffQuery.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((s) => {
+      const hay = `${s.name} ${(s.email ?? "").trim()} ${(s.phone ?? "").trim()}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [items, staffQuery])
 
   const inviteStatusLabel = (status: string) => {
     if (status === "pending") return t("invitations.pendingInvitation")
@@ -1289,7 +1372,10 @@ export default function TeamPage() {
     )
   }
 
-  const formCardTitle = editing ? t("team.edit") : t("team.addPersonCard")
+  const livePersonName = joinPersonName(form.firstName, form.lastName)
+  const formCardTitle = editing
+    ? `${t("team.edit")}${livePersonName ? ` — ${livePersonName}` : ""}`
+    : `${t("team.addPersonCard")}${livePersonName ? ` — ${livePersonName}` : ""}`
   const submitLabel = editing ? t("team.saveChanges") : t("team.save")
   const showSchedulePreview = Boolean(editing) && !isScheduleEditing
   const showExceptionsPreview = Boolean(editing) && !isExceptionsEditing
@@ -1319,12 +1405,12 @@ export default function TeamPage() {
           </div>
         ) : null}
 
-        <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(560px,1fr)_420px] xl:items-start">
-          <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
-            <CardHeader>
-              <CardTitle className="text-lg">{formCardTitle}</CardTitle>
-              {editing ? (
-                <div className="mt-2 flex flex-wrap gap-2">
+        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
+            <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
+              <CardHeader className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-lg">{t("navigation.team")}</CardTitle>
                   <Button
                     type="button"
                     variant="outline"
@@ -1332,6 +1418,199 @@ export default function TeamPage() {
                     onClick={() => resetFormToCreate()}
                   >
                     + {t("team.addPersonCard")}
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="team-staff-search" className="text-xs text-muted-foreground">
+                    {language === "en" ? "Search" : "Szukaj"}
+                  </Label>
+                  <Input
+                    id="team-staff-search"
+                    value={staffQuery}
+                    onChange={(e) => setStaffQuery(e.target.value)}
+                    placeholder={language === "en" ? "Name, email, phone..." : "Imię, e-mail, telefon..."}
+                    className="h-10 rounded-xl"
+                  />
+                </div>
+                <Tabs
+                  value={sidebarTab}
+                  onValueChange={(v) => setSidebarTab(v === "invites" ? "invites" : "members")}
+                  className="w-full"
+                >
+                  <TabsList className="w-full">
+                    <TabsTrigger value="members" className="flex-1">
+                      {t("team.teamMembersTitle")}
+                    </TabsTrigger>
+                    {access.ready && access.canManageInvitations ? (
+                      <TabsTrigger value="invites" className="flex-1">
+                        {t("team.pendingInvitationsTitle")}
+                      </TabsTrigger>
+                    ) : null}
+                  </TabsList>
+                </Tabs>
+              </CardHeader>
+              <CardContent className="min-w-0 space-y-3">
+                <Tabs value={sidebarTab} className="w-full">
+                  <TabsContent value="members" className="mt-0 space-y-3">
+                    {loading ? <p className="text-sm text-muted-foreground">{t("team.loading")}</p> : null}
+                    {!loading && staffLoadError ? (
+                      <p className="text-sm text-destructive">
+                        {language === "en" ? "Failed to load team members." : "Nie udało się załadować osób."}
+                      </p>
+                    ) : null}
+                    {!loading && !staffLoadError && items.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
+                    ) : null}
+                    {!loading && !staffLoadError && items.length > 0 && filteredStaff.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {language === "en" ? "No matches." : "Brak wyników."}
+                      </p>
+                    ) : null}
+                    {!loading &&
+                      filteredStaff.map((staff) => {
+                        const svcIds = serviceIdsByStaff[staff.id] ?? []
+                        const svcNames = svcIds
+                          .map((sid) => services.find((s) => s.id === sid)?.name)
+                          .filter(Boolean)
+                          .join(", ")
+                        const staffRoleLabel =
+                          normalizeStaffRole(staff.role) === "admin"
+                            ? t("invitations.adminRoleOption")
+                            : t("invitations.staffRoleOption")
+                        return (
+                          <button
+                            key={staff.id}
+                            type="button"
+                            onClick={() => beginEdit(staff)}
+                            className={`w-full rounded-xl border p-3 text-left text-sm transition ${
+                              editing?.id === staff.id
+                                ? "border-primary/40 bg-[color:var(--nav-active-bg)]"
+                                : "border-border/80 bg-muted/10 hover:bg-muted/20"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="truncate font-semibold text-foreground">{getStaffDisplayName(staff)}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {(staff.email ?? "").trim() || "-"} · {(staff.phone ?? "").trim() || "-"}
+                                </p>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {t("team.panelRole")}: {staffRoleLabel}
+                                </p>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {t("team.servicesShort")}: {svcNames || t("team.noServicesAssigned")}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={staff.isActive ? "default" : "secondary"}
+                                className="shrink-0 rounded-lg text-[0.65rem] font-normal"
+                              >
+                                {staff.isActive ? t("team.active") : t("services.hiddenStatus")}
+                              </Badge>
+                            </div>
+                          </button>
+                        )
+                      })}
+                  </TabsContent>
+
+                  {access.ready && access.canManageInvitations ? (
+                    <TabsContent value="invites" className="mt-0 space-y-3">
+                      <p className="text-xs text-muted-foreground">{t("invitations.noEmailBackend")}</p>
+                      {pendingInvites.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">{t("team.pendingInvitationsEmpty")}</p>
+                      ) : (
+                        <ul className="space-y-3">
+                          {pendingInvites.map((inv) => {
+                            const roleLabel =
+                              inv.role === "admin"
+                                ? t("invitations.adminRoleOption")
+                                : t("invitations.staffRoleOption")
+                            const created = dateTimeFmt.format(new Date(inv.created_at))
+                            const highlight = inviteHighlightId === inv.id
+                            return (
+                              <li
+                                key={inv.id}
+                                className={`rounded-xl border px-3 py-3 text-sm ${
+                                  highlight
+                                    ? "border-primary/40 bg-[color:var(--nav-active-bg)]"
+                                    : "border-border/80 bg-muted/10"
+                                }`}
+                              >
+                                <div className="min-w-0 space-y-1">
+                                  <p className="truncate font-medium">{inv.email}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("team.panelRole")}: {roleLabel}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("team.inviteCreatedAt")}: {created}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("team.inviteStatus")}: {inviteStatusLabel(inv.status)}
+                                  </p>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-10 w-full rounded-xl"
+                                    onClick={() => void copyInvitationLink(inv.token)}
+                                  >
+                                    <Copy className="size-4" aria-hidden />
+                                    {t("invitations.copyInvitationLink")}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="h-10 w-full rounded-xl text-destructive hover:text-destructive"
+                                    onClick={() => void cancelInvitation(inv.id)}
+                                  >
+                                    {t("team.cancelInvitation")}
+                                  </Button>
+                                </div>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </TabsContent>
+                  ) : null}
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
+            <CardHeader>
+              <CardTitle className="text-lg">{formCardTitle}</CardTitle>
+              {editing ? (
+                <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                  {editing.isActive ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-xl px-3"
+                      onClick={() => void deactivateStaff(editing)}
+                    >
+                      {t("team.deactivate")}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 rounded-xl px-3"
+                      onClick={() => void activateStaff(editing)}
+                    >
+                      {t("team.activate")}
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="h-9 rounded-xl px-3"
+                    onClick={() => void remove(editing.id)}
+                  >
+                    <Trash2 className="size-4" aria-hidden />
+                    {t("common.delete")}
                   </Button>
                 </div>
               ) : null}
@@ -1348,585 +1627,666 @@ export default function TeamPage() {
                 }}
                 className="space-y-6"
               >
-                <div className={editing ? "max-w-3xl space-y-6" : "space-y-6"}>
-                <div className="space-y-3">
-                  <p className="text-sm font-semibold text-foreground">{t("team.personDetailsSection")}</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="staff-first-name">{t("team.firstName")}</Label>
-                      <Input
-                        id="staff-first-name"
-                        value={form.firstName}
-                        onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                        className="h-11 rounded-xl"
-                        autoComplete="given-name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="staff-last-name">{t("team.lastName")}</Label>
-                      <Input
-                        id="staff-last-name"
-                        value={form.lastName}
-                        onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                        className="h-11 rounded-xl"
-                        autoComplete="family-name"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="staff-phone">{t("team.phone")}</Label>
-                    <Input
-                      id="staff-phone"
-                      value={form.phone}
-                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                      className="h-11 rounded-xl"
-                      autoComplete="tel"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="staff-email">{t("team.contactEmail")}</Label>
-                    <Input
-                      id="staff-email"
-                      type="email"
-                      value={form.email}
-                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                      className="h-11 rounded-xl"
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                    <Label htmlFor="staff-active">{t("team.active")}</Label>
-                    <Switch
-                      id="staff-active"
-                      checked={form.isActive}
-                      onCheckedChange={(checked) => setForm((f) => ({ ...f, isActive: Boolean(checked) }))}
-                    />
-                  </div>
-                </div>
-
-                {access.canManageInvitations ? (
-                  <div className="space-y-4 rounded-xl border border-border/70 bg-muted/10 p-4">
-                    <p className="text-sm font-semibold text-foreground">{t("team.panelAccessSection")}</p>
-                    <div className="space-y-2">
-                      <Label htmlFor="panel-member-role">{t("team.panelRole")}</Label>
-                      <Select
-                        value={form.panelMemberRole}
-                        onValueChange={(v) =>
-                          setForm((f) => ({
-                            ...f,
-                            panelMemberRole: v === "admin" ? "admin" : "staff",
-                          }))
-                        }
-                      >
-                        <SelectTrigger id="panel-member-role" className="h-11 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="staff">{t("invitations.staffRoleOption")}</SelectItem>
-                          <SelectItem value="admin">{t("invitations.adminRoleOption")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      {form.panelMemberRole === "admin"
-                        ? t("team.panelRoleOwnerHint")
-                        : t("team.panelRoleStaffHint")}
-                    </p>
-                    <p className="text-xs leading-relaxed text-muted-foreground">{t("team.panelAccessIntro")}</p>
-                  </div>
-                ) : null}
-
-                <div className="min-w-0 space-y-3 rounded-xl border border-border/70 p-4">
-                  <p className="text-sm font-semibold text-foreground">{t("team.servicesForStaff")}</p>
-                  <div className="min-w-0 space-y-2">
-                    {services.length === 0 ? (
-                      <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
-                        <p>{t("team.servicesEmptyHint")}</p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="mt-3 h-11 w-full rounded-xl sm:w-auto"
-                          asChild
-                        >
-                          <Link href="/services">{t("team.goToServices")}</Link>
-                        </Button>
-                      </div>
-                    ) : (
-                      <ul className="space-y-2">
-                        {services.map((service) => {
-                          const checked = form.serviceIds.includes(service.id)
-                          const canAssign = service.isActive || checked
-                          return (
-                            <li key={service.id} className="min-w-0">
-                              <label
-                                className={`flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left text-sm transition-colors ${
-                                  checked
-                                    ? "border-primary bg-[color:var(--nav-active-bg)]"
-                                    : "border-border bg-card"
-                                } ${!canAssign ? "cursor-not-allowed opacity-60" : ""}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="mt-1 size-4 shrink-0 rounded border-border"
-                                  checked={checked}
-                                  disabled={!canAssign}
-                                  onChange={() => toggleService(service.id, service.isActive)}
-                                />
-                                <span className="min-w-0 flex-1">
-                                  <span className="block font-medium text-foreground">{service.name}</span>
-                                  <span className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-muted-foreground">
-                                    <span>
-                                      {t("team.durationLabel").replace("{n}", String(service.durationMinutes))}
-                                    </span>
-                                    <span aria-hidden>·</span>
-                                    <span>{formatPrice(service)}</span>
-                                    {!service.isActive ? (
-                                      <>
-                                        <span aria-hidden>·</span>
-                                        <Badge variant="secondary" className="text-[0.65rem] font-normal">
-                                          {t("services.hiddenStatus")}
-                                        </Badge>
-                                      </>
-                                    ) : null}
-                                  </span>
-                                </span>
-                              </label>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-                    {activeServices.length === 0 && services.length > 0 ? (
-                      <p className="text-xs text-muted-foreground">{t("team.servicesOnlyHiddenHint")}</p>
+                <Tabs
+                  value={formTab}
+                  onValueChange={(v) => {
+                    const allowed =
+                      v === "panel" || v === "services" || v === "schedule" || v === "exceptions" ? v : "profile"
+                    setFormTab(allowed)
+                  }}
+                  className="w-full"
+                >
+                  <TabsList className="w-full flex-wrap justify-start gap-1">
+                    <TabsTrigger value="profile">{t("team.personDetailsSection")}</TabsTrigger>
+                    {access.canManageInvitations ? (
+                      <TabsTrigger value="panel">{t("team.panelAccessSection")}</TabsTrigger>
                     ) : null}
-                  </div>
-                </div>
-                </div>
+                    <TabsTrigger value="services">{t("team.servicesForStaff")}</TabsTrigger>
+                    <TabsTrigger value="schedule">{t("team.schedule")}</TabsTrigger>
+                    <TabsTrigger value="exceptions">{t("team.scheduleExceptionsTitle")}</TabsTrigger>
+                  </TabsList>
 
-                <div className="w-full max-w-none min-w-0 space-y-5 overflow-x-hidden rounded-xl border border-border/70 p-4">
-                  <p className="text-sm font-semibold text-foreground">{t("team.schedule")}</p>
-                  {showSchedulePreview ? (
-                    <div className="space-y-3">
-                      {form.useBusinessHours ? (
-                        <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                          <p className="text-sm font-medium text-foreground">{t("team.usesBusinessWorkingHours")}</p>
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            {t("team.usesBusinessWorkingHoursDescription")}
-                          </p>
+                  <TabsContent value="profile" className="mt-5 space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="staff-first-name">{t("team.firstName")}</Label>
+                        <Input
+                          id="staff-first-name"
+                          value={form.firstName}
+                          onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                          className="h-11 rounded-xl"
+                          autoComplete="given-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="staff-last-name">{t("team.lastName")}</Label>
+                        <Input
+                          id="staff-last-name"
+                          value={form.lastName}
+                          onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                          className="h-11 rounded-xl"
+                          autoComplete="family-name"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="staff-phone">{t("team.phone")}</Label>
+                      <Input
+                        id="staff-phone"
+                        value={form.phone}
+                        onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+                        className="h-11 rounded-xl"
+                        autoComplete="tel"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="staff-email">{t("team.contactEmail")}</Label>
+                      <Input
+                        id="staff-email"
+                        type="email"
+                        value={form.email}
+                        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                        className="h-11 rounded-xl"
+                        autoComplete="email"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                      <Label htmlFor="staff-active">{t("team.active")}</Label>
+                      <Switch
+                        id="staff-active"
+                        checked={form.isActive}
+                        onCheckedChange={(checked) =>
+                          setForm((f) => ({ ...f, isActive: Boolean(checked) }))
+                        }
+                      />
+                    </div>
+                  </TabsContent>
+
+                  {access.canManageInvitations ? (
+                    <TabsContent value="panel" className="mt-5 space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="panel-member-role">{t("team.panelRole")}</Label>
+                        <Select
+                          value={form.panelMemberRole}
+                          onValueChange={(v) =>
+                            setForm((f) => ({
+                              ...f,
+                              panelMemberRole: v === "admin" ? "admin" : "staff",
+                            }))
+                          }
+                        >
+                          <SelectTrigger id="panel-member-role" className="h-11 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="staff">{t("invitations.staffRoleOption")}</SelectItem>
+                            <SelectItem value="admin">{t("invitations.adminRoleOption")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          {form.panelMemberRole === "admin"
+                            ? t("team.panelRoleOwnerHint")
+                            : t("team.panelRoleStaffHint")}
+                        </p>
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                          {t("team.panelAccessIntro")}
+                        </p>
+                      </div>
+                    </TabsContent>
+                  ) : null}
+
+                  <TabsContent value="services" className="mt-5 space-y-3">
+                    <div className="min-w-0 space-y-2">
+                      {services.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+                          <p>{t("team.servicesEmptyHint")}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-3 h-11 w-full rounded-xl sm:w-auto"
+                            asChild
+                          >
+                            <Link href="/services">{t("team.goToServices")}</Link>
+                          </Button>
                         </div>
                       ) : (
-                        form.rules.map((rule) => (
-                          <div
-                            key={rule.weekday}
-                            className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm leading-relaxed text-foreground"
-                          >
-                            <span className="font-medium">{t(weekdayLabelKey(rule.weekday))}</span>
-                            <span className="text-muted-foreground">: </span>
-                            {rule.isAvailable ? (
-                              <>
-                                <span>{t("availability.open")}</span>
-                                <span className="text-muted-foreground">
-                                  {" "}
-                                  {rule.startTime}-{rule.endTime}
-                                </span>
-                              </>
+                        <ul className="space-y-2">
+                          {services.map((service) => {
+                            const checked = form.serviceIds.includes(service.id)
+                            const canAssign = service.isActive || checked
+                            return (
+                              <li key={service.id} className="min-w-0">
+                                <label
+                                  className={`flex min-w-0 cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left text-sm transition-colors ${
+                                    checked
+                                      ? "border-primary bg-[color:var(--nav-active-bg)]"
+                                      : "border-border bg-card"
+                                  } ${!canAssign ? "cursor-not-allowed opacity-60" : ""}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="mt-1 size-4 shrink-0 rounded border-border"
+                                    checked={checked}
+                                    disabled={!canAssign}
+                                    onChange={() => toggleService(service.id, service.isActive)}
+                                  />
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block font-medium text-foreground">{service.name}</span>
+                                    <span className="mt-0.5 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-muted-foreground">
+                                      <span>
+                                        {t("team.durationLabel").replace("{n}", String(service.durationMinutes))}
+                                      </span>
+                                      <span aria-hidden>·</span>
+                                      <span>{formatPrice(service)}</span>
+                                      {!service.isActive ? (
+                                        <>
+                                          <span aria-hidden>·</span>
+                                          <Badge variant="secondary" className="text-[0.65rem] font-normal">
+                                            {t("services.hiddenStatus")}
+                                          </Badge>
+                                        </>
+                                      ) : null}
+                                    </span>
+                                  </span>
+                                </label>
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                      {activeServices.length === 0 && services.length > 0 ? (
+                        <p className="text-xs text-muted-foreground">{t("team.servicesOnlyHiddenHint")}</p>
+                      ) : null}
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="schedule" className="mt-5">
+                    <div className="space-y-5">
+                      <div className="w-full max-w-none min-w-0 space-y-5 overflow-x-hidden rounded-xl border border-border/70 p-4">
+                        <p className="text-sm font-semibold text-foreground">{t("team.schedule")}</p>
+                        {showSchedulePreview ? (
+                          <div className="space-y-3">
+                            {form.useBusinessHours ? (
+                              <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                                <p className="text-sm font-medium text-foreground">
+                                  {t("team.usesBusinessWorkingHours")}
+                                </p>
+                                <p className="text-xs leading-relaxed text-muted-foreground">
+                                  {t("team.usesBusinessWorkingHoursDescription")}
+                                </p>
+                              </div>
                             ) : (
-                              <span>{t("availability.closed")}</span>
+                              form.rules.map((rule) => (
+                                <div
+                                  key={rule.weekday}
+                                  className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-sm leading-relaxed text-foreground"
+                                >
+                                  <span className="font-medium">{t(weekdayLabelKey(rule.weekday))}</span>
+                                  <span className="text-muted-foreground">: </span>
+                                  {rule.isAvailable ? (
+                                    <>
+                                      <span>{t("availability.open")}</span>
+                                      <span className="text-muted-foreground">
+                                        {" "}
+                                        {rule.startTime}-{rule.endTime}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span>{t("availability.closed")}</span>
+                                  )}
+                                </div>
+                              ))
+                            )}
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-10 rounded-xl"
+                                onClick={() => setIsScheduleEditing(true)}
+                              >
+                                {t("team.editSchedule")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <Label htmlFor="use-biz-hours" className="text-sm font-medium">
+                                  {t("team.useBusinessHours")}
+                                </Label>
+                                <Switch
+                                  id="use-biz-hours"
+                                  checked={form.useBusinessHours}
+                                  onCheckedChange={(checked) =>
+                                    setForm((f) => ({ ...f, useBusinessHours: Boolean(checked) }))
+                                  }
+                                />
+                              </div>
+                              {form.useBusinessHours ? (
+                                <p className="text-xs leading-relaxed text-muted-foreground">
+                                  {t("team.useBusinessHoursDescription")}
+                                </p>
+                              ) : null}
+                            </div>
+                            {!form.useBusinessHours
+                              ? form.rules.map((rule) => (
+                                  <div
+                                    key={rule.weekday}
+                                    className="min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-3"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="text-sm font-medium text-foreground">
+                                        {t(weekdayLabelKey(rule.weekday))}
+                                      </span>
+                                      <Switch
+                                        checked={rule.isAvailable}
+                                        onCheckedChange={(checked) =>
+                                          updateRule(rule.weekday, { isAvailable: Boolean(checked) })
+                                        }
+                                        aria-label={t(weekdayLabelKey(rule.weekday))}
+                                      />
+                                    </div>
+                                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+                                      <div className="min-w-0 space-y-1.5">
+                                        <Label
+                                          className="text-xs text-muted-foreground"
+                                          htmlFor={`start-${rule.weekday}`}
+                                        >
+                                          {t("team.timeFrom")}
+                                        </Label>
+                                        <Input
+                                          id={`start-${rule.weekday}`}
+                                          type="time"
+                                          value={rule.startTime}
+                                          onChange={(e) =>
+                                            updateRule(rule.weekday, { startTime: e.target.value })
+                                          }
+                                          disabled={!rule.isAvailable}
+                                          className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
+                                        />
+                                      </div>
+                                      <div className="min-w-0 space-y-1.5">
+                                        <Label
+                                          className="text-xs text-muted-foreground"
+                                          htmlFor={`end-${rule.weekday}`}
+                                        >
+                                          {t("team.timeTo")}
+                                        </Label>
+                                        <Input
+                                          id={`end-${rule.weekday}`}
+                                          type="time"
+                                          value={rule.endTime}
+                                          onChange={(e) =>
+                                            updateRule(rule.weekday, { endTime: e.target.value })
+                                          }
+                                          disabled={!rule.isAvailable}
+                                          className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))
+                              : null}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="exceptions" className="mt-5">
+                    <div className="space-y-5">
+                      <div className="w-full max-w-none min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-4">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-foreground">{t("team.scheduleExceptionsTitle")}</p>
+                          <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsHint")}</p>
+                        </div>
+                        <div className="space-y-6">
+                          <div className={`min-w-0 ${isExceptionsEditing ? "space-y-3" : ""}`}>
+                            {isExceptionsEditing ? (
+                              <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
+                                <p className="text-sm font-semibold text-foreground">
+                                  {language === "en" ? "Editing schedule exceptions" : "Edycja wyjątków grafiku"}
+                                </p>
+                              </div>
+                            ) : null}
+                            {showExceptionsPreview ? (
+                              <div className="space-y-3">
+                                {form.exceptions.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("team.scheduleExceptionsEmpty")}
+                                  </p>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {groupedExceptionPreview.map((item, idx) => (
+                                      <div
+                                        key={`grp-${idx}-${item.startDate}-${item.endDate}-${item.type}`}
+                                        className="rounded-xl border border-border/70 bg-muted/20 p-3"
+                                      >
+                                        <p className="text-sm font-medium text-foreground">
+                                          {formatExceptionPreviewDate(item.startDate)}
+                                          {item.startDate !== item.endDate
+                                            ? ` - ${formatExceptionPreviewDate(item.endDate)}`
+                                            : ""}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                          {item.type === "time_off_group"
+                                            ? t("team.exceptionTypeClosed")
+                                            : `${t("team.exceptionTypeSpecialHours")}: ${item.specialHours?.startTime ?? ""}-${item.specialHours?.endTime ?? ""}`}
+                                        </p>
+                                        {(item.note ?? "").trim() ? (
+                                          <p className="mt-1 text-xs text-muted-foreground">
+                                            {t("team.exceptionReasonLabel")}: {item.note}
+                                          </p>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-10 rounded-xl"
+                                    onClick={() => setIsExceptionsEditing(true)}
+                                  >
+                                    {t("team.editExceptions")}
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                {form.exceptions.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {t("team.scheduleExceptionsEmpty")}
+                                  </p>
+                                ) : (
+                                  <div className="space-y-4">
+                                    {form.exceptions.map((ex, idx) => (
+                                      <div
+                                        key={`${idx}-${ex.exceptionDate}`}
+                                        className="rounded-xl border border-border/70 bg-muted/20 p-4"
+                                      >
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                          <div className="space-y-1.5">
+                                            <Label htmlFor={`staff-ex-date-${idx}`}>
+                                              {t("team.exceptionDateFromLabel")}
+                                            </Label>
+                                            <AppDatePicker
+                                              id={`staff-ex-date-${idx}`}
+                                              value={ex.exceptionDate}
+                                              placeholder={t("team.exceptionDateFromLabel")}
+                                              closeOnSelect
+                                              onChange={(iso) =>
+                                                updateException(idx, patchStaffExceptionOnFromChange(ex, iso))
+                                              }
+                                              className="h-11 rounded-xl"
+                                            />
+                                          </div>
+                                          <div className="space-y-1.5">
+                                            <Label htmlFor={`staff-ex-date-end-${idx}`}>
+                                              {t("team.exceptionDateToLabel")}
+                                            </Label>
+                                            <AppDatePicker
+                                              id={`staff-ex-date-end-${idx}`}
+                                              value={ex.exceptionEndDate ?? ""}
+                                              placeholder={t("team.exceptionDateToLabel")}
+                                              min={
+                                                /^\d{4}-\d{2}-\d{2}$/.test(ex.exceptionDate)
+                                                  ? ex.exceptionDate
+                                                  : undefined
+                                              }
+                                              closeOnSelect
+                                              onChange={(iso) => {
+                                                const from = ex.exceptionDate.trim().slice(0, 10)
+                                                if (/^\d{4}-\d{2}-\d{2}$/.test(from) && iso < from) {
+                                                  setNotice(t("team.exceptionEndBeforeStart"))
+                                                  setNoticeDetail(null)
+                                                  return
+                                                }
+                                                updateException(idx, { exceptionEndDate: iso })
+                                              }}
+                                              className="h-11 rounded-xl"
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="grid gap-3 md:grid-cols-[minmax(200px,1fr)_minmax(0,1fr)]">
+                                          <div className="min-w-0 space-y-1.5">
+                                            <Label htmlFor={`staff-ex-type-${idx}`}>
+                                              {t("team.exceptionTypeLabel")}
+                                            </Label>
+                                            <Select
+                                              value={ex.isClosed ? "closed" : "hours"}
+                                              onValueChange={(v) =>
+                                                updateException(idx, { isClosed: v === "closed" })
+                                              }
+                                            >
+                                              <SelectTrigger id={`staff-ex-type-${idx}`} className="h-11 rounded-xl">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                <SelectItem value="closed">{t("team.exceptionTypeClosed")}</SelectItem>
+                                                <SelectItem value="hours">{t("team.exceptionTypeSpecialHours")}</SelectItem>
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        </div>
+                                        {!ex.isClosed ? (
+                                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                            <div className="space-y-1.5">
+                                              <Label htmlFor={`staff-ex-start-${idx}`}>{t("team.timeFrom")}</Label>
+                                              <Input
+                                                id={`staff-ex-start-${idx}`}
+                                                type="time"
+                                                value={ex.startTime}
+                                                onChange={(e) =>
+                                                  updateException(idx, { startTime: e.target.value })
+                                                }
+                                                className="h-11 rounded-xl"
+                                              />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                              <Label htmlFor={`staff-ex-end-${idx}`}>{t("team.timeTo")}</Label>
+                                              <Input
+                                                id={`staff-ex-end-${idx}`}
+                                                type="time"
+                                                value={ex.endTime}
+                                                onChange={(e) =>
+                                                  updateException(idx, { endTime: e.target.value })
+                                                }
+                                                className="h-11 rounded-xl"
+                                              />
+                                            </div>
+                                          </div>
+                                        ) : null}
+                                        <div className="mt-3 space-y-1.5">
+                                          <Label htmlFor={`staff-ex-reason-${idx}`}>
+                                            {t("team.exceptionReasonLabel")}
+                                          </Label>
+                                          <Input
+                                            id={`staff-ex-reason-${idx}`}
+                                            value={ex.reason ?? ""}
+                                            onChange={(e) => updateException(idx, { reason: e.target.value })}
+                                            className="h-11 rounded-xl"
+                                          />
+                                        </div>
+                                        <div className="mt-4 flex justify-end">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="h-10 rounded-xl"
+                                            onClick={() => removeException(idx)}
+                                          >
+                                            {t("team.deleteException")}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-10 rounded-xl"
+                                    onClick={addException}
+                                  >
+                                    {t("team.addException")}
+                                  </Button>
+                                </div>
+                              </>
                             )}
                           </div>
-                        ))
-                      )}
-                      <div className="flex justify-end">
-                        <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => setIsScheduleEditing(true)}>
-                          {t("team.editSchedule")}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <Label htmlFor="use-biz-hours" className="text-sm font-medium">
-                            {t("team.useBusinessHours")}
-                          </Label>
-                          <Switch
-                            id="use-biz-hours"
-                            checked={form.useBusinessHours}
-                            onCheckedChange={(checked) =>
-                              setForm((f) => ({ ...f, useBusinessHours: Boolean(checked) }))
-                            }
-                          />
-                        </div>
-                        {form.useBusinessHours ? (
-                          <p className="text-xs leading-relaxed text-muted-foreground">
-                            {t("team.useBusinessHoursDescription")}
-                          </p>
-                        ) : null}
-                      </div>
-                      {!form.useBusinessHours
-                        ? form.rules.map((rule) => (
-                            <div
-                              key={rule.weekday}
-                              className="min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-3"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-sm font-medium text-foreground">
-                                  {t(weekdayLabelKey(rule.weekday))}
-                                </span>
-                                <Switch
-                                  checked={rule.isAvailable}
-                                  onCheckedChange={(checked) =>
-                                    updateRule(rule.weekday, { isAvailable: Boolean(checked) })
-                                  }
-                                  aria-label={t(weekdayLabelKey(rule.weekday))}
-                                />
-                              </div>
-                              <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="min-w-0 space-y-1.5">
-                                  <Label className="text-xs text-muted-foreground" htmlFor={`start-${rule.weekday}`}>
-                                    {t("team.timeFrom")}
-                                  </Label>
-                                  <Input
-                                    id={`start-${rule.weekday}`}
-                                    type="time"
-                                    value={rule.startTime}
-                                    onChange={(e) => updateRule(rule.weekday, { startTime: e.target.value })}
-                                    disabled={!rule.isAvailable}
-                                    className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
-                                  />
-                                </div>
-                                <div className="min-w-0 space-y-1.5">
-                                  <Label className="text-xs text-muted-foreground" htmlFor={`end-${rule.weekday}`}>
-                                    {t("team.timeTo")}
-                                  </Label>
-                                  <Input
-                                    id={`end-${rule.weekday}`}
-                                    type="time"
-                                    value={rule.endTime}
-                                    onChange={(e) => updateRule(rule.weekday, { endTime: e.target.value })}
-                                    disabled={!rule.isAvailable}
-                                    className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
-                                  />
-                                </div>
-                              </div>
+                          <div className="mx-auto w-full max-w-[520px] min-w-0 space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3">
+                            <div className="flex items-center justify-between">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-8 rounded-lg p-0"
+                                onClick={() =>
+                                  setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+                                }
+                                aria-label={language === "en" ? "Previous month" : "Poprzedni miesiąc"}
+                              >
+                                <ChevronLeft className="size-4" />
+                              </Button>
+                              <p className="text-sm font-medium capitalize text-foreground">{calendarMonthLabel}</p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-8 w-8 rounded-lg p-0"
+                                onClick={() =>
+                                  setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+                                }
+                                aria-label={language === "en" ? "Next month" : "Następny miesiąc"}
+                              >
+                                <ChevronRight className="size-4" />
+                              </Button>
                             </div>
-                          ))
-                        : null}
-                    </>
-                  )}
-                </div>
-
-                <div className="w-full max-w-none min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">{t("team.scheduleExceptionsTitle")}</p>
-                    <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsHint")}</p>
-                  </div>
-                  <div className="space-y-6">
-                    <div className={`min-w-0 ${isExceptionsEditing ? "space-y-3" : ""}`}>
-                      {isExceptionsEditing ? (
-                        <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
-                          <p className="text-sm font-semibold text-foreground">
-                            {language === "en" ? "Editing schedule exceptions" : "Edycja wyjątków grafiku"}
-                          </p>
-                        </div>
-                      ) : null}
-                      {showExceptionsPreview ? (
-                        <div className="space-y-3">
-                          {form.exceptions.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsEmpty")}</p>
-                          ) : (
-                            <div className="space-y-3">
-                              {groupedExceptionPreview.map((item, idx) => (
-                                <div key={`grp-${idx}-${item.startDate}-${item.endDate}-${item.type}`} className="rounded-xl border border-border/70 bg-muted/20 p-3">
-                                  <p className="text-sm font-medium text-foreground">
-                                    {formatExceptionPreviewDate(item.startDate)}
-                                    {item.startDate !== item.endDate
-                                      ? ` - ${formatExceptionPreviewDate(item.endDate)}`
-                                      : ""}
-                                  </p>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {item.type === "time_off_group"
-                                      ? t("team.exceptionTypeClosed")
-                                      : `${t("team.exceptionTypeSpecialHours")}: ${item.specialHours?.startTime ?? ""}-${item.specialHours?.endTime ?? ""}`}
-                                  </p>
-                                  {(item.note ?? "").trim() ? (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                      {t("team.exceptionReasonLabel")}: {item.note}
-                                    </p>
-                                  ) : null}
+                            <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground">
+                              {([1, 2, 3, 4, 5, 6, 0] as const).map((w) => (
+                                <div key={`w-head-${w}`} className="text-center">
+                                  {t(weekdayLabelKey(w)).slice(0, 2)}
                                 </div>
                               ))}
                             </div>
-                          )}
-                          <div className="flex justify-end">
-                            <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => setIsExceptionsEditing(true)}>
-                              {t("team.editExceptions")}
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          {form.exceptions.length === 0 ? (
-                            <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsEmpty")}</p>
-                          ) : (
-                            <div className="space-y-4">
-                              {form.exceptions.map((ex, idx) => (
-                                <div
-                                  key={`${idx}-${ex.exceptionDate}`}
-                                  className="rounded-xl border border-border/70 bg-muted/20 p-4"
-                                >
-                                  <div className="grid gap-3 md:grid-cols-2">
-                                    <div className="space-y-1.5">
-                                      <Label htmlFor={`staff-ex-date-${idx}`}>{t("team.exceptionDateFromLabel")}</Label>
-                                      <AppDatePicker
-                                        id={`staff-ex-date-${idx}`}
-                                        value={ex.exceptionDate}
-                                        placeholder={t("team.exceptionDateFromLabel")}
-                                        closeOnSelect
-                                        onChange={(iso) =>
-                                          updateException(idx, patchStaffExceptionOnFromChange(ex, iso))
-                                        }
-                                        className="h-11 rounded-xl"
-                                      />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                      <Label htmlFor={`staff-ex-date-end-${idx}`}>{t("team.exceptionDateToLabel")}</Label>
-                                      <AppDatePicker
-                                        id={`staff-ex-date-end-${idx}`}
-                                        value={ex.exceptionEndDate ?? ""}
-                                        placeholder={t("team.exceptionDateToLabel")}
-                                        min={
-                                          /^\d{4}-\d{2}-\d{2}$/.test(ex.exceptionDate)
-                                            ? ex.exceptionDate
-                                            : undefined
-                                        }
-                                        closeOnSelect
-                                        onChange={(iso) => {
-                                          const from = ex.exceptionDate.trim().slice(0, 10)
-                                          if (/^\d{4}-\d{2}-\d{2}$/.test(from) && iso < from) {
-                                            setNotice(t("team.exceptionEndBeforeStart"))
-                                            setNoticeDetail(null)
-                                            return
-                                          }
-                                          updateException(idx, { exceptionEndDate: iso })
-                                        }}
-                                        className="h-11 rounded-xl"
-                                      />
-                                    </div>
-                                  </div>
-                                  <div className="grid gap-3 md:grid-cols-[minmax(200px,1fr)_minmax(0,1fr)]">
-                                    <div className="min-w-0 space-y-1.5">
-                                      <Label htmlFor={`staff-ex-type-${idx}`}>{t("team.exceptionTypeLabel")}</Label>
-                                      <Select
-                                        value={ex.isClosed ? "closed" : "hours"}
-                                        onValueChange={(v) => updateException(idx, { isClosed: v === "closed" })}
-                                      >
-                                        <SelectTrigger id={`staff-ex-type-${idx}`} className="h-11 rounded-xl">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="closed">{t("team.exceptionTypeClosed")}</SelectItem>
-                                          <SelectItem value="hours">{t("team.exceptionTypeSpecialHours")}</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                  {!ex.isClosed ? (
-                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                      <div className="space-y-1.5">
-                                        <Label htmlFor={`staff-ex-start-${idx}`}>{t("team.timeFrom")}</Label>
-                                        <Input
-                                          id={`staff-ex-start-${idx}`}
-                                          type="time"
-                                          value={ex.startTime}
-                                          onChange={(e) => updateException(idx, { startTime: e.target.value })}
-                                          className="h-11 rounded-xl"
-                                        />
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label htmlFor={`staff-ex-end-${idx}`}>{t("team.timeTo")}</Label>
-                                        <Input
-                                          id={`staff-ex-end-${idx}`}
-                                          type="time"
-                                          value={ex.endTime}
-                                          onChange={(e) => updateException(idx, { endTime: e.target.value })}
-                                          className="h-11 rounded-xl"
-                                        />
-                                      </div>
-                                    </div>
-                                  ) : null}
-                                  <div className="mt-3 space-y-1.5">
-                                    <Label htmlFor={`staff-ex-reason-${idx}`}>{t("team.exceptionReasonLabel")}</Label>
-                                    <Input
-                                      id={`staff-ex-reason-${idx}`}
-                                      value={ex.reason ?? ""}
-                                      onChange={(e) => updateException(idx, { reason: e.target.value })}
-                                      className="h-11 rounded-xl"
-                                    />
-                                  </div>
-                                  <div className="mt-4 flex justify-end">
-                                    <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => removeException(idx)}>
-                                      {t("team.deleteException")}
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
+                            <div className="grid grid-cols-7 gap-1">
+                              {calendarGridDays.map((day) => {
+                                const iso = toIsoDateLocal(day)
+                                const inMonth = day.getMonth() === calendarMonth.getMonth()
+                                const holiday = calendarHolidaysByDay.get(iso)
+                                const ex = calendarExceptionsByDay.get(iso)
+                                const isToday = iso === toIsoDateLocal(new Date())
+                                const isSelected = selectedCalendarDate === iso
+                                const hasDayOff = Boolean(ex?.types.has("day_off"))
+                                const hasSpecialHours = Boolean(ex?.types.has("special_hours"))
+                                return (
+                                  <button
+                                    key={iso}
+                                    type="button"
+                                    onClick={() => setSelectedCalendarDate(iso)}
+                                    className={`relative min-h-11 rounded-lg border p-1 text-xs transition ${
+                                      isSelected
+                                        ? "border-primary bg-[color:var(--nav-active-bg)]"
+                                        : "border-border/70 bg-card"
+                                    } ${!inMonth ? "opacity-45" : ""} ${isToday ? "ring-1 ring-primary/60" : ""}`}
+                                    title={
+                                      holiday
+                                        ? language === "en"
+                                          ? holiday.nameEn
+                                          : holiday.namePl
+                                        : undefined
+                                    }
+                                  >
+                                    <span className="block text-left">{day.getDate()}</span>
+                                    <span className="mt-1 flex gap-1">
+                                      {holiday ? <span className="size-1.5 rounded-full bg-amber-400" /> : null}
+                                      {hasDayOff ? <span className="size-1.5 rounded-full bg-rose-500" /> : null}
+                                      {hasSpecialHours ? <span className="size-1.5 rounded-full bg-sky-400" /> : null}
+                                    </span>
+                                  </button>
+                                )
+                              })}
                             </div>
-                          )}
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={addException}>
-                              {t("team.addException")}
-                            </Button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                    <div className="mx-auto w-full max-w-[520px] min-w-0 space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3">
-                      <div className="flex items-center justify-between">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-8 w-8 rounded-lg p-0"
-                          onClick={() =>
-                            setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-                          }
-                          aria-label={language === "en" ? "Previous month" : "Poprzedni miesiąc"}
-                        >
-                          <ChevronLeft className="size-4" />
-                        </Button>
-                        <p className="text-sm font-medium capitalize text-foreground">{calendarMonthLabel}</p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-8 w-8 rounded-lg p-0"
-                          onClick={() =>
-                            setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
-                          }
-                          aria-label={language === "en" ? "Next month" : "Następny miesiąc"}
-                        >
-                          <ChevronRight className="size-4" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground">
-                        {([1, 2, 3, 4, 5, 6, 0] as const).map((w) => (
-                          <div key={`w-head-${w}`} className="text-center">
-                            {t(weekdayLabelKey(w)).slice(0, 2)}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="grid grid-cols-7 gap-1">
-                        {calendarGridDays.map((day) => {
-                          const iso = toIsoDateLocal(day)
-                          const inMonth = day.getMonth() === calendarMonth.getMonth()
-                          const holiday = calendarHolidaysByDay.get(iso)
-                          const ex = calendarExceptionsByDay.get(iso)
-                          const isToday = iso === toIsoDateLocal(new Date())
-                          const isSelected = selectedCalendarDate === iso
-                          const hasDayOff = Boolean(ex?.types.has("day_off"))
-                          const hasSpecialHours = Boolean(ex?.types.has("special_hours"))
-                          return (
-                            <button
-                              key={iso}
-                              type="button"
-                              onClick={() => setSelectedCalendarDate(iso)}
-                              className={`relative min-h-11 rounded-lg border p-1 text-xs transition ${
-                                isSelected
-                                  ? "border-primary bg-[color:var(--nav-active-bg)]"
-                                  : "border-border/70 bg-card"
-                              } ${!inMonth ? "opacity-45" : ""} ${isToday ? "ring-1 ring-primary/60" : ""}`}
-                              title={
-                                holiday
-                                  ? language === "en"
-                                    ? holiday.nameEn
-                                    : holiday.namePl
-                                  : undefined
-                              }
-                            >
-                              <span className="block text-left">{day.getDate()}</span>
-                              <span className="mt-1 flex gap-1">
-                                {holiday ? <span className="size-1.5 rounded-full bg-amber-400" /> : null}
-                                {hasDayOff ? <span className="size-1.5 rounded-full bg-rose-500" /> : null}
-                                {hasSpecialHours ? <span className="size-1.5 rounded-full bg-sky-400" /> : null}
+                            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <span className="size-2 rounded-full bg-amber-400" />
+                                {t("team.holidayDayType")}
                               </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                      <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="size-2 rounded-full bg-amber-400" />
-                          {t("team.holidayDayType")}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="size-2 rounded-full bg-rose-500" />
-                          {t("team.exceptionTypeClosed")}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <span className="size-2 rounded-full bg-sky-400" />
-                          {t("team.exceptionTypeSpecialHours")}
-                        </span>
-                      </div>
-                      {selectedCalendarDate ? (
-                        <div className="rounded-xl border border-border/70 bg-card p-3 text-xs">
-                          <p className="font-medium text-foreground">
-                            {language === "en" ? "Date" : "Data"}: {formatExceptionPreviewDate(selectedCalendarDate)}
-                          </p>
-                          {selectedDayException ? (
-                            <>
-                              <p className="mt-1 text-muted-foreground">
-                                {language === "en" ? "Type" : "Typ"}:{" "}
-                                {selectedDayException.types.has("day_off")
-                                  ? t("team.exceptionTypeClosed")
-                                  : t("team.exceptionTypeSpecialHours")}
-                              </p>
-                              {selectedDayException.types.has("special_hours") ? (
-                                <p className="mt-1 text-muted-foreground">
-                                  {language === "en" ? "Hours" : "Godziny"}:{" "}
-                                  {selectedDayException.exceptions
-                                    .filter((x) => !x.isClosed)
-                                    .map((x) => `${x.startTime}-${x.endTime}`)
-                                    .join(", ")}
+                              <span className="inline-flex items-center gap-1">
+                                <span className="size-2 rounded-full bg-rose-500" />
+                                {t("team.exceptionTypeClosed")}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <span className="size-2 rounded-full bg-sky-400" />
+                                {t("team.exceptionTypeSpecialHours")}
+                              </span>
+                            </div>
+                            {selectedCalendarDate ? (
+                              <div className="rounded-xl border border-border/70 bg-card p-3 text-xs">
+                                <p className="font-medium text-foreground">
+                                  {language === "en" ? "Date" : "Data"}: {formatExceptionPreviewDate(selectedCalendarDate)}
                                 </p>
-                              ) : null}
-                              {selectedDayException.exceptions.find((x) => (x.reason ?? "").trim()) ? (
-                                <p className="mt-1 text-muted-foreground">
-                                  {t("team.exceptionReasonLabel")}:{" "}
-                                  {(selectedDayException.exceptions.find((x) => (x.reason ?? "").trim())?.reason ?? "").trim()}
-                                </p>
-                              ) : null}
-                              {selectedDayHoliday ? (
-                                <p className="mt-1 text-muted-foreground">
-                                  {t("team.holidayDayType")}:{" "}
-                                  {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
-                                </p>
-                              ) : null}
-                            </>
-                          ) : selectedDayHoliday ? (
-                            <>
-                              <p className="mt-1 text-muted-foreground">
-                                {language === "en" ? "Type" : "Typ"}: {t("team.holidayDayType")}
+                                {selectedDayException ? (
+                                  <>
+                                    <p className="mt-1 text-muted-foreground">
+                                      {language === "en" ? "Type" : "Typ"}:{" "}
+                                      {selectedDayException.types.has("day_off")
+                                        ? t("team.exceptionTypeClosed")
+                                        : t("team.exceptionTypeSpecialHours")}
+                                    </p>
+                                    {selectedDayException.types.has("special_hours") ? (
+                                      <p className="mt-1 text-muted-foreground">
+                                        {language === "en" ? "Hours" : "Godziny"}:{" "}
+                                        {selectedDayException.exceptions
+                                          .filter((x) => !x.isClosed)
+                                          .map((x) => `${x.startTime}-${x.endTime}`)
+                                          .join(", ")}
+                                      </p>
+                                    ) : null}
+                                    {selectedDayException.exceptions.find((x) => (x.reason ?? "").trim()) ? (
+                                      <p className="mt-1 text-muted-foreground">
+                                        {t("team.exceptionReasonLabel")}:{" "}
+                                        {(selectedDayException.exceptions.find((x) => (x.reason ?? "").trim())?.reason ?? "").trim()}
+                                      </p>
+                                    ) : null}
+                                    {selectedDayHoliday ? (
+                                      <p className="mt-1 text-muted-foreground">
+                                        {t("team.holidayDayType")}:{" "}
+                                        {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
+                                      </p>
+                                    ) : null}
+                                  </>
+                                ) : selectedDayHoliday ? (
+                                  <>
+                                    <p className="mt-1 text-muted-foreground">
+                                      {language === "en" ? "Type" : "Typ"}: {t("team.holidayDayType")}
+                                    </p>
+                                    <p className="mt-1 text-muted-foreground">
+                                      {language === "en" ? "Holiday name" : "Nazwa święta"}:{" "}
+                                      {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="mt-1 text-muted-foreground">
+                                    {language === "en" ? "No holiday or exception on this day." : "Brak święta i wyjątku w tym dniu."}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                {language === "en"
+                                  ? "Select a day to see details."
+                                  : "Kliknij dzień w kalendarzu, aby zobaczyć szczegóły."}
                               </p>
-                              <p className="mt-1 text-muted-foreground">
-                                {language === "en" ? "Holiday name" : "Nazwa święta"}:{" "}
-                                {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
-                              </p>
-                            </>
-                          ) : (
-                            <p className="mt-1 text-muted-foreground">
-                              {language === "en" ? "No holiday or exception on this day." : "Brak święta i wyjątku w tym dniu."}
-                            </p>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          {language === "en"
-                            ? "Select a day to see details."
-                            : "Kliknij dzień w kalendarzu, aby zobaczyć szczegóły."}
-                        </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </TabsContent>
+                </Tabs>
 
                 {editing ? (
                   <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-4">
@@ -1967,172 +2327,6 @@ export default function TeamPage() {
               </form>
             </CardContent>
           </Card>
-
-          <div className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
-            <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
-              <CardHeader>
-                <CardTitle className="text-lg">{t("team.teamMembersTitle")}</CardTitle>
-              </CardHeader>
-              <CardContent className="min-w-0 space-y-3">
-                {loading ? <p className="text-sm text-muted-foreground">{t("team.loading")}</p> : null}
-                {!loading && staffLoadError ? (
-                  <p className="text-sm text-destructive">
-                    {language === "en" ? "Failed to load team members." : "Nie udało się załadować osób."}
-                  </p>
-                ) : null}
-                {!loading && !staffLoadError && items.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
-                ) : null}
-                {!loading &&
-                  items.map((staff) => {
-                    const svcIds = serviceIdsByStaff[staff.id] ?? []
-                    const svcNames = svcIds
-                      .map((sid) => services.find((s) => s.id === sid)?.name)
-                      .filter(Boolean)
-                      .join(", ")
-                    const staffRoleLabel =
-                      normalizeStaffRole(staff.role) === "admin"
-                        ? t("invitations.adminRoleOption")
-                        : t("invitations.staffRoleOption")
-                    return (
-                      <div
-                        key={staff.id}
-                        className="rounded-xl border border-border/80 bg-card/60 p-4 text-sm shadow-sm"
-                      >
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0 space-y-1">
-                            <p className="font-semibold text-foreground">{staff.name}</p>
-                            <p className="break-words text-muted-foreground">
-                              {(staff.email ?? "").trim() || "-"}
-                            </p>
-                            <p className="break-words text-muted-foreground">
-                              {(staff.phone ?? "").trim() || "-"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {staff.isActive ? t("team.active") : t("services.hiddenStatus")}
-                            </p>
-                            <p className="text-xs">
-                              <span className="font-medium text-foreground/90">{t("team.panelRole")}:</span>{" "}
-                              {staffRoleLabel}
-                            </p>
-                            <p className="text-xs break-words text-muted-foreground">
-                              <span className="font-medium text-foreground/90">{t("team.servicesShort")}:</span>{" "}
-                              {svcNames || t("team.noServicesAssigned")}
-                            </p>
-                          </div>
-                          <div className="flex shrink-0 flex-col gap-2 sm:max-w-[12rem] sm:items-stretch">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="h-11 w-full rounded-xl"
-                              onClick={() => beginEdit(staff)}
-                            >
-                              <Pencil className="size-4" aria-hidden />
-                              {t("team.edit")}
-                            </Button>
-                            {staff.isActive ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="h-11 w-full rounded-xl"
-                                onClick={() => void deactivateStaff(staff)}
-                              >
-                                {t("team.deactivate")}
-                              </Button>
-                            ) : (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="h-11 w-full rounded-xl"
-                                onClick={() => void activateStaff(staff)}
-                              >
-                                {t("team.activate")}
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              className="h-11 w-full rounded-xl"
-                              onClick={() => void remove(staff.id)}
-                            >
-                              <Trash2 className="size-4" aria-hidden />
-                              {t("common.delete")}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-              </CardContent>
-            </Card>
-
-            {access.ready && access.canManageInvitations ? (
-              <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
-                <CardHeader>
-                  <CardTitle className="text-lg">{t("team.pendingInvitationsTitle")}</CardTitle>
-                  <CardDescription>{t("invitations.noEmailBackend")}</CardDescription>
-                </CardHeader>
-                <CardContent className="min-w-0 space-y-3">
-                  {pendingInvites.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("team.pendingInvitationsEmpty")}</p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {pendingInvites.map((inv) => {
-                        const roleLabel =
-                          inv.role === "admin" ? t("invitations.adminRoleOption") : t("invitations.staffRoleOption")
-                        const created = dateTimeFmt.format(new Date(inv.created_at))
-                        const highlight = inviteHighlightId === inv.id
-                        return (
-                          <li
-                            key={inv.id}
-                            className={`rounded-xl border px-3 py-3 text-sm ${
-                              highlight
-                                ? "border-primary/40 bg-[color:var(--nav-active-bg)]"
-                                : "border-border/80 bg-muted/20"
-                            }`}
-                          >
-                            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <p className="truncate font-medium">{inv.email}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("team.panelRole")}: {roleLabel}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("team.inviteCreatedAt")}: {created}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {t("team.inviteStatus")}: {inviteStatusLabel(inv.status)}
-                                </p>
-                              </div>
-                              <div className="flex shrink-0 flex-col gap-2 sm:w-44">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  className="h-11 w-full rounded-xl"
-                                  onClick={() => void copyInvitationLink(inv.token)}
-                                >
-                                  <Copy className="size-4" aria-hidden />
-                                  {t("invitations.copyInvitationLink")}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  className="h-11 w-full rounded-xl text-destructive hover:text-destructive"
-                                  onClick={() => void cancelInvitation(inv.id)}
-                                >
-                                  {t("team.cancelInvitation")}
-                                </Button>
-                              </div>
-                            </div>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            ) : null}
-          </div>
         </div>
       </PageShell>
     </AppShell>

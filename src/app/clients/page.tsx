@@ -55,8 +55,7 @@ import {
   persistClientUpdates,
   riskTierFromScore,
 } from "@/lib/clients/clients-store"
-import { findOrCreateClient } from "@/lib/clients/find-or-create-client"
-import { deleteClient, updateClient } from "@/lib/supabase/repositories/clients.repository"
+import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import type { Client, ClientRiskTier } from "@/types/domain"
@@ -88,30 +87,40 @@ function ClientRiskPanelBlock(props: { riskTier: ClientRiskTier; riskScore: numb
           <ClientRiskTierBadge tier={props.riskTier} />
         </div>
         <p className="text-sm leading-snug text-muted-foreground">{t("clients.riskBasedOnHistory")}</p>
-        <details className="text-sm text-muted-foreground">
-          <summary className="cursor-pointer select-none list-none rounded-md py-0.5 text-foreground/85 underline decoration-muted-foreground/55 underline-offset-[3px] hover:decoration-foreground/50 [&::-webkit-details-marker]:hidden">
-            {t("clients.riskHowSummary")}
-          </summary>
-          <p className="mt-2 leading-snug">{t("clients.riskHowBody")}</p>
-        </details>
       </div>
     </section>
   )
 }
 
 type FormState = {
-  fullName: string
+  firstName: string
+  lastName: string
   phone: string
   email: string
   notes: string
 }
 
 const emptyForm = (): FormState => ({
-  fullName: "",
+  firstName: "",
+  lastName: "",
   phone: "",
   email: "",
   notes: "",
 })
+
+function splitPersonName(fullName: string): { firstName: string; lastName: string } {
+  const normalized = fullName.trim().replace(/\s+/g, " ")
+  if (!normalized) return { firstName: "", lastName: "" }
+  const parts = normalized.split(" ")
+  return {
+    firstName: parts[0] ?? "",
+    lastName: parts.slice(1).join(" "),
+  }
+}
+
+function joinPersonName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ")
+}
 
 function isEmailFormatValid(email: string): boolean {
   const t = email.trim()
@@ -220,7 +229,7 @@ export default function ClientsPage() {
 
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    const fullName = form.fullName.trim()
+    const fullName = joinPersonName(form.firstName, form.lastName)
     const phone = form.phone.trim()
     const email = form.email.trim()
     if (!fullName) return
@@ -231,21 +240,16 @@ export default function ClientsPage() {
     const bid = workspace?.businessProfileId ?? null
 
     if (workspace?.mode === "supabase_clients" && sb && bid) {
-      const fc = await findOrCreateClient(sb, bid, {
-        fullName,
-        phone,
-        email: email || "",
-      })
-      if (!fc.ok) {
-        return
-      }
+      // IMPORTANT: create must not overwrite an existing client (no "find or create").
       const notesTrim = form.notes.trim()
-      if (notesTrim.length > 0) {
-        const patched = await updateClient(sb, bid, fc.clientId, { notes: notesTrim })
-        if (patched.error || !patched.data) {
-          return
-        }
-      }
+      const created = await createClient(sb, {
+        business_id: bid,
+        full_name: fullName,
+        phone: phone || "",
+        email: email || "",
+        notes: notesTrim.length > 0 ? notesTrim : null,
+      })
+      if (created.error || !created.data) return
       const w = await loadClientsWorkspace()
       queueMicrotask(() => {
         setClients(w.clients)
@@ -317,8 +321,10 @@ export default function ClientsPage() {
 
   const startDetailsEdit = () => {
     if (!detailsClient) return
+    const split = splitPersonName(detailsClient.fullName)
     setDetailForm({
-      fullName: detailsClient.fullName,
+      firstName: split.firstName,
+      lastName: split.lastName,
       phone: detailsClient.phone,
       email: detailsClient.email,
       notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
@@ -331,8 +337,10 @@ export default function ClientsPage() {
     setDetailsEditing(false)
     setDetailFieldError(null)
     if (detailsClient) {
+      const split = splitPersonName(detailsClient.fullName)
       setDetailForm({
-        fullName: detailsClient.fullName,
+        firstName: split.firstName,
+        lastName: split.lastName,
         phone: detailsClient.phone,
         email: detailsClient.email,
         notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
@@ -344,7 +352,7 @@ export default function ClientsPage() {
     e.preventDefault()
     if (!detailsClient || !workspace) return
 
-    const fullName = detailForm.fullName.trim()
+    const fullName = joinPersonName(detailForm.firstName, detailForm.lastName)
     const phone = detailForm.phone.trim()
     const email = detailForm.email.trim()
 
@@ -376,7 +384,12 @@ export default function ClientsPage() {
         currentList: clients,
       })
       if (!res.ok) {
-        setDetailFieldError(t("clients.saveFailed"))
+        const details = res.errorMessage?.trim()
+        setDetailFieldError(
+          details
+            ? `${t("clients.saveFailed")} Szczegóły: ${details}`
+            : t("clients.saveFailed")
+        )
         return
       }
       queueMicrotask(() => {
@@ -384,6 +397,14 @@ export default function ClientsPage() {
         setDetailsEditing(false)
         setShowSaved("edited")
       })
+      void reloadCatalog()
+    } catch (error) {
+      const details = error instanceof Error ? error.message : null
+      setDetailFieldError(
+        details
+          ? `${t("clients.saveFailed")} Szczegóły: ${details}`
+          : t("clients.saveFailed")
+      )
     } finally {
       setDetailSaving(false)
     }
@@ -704,15 +725,29 @@ export default function ClientsPage() {
           >
             <div className="flex-1 space-y-5 px-6 py-6">
               <div className="space-y-2">
-                <Label htmlFor="fullName">{t("clients.fieldFullName")}</Label>
-                <Input
-                  id="fullName"
-                  required
-                  autoComplete="name"
-                  value={form.fullName}
-                  onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
-                  placeholder={t("clients.placeholderFullName")}
-                />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">{t("team.firstName")}</Label>
+                    <Input
+                      id="firstName"
+                      required
+                      autoComplete="given-name"
+                      value={form.firstName}
+                      onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
+                      placeholder={language === "en" ? "First name" : "Imię"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">{t("team.lastName")}</Label>
+                    <Input
+                      id="lastName"
+                      autoComplete="family-name"
+                      value={form.lastName}
+                      onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
+                      placeholder={language === "en" ? "Last name" : "Nazwisko"}
+                    />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="client-phone">{t("clients.fieldPhoneShort")}</Label>
@@ -785,17 +820,33 @@ export default function ClientsPage() {
                     </SheetTitle>
                   ) : (
                     <div className="space-y-2">
-                      <Label htmlFor="detail-fullName">{t("clients.fieldFullName")}</Label>
-                      <Input
-                        id="detail-fullName"
-                        autoComplete="name"
-                        required
-                        className="h-11 rounded-xl text-base"
-                        value={detailForm.fullName}
-                        onChange={(e) =>
-                          setDetailForm((prev) => ({ ...prev, fullName: e.target.value }))
-                        }
-                      />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="detail-firstName">{t("team.firstName")}</Label>
+                          <Input
+                            id="detail-firstName"
+                            autoComplete="given-name"
+                            required
+                            className="h-11 rounded-xl text-base"
+                            value={detailForm.firstName}
+                            onChange={(e) =>
+                              setDetailForm((prev) => ({ ...prev, firstName: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="detail-lastName">{t("team.lastName")}</Label>
+                          <Input
+                            id="detail-lastName"
+                            autoComplete="family-name"
+                            className="h-11 rounded-xl text-base"
+                            value={detailForm.lastName}
+                            onChange={(e) =>
+                              setDetailForm((prev) => ({ ...prev, lastName: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                   <SheetDescription className="text-base">
@@ -914,8 +965,32 @@ export default function ClientsPage() {
                         {t("clients.sectionContactHead")}
                       </h3>
                       <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4 text-sm">
-                        <p className="font-medium text-foreground">{detailsClient.phone}</p>
-                        <p className="mt-2 break-all text-muted-foreground">{detailsClient.email}</p>
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {t("clients.fieldFullName")}
+                            </p>
+                            <p className="mt-0.5 text-foreground">
+                              {detailsClient.fullName.trim() || "Brak imienia i nazwiska"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {t("clients.fieldPhoneShort")}
+                            </p>
+                            <p className="mt-0.5 break-all text-foreground">
+                              {detailsClient.phone.trim() || "Brak telefonu"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">
+                              {t("clients.fieldEmailShort")}
+                            </p>
+                            <p className="mt-0.5 break-all text-foreground">
+                              {detailsClient.email.trim() || "Brak e-maila"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </section>
 
