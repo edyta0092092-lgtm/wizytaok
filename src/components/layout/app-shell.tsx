@@ -1,12 +1,27 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 
-import { HelpFloatingWidget } from "@/components/help/help-floating-widget"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AppTopbar } from "@/components/layout/app-topbar"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { useDeferUntilIdle } from "@/lib/react/use-defer-until-idle"
 import { cn } from "@/lib/utils"
+
+const HelpFloatingWidgetLazy = dynamic(
+  () =>
+    import("@/components/help/help-floating-widget").then((m) => ({
+      default: m.HelpFloatingWidget,
+    })),
+  { ssr: false },
+)
+
+function DeferredHelpFloatingWidget() {
+  const ready = useDeferUntilIdle(600)
+  if (!ready) return null
+  return <HelpFloatingWidgetLazy />
+}
 
 type AppShellProps = {
   children: React.ReactNode
@@ -55,7 +70,7 @@ export function AppShell({
           {children}
         </div>
       </div>
-      <HelpFloatingWidget />
+      <DeferredHelpFloatingWidget />
     </div>
   )
 }
