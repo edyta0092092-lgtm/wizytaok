@@ -40,10 +40,10 @@ export default function HomePage() {
       <section className="mx-auto grid max-w-6xl gap-10 px-6 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <p className="inline-flex rounded-full border border-border bg-card px-3 py-1 text-sm text-primary">
+            <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
               {t("marketing.heroAudience")}
-            </p>
-            <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+            </span>
+            <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
               {t("marketing.freeDaysBadge")}
             </span>
           </div>

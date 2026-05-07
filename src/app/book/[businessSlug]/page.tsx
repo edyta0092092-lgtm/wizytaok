@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -55,19 +56,10 @@ import {
 } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { BRAND } from "@/config/brand"
-import { cn } from "@/lib/utils"
 import { getActiveServicesForBusinessSlug } from "@/lib/services/services-store"
 import type { AvailabilityDay, Service } from "@/types/domain"
 import type { StaffMember } from "@/types/domain"
 
-const BOOKING_STEP_KEYS = [
-  "bookingPublic.step1",
-  "bookingPublic.step2",
-  "bookingPublic.step3",
-  "bookingPublic.step4",
-  "bookingPublic.step5",
-  "bookingPublic.step6",
-] as const
 import { getServiceStaffForPublicSlug } from "@/lib/staff/staff-store"
 import {
   getStaffAvailabilityForPublicSlug,
@@ -80,10 +72,15 @@ import {
 } from "@/lib/notifications/notifications"
 
 type BookingForm = {
-  fullName: string
+  firstName: string
+  lastName: string
   phone: string
   email: string
   note: string
+}
+
+function joinPersonName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ")
 }
 
 export default function PublicBookingPage() {
@@ -93,7 +90,8 @@ export default function PublicBookingPage() {
   const businessSlug = params.businessSlug
 
   const [form, setForm] = React.useState<BookingForm>({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     phone: "",
     email: "",
     note: "",
@@ -216,7 +214,7 @@ export default function PublicBookingPage() {
         setCatalog(active)
         setSelectedServiceId((prev) => {
           if (prev && active.some((s) => s.id === prev)) return prev
-          return active[0]?.id ?? null
+          return null
         })
       })()
     }
@@ -710,11 +708,12 @@ export default function PublicBookingPage() {
   }, [t])
 
   const confirmBooking = () => {
+    const clientName = joinPersonName(form.firstName, form.lastName)
     if (!selectedServiceId || !selectedDayKey || !selectedTime) {
       setError(t("bookingPublic.required"))
       return
     }
-    if (!form.fullName.trim() || !form.phone.trim()) {
+    if (!form.firstName.trim() || !form.phone.trim()) {
       setError(t("bookingPublic.fillRequired"))
       return
     }
@@ -767,7 +766,7 @@ export default function PublicBookingPage() {
             businessSlug: normalizedSlug,
             serviceId: selectedServiceId,
             staffId: resolvedStaffId,
-            clientName: form.fullName.trim(),
+            clientName,
             clientPhone: form.phone.trim(),
             clientEmail: form.email.trim() || undefined,
             appointmentDate: selectedDayKey,
@@ -806,7 +805,7 @@ export default function PublicBookingPage() {
             servicePrice: selectedService?.price ?? 0,
             date: selectedDayKey,
             time: selectedTime,
-            customerName: form.fullName.trim(),
+            customerName: clientName,
             customerPhone: form.phone.trim(),
             customerEmail: form.email.trim() || undefined,
             note: form.note.trim() || undefined,
@@ -858,7 +857,7 @@ export default function PublicBookingPage() {
         servicePrice: selectedService?.price ?? 0,
         date: selectedDayKey,
         time: selectedTime,
-        customerName: form.fullName.trim(),
+        customerName: clientName,
         customerPhone: form.phone.trim(),
         customerEmail: form.email.trim() || undefined,
         note: form.note.trim() || undefined,
@@ -879,37 +878,6 @@ export default function PublicBookingPage() {
     })()
   }
 
-  const bookingCurrentStep = React.useMemo(() => {
-    if (!selectedServiceId) return 1
-    if (blockCalendarForNoStaff) return 2
-    if (!selectedDayKey) return 3
-    if (!selectedTime) return 4
-    if (!form.fullName.trim() || !form.phone.trim()) return 5
-    return 6
-  }, [
-    selectedServiceId,
-    blockCalendarForNoStaff,
-    selectedDayKey,
-    selectedTime,
-    form.fullName,
-    form.phone,
-  ])
-
-  const bookingStepDone = React.useMemo(() => {
-    const s1 = Boolean(selectedServiceId)
-    const s2 = s1 && !blockCalendarForNoStaff
-    const s3 = s2 && Boolean(selectedDayKey)
-    const s4 = s3 && Boolean(selectedTime)
-    const s5 = s4 && Boolean(form.fullName.trim() && form.phone.trim())
-    return [s1, s2, s3, s4, s5, s5]
-  }, [
-    selectedServiceId,
-    blockCalendarForNoStaff,
-    selectedDayKey,
-    selectedTime,
-    form.fullName,
-    form.phone,
-  ])
 
   if (businessNotFound) {
     return (
@@ -929,9 +897,9 @@ export default function PublicBookingPage() {
   const displayBusinessName = businessTitle ?? BRAND.name
 
   return (
-    <main className="min-h-screen bg-background px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-background px-4 py-4 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-6 space-y-2">
+        <header className="mb-4 space-y-1.5">
           <Badge variant="outline" className="rounded-full">
             {t("bookingPublic.onlineBadge")}
           </Badge>
@@ -943,46 +911,13 @@ export default function PublicBookingPage() {
           </p>
         </header>
 
-        <nav className="mb-6 overflow-x-auto pb-1" aria-label={t("bookingPublic.stepsAriaLabel")}>
-          <ol className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 sm:gap-x-3">
-            {BOOKING_STEP_KEYS.map((stepKey, idx) => {
-              const n = idx + 1
-              const isActive = bookingCurrentStep === n
-              const isDone = bookingStepDone[idx]
-              return (
-                <li key={stepKey} className="flex items-center gap-2 sm:gap-3">
-                  {n > 1 ? (
-                    <span className="hidden text-xs text-muted-foreground sm:inline" aria-hidden>
-                      →
-                    </span>
-                  ) : null}
-                  <span
-                    className={cn(
-                      "inline-flex min-h-8 max-w-[11rem] flex-wrap items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium sm:max-w-none sm:text-sm",
-                      isActive
-                        ? "border-primary bg-[color:var(--nav-active-bg)] text-foreground"
-                        : isDone
-                          ? "border-border/80 bg-muted/40 text-muted-foreground"
-                          : "border-border/60 bg-card text-muted-foreground",
-                    )}
-                    aria-current={isActive ? "step" : undefined}
-                  >
-                    <span className="font-normal tabular-nums text-muted-foreground">{n}.</span>
-                    <span className="min-w-0">{t(stepKey)}</span>
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
-        </nav>
-
-        <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-          <section className="space-y-4">
+        <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr]">
+          <section className="space-y-3">
             <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">{t("bookingPublic.chooseService")}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
+              <CardContent className="space-y-2 pt-0">
                 {servicesLoadFailed ? (
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">{t("bookingPublic.servicesLoadTryLater")}</p>
@@ -1008,7 +943,7 @@ export default function PublicBookingPage() {
                         setDayOverride(null)
                         setSelectedTime(null)
                       }}
-                      className={`w-full rounded-xl border p-3 text-left transition-colors ${
+                      className={`w-full rounded-xl border p-2.5 text-left transition-colors ${
                         selectedServiceId === service.id
                           ? "border-primary bg-[color:var(--nav-active-bg)]"
                           : "border-border bg-card hover:bg-muted/40"
@@ -1033,14 +968,14 @@ export default function PublicBookingPage() {
             {selectedServiceId ? (
               <>
                 <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <CardTitle className="text-base">
                       {serviceStaff.length === 1
                         ? t("bookingPublic.staffMemberLabel")
                         : t("bookingPublic.chooseStaffMember")}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2">
+                  <CardContent className="space-y-2 pt-0">
                     {serviceStaff.length === 0 ? (
                       <p className="text-sm text-muted-foreground">{t("bookingPublic.noAssignedStaffContactBusiness")}</p>
                     ) : serviceStaff.length === 1 ? (
@@ -1124,17 +1059,27 @@ export default function PublicBookingPage() {
             ) : null}
 
             <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">{t("bookingPublic.yourDetails")}</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3">
+              <CardContent className="grid gap-2.5 pt-0">
                 <div className="grid gap-1.5">
-                  <Label htmlFor="book-fullname">{t("bookingPublic.fullName")}</Label>
+                  <Label htmlFor="book-firstname">{t("bookingPublic.firstName")}</Label>
                   <Input
-                    id="book-fullname"
-                    value={form.fullName}
+                    id="book-firstname"
+                    value={form.firstName}
                     onChange={(e) =>
-                      setForm((f) => ({ ...f, fullName: e.target.value }))
+                      setForm((f) => ({ ...f, firstName: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="book-lastname">{t("bookingPublic.lastName")}</Label>
+                  <Input
+                    id="book-lastname"
+                    value={form.lastName}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, lastName: e.target.value }))
                     }
                   />
                 </div>
@@ -1176,10 +1121,10 @@ export default function PublicBookingPage() {
 
           <aside>
             <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:sticky lg:top-6">
-              <CardHeader>
+              <CardHeader className="pb-3">
                 <CardTitle className="text-base">{t("bookingPublic.summary")}</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm">
+              <CardContent className="space-y-1.5 pt-0 text-sm">
                 <p>
                   <span className="text-muted-foreground">{t("bookingPublic.service")}:</span>{" "}
                   <span className="font-medium text-foreground">
@@ -1233,8 +1178,8 @@ export default function PublicBookingPage() {
                 <p>
                   <span className="text-muted-foreground">{t("bookingPublic.clientDetails")}:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {form.fullName || form.phone
-                      ? `${form.fullName || "-"} (${form.phone || "-"})`
+                    {joinPersonName(form.firstName, form.lastName) || form.phone
+                      ? `${joinPersonName(form.firstName, form.lastName) || "-"} (${form.phone || "-"})`
                       : t("bookingPublic.noSelection")}
                   </span>
                 </p>
@@ -1259,6 +1204,13 @@ export default function PublicBookingPage() {
                 >
                   {t("bookingPublic.confirmBooking")}
                 </Button>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {t("bookingPublic.privacyNoticePrefix")}{" "}
+                  <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">
+                    {t("bookingPublic.privacyNoticeLink")}
+                  </Link>
+                  .
+                </p>
               </CardContent>
             </Card>
           </aside>

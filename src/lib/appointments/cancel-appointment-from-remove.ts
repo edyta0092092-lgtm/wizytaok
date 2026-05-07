@@ -13,7 +13,7 @@ export async function cancelAppointmentFromRemove(
   appointmentId: string,
   language: "en" | "pl",
   notifyClient = false,
-): Promise<{ ok: boolean; error?: string; data?: unknown }> {
+): Promise<{ ok: boolean; error?: string; data?: unknown; notice?: string }> {
   const tid = typeof appointmentId === "string" ? appointmentId.trim() : ""
   if (!tid) {
     return { ok: false, error: "missing_appointment_id" }
@@ -47,6 +47,14 @@ export async function cancelAppointmentFromRemove(
 
   const bookingUuid = resolveSupabaseBookingRowUuidFromUiId(tid)
   if (bookingUuid) {
+    if (notifyClient) {
+      const apiResult = await fetchCancelBookingByCompany(tid, language, true)
+      if (apiResult.ok) {
+        window.dispatchEvent(new Event("pw-bookings"))
+        return { ok: true, notice: apiResult.notice }
+      }
+    }
+
     const client = getBrowserClient()
     if (client && isSupabaseConfigured()) {
       const now = new Date().toISOString()
@@ -111,9 +119,7 @@ export async function cancelAppointmentFromRemove(
         }
         data = minimal.data
       }
-      if (notifyClient) {
-        void fetchCancelBookingByCompany(tid, language, true)
-      }
+      if (notifyClient) void fetchCancelBookingByCompany(tid, language, true)
       window.dispatchEvent(new Event("pw-bookings"))
       return { ok: true, data }
     }

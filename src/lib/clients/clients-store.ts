@@ -2,9 +2,14 @@
 
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { updateManualAppointment, unwrapManualAppointmentId } from "@/lib/appointments/manual-appointments"
-import { unwrapSupabaseBookingAppointmentId, updateBooking } from "@/lib/bookings/bookings-store"
+import {
+  getBookingsForBusiness,
+  unwrapSupabaseBookingAppointmentId,
+  updateBooking,
+} from "@/lib/bookings/bookings-store"
 import { unwrapPublicAppointmentId, updatePublicBooking } from "@/lib/bookings/public-bookings"
 import { DEMO_BOOKING_SLUG, normalizePublicSlug } from "@/lib/business/slug"
+import { findOrCreateClient } from "@/lib/clients/find-or-create-client"
 import { initialClientsList } from "@/data/mock-clients"
 import {
   normalizeEmail as normalizeEmailCanonical,
@@ -87,6 +92,7 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
       const nh = typeof o.noShowCount === "number" ? o.noShowCount : 0
       const vc = typeof o.visitCount === "number" ? o.visitCount : 0
       const cc = typeof o.confirmedVisitCount === "number" ? o.confirmedVisitCount : 0
+      const can = typeof o.cancelledVisitCount === "number" ? o.cancelledVisitCount : 0
       const rs = typeof o.riskScore === "number" ? o.riskScore : 48
       const rt = o.riskTier === "low" || o.riskTier === "medium" || o.riskTier === "high" ? o.riskTier : riskTierFromScore(rs)
       const visits: ClientVisitHistoryItem[] = []
@@ -124,6 +130,7 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
         visitCount: vc,
         confirmedVisitCount: cc,
         noShowCount: nh,
+        cancelledVisitCount: can,
         notes:
           typeof o.notes === "string" || o.notes === undefined ? (o.notes as string | undefined) : undefined,
         riskScore: rs,
@@ -222,6 +229,8 @@ function deriveRiskScoreFromStats(total: number, noShowCount: number, confirmedC
   const t = Math.max(total, 1)
   let score = 26 + Math.round((noShowCount / t) * 58)
   score -= Math.round((confirmedCount / t) * 22)
+  const cancelledCount = Math.max(0, total - noShowCount - confirmedCount)
+  score += Math.round((cancelledCount / t) * 12)
   return Math.max(10, Math.min(92, score))
 }
 
@@ -263,9 +272,12 @@ function enrichVisitHistories(rows: Appointment[]): ClientVisitHistoryItem[] {
 
 function deriveClientsFromScopedAppointments(
   appointments: Appointment[],
-  slugNorm: string | null
+  slugNorm: string | null,
+  options?: { skipBusinessSlugFilter?: boolean }
 ): Client[] {
-  const scoped = appointments.filter((a) => belongsToScopedBusiness(a, slugNorm))
+  const scoped = options?.skipBusinessSlugFilter
+    ? appointments
+    : appointments.filter((a) => belongsToScopedBusiness(a, slugNorm))
 
   const buckets = new Map<string, Appointment[]>()
   scoped.forEach((a) => {
@@ -295,9 +307,11 @@ function deriveClientsFromScopedAppointments(
     const visitCount = history.length
     let noShowCount = 0
     let confirmedVisitCount = 0
+    let cancelledVisitCount = 0
     history.forEach((h) => {
       if (h.status === "no_show") noShowCount += 1
       if (h.status === "confirmed" || h.status === "completed") confirmedVisitCount += 1
+      if (h.status === "cancelled") cancelledVisitCount += 1
     })
 
     const sample = apts[0]!
@@ -311,6 +325,7 @@ function deriveClientsFromScopedAppointments(
       visitCount,
       confirmedVisitCount,
       noShowCount,
+      cancelledVisitCount,
       notes: extras[id] ?? undefined,
       riskScore,
       riskTier: riskTierFromScore(riskScore),
@@ -321,6 +336,72 @@ function deriveClientsFromScopedAppointments(
   persistGroupIdentityMap(nextGroupMap)
   clients.sort((a, b) => a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }))
   return clients
+}
+
+function clientSnapshotKey(c: Pick<Client, "fullName" | "phone" | "email">): string {
+  const phone = normalizePhoneDigits(c.phone)
+  const email = normalizeEmailLower(c.email)
+  const name = c.fullName.trim().toLowerCase().replace(/\s+/g, " ")
+  if (phone.length >= 6) return `dig:${phone}`
+  if (email.includes("@")) return `em:${email}`
+  return `nm:${name}|d:${phone}`
+}
+
+function mergeClientsKeepingSnapshot(snapshot: Client[], derived: Client[]): Client[] {
+  if (snapshot.length === 0) return derived
+  if (derived.length === 0) return snapshot
+  const byKey = new Map<string, Client>()
+  for (const row of snapshot) {
+    byKey.set(clientSnapshotKey(row), row)
+  }
+  for (const row of derived) {
+    byKey.set(clientSnapshotKey(row), row)
+  }
+  return Array.from(byKey.values()).sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" })
+  )
+}
+
+async function ensureClientsFromSupabaseBookings(businessProfileId: string): Promise<void> {
+  const sb = getBrowserClient()
+  if (!sb) return
+  const { data, error } = await sb
+    .from("bookings")
+    .select("id,client_id,client_name,client_phone,client_email")
+    .eq("business_id", businessProfileId)
+    .order("created_at", { ascending: true })
+  if (error || !Array.isArray(data)) return
+  for (const row of data) {
+    const bookingId = typeof row.id === "string" ? row.id.trim() : ""
+    if (!bookingId) continue
+    const currentClientId = typeof row.client_id === "string" ? row.client_id.trim() : ""
+    const fullName = typeof row.client_name === "string" ? row.client_name.trim() || "?" : "?"
+    const phone = typeof row.client_phone === "string" ? row.client_phone.trim() : ""
+    const email = normalizeEmailLower(
+      typeof row.client_email === "string" ? row.client_email : ""
+    )
+    if (!fullName && !phone && !email) continue
+    const linked = await findOrCreateClient(sb, businessProfileId, {
+      fullName,
+      phone,
+      email,
+    })
+    if (!linked.ok) continue
+    if (currentClientId && currentClientId === linked.clientId) continue
+    const patch: TablesUpdate<"bookings"> = {
+      client_id: linked.clientId,
+      client_name: fullName,
+      client_phone: phone,
+      client_email: email || null,
+    }
+    // Silent reconciliation update: avoid dispatching pw-bookings for every row,
+    // because it can trigger reload races in Clients view.
+    await sb
+      .from("bookings")
+      .update(patch)
+      .eq("id", bookingId)
+      .eq("business_id", businessProfileId)
+  }
 }
 
 function djbStableHex(text: string): string {
@@ -354,16 +435,19 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
     let visitCount = 0
     let noShowCount = 0
     let confirmedVisitCount = 0
+    let cancelledVisitCount = 0
     if (visitHistory.length > 0) {
       visitCount = visitHistory.length
       visitHistory.forEach((h) => {
         if (h.status === "no_show") noShowCount += 1
         if (h.status === "confirmed" || h.status === "completed") confirmedVisitCount += 1
+        if (h.status === "cancelled") cancelledVisitCount += 1
       })
     } else {
       noShowCount = typeof r.noShowCount === "number" ? Math.max(0, r.noShowCount) : 0
       confirmedVisitCount = typeof r.confirmedCount === "number" ? Math.max(0, r.confirmedCount) : 0
-      visitCount = Math.max(1, noShowCount + confirmedVisitCount)
+      cancelledVisitCount = typeof r.cancelledCount === "number" ? Math.max(0, r.cancelledCount) : 0
+      visitCount = Math.max(0, noShowCount + confirmedVisitCount + cancelledVisitCount)
     }
 
     const riskScore =
@@ -380,6 +464,7 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
       visitCount,
       confirmedVisitCount,
       noShowCount,
+      cancelledVisitCount,
       notes: notesVal,
       riskScore,
       riskTier: riskTierFromScore(riskScore),
@@ -389,7 +474,7 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
 }
 
 export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
-  const appointments = typeof window !== "undefined" ? await fetchMergedAppointments() : []
+  const mergedAppointments = typeof window !== "undefined" ? await fetchMergedAppointments() : []
 
   if (!isSupabaseConfigured()) {
     const snap = readStoredCatalog()
@@ -436,11 +521,14 @@ export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
   const slugNormRaw = bp?.slug?.trim() ?? ""
   const slugNorm = slugNormRaw ? normalizePublicSlug(slugNormRaw) : null
 
+  const supabaseAppointments = await getBookingsForBusiness(sb, bid, slugNormRaw)
+  await ensureClientsFromSupabaseBookings(bid)
+  const appointments = supabaseAppointments.length > 0 ? supabaseAppointments : mergedAppointments
+
   const res = await getClients(sb, bid)
-  if (!res.error && res.data && res.data.length > 0) {
-    const clients = enrichSupabaseClientsWithHistories(res.data, appointments, slugNorm).sort((a, b) =>
-      a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" })
-    )
+  if (!res.error && res.data) {
+    const clients = enrichSupabaseClientsWithHistories(res.data, appointments, slugNorm)
+    persistClientsCatalog(clients)
     return {
       clients,
       mode: "supabase_clients",
@@ -449,11 +537,39 @@ export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
     }
   }
 
-  const derived = deriveClientsFromScopedAppointments(appointments, slugNorm)
+  // Supabase query succeeded but no usable data path left.
+  if (!res.error) {
+    return {
+      clients: [],
+      mode: "supabase_clients",
+      businessSlug: slugNormRaw || null,
+      businessProfileId: bid,
+    }
+  }
+
+  const derived = deriveClientsFromScopedAppointments(appointments, slugNorm, {
+    skipBusinessSlugFilter: true,
+  })
+  if (res.error) {
+    const mergedOnError = mergeClientsKeepingSnapshot(readStoredCatalog() ?? [], derived)
+    if (mergedOnError.length > 0) {
+      persistClientsCatalog(mergedOnError)
+      return {
+        clients: mergedOnError,
+        mode: "derived_from_visits",
+        businessSlug: slugNormRaw || null,
+        businessProfileId: bid,
+      }
+    }
+  }
 
   if (derived.length > 0) {
+    // Keep fallback clients stable across appointment deletions.
+    // Derived list alone is volatile; merge it with latest snapshot.
+    const mergedDerived = mergeClientsKeepingSnapshot(readStoredCatalog() ?? [], derived)
+    persistClientsCatalog(mergedDerived)
     return {
-      clients: derived,
+      clients: mergedDerived,
       mode: "derived_from_visits",
       businessSlug: slugNormRaw || null,
       businessProfileId: bid,
@@ -565,37 +681,106 @@ export async function persistClientUpdates(args: {
   const notesTrim = nextFields.notes?.trim() ?? ""
 
   const sb = getBrowserClient()
+  const canUseSupabaseClients = Boolean(sb && businessProfileId)
+  const isClientsTableMissingError = (message: string | undefined): boolean =>
+    (message ?? "").toLowerCase().includes("could not find the table 'public.clients' in the schema cache")
 
-  if (mode === "supabase_clients" && businessProfileId && sb) {
-    const payload: TablesUpdate<"clients"> = {
-      full_name: fullName,
-      phone: phone || "",
-      email: emailRaw || "",
-      normalized_phone: normalizePhoneCanonical(phone),
-      normalized_email: normalizeEmailCanonical(emailRaw),
-      notes: notesTrim.length > 0 ? notesTrim : null,
-      updated_at: new Date().toISOString(),
-    }
-    const patchRes = await updateClient(sb, businessProfileId, clientId, {
-      ...payload,
-    })
-    if (process.env.NODE_ENV === "development") {
-      console.info("[clients.update]", {
-        clientId,
-        businessId: businessProfileId,
-        payload,
-        error: patchRes.error?.message ?? null,
+  if (canUseSupabaseClients && sb && businessProfileId) {
+    let targetClientId = clientId
+    let updatedNoShowCount: number | null = null
+    let updatedConfirmedCount: number | null = null
+    if (!isLikelyUuidClientId(targetClientId)) {
+      const resolved = await findOrCreateClient(sb, businessProfileId, {
+        fullName,
+        email: emailRaw,
+        phone,
       })
-    }
-    if (patchRes.error || !patchRes.data) {
-      return {
-        ok: false,
-        errorMessage: patchRes.error?.message ?? "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+      if (!resolved.ok) {
+        if (!isClientsTableMissingError(resolved.error)) {
+          return {
+            ok: false,
+            errorMessage: resolved.error || "Nie udało się odnaleźć/utworzyć klienta przed zapisem.",
+          }
+        }
+      } else {
+        targetClientId = resolved.clientId
       }
     }
+    if (isLikelyUuidClientId(targetClientId)) {
+      const payload: TablesUpdate<"clients"> = {
+        full_name: fullName,
+        phone: phone || "",
+        email: emailRaw || "",
+        normalized_phone: normalizePhoneCanonical(phone),
+        normalized_email: normalizeEmailCanonical(emailRaw),
+        notes: notesTrim.length > 0 ? notesTrim : null,
+        updated_at: new Date().toISOString(),
+      }
+      const patchRes = await updateClient(sb, businessProfileId, targetClientId, {
+        ...payload,
+      })
+      if (process.env.NODE_ENV === "development") {
+        console.info("[clients.update]", {
+          clientId: targetClientId,
+          businessId: businessProfileId,
+          payload,
+          error: patchRes.error?.message ?? null,
+        })
+      }
+      if (patchRes.error && !isClientsTableMissingError(patchRes.error.message)) {
+        return {
+          ok: false,
+          errorMessage: patchRes.error?.message ?? "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+        }
+      }
+      if (patchRes.data) {
+        updatedNoShowCount = Math.max(0, Number(patchRes.data.noShowCount ?? 0))
+        updatedConfirmedCount = Math.max(0, Number(patchRes.data.confirmedCount ?? 0))
+      }
+    }
+    // Keep Visits panel consistent with Clients panel: update all bookings
+    // linked to this client id directly in Supabase.
+    const bookingsSync = await sb
+      .from("bookings")
+      .update({
+        client_name: fullName,
+        client_phone: phone || "",
+        client_email: emailRaw || null,
+      })
+      .eq("business_id", businessProfileId)
+      .eq("client_id", targetClientId)
+    if (bookingsSync.error && process.env.NODE_ENV === "development") {
+      console.warn("[clients.update.bookingsSync.error]", {
+        clientId: targetClientId,
+        businessId: businessProfileId,
+        error: bookingsSync.error.message ?? null,
+      })
+    }
     await propagateContactToRelatedBookings(prior, { ...nextFields, fullName, phone, email: emailRaw }, businessProfileId, slugNormResolved)
-    const reload = await loadClientsWorkspace()
-    return { ok: true, clients: reload.clients }
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("pw-bookings"))
+    }
+    const merged = args.currentList
+      .map((c) =>
+        c.id === clientId
+          ? {
+              ...c,
+              id: targetClientId,
+              fullName,
+              phone,
+              email: emailRaw,
+              notes: notesTrim || undefined,
+              noShowCount: Math.max(0, Number(updatedNoShowCount ?? c.noShowCount ?? 0)),
+              confirmedVisitCount: Math.max(
+                0,
+                Number(updatedConfirmedCount ?? c.confirmedVisitCount ?? 0)
+              ),
+            }
+          : c
+      )
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }))
+    persistClientsCatalog(merged)
+    return { ok: true, clients: merged }
   }
 
   if (mode === "derived_from_visits") {

@@ -22,9 +22,20 @@ export function useAppointmentsListPresentation(args: {
   sourceFilter: AppointmentSourceFilter
   staffFilter: StaffAppointmentFilterValue
   restrictToToday: boolean
+  clientNameFilter: string
+  serviceFilter: string
   language: string
 }) {
-  const { appointments, filter, sourceFilter, staffFilter, restrictToToday, language } = args
+  const {
+    appointments,
+    filter,
+    sourceFilter,
+    staffFilter,
+    restrictToToday,
+    clientNameFilter,
+    serviceFilter,
+    language,
+  } = args
 
   const dateFmt = React.useMemo(
     () =>
@@ -54,6 +65,8 @@ export function useAppointmentsListPresentation(args: {
   )
 
   const filtered = React.useMemo(() => {
+    const qClient = clientNameFilter.trim().toLowerCase()
+    const qService = serviceFilter.trim().toLowerCase()
     const today = getAppToday()
     let base = appointments
     if (restrictToToday) {
@@ -72,7 +85,21 @@ export function useAppointmentsListPresentation(args: {
     return stage
       .filter((a) => appointmentMatchesSourceFilter(a.source, sourceFilter))
       .filter((a) => bookingMatchesStaffFilter(a, staffFilter))
-  }, [appointments, filter, sourceFilter, staffFilter, restrictToToday])
+      .filter((a) =>
+        qClient ? String(a.clientName ?? "").toLowerCase().includes(qClient) : true
+      )
+      .filter((a) =>
+        qService ? String(a.serviceLabel ?? "").toLowerCase().includes(qService) : true
+      )
+  }, [
+    appointments,
+    filter,
+    sourceFilter,
+    staffFilter,
+    restrictToToday,
+    clientNameFilter,
+    serviceFilter,
+  ])
 
   const grouped = React.useMemo(() => {
     const out: Record<AppointmentGroupKey, Appointment[]> = {

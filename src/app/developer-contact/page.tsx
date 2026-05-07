@@ -3,6 +3,7 @@
 import Link from "next/link"
 
 import { Logo } from "@/components/brand/logo"
+import { Button } from "@/components/ui/button"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export default function DeveloperContactPage() {
@@ -43,11 +44,21 @@ export default function DeveloperContactPage() {
               {t("developerPage.websitePlaceholder")}
             </dd>
           </div>
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <dt className="font-medium text-foreground">{t("developerPage.supportChatTitle")}</dt>
+            <dd className="mt-1 text-xs text-muted-foreground">{t("developerPage.supportChatHint")}</dd>
+            <Button asChild className="mt-3 h-10 w-full rounded-xl sm:w-auto">
+              <Link href="/help">{t("developerPage.supportChatCta")}</Link>
+            </Button>
+          </div>
         </dl>
 
         <footer className="flex flex-wrap gap-x-4 gap-y-2 border-t border-border/80 pt-6 text-sm">
           <Link href="/terms" className="font-medium text-primary underline-offset-4 hover:underline">
             {t("footer.terms")}
+          </Link>
+          <Link href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
+            {t("footer.privacy")}
           </Link>
           <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline">
             {t("developerPage.backHome")}

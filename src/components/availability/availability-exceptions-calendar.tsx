@@ -345,6 +345,26 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
     return [...rows].sort((a, b) => String(a.exception_date).localeCompare(String(b.exception_date)))
   }, [rows])
 
+  const startAddException = () => {
+    const n = new Date()
+    const key = toLocalDateKeyFromParts(n.getFullYear(), n.getMonth(), n.getDate())
+    selectDay(key)
+  }
+
+  const openExceptionEditor = (dateKey: string) => {
+    const d = parseLocalDateKey(dateKey)
+    if (Number.isFinite(d.getTime())) {
+      setViewYear(d.getFullYear())
+      setViewMonth(d.getMonth())
+    }
+    if (activeKey === dateKey) {
+      setActiveKey(null)
+      queueMicrotask(() => selectDay(dateKey))
+      return
+    }
+    selectDay(dateKey)
+  }
+
   if (!isSupabaseConfigured() || !businessProfileId) {
     return null
   }
@@ -539,9 +559,16 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
 
           <div className="min-w-0 space-y-5">
             {!activeKey ? (
-              <p className="rounded-lg border border-dashed border-border/80 bg-muted/15 px-3 py-3 text-sm text-muted-foreground">
-                {t("availability.selectDayHint")}
-              </p>
+              <div className="space-y-3 rounded-lg border border-dashed border-border/80 bg-muted/15 px-3 py-3">
+                <p className="text-sm text-muted-foreground">{t("availability.selectDayHint")}</p>
+                <Button
+                  type="button"
+                  className="h-11 w-full rounded-xl sm:w-auto"
+                  onClick={startAddException}
+                >
+                  {t("availability.addException")}
+                </Button>
+              </div>
             ) : (
               <div className="min-w-0 space-y-3 rounded-xl border border-border/80 bg-muted/10 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -625,7 +652,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                         type="time"
                         value={formStart}
                         onChange={(e) => setFormStart(e.target.value)}
-                        className="h-10 max-w-full rounded-lg text-sm"
+                        className="h-11 max-w-full rounded-xl text-sm"
                       />
                     </div>
                     <div className="min-w-0 space-y-1">
@@ -637,7 +664,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                         type="time"
                         value={formEnd}
                         onChange={(e) => setFormEnd(e.target.value)}
-                        className="h-10 max-w-full rounded-lg text-sm"
+                        className="h-11 max-w-full rounded-xl text-sm"
                       />
                     </div>
                   </div>
@@ -719,7 +746,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                               type="button"
                               variant="outline"
                               className="h-10 w-full rounded-xl text-xs sm:w-auto"
-                              onClick={() => selectDay(key)}
+                              onClick={() => openExceptionEditor(key)}
                             >
                               {t("availability.editExceptionFull")}
                             </Button>

@@ -13,7 +13,6 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { ClientRiskTierBadge } from "@/components/shared/client-risk-tier-badge"
 import { EmptyState } from "@/components/shared/empty-state"
 import { FormActions } from "@/components/shared/form-actions"
 import { StatusBadge } from "@/components/shared/status-badge"
@@ -53,12 +52,11 @@ import {
   type ClientsLoadMode,
   persistClientsCatalog,
   persistClientUpdates,
-  riskTierFromScore,
 } from "@/lib/clients/clients-store"
 import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import type { Client, ClientRiskTier } from "@/types/domain"
+import type { Client } from "@/types/domain"
 
 let localFallbackClientSeq = 0
 
@@ -72,24 +70,6 @@ function allocateLocalFallbackClientId(): string {
 
 function normalizeQuery(s: string) {
   return s.trim().toLowerCase().replace(/\s+/g, " ")
-}
-
-function ClientRiskPanelBlock(props: { riskTier: ClientRiskTier; riskScore: number }) {
-  const { t } = useTranslations()
-  const nativeTip = t("clients.riskScoreNativeTooltip").replace("{score}", String(props.riskScore))
-  return (
-    <section className="space-y-3">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {t("clients.sectionRiskHead")}
-      </h3>
-      <div className="space-y-2">
-        <div className="w-fit max-w-full" title={nativeTip}>
-          <ClientRiskTierBadge tier={props.riskTier} />
-        </div>
-        <p className="text-sm leading-snug text-muted-foreground">{t("clients.riskBasedOnHistory")}</p>
-      </div>
-    </section>
-  )
 }
 
 type FormState = {
@@ -126,6 +106,62 @@ function isEmailFormatValid(email: string): boolean {
   const t = email.trim()
   if (!t) return true
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t)
+}
+
+function stableClientRenderId(c: Client): string {
+  const id = c.id.trim()
+  if (id) return id
+  const email = c.email.trim().toLowerCase()
+  const phone = c.phone.replace(/\s+/g, "")
+  const name = c.fullName.trim().toLowerCase().replace(/\s+/g, "-")
+  return `client-${email || phone || name || "unknown"}`
+}
+
+function dedupeClientsForRender(rows: Client[]): Client[] {
+  const byId = new Map<string, Client>()
+  for (const row of rows) {
+    const key = stableClientRenderId(row)
+    const prev = byId.get(key)
+    if (!prev) {
+      byId.set(key, { ...row, id: key })
+      continue
+    }
+    const visitHistoryMap = new Map<string, (typeof row.visitHistory)[number]>()
+    for (const v of prev.visitHistory) {
+      visitHistoryMap.set(`${v.id}|${v.startsAt}|${v.serviceLabel}|${v.status}`, v)
+    }
+    for (const v of row.visitHistory) {
+      visitHistoryMap.set(`${v.id}|${v.startsAt}|${v.serviceLabel}|${v.status}`, v)
+    }
+    const mergedVisitHistory = Array.from(visitHistoryMap.values()).sort(
+      (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
+    )
+    const mergedVisitCount = Math.max(
+      prev.visitCount + row.visitCount,
+      mergedVisitHistory.length
+    )
+    const mergedConfirmed = prev.confirmedVisitCount + row.confirmedVisitCount
+    const mergedNoShow = prev.noShowCount + row.noShowCount
+    const mergedCancelled = (prev.cancelledVisitCount ?? 0) + (row.cancelledVisitCount ?? 0)
+    byId.set(key, {
+      ...row,
+      id: key,
+      fullName: row.fullName.trim() || prev.fullName.trim(),
+      phone: row.phone.trim() || prev.phone.trim(),
+      email: row.email.trim() || prev.email.trim(),
+      notes: row.notes?.trim() || prev.notes?.trim() || undefined,
+      visitCount: mergedVisitCount,
+      confirmedVisitCount: mergedConfirmed,
+      noShowCount: mergedNoShow,
+      cancelledVisitCount: mergedCancelled,
+      riskScore: row.riskScore,
+      riskTier: row.riskTier,
+      visitHistory: mergedVisitHistory,
+    })
+  }
+  return Array.from(byId.values()).sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" })
+  )
 }
 
 type SaveBanner = "added" | "edited" | null
@@ -203,10 +239,12 @@ export default function ClientsPage() {
     })
   }, [detailsId])
 
+  const uniqueClients = React.useMemo(() => dedupeClientsForRender(clients), [clients])
+
   const filtered = React.useMemo(() => {
     const q = normalizeQuery(query)
-    if (!q) return clients
-    return clients.filter((c) => {
+    if (!q) return uniqueClients
+    return uniqueClients.filter((c) => {
       const phoneNorm = c.phone.replace(/\s/g, "").toLowerCase()
       const qPhone = q.replace(/\s/g, "")
       return (
@@ -215,11 +253,11 @@ export default function ClientsPage() {
         c.email.toLowerCase().includes(q)
       )
     })
-  }, [clients, query])
+  }, [uniqueClients, query])
 
   const detailsClient = React.useMemo(
-    () => (detailsId ? clients.find((c) => c.id === detailsId) ?? null : null),
-    [clients, detailsId]
+    () => (detailsId ? uniqueClients.find((c) => c.id === detailsId) ?? null : null),
+    [uniqueClients, detailsId]
   )
 
   const openCreate = () => {
@@ -235,7 +273,6 @@ export default function ClientsPage() {
     if (!fullName) return
     if (!isEmailFormatValid(email)) return
 
-    const riskScore = 24
     const sb = isSupabaseConfigured() ? getBrowserClient() : null
     const bid = workspace?.businessProfileId ?? null
 
@@ -272,9 +309,10 @@ export default function ClientsPage() {
       visitCount: 0,
       confirmedVisitCount: 0,
       noShowCount: 0,
+      cancelledVisitCount: 0,
       notes: form.notes.trim() || undefined,
-      riskScore,
-      riskTier: riskTierFromScore(riskScore),
+      riskScore: 24,
+      riskTier: "low",
       visitHistory: [],
     }
 
@@ -296,7 +334,7 @@ export default function ClientsPage() {
     const bid = workspace?.businessProfileId ?? null
 
     if (workspace?.mode === "supabase_clients" && sb && bid && isLikelyUuidClientId(id)) {
-      const del = await deleteClient(sb, bid, id)
+      const del = await deleteClient(sb, bid, id, "clients_panel")
       if (del.error) return
       const w = await loadClientsWorkspace()
       queueMicrotask(() => {
@@ -395,9 +433,10 @@ export default function ClientsPage() {
       queueMicrotask(() => {
         setClients(res.clients)
         setDetailsEditing(false)
+        setDetailFieldError(null)
+        setDetailsId(null)
         setShowSaved("edited")
       })
-      void reloadCatalog()
     } catch (error) {
       const details = error instanceof Error ? error.message : null
       setDetailFieldError(
@@ -410,13 +449,12 @@ export default function ClientsPage() {
     }
   }
 
-  const isGloballyEmpty = !catalogLoading && clients.length === 0
+  const isGloballyEmpty = !catalogLoading && uniqueClients.length === 0
   const isSearchEmpty = !isGloballyEmpty && filtered.length === 0
 
-  const totalClients = clients.length
-  const highRiskCount = clients.filter((c) => c.riskTier === "high").length
-  const noShowTotal = clients.reduce((sum, c) => sum + (c.noShowCount ?? 0), 0)
-  const confirmedTotal = clients.reduce(
+  const totalClients = uniqueClients.length
+  const noShowTotal = uniqueClients.reduce((sum, c) => sum + (c.noShowCount ?? 0), 0)
+  const confirmedTotal = uniqueClients.reduce(
     (sum, c) => sum + (c.confirmedVisitCount ?? 0),
     0
   )
@@ -448,7 +486,7 @@ export default function ClientsPage() {
             {showSaved === "added" ? t("clients.addedBanner") : t("clients.updatedBanner")}
           </div>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardContent className="px-4 py-3.5">
               <p className="text-xs font-medium text-muted-foreground">
@@ -456,16 +494,6 @@ export default function ClientsPage() {
               </p>
               <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
                 {totalClients}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-4 py-3.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                {t("clients.highRisk")}
-              </p>
-              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
-                {highRiskCount}
               </p>
             </CardContent>
           </Card>
@@ -531,8 +559,7 @@ export default function ClientsPage() {
                         <TableHead className="w-[26%] pl-4">{t("clients.tableClient")}</TableHead>
                         <TableHead className="w-[30%]">{t("clients.tableContact")}</TableHead>
                         <TableHead className="w-[20%]">{t("clients.tableLastVisits")}</TableHead>
-                        <TableHead className="w-[14%]">{t("clients.tableRisk")}</TableHead>
-                        <TableHead className="w-[10%] min-w-[5rem] pr-4 text-right">
+                        <TableHead className="w-[24%] min-w-[5rem] pr-4 text-right">
                           {t("clients.moreButton")}
                         </TableHead>
                       </TableRow>
@@ -559,11 +586,9 @@ export default function ClientsPage() {
                             <div className="text-sm text-muted-foreground">
                               <span className="font-medium text-foreground">{row.visitCount}</span>{" "}
                               {t("clients.visitsAbbrInline")} · {row.confirmedVisitCount}{" "}
-                              {t("clients.confirmedAbbr")} · {row.noShowCount} {t("clients.noShow")}
+                              {t("clients.confirmedAbbr")} · {row.noShowCount} {t("clients.noShow")} ·{" "}
+                              {row.cancelledVisitCount} {t("clients.cancelledShort")}
                             </div>
-                          </TableCell>
-                          <TableCell className="min-w-0">
-                            <ClientRiskTierBadge tier={row.riskTier} />
                           </TableCell>
                           <TableCell
                             className="pr-4 text-right"
@@ -656,10 +681,12 @@ export default function ClientsPage() {
                               </span>{" "}
                               {t("clients.noShow")}
                             </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            <ClientRiskTierBadge tier={row.riskTier} />
+                            <span className="tabular-nums">
+                              <span className="font-semibold text-foreground">
+                                {row.cancelledVisitCount}
+                              </span>{" "}
+                              {t("clients.cancelledShort")}
+                            </span>
                           </div>
 
                           <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
@@ -896,11 +923,6 @@ export default function ClientsPage() {
                       </div>
                     </section>
 
-                    <ClientRiskPanelBlock
-                      riskTier={detailsClient.riskTier}
-                      riskScore={detailsClient.riskScore}
-                    />
-
                     <section className="space-y-3">
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {t("clients.sectionNotesHead")}
@@ -993,11 +1015,6 @@ export default function ClientsPage() {
                         </div>
                       </div>
                     </section>
-
-                    <ClientRiskPanelBlock
-                      riskTier={detailsClient.riskTier}
-                      riskScore={detailsClient.riskScore}
-                    />
 
                     <section className="space-y-3">
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

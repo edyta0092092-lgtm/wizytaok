@@ -18,9 +18,18 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 const PRICING_FEATURE_KEYS = [
   "marketing.pricingFeatureReminders",
   "marketing.pricingFeatureConfirm",
+  "marketing.pricingFeatureOnlineBooking",
+  "marketing.pricingFeatureAppointments",
+  "marketing.pricingFeatureAvailability",
+  "marketing.pricingFeatureTeam",
   "marketing.pricingFeatureTemplates",
-  "marketing.pricingFeatureRisk",
   "marketing.pricingFeatureSupport",
+] as const
+
+const PRICING_TRIAL_KEYS = [
+  "marketing.pricingTrialNoCard",
+  "marketing.pricingTrialSetup",
+  "marketing.pricingTrialGoLive",
 ] as const
 
 export default function PricingPage() {
@@ -58,7 +67,7 @@ export default function PricingPage() {
           </p>
         </div>
 
-        <div className="mx-auto mt-6 max-w-md">
+        <div className="mx-auto mt-6 grid max-w-5xl gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)]">
           <Card className="border-border shadow-none sm:mx-auto">
             <CardHeader className="space-y-1 pb-2 text-left sm:text-left">
               <CardTitle className="text-lg font-medium">{t("marketing.pricingPlanName")}</CardTitle>
@@ -72,6 +81,9 @@ export default function PricingPage() {
               </p>
             </CardHeader>
             <CardContent className="pt-4">
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t("marketing.pricingIncludesTitle")}
+              </p>
               <ul className="space-y-2 text-left text-sm text-muted-foreground">
                 {PRICING_FEATURE_KEYS.map((key) => (
                   <li key={key} className="flex gap-3">
@@ -94,6 +106,40 @@ export default function PricingPage() {
               </Button>
             </CardFooter>
           </Card>
+
+          <div className="space-y-4">
+            <Card className="border-border shadow-none">
+              <CardHeader className="pb-2 text-left">
+                <CardTitle className="text-base font-medium">
+                  {t("marketing.pricingTrialTitle")}
+                </CardTitle>
+                <CardDescription>{t("marketing.pricingTrialLead")}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-foreground">
+                  {PRICING_TRIAL_KEYS.map((key) => (
+                    <li key={key} className="flex gap-3">
+                      <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+                      <span>{t(key)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border shadow-none">
+              <CardHeader className="pb-2 text-left">
+                <CardTitle className="text-base font-medium">
+                  {t("marketing.pricingWhoTitle")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {t("marketing.pricingWhoLead")}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
     </div>

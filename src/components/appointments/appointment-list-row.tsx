@@ -5,12 +5,12 @@ import Link from "next/link"
 
 import { AppointmentRowActions } from "@/components/appointments/appointment-row-actions"
 import { AppointmentStaffCaption } from "@/components/shared/appointment-staff-caption"
-import { BookingSourceBadge } from "@/components/shared/booking-source-badge"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { getBookingSourceLabel } from "@/lib/bookings/booking-source"
 import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
@@ -102,6 +102,7 @@ export function AppointmentListRow({
   isCancellingVisit,
 }: AppointmentListRowProps) {
   const { t } = useTranslations()
+  const sourceLabel = getBookingSourceLabel(row.source, language)
 
   return (
     <React.Fragment>
@@ -200,15 +201,16 @@ export function AppointmentListRow({
         <div className="flex min-w-0 flex-col gap-2 md:max-w-full md:items-end">
           <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
             <StatusBadge status={row.status} />
-            <BookingSourceBadge source={row.source} variant="full" />
           </div>
           <AppointmentRowActions
+            status={row.status}
             statusOrder={statusOrder}
             onEditVisit={onEditVisit}
             onChangeStatus={onChangeStatus}
             allowAppointmentDelete={allowAppointmentDelete}
             onDelete={onDeleteRequest}
           />
+          <p className="text-xs text-muted-foreground md:text-right">{sourceLabel}</p>
         </div>
       </div>
 
@@ -268,6 +270,7 @@ export function AppointmentListRow({
                 type="time"
                 value={proposeTime}
                 onChange={(e) => onProposeTimeChange(e.target.value)}
+                className="h-11 rounded-xl"
               />
             </div>
           </div>

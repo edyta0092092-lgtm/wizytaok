@@ -1263,6 +1263,32 @@ export default function TeamPage() {
         panelMemberRole: form.panelMemberRole,
       })
       setSavedServiceIds([...refreshedServiceIds])
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === editing.id
+            ? {
+                ...x,
+                name,
+                role: form.panelMemberRole,
+                email: emailTrim || undefined,
+                phone: phoneForSave || undefined,
+                isActive: form.isActive,
+              }
+            : x,
+        ),
+      )
+      setEditing((prev) =>
+        prev && prev.id === editing.id
+          ? {
+              ...prev,
+              name,
+              role: form.panelMemberRole,
+              email: emailTrim || undefined,
+              phone: phoneForSave || undefined,
+              isActive: form.isActive,
+            }
+          : prev,
+      )
       setIsScheduleEditing(false)
       setIsExceptionsEditing(false)
     } finally {

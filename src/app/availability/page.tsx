@@ -279,7 +279,7 @@ export default function AvailabilityPage() {
                           value={day.startTime}
                           disabled={!day.isOpen || loading || loadError}
                           onChange={(e) => updateDay(day.id, { startTime: e.target.value })}
-                          className="h-8 rounded-xl"
+                          className="h-11 rounded-xl"
                         />
                       </div>
                       <div>
@@ -292,7 +292,7 @@ export default function AvailabilityPage() {
                           value={day.endTime}
                           disabled={!day.isOpen || loading || loadError}
                           onChange={(e) => updateDay(day.id, { endTime: e.target.value })}
-                          className="h-8 rounded-xl"
+                          className="h-11 rounded-xl"
                         />
                       </div>
                     </div>

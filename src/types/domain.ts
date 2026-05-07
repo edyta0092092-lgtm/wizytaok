@@ -108,6 +108,7 @@ export type Client = {
   visitCount: number
   confirmedVisitCount: number
   noShowCount: number
+  cancelledVisitCount: number
   notes?: string
   /** 0–100, im wyżej tym większe ryzyko nieobecności klienta */
   riskScore: number
@@ -289,6 +290,7 @@ export type ClientRecord = {
   notes: string | null
   noShowCount: number
   confirmedCount: number
+  cancelledCount?: number
   createdAt: string
   updatedAt: string
 }

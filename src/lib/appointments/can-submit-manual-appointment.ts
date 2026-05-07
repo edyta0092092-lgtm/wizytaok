@@ -7,7 +7,7 @@ export function canSubmitManualAppointment(input: {
   manualStaffForServiceCount: number
 }): boolean {
   const { form, hasActiveTeamMembers, manualStaffForServiceCount } = input
-  if (!form.clientName.trim() || !form.clientPhone.trim() || !form.date || !form.time) {
+  if (!form.clientFirstName.trim() || !form.clientPhone.trim() || !form.date || !form.time) {
     return false
   }
   if (!form.serviceId.trim()) return false

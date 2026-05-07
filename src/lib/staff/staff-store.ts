@@ -32,11 +32,24 @@ export function normalizeStaffRole(raw: string | null | undefined): "admin" | "s
 
 function isMissingColumnError(message: string | undefined, column: string): boolean {
   const text = (message ?? "").toLowerCase()
-  return text.includes(`column ${column.toLowerCase()}`) && text.includes("does not exist")
+  const col = column.toLowerCase()
+  const missingByPg = text.includes(`column ${col}`) && text.includes("does not exist")
+  const missingBySchemaCache =
+    text.includes(`'${col}' column`) && text.includes("schema cache")
+  return missingByPg || missingBySchemaCache
 }
 
 function isMissingAnyColumnError(message: string | undefined, columns: string[]): boolean {
   return columns.some((column) => isMissingColumnError(message, column))
+}
+
+function extractMissingColumnName(message: string | undefined): string | null {
+  const text = (message ?? "").toLowerCase()
+  const m1 = text.match(/column\s+["']?([a-z0-9_]+)["']?\s+does not exist/i)
+  if (m1?.[1]) return m1[1]
+  const m2 = text.match(/could not find the ['"]([a-z0-9_]+)['"] column/i)
+  if (m2?.[1]) return m2[1]
+  return null
 }
 
 function toUniqueServiceIds(serviceIds: string[]): string[] {
@@ -170,6 +183,32 @@ export type PublicBookingServiceStaffResult = {
   rpcError?: string
 }
 
+function mapPublicStaffRpcRows(
+  rows: Array<Record<string, unknown>>,
+  businessId: string
+): StaffMember[] {
+  return rows
+    .map((r) => {
+      const id = String(r.id ?? "").trim()
+      if (!id) return null
+      const rawName =
+        (typeof r.name === "string" ? r.name : "") ||
+        (typeof r.full_name === "string" ? r.full_name : "")
+      const normalizedName = rawName.trim().replace(/\s+/g, " ")
+      return {
+        id,
+        businessId,
+        name: normalizedName || "Bez nazwy",
+        role: undefined,
+        email: undefined,
+        phone: undefined,
+        avatarUrl: undefined,
+        isActive: true,
+      } as StaffMember
+    })
+    .filter((m): m is StaffMember => Boolean(m))
+}
+
 function mapStaffRow(row: StaffRow): StaffMember {
   return {
     id: row.id,
@@ -246,14 +285,21 @@ export async function getActiveStaffForBusiness(
   businessId: string | null
 ): Promise<StaffMember[]> {
   if (!isSupabaseStaffPath(client, businessId)) return []
-  const { data, error } = await client!
+  let res = await client!
     .from("staff_members")
     .select("id, business_id, name, role, email, phone, avatar_url, is_active")
     .eq("business_id", businessId!)
     .eq("is_active", true)
     .order("created_at", { ascending: true })
-  if (error || !data) return []
-  return data.map(mapStaffRow)
+  if (res.error?.message && res.error.message.toLowerCase().includes("is_active")) {
+    res = await client!
+      .from("staff_members")
+      .select("id, business_id, name, role, email, phone, avatar_url, is_active")
+      .eq("business_id", businessId!)
+      .order("created_at", { ascending: true })
+  }
+  if (res.error || !res.data) return []
+  return res.data.map(mapStaffRow).filter((m) => m.isActive !== false)
 }
 
 /** Zalogowana przeglądarka + bieżący profil firmy z Supabase. */
@@ -409,39 +455,57 @@ export async function updateStaffMember(
   const lastName = (updates.lastName ?? "").trim()
   const fullName = updates.name?.trim() ?? `${firstName} ${lastName}`.trim()
   const patch: TablesUpdate<"staff_members"> = {}
-  if (updates.name !== undefined) patch.name = fullName
+  if (updates.name !== undefined || updates.firstName !== undefined || updates.lastName !== undefined) {
+    patch.name = fullName
+    ;(patch as Record<string, unknown>).full_name = fullName
+    ;(patch as Record<string, unknown>).first_name = firstName || null
+    ;(patch as Record<string, unknown>).last_name = lastName || null
+  }
   if (updates.role !== undefined) patch.role = normalizeStaffRole(updates.role)
   if (updates.email !== undefined) patch.email = updates.email?.trim() || null
   if (updates.phone !== undefined) patch.phone = updates.phone?.trim() || null
   if (updates.isActive !== undefined) patch.is_active = updates.isActive
 
-  const updateAndVerify = async (payload: Record<string, unknown>) => {
-    // prefer scoping by business_id, but fall back for legacy schemas
+  const updateAndVerify = async (
+    payload: Record<string, unknown>
+  ): Promise<{ error: { message: string } | null }> => {
+    // Prefer scope by business_id, but fall back for legacy schemas.
+    // Treat "no error" as success to avoid false negatives on strict RLS select paths.
     const attemptScoped = await client!
       .from("staff_members")
       .update(payload as never)
       .eq("id", staffId)
       .eq("business_id", businessId!)
-      .select("id")
-      .maybeSingle()
     if (attemptScoped.error && isMissingColumnError(attemptScoped.error.message, "business_id")) {
       const attemptLoose = await client!
         .from("staff_members")
         .update(payload as never)
         .eq("id", staffId)
-        .select("id")
-        .maybeSingle()
-      return attemptLoose
+      return { error: attemptLoose.error ? { message: attemptLoose.error.message } : null }
     }
-    return attemptScoped
+    return { error: attemptScoped.error ? { message: attemptScoped.error.message } : null }
   }
 
   if (Object.keys(patch).length > 0) {
-    const primary = await updateAndVerify(patch as unknown as Record<string, unknown>)
-    if (primary.error || !primary.data) {
+    let dynamicPatch = patch as unknown as Record<string, unknown>
+    let primary = await updateAndVerify(dynamicPatch)
+    for (let i = 0; i < 3; i += 1) {
+      if (!primary.error) break
+      if (!isMissingAnyColumnError(primary.error.message, ["full_name", "first_name", "last_name"])) {
+        break
+      }
+      const missing = extractMissingColumnName(primary.error.message)
+      if (!missing || !(missing in dynamicPatch)) break
+      const { [missing]: _skip, ...rest } = dynamicPatch
+      void _skip
+      dynamicPatch = rest
+      primary = await updateAndVerify(dynamicPatch)
+    }
+    if (primary.error) {
       if (
         updates.name !== undefined &&
-        isMissingColumnError(primary.error?.message, "name")
+        primary.error &&
+        isMissingColumnError(primary.error.message, "name")
       ) {
         const fallbackPatch: Record<string, unknown> = {
           full_name: fullName,
@@ -453,20 +517,16 @@ export async function updateStaffMember(
         if (updates.phone !== undefined) fallbackPatch.phone = updates.phone?.trim() || null
         if (updates.isActive !== undefined) fallbackPatch.is_active = updates.isActive
         const fallback = await updateAndVerify(fallbackPatch)
-        if (fallback.error || !fallback.data) {
+        if (fallback.error) {
           return {
             ok: false,
-            error:
-              fallback.error?.message ??
-              "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+            error: fallback.error?.message ?? "Błąd aktualizacji osoby.",
           }
         }
       } else {
         return {
           ok: false,
-          error:
-            primary.error?.message ??
-            "Brak rekordu po aktualizacji (RLS/ID/business_id).",
+          error: primary.error?.message ?? "Błąd aktualizacji osoby.",
         }
       }
     }
@@ -579,24 +639,28 @@ export async function getServiceStaffForPublicSlug(
   }
 
   const rows = (data ?? []) as Array<Record<string, unknown>>
-  const staff: StaffMember[] = rows.map((r) => {
-    const rawName =
-      (typeof r.name === "string" ? r.name : "") ||
-      (typeof r.full_name === "string" ? r.full_name : "")
-    const normalizedName = rawName.trim().replace(/\s+/g, " ")
-    return {
-      id: String(r.id ?? ""),
-      businessId: bid,
-      name: normalizedName || "Bez nazwy",
-      role: undefined,
-      email: undefined,
-      phone: undefined,
-      avatarUrl: undefined,
-      isActive: true,
-    }
-  }).filter((m) => m.id.length > 0)
+  const staff = mapPublicStaffRpcRows(rows, bid)
 
   return { staff, businessId: bid, rpcStaff: data }
+}
+
+/** Ten sam RPC co public booking, ale dla panelu firmowego (businessId + serviceId). */
+export async function getPublicStaffForBusinessService(
+  client: StaffStoreClient | null,
+  businessId: string | null,
+  serviceId: string | null
+): Promise<StaffMember[]> {
+  if (!client || !isSupabaseConfigured() || !businessId?.trim() || !serviceId?.trim()) return []
+  const bid = businessId.trim()
+  const sid = serviceId.trim()
+  const { data, error } = await client.rpc("get_public_staff_for_service", {
+    p_business_id: bid,
+    p_service_id: sid,
+  })
+  if (error || !Array.isArray(data)) return []
+  return mapPublicStaffRpcRows(data as Array<Record<string, unknown>>, bid).sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+  )
 }
 
 /** Alias: aktywni pracownicy z `staff_services` dla danej usługi. */
@@ -615,10 +679,58 @@ export async function getStaffMembersForService(
   serviceId: string
 ): Promise<StaffMember[]> {
   if (!isSupabaseStaffPath(client, businessId) || !serviceId.trim()) return []
-  const { links } = await loadStaffServiceLinksForService(client!, businessId!, serviceId.trim())
+  const sid = serviceId.trim()
+  const { links } = await loadStaffServiceLinksForService(client!, businessId!, sid)
   const staffIds = uniqueNonEmptyIds(links.map((row) => staffMemberIdFromStaffServiceRow(row) ?? ""))
-  if (staffIds.length === 0) return []
-  return fetchStaffMembersByIdsForBusiness(client!, businessId!, staffIds)
+  if (staffIds.length > 0) {
+    return fetchStaffMembersByIdsForBusiness(client!, businessId!, staffIds)
+  }
+
+  // Legacy-safe fallback: if staff_services links could not be resolved directly,
+  // scan active staff for this business and reuse getStaffServiceIds() compatibility logic
+  // (staff_id vs staff_member_id, with/without business_id), then match by normalized service id.
+  const activeStaff = await getActiveStaffForBusiness(client!, businessId!)
+  if (activeStaff.length === 0) return []
+  const resolved: StaffMember[] = []
+  for (const member of activeStaff) {
+    const serviceIds = await getStaffServiceIds(client!, businessId!, member.id)
+    if (serviceIds.some((id) => publicBookingServiceIdsMatch(id, sid))) {
+      resolved.push(member)
+    }
+  }
+  if (resolved.length > 0) {
+    return resolved.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+  }
+
+  // Final fallback: reuse the same RPC used by public booking flow.
+  // This keeps company panel staff selection aligned with client-facing booking logic.
+  const rpc = await client!.rpc("get_public_staff_for_service", {
+    p_business_id: businessId!,
+    p_service_id: sid,
+  })
+  if (rpc.error || !Array.isArray(rpc.data)) return []
+  const rpcRows = rpc.data as Array<Record<string, unknown>>
+  const rpcStaff = rpcRows
+    .map((r) => {
+      const id = String(r.id ?? "").trim()
+      if (!id) return null
+      const rawName =
+        (typeof r.name === "string" ? r.name : "") ||
+        (typeof r.full_name === "string" ? r.full_name : "")
+      const normalizedName = rawName.trim().replace(/\s+/g, " ")
+      return {
+        id,
+        businessId: businessId!,
+        name: normalizedName || "Bez nazwy",
+        role: undefined,
+        email: undefined,
+        phone: undefined,
+        avatarUrl: undefined,
+        isActive: true,
+      } as StaffMember
+    })
+    .filter((m): m is StaffMember => Boolean(m))
+  return rpcStaff.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
 }
 
 export async function getStaffServiceIds(
@@ -655,6 +767,16 @@ export async function getStaffServiceIds(
     error?: { message?: string }
   }).data
   if (fallbackNoBusinessData) return fallbackNoBusinessData.map((x) => x.service_id)
+  const fallbackStaffIdNoBusiness = await (client!.from("staff_services") as unknown as {
+    select: (fields: string) => { eq: (column: string, value: string) => Promise<unknown> }
+  })
+    .select("service_id")
+    .eq("staff_id", staffId)
+  const fallbackStaffIdNoBusinessData = (fallbackStaffIdNoBusiness as {
+    data?: Array<{ service_id: string }>
+    error?: { message?: string }
+  }).data
+  if (fallbackStaffIdNoBusinessData) return fallbackStaffIdNoBusinessData.map((x) => x.service_id)
   return []
 }
 

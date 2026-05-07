@@ -278,7 +278,7 @@ export function ServiceHoursSheet({
                           value={row.startTime}
                           onChange={(e) => updateRow(row.weekday, { startTime: e.target.value })}
                           disabled={!row.isAvailable}
-                          className="h-9"
+                          className="h-11 rounded-xl"
                         />
                       </div>
                       <div className="space-y-1">
@@ -288,7 +288,7 @@ export function ServiceHoursSheet({
                           value={row.endTime}
                           onChange={(e) => updateRow(row.weekday, { endTime: e.target.value })}
                           disabled={!row.isAvailable}
-                          className="h-9"
+                          className="h-11 rounded-xl"
                         />
                       </div>
                     </div>

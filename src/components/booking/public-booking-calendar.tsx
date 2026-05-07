@@ -537,10 +537,10 @@ export function PublicBookingCalendar({
                     type="button"
                     onClick={() => onSelectTime(slot)}
                     className={cn(
-                      "min-h-8 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors sm:text-sm",
+                      "inline-flex h-11 min-w-[5.5rem] shrink-0 items-center justify-center rounded-xl border px-3 text-sm font-medium transition-colors",
                       selectedTime === slot
                         ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                        : "border-border bg-muted/30 text-foreground hover:border-primary/35 hover:bg-muted/50 dark:bg-muted/20"
+                        : "border-border bg-card text-foreground hover:border-primary/35 hover:bg-muted/40"
                     )}
                   >
                     {slot}

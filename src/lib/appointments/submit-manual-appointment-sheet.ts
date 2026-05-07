@@ -1,9 +1,10 @@
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
-import { createManualBooking } from "@/lib/bookings/bookings-store"
+import { createOnlineBooking, updateBooking } from "@/lib/bookings/bookings-store"
 import { MANUAL_BOOKING_ANY_STAFF, resolveManualBookingStaffSelection } from "@/lib/bookings/manual-booking-staff"
 import { saveManualAppointment, type ManualAppointment } from "@/lib/appointments/manual-appointments"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import type { TablesUpdate } from "@/types/database"
 import type { Service, StaffMember } from "@/types/domain"
 
 export type SubmitManualSheetFailureReason =
@@ -20,12 +21,14 @@ export type SubmitManualSheetResult =
  * Zapis wizyty z formularza „ręcznej” rezerwacji (Supabase lub lokalny store).
  */
 export async function submitManualAppointmentSheet(input: {
+  businessId?: string | null
   form: ManualAppointmentFormState
   selectedService: Service | null
   manualStaffForService: StaffMember[]
   hasActiveTeamMembers: boolean
 }): Promise<SubmitManualSheetResult> {
-  const { form, selectedService: svc, manualStaffForService, hasActiveTeamMembers } = input
+  const { businessId, form, selectedService: svc, manualStaffForService, hasActiveTeamMembers } = input
+  const clientName = [form.clientFirstName.trim(), form.clientLastName.trim()].filter(Boolean).join(" ")
 
   if (!form.date.trim() || !form.time.trim()) {
     return { ok: false, reason: { code: "slot_required" } }
@@ -35,11 +38,37 @@ export async function submitManualAppointmentSheet(input: {
   }
 
   const serviceName = svc.name.trim()
+  const createLocalManual = (staffId?: string, staffName?: string): SubmitManualSheetResult => {
+    const manual: ManualAppointment = {
+      id: crypto.randomUUID(),
+      clientName,
+      clientPhone: form.clientPhone.trim(),
+      clientEmail: form.clientEmail.trim() || undefined,
+      serviceName,
+      date: form.date,
+      time: form.time,
+      status: form.status,
+      note: form.note.trim() || undefined,
+      source: "manual",
+      createdAt: new Date().toISOString(),
+      serviceId: svc.id,
+      staffId,
+      staffName,
+    }
+    saveManualAppointment(manual)
+    return { ok: true }
+  }
   const client = getBrowserClient()
+  const supabaseRuntime = isSupabaseConfigured()
   const bid =
-    isSupabaseConfigured() && client ? await getCurrentBusinessProfileIdForClient(client) : null
+    supabaseRuntime && client
+      ? businessId?.trim() || (await getCurrentBusinessProfileIdForClient(client))
+      : null
 
-  if (client && bid) {
+  if (supabaseRuntime) {
+    if (!client || !bid) {
+      return { ok: false, reason: { code: "create_failed", error: "other" } }
+    }
     const resolution = await resolveManualBookingStaffSelection({
       client,
       businessId: bid,
@@ -53,28 +82,45 @@ export async function submitManualAppointmentSheet(input: {
     if (!resolution.ok) {
       return { ok: false, reason: { code: "staff_resolution", errorKey: resolution.errorKey } }
     }
-    const r = await createManualBooking(client, bid, {
-      clientName: form.clientName.trim(),
+    const { data: profile } = await client
+      .from("business_profiles")
+      .select("slug")
+      .eq("id", bid)
+      .maybeSingle()
+    const slug = typeof profile?.slug === "string" ? profile.slug.trim() : ""
+    if (!slug) {
+      return { ok: false, reason: { code: "create_failed", error: "other" } }
+    }
+    const created = await createOnlineBooking(client, {
+      businessSlug: slug,
+      serviceId: svc.id,
+      clientName,
       clientPhone: form.clientPhone.trim(),
       clientEmail: form.clientEmail.trim() || undefined,
-      serviceName,
-      serviceId: svc.id,
-      staffId: resolution.staffId,
-      staffName: resolution.staffName,
-      serviceDurationMinutes: svc.durationMinutes,
-      servicePrice: svc.price,
-      serviceCurrency: svc.currency ?? "PLN",
       appointmentDate: form.date,
       appointmentTime: form.time,
-      status: form.status,
       customerNote: form.note.trim() || undefined,
-      bookingSource: "manual",
+      staffId: resolution.staffId,
     })
-    if (!r.ok) {
+    if (!created.ok || !created.id) {
       return {
         ok: false,
-        reason: { code: "create_failed", error: r.error === "slot_taken" ? "slot_taken" : "other" },
+        reason: {
+          code: "create_failed",
+          error: created.error === "slot_taken" ? "slot_taken" : "other",
+        },
       }
+    }
+    const patch: TablesUpdate<"bookings"> = {
+      source: "manual",
+      status: form.status,
+      staff_id: resolution.staffId,
+      staff_name: resolution.staffName,
+      updated_at: new Date().toISOString(),
+    }
+    const patched = await updateBooking(client, bid, created.id, patch)
+    if (!patched.ok) {
+      return { ok: false, reason: { code: "create_failed", error: "other" } }
     }
     return { ok: true }
   }
@@ -96,22 +142,5 @@ export async function submitManualAppointmentSheet(input: {
     staffNameLocal = one?.name
   }
 
-  const manual: ManualAppointment = {
-    id: crypto.randomUUID(),
-    clientName: form.clientName.trim(),
-    clientPhone: form.clientPhone.trim(),
-    clientEmail: form.clientEmail.trim() || undefined,
-    serviceName,
-    date: form.date,
-    time: form.time,
-    status: form.status,
-    note: form.note.trim() || undefined,
-    source: "manual",
-    createdAt: new Date().toISOString(),
-    serviceId: svc.id,
-    staffId: staffIdLocal,
-    staffName: staffNameLocal,
-  }
-  saveManualAppointment(manual)
-  return { ok: true }
+  return createLocalManual(staffIdLocal, staffNameLocal)
 }

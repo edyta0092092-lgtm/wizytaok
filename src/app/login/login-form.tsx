@@ -181,6 +181,15 @@ export function LoginForm() {
             </form>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 border-t border-border/70 bg-muted/15 text-center text-sm text-muted-foreground">
+            <p className="text-xs leading-relaxed">
+              <Link href="/terms" className="underline-offset-4 hover:underline">
+                {t("footer.terms")}
+              </Link>{" "}
+              ·{" "}
+              <Link href="/privacy" className="underline-offset-4 hover:underline">
+                {t("footer.privacy")}
+              </Link>
+            </p>
             <p>
               {t("auth.noAccount")}{" "}
               <Link

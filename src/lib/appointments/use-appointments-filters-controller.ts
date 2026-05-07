@@ -18,6 +18,11 @@ export type UseAppointmentsFiltersControllerParams = {
   filter: AppointmentsListFilter
   onFilterChange: (next: AppointmentsListFilter) => void
   restrictToToday: boolean
+  clientNameFilter: string
+  onClientNameFilterChange: (next: string) => void
+  serviceFilter: string
+  onServiceFilterChange: (next: string) => void
+  serviceOptions: string[]
 }
 
 export function useAppointmentsFiltersController({
@@ -31,6 +36,11 @@ export function useAppointmentsFiltersController({
   filter,
   onFilterChange,
   restrictToToday,
+  clientNameFilter,
+  onClientNameFilterChange,
+  serviceFilter,
+  onServiceFilterChange,
+  serviceOptions,
 }: UseAppointmentsFiltersControllerParams) {
   return React.useMemo(
     () => ({
@@ -44,6 +54,11 @@ export function useAppointmentsFiltersController({
       filter,
       onFilterChange,
       restrictToToday,
+      clientNameFilter,
+      onClientNameFilterChange,
+      serviceFilter,
+      onServiceFilterChange,
+      serviceOptions,
     }),
     [
       sourceFilter,
@@ -56,6 +71,11 @@ export function useAppointmentsFiltersController({
       filter,
       onFilterChange,
       restrictToToday,
+      clientNameFilter,
+      onClientNameFilterChange,
+      serviceFilter,
+      onServiceFilterChange,
+      serviceOptions,
     ],
   )
 }

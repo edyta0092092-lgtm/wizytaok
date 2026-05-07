@@ -21,7 +21,8 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 import type { Service, StaffMember } from "@/types/domain"
 
 export type ManualAppointmentFormState = {
-  clientName: string
+  clientFirstName: string
+  clientLastName: string
   clientPhone: string
   clientEmail: string
   serviceId: string
@@ -39,6 +40,7 @@ export type ManualAppointmentSheetProps = {
   setForm: React.Dispatch<React.SetStateAction<ManualAppointmentFormState>>
   manualServiceOptions: Service[]
   manualStaffForService: StaffMember[]
+  manualAvailableStaffIds: Set<string> | null
   hasActiveTeamMembers: boolean
   canSubmitManualAppointment: boolean
   isSaving: boolean
@@ -53,6 +55,7 @@ export function ManualAppointmentSheet({
   setForm,
   manualServiceOptions,
   manualStaffForService,
+  manualAvailableStaffIds,
   hasActiveTeamMembers,
   canSubmitManualAppointment,
   isSaving,
@@ -60,6 +63,11 @@ export function ManualAppointmentSheet({
   onSubmit,
 }: ManualAppointmentSheetProps) {
   const { t } = useTranslations()
+  const availableStaffForSlot =
+    manualAvailableStaffIds == null
+      ? manualStaffForService
+      : manualStaffForService.filter((s) => manualAvailableStaffIds.has(s.id))
+  const hasSlotSelected = Boolean(form.date.trim() && form.time.trim())
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -69,14 +77,24 @@ export function ManualAppointmentSheet({
         </SheetHeader>
         <form onSubmit={onSubmit} className="premium-scrollbar flex flex-1 flex-col overflow-y-auto">
           <div className="flex-1 space-y-4 px-6 py-5 pb-4">
-            <div className="space-y-1">
-              <Label htmlFor="ma-client">{t("appointments.fieldClient")}</Label>
-              <Input
-                id="ma-client"
-                required
-                value={form.clientName}
-                onChange={(e) => setForm((f) => ({ ...f, clientName: e.target.value }))}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="ma-client-first">{t("appointments.fieldClientFirstName")}</Label>
+                <Input
+                  id="ma-client-first"
+                  required
+                  value={form.clientFirstName}
+                  onChange={(e) => setForm((f) => ({ ...f, clientFirstName: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ma-client-last">{t("appointments.fieldClientLastName")}</Label>
+                <Input
+                  id="ma-client-last"
+                  value={form.clientLastName}
+                  onChange={(e) => setForm((f) => ({ ...f, clientLastName: e.target.value }))}
+                />
+              </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor="ma-phone">{t("appointments.fieldPhone")}</Label>
@@ -123,11 +141,11 @@ export function ManualAppointmentSheet({
                 <p className="text-sm text-muted-foreground">
                   {t("appointments.manualChooseServiceFirst")}
                 </p>
-              ) : manualStaffForService.length === 1 ? (
+              ) : availableStaffForSlot.length === 1 ? (
                 <p id="ma-staff" className="text-sm font-medium text-foreground">
-                  {manualStaffForService[0]!.name}
+                  {availableStaffForSlot[0]!.name}
                 </p>
-              ) : manualStaffForService.length > 1 ? (
+              ) : availableStaffForSlot.length > 1 ? (
                 <select
                   id="ma-staff"
                   className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -137,12 +155,16 @@ export function ManualAppointmentSheet({
                   <option value={MANUAL_BOOKING_ANY_STAFF}>
                     {t("appointments.manualAnyStaff")}
                   </option>
-                  {manualStaffForService.map((s) => (
+                  {availableStaffForSlot.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
                 </select>
+              ) : manualStaffForService.length > 0 && hasSlotSelected ? (
+                <p id="ma-staff" className="text-sm text-muted-foreground">
+                  {t("appointments.proposeNoStaffAvailableInSlot")}
+                </p>
               ) : hasActiveTeamMembers ? (
                 <p id="ma-staff" className="text-sm text-muted-foreground">
                   {t("appointments.manualNoStaffForService")}
@@ -184,6 +206,7 @@ export function ManualAppointmentSheet({
                   required
                   value={form.time}
                   onChange={(e) => setForm((f) => ({ ...f, time: e.target.value }))}
+                  className="h-11 rounded-xl"
                 />
               </div>
             </div>

@@ -22,6 +22,7 @@ function failureReasonToMessage(
 }
 
 export type UseManualAppointmentSheetSubmitParams = {
+  businessId: string | null
   form: ManualAppointmentFormState
   selectedService: Service | null
   manualStaffForService: StaffMember[]
@@ -37,6 +38,7 @@ export function useManualAppointmentSheetSubmit(
   p: UseManualAppointmentSheetSubmitParams,
 ): (e: React.FormEvent) => void {
   const {
+    businessId,
     form,
     selectedService,
     manualStaffForService,
@@ -55,6 +57,7 @@ export function useManualAppointmentSheetSubmit(
         setIsSaving(true)
         try {
           const result = await submitManualAppointmentSheet({
+            businessId,
             form,
             selectedService,
             manualStaffForService,
@@ -64,6 +67,8 @@ export function useManualAppointmentSheetSubmit(
             setActionNotice(failureReasonToMessage(result.reason, t))
             return
           }
+          window.dispatchEvent(new Event("pw-bookings"))
+          setActionNotice(t("appointments.appointmentAdded"))
           setSheetOpen(false)
           setShowAddedBanner(true)
         } finally {
@@ -72,6 +77,7 @@ export function useManualAppointmentSheetSubmit(
       })()
     },
     [
+      businessId,
       form,
       selectedService,
       manualStaffForService,

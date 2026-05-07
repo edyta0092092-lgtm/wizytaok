@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
+import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js"
 
 import { noClientResult, type SupabaseResult } from "@/lib/supabase/guard"
 import { mapClientRow } from "@/lib/supabase/mappers"
@@ -6,6 +6,25 @@ import type { Database, TablesInsert, TablesUpdate } from "@/types/database"
 import type { ClientRecord } from "@/types/domain"
 
 type Sb = SupabaseClient<Database>
+
+function forbiddenDeleteSourceError(): PostgrestError {
+  return {
+    name: "PostgrestError",
+    message: "client_delete_forbidden_source",
+    details: "Client deletion is only allowed from clients panel.",
+    hint: "Use deleteClient(..., 'clients_panel') from clients page flow.",
+    code: "CLIENT_DELETE_FORBIDDEN_SOURCE",
+    toJSON() {
+      return {
+        name: this.name,
+        message: this.message,
+        details: this.details,
+        hint: this.hint,
+        code: this.code,
+      }
+    },
+  } as PostgrestError
+}
 
 export async function getClients(
   client: Sb | null,
@@ -56,19 +75,30 @@ export async function updateClient(
     .eq("id", clientId)
     .eq("business_id", businessId)
     .select("*")
-    .single()
+    .maybeSingle()
 
   if (error) return { data: null, error }
-  if (!data) return { data: null, error: null }
+  if (!data) {
+    // Update may succeed while row is not returned (e.g. strict RLS select path).
+    // Treat as successful update; caller can refresh list/state separately.
+    return { data: null, error: null }
+  }
   return { data: mapClientRow(data), error: null }
 }
 
 export async function deleteClient(
   client: Sb | null,
   businessId: string,
-  clientId: string
+  clientId: string,
+  source: "clients_panel"
 ): Promise<SupabaseResult<null>> {
   if (!client) return noClientResult()
+  if (source !== "clients_panel") {
+    return {
+      data: null,
+      error: forbiddenDeleteSourceError(),
+    }
+  }
   const { error } = await client
     .from("clients")
     .delete()

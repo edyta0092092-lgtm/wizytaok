@@ -10,19 +10,23 @@ import { useManualAppointmentSheetSubmit } from "@/lib/appointments/use-manual-a
 import { useOpenManualAppointmentCreateSheet } from "@/lib/appointments/use-open-manual-appointment-create-sheet"
 
 export function useManualAppointmentCreateSheet(input: {
+  businessId: string | null
   hasActiveTeamMembers: boolean
   t: (key: string) => string
   setActionNotice: (v: string) => void
   setShowAdded: (v: boolean) => void
 }) {
-  const { hasActiveTeamMembers, t, setActionNotice, setShowAdded } = input
+  const { businessId, hasActiveTeamMembers, t, setActionNotice, setShowAdded } = input
 
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
   const [form, setForm] = React.useState<ManualAppointmentFormState>(EMPTY_MANUAL_APPOINTMENT_FORM)
 
-  const { manualServiceOptions, manualStaffForService } = useManualAppointmentSheetData(
+  const { manualServiceOptions, manualStaffForService, manualAvailableStaffIds } = useManualAppointmentSheetData(
+    businessId,
     form.serviceId,
+    form.date,
+    form.time,
     setForm,
   )
 
@@ -40,6 +44,7 @@ export function useManualAppointmentCreateSheet(input: {
   const openCreate = useOpenManualAppointmentCreateSheet(setForm, setSheetOpen)
 
   const saveManual = useManualAppointmentSheetSubmit({
+    businessId,
     form,
     selectedService: selectedServiceForManual,
     manualStaffForService,
@@ -59,6 +64,7 @@ export function useManualAppointmentCreateSheet(input: {
     isSaving,
     manualServiceOptions,
     manualStaffForService,
+    manualAvailableStaffIds,
     canSubmitManual,
     openCreate,
     saveManual,

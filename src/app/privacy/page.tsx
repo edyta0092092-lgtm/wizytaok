@@ -4,13 +4,13 @@ import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  TERMS_DRAFT_BADGE,
-  TERMS_DRAFT_VERSION,
-  TERMS_INTRO,
-  TERMS_SECTIONS,
-} from "@/content/legal/terms"
+  PRIVACY_DRAFT_BADGE,
+  PRIVACY_DRAFT_VERSION,
+  PRIVACY_INTRO,
+  PRIVACY_SECTIONS,
+} from "@/content/legal/privacy"
 
-export default function TermsPage() {
+export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-background px-4 py-10">
       <main className="mx-auto w-full max-w-3xl space-y-8">
@@ -23,22 +23,24 @@ export default function TermsPage() {
             variant="outline"
             className="rounded-full border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-200"
           >
-            {TERMS_DRAFT_BADGE}
+            {PRIVACY_DRAFT_BADGE}
           </Badge>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Regulamin serwisu WizytaOK</h1>
-          <p className="text-sm text-muted-foreground">{TERMS_DRAFT_VERSION}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Polityka prywatności WizytaOK
+          </h1>
+          <p className="text-sm text-muted-foreground">{PRIVACY_DRAFT_VERSION}</p>
         </header>
 
         <div
           role="status"
           className="rounded-2xl border border-amber-500/35 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-50"
         >
-          Dokument roboczy przed startem komercyjnym. Uzupełnij dane Operatora i przeprowadź finalną
-          weryfikację prawną.
+          Dokument roboczy przed startem komercyjnym. Uzupełnij dane Operatora oraz dokumentację
+          powierzenia przetwarzania danych (DPA), a następnie wykonaj finalną weryfikację prawną.
         </div>
 
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card/80 p-5 text-sm text-muted-foreground shadow-sm">
-          {TERMS_INTRO.map((line) => (
+          {PRIVACY_INTRO.map((line) => (
             <p key={line} className="leading-relaxed">
               {line}
             </p>
@@ -46,8 +48,11 @@ export default function TermsPage() {
         </div>
 
         <div className="space-y-6">
-          {TERMS_SECTIONS.map((section) => (
-            <section key={section.title} className="space-y-2 rounded-2xl border border-border/80 bg-card/80 p-5 shadow-sm">
+          {PRIVACY_SECTIONS.map((section) => (
+            <section
+              key={section.title}
+              className="space-y-2 rounded-2xl border border-border/80 bg-card/80 p-5 shadow-sm"
+            >
               <h2 className="text-base font-semibold text-foreground">{section.title}</h2>
               {section.paragraphs.map((paragraph) => (
                 <p key={paragraph} className="text-sm leading-relaxed text-muted-foreground">
@@ -67,7 +72,7 @@ export default function TermsPage() {
               <Link href="/dashboard">Przejdź do panelu</Link>
             </Button>
             <Button asChild variant="ghost" className="h-10 rounded-xl">
-              <Link href="/privacy">Polityka prywatności</Link>
+              <Link href="/terms">Regulamin</Link>
             </Button>
             <Button asChild variant="ghost" className="h-10 rounded-xl">
               <Link href="/developer-contact">Kontakt techniczny</Link>
@@ -77,11 +82,6 @@ export default function TermsPage() {
             Placeholdery do uzupełnienia: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM], [NAZWA
             FIRMY], [ADRES], [NIP], [REGON], [E-MAIL KONTAKTOWY], [DATA WEJŚCIA W ŻYCIE].
           </p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Link href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
-              Polityka prywatności
-            </Link>
-          </div>
         </footer>
       </main>
     </div>

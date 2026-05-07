@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   APPOINTMENTS_SOURCE_FILTERS,
   APPOINTMENTS_STATUS_FILTERS,
@@ -28,6 +29,11 @@ export type AppointmentsFiltersBarProps = {
   filter: AppointmentsListFilter
   onFilterChange: (next: AppointmentsListFilter) => void
   restrictToToday: boolean
+  clientNameFilter: string
+  onClientNameFilterChange: (next: string) => void
+  serviceFilter: string
+  onServiceFilterChange: (next: string) => void
+  serviceOptions: string[]
 }
 
 export function AppointmentsFiltersBar({
@@ -41,6 +47,11 @@ export function AppointmentsFiltersBar({
   filter,
   onFilterChange,
   restrictToToday,
+  clientNameFilter,
+  onClientNameFilterChange,
+  serviceFilter,
+  onServiceFilterChange,
+  serviceOptions,
 }: AppointmentsFiltersBarProps) {
   const { t } = useTranslations()
 
@@ -108,6 +119,44 @@ export function AppointmentsFiltersBar({
               {t("appointments.staffFilterLoadError")}
             </p>
           ) : null}
+        </div>
+      </div>
+      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
+        <div className="min-w-0">
+          <label
+            htmlFor="appointments-client-filter"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            {t("appointments.clientNameFilterLabel")}
+          </label>
+          <Input
+            id="appointments-client-filter"
+            value={clientNameFilter}
+            onChange={(e) => onClientNameFilterChange(e.target.value)}
+            placeholder={t("appointments.clientNameFilterPlaceholder")}
+            className="h-9 rounded-xl"
+          />
+        </div>
+        <div className="min-w-0">
+          <label
+            htmlFor="appointments-service-filter"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            {t("appointments.serviceFilterLabel")}
+          </label>
+          <select
+            id="appointments-service-filter"
+            value={serviceFilter}
+            onChange={(e) => onServiceFilterChange(e.target.value)}
+            className="h-9 w-full max-w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+          >
+            <option value="">{t("appointments.serviceFilterAll")}</option>
+            {serviceOptions.map((serviceName) => (
+              <option key={serviceName} value={serviceName}>
+                {serviceName}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <div className="flex min-w-0 flex-wrap gap-2">

@@ -199,6 +199,7 @@ export function mapBookingRowToAppointment(row: Tables<"bookings">, businessSlug
   const pb = mapBookingRowToPublicBooking(row, businessSlug)
   return {
     id: `${SB_BOOKING_PREFIX}${row.id}`,
+    clientId: row.client_id ?? undefined,
     clientName: pb.customerName,
     phone: pb.customerPhone,
     email: pb.customerEmail,

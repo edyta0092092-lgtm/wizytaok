@@ -25,7 +25,7 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 
 export function AppointmentsPageInner() {
   // Access, i18n and source data.
-  const { ready: accessReady, canDeleteBookings } = useBusinessAccess()
+  const { ready: accessReady, canDeleteBookings, businessId } = useBusinessAccess()
   const { t, language } = useTranslations()
   const { appointments } = useAppointmentsStore()
   const {
@@ -39,12 +39,24 @@ export function AppointmentsPageInner() {
   } = useAppointmentsUrlSyncedFilters()
   const { allStaffMembers, staffLoading, staffLoadError, staffSelectOptions } =
     useAppointmentsStaffForFilters(appointments, staffFilter, setStaffFilterAndUrl)
+  const [clientNameFilter, setClientNameFilter] = React.useState("")
+  const [serviceFilter, setServiceFilter] = React.useState("")
+  const serviceOptions = React.useMemo(() => {
+    const unique = new Set<string>()
+    for (const row of appointments) {
+      const label = String(row.serviceLabel ?? "").trim()
+      if (label) unique.add(label)
+    }
+    return Array.from(unique).sort((a, b) => a.localeCompare(b, language))
+  }, [appointments, language])
   const { filtered, grouped, formatWhen } = useAppointmentsListPresentation({
     appointments,
     filter,
     sourceFilter,
     staffFilter,
     restrictToToday,
+    clientNameFilter,
+    serviceFilter,
     language,
   })
 
@@ -84,10 +96,12 @@ export function AppointmentsPageInner() {
     isSaving,
     manualServiceOptions,
     manualStaffForService,
+    manualAvailableStaffIds,
     canSubmitManual,
     openCreate,
     saveManual,
   } = useManualAppointmentCreateSheet({
+    businessId,
     hasActiveTeamMembers,
     t,
     setActionNotice,
@@ -185,6 +199,11 @@ export function AppointmentsPageInner() {
     filter,
     onFilterChange: setFilter,
     restrictToToday,
+    clientNameFilter,
+    onClientNameFilterChange: setClientNameFilter,
+    serviceFilter,
+    onServiceFilterChange: setServiceFilter,
+    serviceOptions,
   })
 
   return (
@@ -213,6 +232,7 @@ export function AppointmentsPageInner() {
         setForm={setForm}
         manualServiceOptions={manualServiceOptions}
         manualStaffForService={manualStaffForService}
+        manualAvailableStaffIds={manualAvailableStaffIds}
         hasActiveTeamMembers={hasActiveTeamMembers}
         canSubmitManualAppointment={canSubmitManual}
         isSaving={isSaving}

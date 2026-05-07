@@ -605,6 +605,19 @@ export async function getCurrentBusinessProfileIdForClient(
     .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
-  if (memErr || !memberRows?.length) return null
-  return memberRows[0].business_id ?? null
+  if (!memErr && memberRows?.length) {
+    return memberRows[0].business_id ?? null
+  }
+  const isMissingIsActive =
+    typeof memErr?.message === "string" &&
+    memErr.message.toLowerCase().includes("is_active") &&
+    memErr.message.toLowerCase().includes("does not exist")
+  if (!isMissingIsActive) return null
+  const { data: fallbackMembers, error: fallbackErr } = await client
+    .from("business_members")
+    .select("business_id")
+    .eq("user_id", user.id)
+    .limit(1)
+  if (fallbackErr || !fallbackMembers?.length) return null
+  return fallbackMembers[0].business_id ?? null
 }

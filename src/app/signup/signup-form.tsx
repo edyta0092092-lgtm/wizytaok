@@ -229,6 +229,17 @@ export function SignupForm() {
                   {info}
                 </p>
               ) : null}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t("auth.signupLegalPrefix")}{" "}
+                <Link href="/terms" className="underline-offset-4 hover:underline">
+                  {t("footer.terms")}
+                </Link>{" "}
+                {t("auth.signupLegalAnd")}{" "}
+                <Link href="/privacy" className="underline-offset-4 hover:underline">
+                  {t("footer.privacy")}
+                </Link>
+                .
+              </p>
               <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>

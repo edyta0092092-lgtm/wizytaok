@@ -94,12 +94,15 @@ export const plDeveloperPage = {
   title: "Kontakt do developera",
   lead: "Dane kontaktowe w sprawie technicznej aplikacji (uzupełnij przed produkcją).",
   techNote: "Kontakt techniczny w sprawach działania aplikacji.",
-  nameLabel: "Imię lub nazwa developera",
-  namePlaceholder: "[uzupełnij]",
+  nameLabel: "Nazwa",
+  namePlaceholder: "Cronova",
   emailLabel: "E-mail",
-  emailPlaceholder: "[uzupełnij e-mail developera]",
+  emailPlaceholder: "kontakt@cronova.com.pl",
   websiteLabel: "Strona WWW (opcjonalnie)",
-  websitePlaceholder: "[opcjonalnie]",
+  websitePlaceholder: "www.cronova.com.pl",
+  supportChatTitle: "Czat z obsługą",
+  supportChatHint: "Jeśli potrzebujesz szybkiej pomocy, przejdź do czatu wsparcia.",
+  supportChatCta: "Przejdź do czatu z obsługą",
   backHome: "Strona główna",
 } as const
 
@@ -113,5 +116,8 @@ export const enDeveloperPage = {
   emailPlaceholder: "[add developer email]",
   websiteLabel: "Website (optional)",
   websitePlaceholder: "[optional]",
+  supportChatTitle: "Support chat",
+  supportChatHint: "If you need quick help, open the support chat.",
+  supportChatCta: "Open support chat",
   backHome: "Home",
 } as const

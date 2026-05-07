@@ -14,6 +14,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -67,6 +74,121 @@ const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
 }
 
+const TEMPLATE_DEFAULT_CONTENT: Record<
+  TemplateType,
+  { smsBody: string; emailSubject: string; emailBody: string }
+> = {
+  reminder_24h: {
+    smsBody:
+      "Cześć {{imie}}, przypominamy o Twojej wizycie jutro o {{godzina}} ({{usluga}}). Potwierdź lub zarządzaj rezerwacją: {{link_potwierdzenia}}",
+    emailSubject: "Przypomnienie o wizycie jutro",
+    emailBody: `Cześć {{imie}},
+
+przypominamy o Twojej wizycie:
+- Data: {{data}}
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+- Osoba: {{osoba}}
+
+Potwierdź obecność lub zarządzaj rezerwacją tutaj:
+{{link_potwierdzenia}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+  reminder_before_visit: {
+    smsBody:
+      "Cześć {{imie}}, przypominamy o dzisiejszej wizycie o {{godzina}} ({{usluga}}). Do zobaczenia!",
+    emailSubject: "Przypomnienie o dzisiejszej wizycie",
+    emailBody: `Cześć {{imie}},
+
+to krótkie przypomnienie o Twojej dzisiejszej wizycie:
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+- Osoba: {{osoba}}
+
+Do zobaczenia,
+{{nazwa_firmy}}`,
+  },
+  booking_confirmation: {
+    smsBody:
+      "Dziękujemy {{imie}}. Twoja wizyta na {{data}} o {{godzina}} została zapisana. Szczegóły: {{link_rezerwacji}}",
+    emailSubject: "Potwierdzenie rezerwacji wizyty",
+    emailBody: `Cześć {{imie}},
+
+Twoja rezerwacja została potwierdzona.
+
+Szczegóły wizyty:
+- Data: {{data}}
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+- Osoba: {{osoba}}
+
+Zarządzaj rezerwacją:
+{{link_rezerwacji}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+  booking_cancelled_by_company: {
+    smsBody:
+      "Przepraszamy {{imie}}, Twoja wizyta {{data}} o {{godzina}} została anulowana przez firmę. Zarezerwuj nowy termin: {{link_rezerwacji}}",
+    emailSubject: "Twoja wizyta została anulowana",
+    emailBody: `Cześć {{imie}},
+
+przepraszamy, Twoja wizyta została anulowana przez firmę.
+
+Anulowany termin:
+- Data: {{data}}
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+
+Nową rezerwację możesz zrobić tutaj:
+{{link_rezerwacji}}
+
+W razie pytań: {{telefon_firmy}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+  booking_cancelled_by_client: {
+    smsBody:
+      "{{imie}}, potwierdzamy anulowanie Twojej wizyty {{data}} o {{godzina}}. Jeśli chcesz, zarezerwuj ponownie: {{link_rezerwacji}}",
+    emailSubject: "Potwierdzenie anulowania wizyty",
+    emailBody: `Cześć {{imie}},
+
+potwierdzamy anulowanie Twojej wizyty.
+
+Anulowany termin:
+- Data: {{data}}
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+
+Nową wizytę zarezerwujesz tutaj:
+{{link_rezerwacji}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+  no_show_follow_up: {
+    smsBody:
+      "Cześć {{imie}}, nie odnotowaliśmy Twojej obecności na wizycie {{data}} o {{godzina}}. Umów nowy termin: {{link_rezerwacji}}",
+    emailSubject: "Nowy termin po nieobecności",
+    emailBody: `Cześć {{imie}},
+
+nie odnotowaliśmy Twojej obecności na wizycie:
+- Data: {{data}}
+- Godzina: {{godzina}}
+- Usługa: {{usluga}}
+
+Jeśli chcesz, możesz od razu umówić nowy termin:
+{{link_rezerwacji}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+}
+
 function isMissingMessageTemplatesTableError(message: string | null | undefined): boolean {
   const m = String(message ?? "")
   return (
@@ -92,22 +214,26 @@ function formatTimingLabel(minutes: number | null): string {
   return `${min}min`
 }
 
-function parseTimingInput(raw: string): number | null {
-  const value = raw.trim().toLowerCase()
-  if (!value) return null
-  const onlyDigits = value.match(/^\d+$/)
-  if (onlyDigits) return Number(onlyDigits[0])
-  const normalized = value
-    .replace(/godzin(y|a|)?/g, "h")
-    .replace(/godz\./g, "h")
-    .replace(/minut(y|a|)?/g, "min")
-    .replace(/\s+/g, " ")
-  const hMatch = normalized.match(/(\d+)\s*h/)
-  const mMatch = normalized.match(/(\d+)\s*min/)
-  if (!hMatch && !mMatch) return null
-  const h = hMatch ? Number(hMatch[1]) : 0
-  const m = mMatch ? Number(mMatch[1]) : 0
-  return h * 60 + m
+const REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 15, label: "15 min przed" },
+  { value: 30, label: "30 min przed" },
+  { value: 60, label: "1 godzina przed" },
+  { value: 120, label: "2 godziny przed" },
+  { value: 180, label: "3 godziny przed" },
+  { value: 360, label: "6 godzin przed" },
+  { value: 720, label: "12 godzin przed" },
+  { value: 1440, label: "24 godziny przed" },
+  { value: 2880, label: "48 godzin przed" },
+]
+
+function withReadyContent(tpl: GroupedTemplate): GroupedTemplate {
+  const defaults = TEMPLATE_DEFAULT_CONTENT[tpl.type]
+  return {
+    ...tpl,
+    smsBody: tpl.smsBody.trim() || defaults.smsBody,
+    emailSubject: tpl.emailSubject.trim() || defaults.emailSubject,
+    emailBody: tpl.emailBody.trim() || defaults.emailBody,
+  }
 }
 
 function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplate[] {
@@ -152,8 +278,6 @@ export function MessageTemplatesSection({
   const [editingType, setEditingType] = React.useState<TemplateType | null>(null)
   const [form, setForm] = React.useState<GroupedTemplate | null>(null)
   const [showSaved, setShowSaved] = React.useState(false)
-  const [timingInput, setTimingInput] = React.useState("")
-  const [timingInputError, setTimingInputError] = React.useState<string | null>(null)
 
   const openCreate = React.useCallback(() => {
     const first = templates[0]
@@ -220,25 +344,14 @@ export function MessageTemplatesSection({
 
   const openEdit = (tpl: GroupedTemplate) => {
     setEditingType(tpl.type)
-    setForm(tpl)
-    setTimingInput(formatTimingLabel(tpl.timingMinutesBefore))
-    setTimingInputError(null)
+    setForm(withReadyContent(tpl))
     setSheetOpen(true)
   }
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form || !businessId || templatesUnavailable) return
-    let submitFormData = form
-    if (form.type === "reminder_24h" || form.type === "reminder_before_visit") {
-      const parsed = parseTimingInput(timingInput)
-      if (parsed == null) {
-        setTimingInputError("Podaj czas w formacie np. 24h albo 1h 30min.")
-        return
-      }
-      setTimingInputError(null)
-      submitFormData = { ...form, timingMinutesBefore: Math.max(0, parsed) }
-    }
+    const submitFormData = form
     void (async () => {
       const client = getBrowserClient()
       if (!client || !isSupabaseConfigured()) return
@@ -429,29 +542,25 @@ export function MessageTemplatesSection({
               {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
                 <div className="space-y-2">
                   <Label>Wyślij ile czasu przed wizytą</Label>
-                  <Input
-                    type="text"
-                    value={timingInput}
-                    onChange={(e) => {
-                      const next = e.target.value
-                      setTimingInput(next)
-                      const parsed = parseTimingInput(next)
-                      if (parsed == null) {
-                        setTimingInputError("Użyj formatu np. 24h albo 1h 30min.")
-                        return
-                      }
-                      setTimingInputError(null)
+                  <Select
+                    value={String(form?.timingMinutesBefore ?? "")}
+                    onValueChange={(v) => {
+                      const parsed = Number(v)
+                      if (Number.isNaN(parsed)) return
                       setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
                     }}
-                    placeholder="np. 24h lub 1h 30min"
-                  />
-                  {timingInputError ? (
-                    <p className="text-xs text-destructive">{timingInputError}</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Obsługiwane formaty: `24h`, `1h 30min`, `90min`.
-                    </p>
-                  )}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Wybierz czas przypomnienia" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {REMINDER_TIMING_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               ) : null}
               <div className="text-xs text-muted-foreground">

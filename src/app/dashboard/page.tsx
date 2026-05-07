@@ -250,6 +250,7 @@ export default function DashboardPage() {
   const [statusNotice, setStatusNotice] = React.useState("")
   const [statsLoading, setStatsLoading] = React.useState(true)
   const [statsError, setStatsError] = React.useState<string | null>(null)
+  const [statsContextState, setStatsContextState] = React.useState<"login_required" | "no_data" | null>(null)
   const [stats, setStats] = React.useState<TodayDashboardStats>({
     todayAppointmentsCount: 0,
     confirmedTodayCount: 0,
@@ -260,6 +261,19 @@ export default function DashboardPage() {
 
   const statsReady = appointmentsReady && !appointmentsLoadError && !statsLoading && !statsError
 
+  const isAuthOrContextError = (message: string): boolean => {
+    const text = message.toLowerCase()
+    return (
+      text.includes("no_business_id") ||
+      text.includes("jwt") ||
+      text.includes("auth") ||
+      text.includes("not authenticated") ||
+      text.includes("unauthorized") ||
+      text.includes("forbidden")
+    )
+  }
+
+
   const todaysList = React.useMemo(
     () => getAppointmentsForToday(allAppointments, appToday),
     [allAppointments, appToday]
@@ -267,6 +281,16 @@ export default function DashboardPage() {
   const plannedToday = React.useMemo(
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a)),
     [todaysList]
+  )
+  const fallbackStats = React.useMemo<TodayDashboardStats>(
+    () => ({
+      todayAppointmentsCount: plannedToday.length,
+      confirmedTodayCount: plannedToday.filter((a) => a.status === "confirmed").length,
+      pendingTodayCount: countPendingConfirmationAppointments(plannedToday),
+      requiresActionCount: countBookingsNeedingAction(allAppointments),
+      reminderErrorsCount: countAppointmentReminderIssues(allAppointments),
+    }),
+    [plannedToday, allAppointments]
   )
   const visitsTodayComputed = stats.todayAppointmentsCount
   const confirmedToday = stats.confirmedTodayCount
@@ -313,25 +337,45 @@ export default function DashboardPage() {
       if (!appointmentsReady || appointmentsLoadError) return
       setStatsLoading(true)
       setStatsError(null)
+      setStatsContextState(null)
       try {
         if (!isSupabaseConfigured()) {
-          const fallback = {
-            todayAppointmentsCount: plannedToday.length,
-            confirmedTodayCount: plannedToday.filter((a) => a.status === "confirmed").length,
-            pendingTodayCount: countPendingConfirmationAppointments(plannedToday),
-            requiresActionCount: countBookingsNeedingAction(allAppointments),
-            reminderErrorsCount: countAppointmentReminderIssues(allAppointments),
+          if (!cancelled) {
+            setStats(fallbackStats)
+            setStatsContextState("no_data")
           }
-          if (!cancelled) setStats(fallback)
           return
         }
         const client = getBrowserClient()
-        if (!client) throw new Error("no_client")
+        if (!client) {
+          if (!cancelled) {
+            setStats(fallbackStats)
+            setStatsContextState("login_required")
+          }
+          return
+        }
+        const {
+          data: { user },
+        } = await client.auth.getUser()
+        if (!user?.id) {
+          if (!cancelled) {
+            setStats(fallbackStats)
+            setStatsContextState("login_required")
+          }
+          return
+        }
         const businessId = await getCurrentBusinessProfileIdForClient(client)
-        if (!businessId) throw new Error("no_business_id")
+        if (!businessId) {
+          if (!cancelled) {
+            setStats(fallbackStats)
+            setStatsContextState("no_data")
+          }
+          return
+        }
         const nextStats = await getTodayDashboardStats(businessId)
         if (!cancelled) {
           setStats(nextStats)
+          setStatsContextState(null)
           if (process.env.NODE_ENV === "development") {
             console.info("[dashboard.stats]", nextStats)
           }
@@ -339,7 +383,13 @@ export default function DashboardPage() {
       } catch (error) {
         const message = error instanceof Error ? error.message : "unknown_error"
         if (!cancelled) {
-          setStatsError(message)
+          if (isAuthOrContextError(message)) {
+            setStats(fallbackStats)
+            setStatsContextState("login_required")
+            setStatsError(null)
+          } else {
+            setStatsError(message)
+          }
         }
         if (process.env.NODE_ENV === "development") {
           console.info("[dashboard.stats.error]", message)
@@ -353,7 +403,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true
     }
-  }, [appointmentsReady, appointmentsLoadError, allAppointments, plannedToday])
+  }, [appointmentsReady, appointmentsLoadError, fallbackStats])
 
   React.useEffect(() => {
     if (!statusNotice) return
@@ -396,11 +446,15 @@ export default function DashboardPage() {
                 {t("dashboard.heroTitle")}
               </p>
               <h2 className="mt-3 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
-                {!statsReady ? (
+                {statsContextState === "login_required" ? (
+                  <span className="text-muted-foreground">{t("dashboard.signInToSeePlan")}</span>
+                ) : statsContextState === "no_data" ? (
+                  <span className="text-muted-foreground">{t("dashboard.noDataInBrowser")}</span>
+                ) : !statsReady ? (
                   statsError ? (
-                    <span className="text-destructive">Nie udało się załadować podsumowania dnia.</span>
+                    <span className="text-destructive">{t("dashboard.summaryLoadFailed")}</span>
                   ) : (
-                    <span className="text-muted-foreground">Ładowanie danych...</span>
+                    <span className="text-muted-foreground">{t("dashboard.statsLoading")}</span>
                   )
                 ) : visitsTodayComputed === 0 ? (
                   t("dashboard.noAppointmentsTodayLong")
@@ -409,17 +463,23 @@ export default function DashboardPage() {
                 )}
               </h2>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                {statsReady ? (
+                {statsContextState ? null : statsReady ? (
                   t("dashboard.needsActionSummary").replace("{count}", String(needsActionCount))
                 ) : statsError ? null : (
-                  "Ładowanie danych..."
+                  t("dashboard.statsLoading")
                 )}
               </p>
             </div>
             <div className="grid min-h-[5.25rem] grid-cols-3 gap-2 sm:gap-3">
-              {!statsReady ? (
+              {statsContextState ? (
                 <div className="col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
-                  {statsError ? "Nie udało się załadować podsumowania dnia." : "Ładowanie danych..."}
+                  {statsContextState === "login_required"
+                    ? t("dashboard.signInToSeePlan")
+                    : t("dashboard.noDataInBrowser")}
+                </div>
+              ) : !statsReady ? (
+                <div className="col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                  {statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")}
                 </div>
               ) : (
                 <>

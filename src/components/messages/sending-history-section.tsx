@@ -27,7 +27,7 @@ import type { NotificationMessage } from "@/types/domain"
 
 type NotificationLogRow = Tables<"notification_logs">
 
-type HistoryFilter = "all" | "sent" | "scheduled" | "failed" | "skipped"
+type HistoryFilter = "all" | "sent" | "scheduled" | "skipped"
 type ChannelFilter = "all" | "sms" | "email"
 type DateRangeFilter = "today" | "7d" | "30d" | "all"
 type TypeFilter =
@@ -62,6 +62,26 @@ type PlannedReminderRow = {
   second_reminder_due_at: string | null
   second_reminder_sent_at: string | null
   second_reminder_status: string | null
+}
+
+type LegacyPlannedReminderRow = {
+  id: string
+  client_name: string
+  client_phone: string | null
+  client_email: string | null
+  appointment_date: string
+  appointment_time: string
+  reminder_sent_at: string | null
+  reminder_status: string | null
+}
+
+function isMissingColumnInBookingsQuery(message: string | null | undefined): boolean {
+  const m = String(message ?? "")
+  return (
+    /column .* does not exist/i.test(m) ||
+    /could not find the ['"].*['"] column/i.test(m) ||
+    /schema cache/i.test(m)
+  )
 }
 
 function dbChannel(row: NotificationLogRow): "sms" | "email" {
@@ -179,10 +199,30 @@ function statusTone(
 function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean {
   if (filter === "all") return true
   const c = canonicalStatus(entry)
+  const isMissingContactSkip = (() => {
+    if (entry.kind === "db") {
+      const err = String(entry.row.error ?? "").toLowerCase()
+      return (
+        (c === "skipped" || c === "failed") &&
+        (err.includes("missing client contact") ||
+          err.includes("missing phone") ||
+          err.includes("missing email") ||
+          err.includes("brak numeru") ||
+          err.includes("brak telefonu") ||
+          err.includes("brak e-mail"))
+      )
+    }
+    if (entry.kind === "local") {
+      return (
+        entry.msg.status === "failed" &&
+        (entry.msg.failureReason === "missing_phone" || entry.msg.failureReason === "missing_email")
+      )
+    }
+    return false
+  })()
   if (filter === "sent") return c === "sent"
-  if (filter === "scheduled") return c === "scheduled" || c === "queued" || c === "pending"
-  if (filter === "failed") return c === "failed"
-  if (filter === "skipped") return c === "skipped"
+  if (filter === "scheduled") return entry.kind === "planned" && c === "scheduled"
+  if (filter === "skipped") return isMissingContactSkip
   return true
 }
 
@@ -215,7 +255,11 @@ function listTypeLine(
   if (type === "reminder_24h" || type === "first_reminder_24h" || type === "appointment_reminder_24h") {
     return `${t("notifications.reminder24hType")} - ${chLabel}`
   }
-  if (type === "second_reminder" || type === "appointment_reminder_short") {
+  if (
+    type === "second_reminder" ||
+    type === "appointment_reminder_short" ||
+    type === "reminder_before_visit"
+  ) {
     return `${t("notifications.secondReminderType")} - ${chLabel}`
   }
   if (type === "confirmation" || type === "booking_confirmed") {
@@ -433,6 +477,70 @@ export function SendingHistorySection() {
         .eq("business_id", bid)
         .in("status", ["booked", "pending", "confirmed"])
 
+      let plannedRowsResolved: PlannedReminderRow[] = []
+      let plannedError = planErr
+      if (!planErr) {
+        plannedRowsResolved = (planData ?? []) as PlannedReminderRow[]
+      } else if (isMissingColumnInBookingsQuery(planErr.message)) {
+        const { data: legacyPlanData, error: legacyPlanErr } = await client
+          .from("bookings")
+          .select(
+            "id,client_name,client_phone,client_email,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
+          )
+          .eq("business_id", bid)
+          .in("status", ["booked", "pending", "confirmed"])
+        if (!legacyPlanErr) {
+          plannedRowsResolved = ((legacyPlanData ?? []) as LegacyPlannedReminderRow[]).map((row) => ({
+            id: row.id,
+            client_name: row.client_name,
+            client_phone: row.client_phone,
+            client_email: row.client_email,
+            appointment_date: row.appointment_date,
+            appointment_time: row.appointment_time,
+            first_reminder_due_at: null,
+            first_reminder_sent_at: row.reminder_sent_at ?? null,
+            first_reminder_status: row.reminder_status ?? null,
+            second_reminder_due_at: null,
+            second_reminder_sent_at: null,
+            second_reminder_status: "sent",
+          }))
+          plannedError = null
+        } else {
+          plannedError = legacyPlanErr
+        }
+      }
+      if (plannedError && isMissingColumnInBookingsQuery(plannedError.message)) {
+        const { data: minimalPlanData, error: minimalPlanErr } = await client
+          .from("bookings")
+          .select("id,client_name,client_phone,client_email,appointment_date,appointment_time,status")
+          .eq("business_id", bid)
+          .in("status", ["booked", "pending", "confirmed"])
+        if (!minimalPlanErr) {
+          plannedRowsResolved = ((minimalPlanData ?? []) as Array<
+            Pick<
+              PlannedReminderRow,
+              "id" | "client_name" | "client_phone" | "client_email" | "appointment_date" | "appointment_time"
+            >
+          >).map((row) => ({
+            id: row.id,
+            client_name: row.client_name,
+            client_phone: row.client_phone,
+            client_email: row.client_email,
+            appointment_date: row.appointment_date,
+            appointment_time: row.appointment_time,
+            first_reminder_due_at: null,
+            first_reminder_sent_at: null,
+            first_reminder_status: "pending",
+            second_reminder_due_at: null,
+            second_reminder_sent_at: null,
+            second_reminder_status: "pending",
+          }))
+          plannedError = null
+        } else {
+          plannedError = minimalPlanErr
+        }
+      }
+
       if (cancelled) return
       if (qErr) {
         setLoadError(qErr.message)
@@ -441,8 +549,8 @@ export function SendingHistorySection() {
       } else {
         setLoadError(null)
         setRows((data ?? []) as NotificationLogRow[])
-        if (!planErr) {
-          setPlannedRows((planData ?? []) as PlannedReminderRow[])
+        if (!plannedError) {
+          setPlannedRows(plannedRowsResolved)
         } else {
           setPlannedRows([])
         }
@@ -450,8 +558,8 @@ export function SendingHistorySection() {
           console.info("[notifications.logs.load]", {
             businessId: bid,
             count: (data ?? []).length,
-            plannedCount: (planData ?? []).length,
-            error: planErr?.message ?? null,
+            plannedCount: plannedRowsResolved.length,
+            error: plannedError?.message ?? null,
           })
         }
       }
@@ -498,7 +606,9 @@ export function SendingHistorySection() {
 
   const tabFiltered = React.useMemo(() => {
     const sinceMs =
-      dateRange === "today"
+      filter === "scheduled"
+        ? null
+        : dateRange === "today"
         ? nowMs - 24 * 60 * 60 * 1000
         : dateRange === "7d"
           ? nowMs - 7 * 24 * 60 * 60 * 1000
@@ -604,7 +714,6 @@ export function SendingHistorySection() {
     { id: "all", label: t("messagesLog.filterAll") },
     { id: "sent", label: t("messagesLog.filterSent") },
     { id: "scheduled", label: t("messagesLog.filterScheduled") },
-    { id: "failed", label: t("messagesLog.filterFailed") },
     { id: "skipped", label: t("messagesLog.filterSkipped") },
   ]
 

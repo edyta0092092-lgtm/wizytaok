@@ -514,7 +514,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-4 pt-4 md:gap-6">
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="reminder-lead" className="text-sm leading-snug">
+                <Label htmlFor="reminder-lead" className="flex min-h-10 items-end text-sm leading-snug">
                   {t("settings.reminderLeadLabel")}
                 </Label>
                 <Select
@@ -539,7 +539,10 @@ export default function SettingsPage() {
                 </Select>
               </div>
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="reminder-channel" className="text-sm leading-snug">
+                <Label
+                  htmlFor="reminder-channel"
+                  className="flex min-h-10 items-end text-sm leading-snug"
+                >
                   {t("settings.reminderChannelLabel")}
                 </Label>
                 <Select
@@ -839,14 +842,25 @@ export default function SettingsPage() {
 
               <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardHeader className="border-b border-border/70 py-4">
-              <CardTitle className="text-sm font-semibold">
-                {t("settings.legalInfoTitle")}
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-semibold">
+                  {t("settings.legalInfoTitle")}
+                </CardTitle>
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                >
+                  {t("settings.betaBadge")}
+                </Badge>
+              </div>
               <CardDescription className="text-xs text-muted-foreground">
                 {t("settings.legalInfoDescription")}
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-2 pt-4 sm:grid-cols-2 sm:gap-3">
+              <p className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                {t("settings.betaNotice")}
+              </p>
               <Button
                 asChild
                 variant="outline"
@@ -860,6 +874,13 @@ export default function SettingsPage() {
                 className="h-11 w-full justify-center rounded-xl border-border/90"
               >
                 <Link href="/developer-contact">{t("footer.developer")}</Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="h-11 w-full justify-center rounded-xl border-border/90 sm:col-span-2"
+              >
+                <Link href="/privacy">{t("footer.privacy")}</Link>
               </Button>
             </CardContent>
           </Card>

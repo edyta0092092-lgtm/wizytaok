@@ -434,7 +434,13 @@ export function useAppointmentInlineActions(args: {
           setProposeResolvedServiceId("")
           setProposeStaffListForService(null)
           setConfirmCancelVisitForId(null)
-          setActionNotice(labels.visitCancelledLocal)
+          setActionNotice(
+            result.notice === "sent"
+              ? labels.visitCancelledNotifySent
+              : result.notice === "queued"
+                ? labels.visitCancelledNotifyQueued
+                : labels.visitCancelledLocal,
+          )
         } finally {
           setIsCancellingVisit(false)
         }
@@ -443,6 +449,8 @@ export function useAppointmentInlineActions(args: {
     [
       language,
       labels.cancelVisitCouldNotComplete,
+      labels.visitCancelledNotifyQueued,
+      labels.visitCancelledNotifySent,
       labels.visitCancelledLocal,
       setActionNotice,
       setConfirmCancelVisitForId,

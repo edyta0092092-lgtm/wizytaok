@@ -112,13 +112,24 @@ async function loadAccessState(): Promise<BusinessAccessState> {
       userEmail: user.email ?? null,
     }
   }
-  const { data: memberRows } = await client
+  let memberQuery = await client
     .from("business_members")
     .select("business_id, role, display_name, email")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
-  const member = memberRows?.[0]
+  if (
+    memberQuery.error?.message &&
+    memberQuery.error.message.toLowerCase().includes("is_active") &&
+    memberQuery.error.message.toLowerCase().includes("does not exist")
+  ) {
+    memberQuery = await client
+      .from("business_members")
+      .select("business_id, role, display_name, email")
+      .eq("user_id", user.id)
+      .limit(1)
+  }
+  const member = memberQuery.data?.[0]
   if (!member?.business_id) {
     return {
       ready: true,
