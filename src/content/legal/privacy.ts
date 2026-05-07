@@ -1,7 +1,9 @@
+import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
+
 export const PRIVACY_DRAFT_BADGE =
   "Dokument roboczy - wymaga uzupełnienia danych operatora przed startem komercyjnym"
 
-export const PRIVACY_DRAFT_VERSION = "Wersja robocza: [DATA DO UZUPEŁNIENIA]"
+export const PRIVACY_DRAFT_VERSION = "Wersja robocza — okres testowy."
 
 export const PRIVACY_INTRO = [
   "Niniejsza Polityka prywatności opisuje zasady przetwarzania danych osobowych w związku z korzystaniem z WizytaOK.",
@@ -19,7 +21,7 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
   {
     title: "2. Administrator danych",
     paragraphs: [
-      "Administratorem danych w zakresie danych kont Użytkowników WizytaOK jest Operator: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM], [NAZWA FIRMY], [ADRES], [NIP], [REGON], [E-MAIL KONTAKTOWY].",
+      `Administrator danych w zakresie danych kont Użytkowników WizytaOK jest Operator. ${LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}`,
       "Przed startem komercyjnym należy uzupełnić wszystkie dane identyfikacyjne administratora.",
     ],
   },
@@ -97,7 +99,7 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
       "Prawo wniesienia sprzeciwu wobec przetwarzania realizowanego na podstawie prawnie uzasadnionego interesu.",
       "Prawo cofnięcia zgody w dowolnym momencie, jeśli przetwarzanie odbywa się na podstawie zgody.",
       "Prawo wniesienia skargi do Prezesa UODO.",
-      "Żądania można kierować na adres: [E-MAIL KONTAKTOWY].",
+      "Realizacja powyższych praw oraz wniosków dotyczących danych — w okresie testowym przez formularz kontaktu w aplikacji; po uruchomieniu komercyjnym zostanie podany właściwy kanał kontaktu z Administratorem.",
     ],
   },
   {
@@ -131,14 +133,13 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
     title: "15. Zmiany Polityki prywatności",
     paragraphs: [
       "Polityka prywatności może być aktualizowana, zwłaszcza przy zmianach prawnych, technologicznych lub funkcjonalnych.",
-      "Nowa wersja będzie publikowana w aplikacji wraz z informacją o dacie wejścia w życie: [DATA WEJŚCIA W ŻYCIE].",
+      "Nowa wersja będzie publikowana w aplikacji wraz z informacją o dacie wejścia w życie — po zakończeniu okresu testowego i przed pełnym uruchomieniem komercyjnym zostanie to doprecyzowane.",
     ],
   },
   {
     title: "16. Kontakt",
     paragraphs: [
-      "W sprawach związanych z ochroną danych skontaktuj się: [E-MAIL KONTAKTOWY].",
-      "Dane Operatora do uzupełnienia przed startem komercyjnym: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM].",
+      `W sprawach związanych z ochroną danych w okresie testowym skorzystaj z formularza kontaktu w aplikacji. ${LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}`,
     ],
   },
 ]

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Send } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 
+import { TestNotificationsPanel } from "@/components/messages/test-notifications-panel"
 import { EmptyState } from "@/components/shared/empty-state"
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
@@ -38,6 +40,7 @@ type TypeFilter =
   | "booking_cancelled_by_company"
   | "booking_cancelled_by_client"
   | "no_show_follow_up"
+  | "integration_test"
 
 type MergedEntry =
   | { kind: "db"; sortAt: string; row: NotificationLogRow }
@@ -246,6 +249,9 @@ function listTypeLine(
   }
 
   const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
+  if (type === "integration_test") {
+    return `${t("messagesLog.integrationTestLine")} - ${chLabel}`
+  }
   if (type === "booking_created") {
     return `${t("notifications.bookingCreatedType")} - ${chLabel}`
   }
@@ -400,6 +406,7 @@ function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string
 
 export function SendingHistorySection() {
   const { t, language } = useTranslations()
+  const access = useBusinessAccess()
   const searchParams = useSearchParams()
   const logFilter = searchParams.get("filter")
 
@@ -415,6 +422,40 @@ export function SendingHistorySection() {
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("all")
   const [preview, setPreview] = React.useState<PreviewTarget | null>(null)
   const [previewClientName, setPreviewClientName] = React.useState<string | null>(null)
+  const [integrationFlags, setIntegrationFlags] = React.useState<{
+    enableTestNotifications: boolean
+    enableTestBilling: boolean
+  } | null>(null)
+  const [logRefreshTick, setLogRefreshTick] = React.useState(0)
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch("/api/config/test-integrations")
+        const data = (await res.json()) as {
+          enableTestNotifications?: boolean
+          enableTestBilling?: boolean
+        }
+        if (!cancelled) {
+          setIntegrationFlags({
+            enableTestNotifications: data.enableTestNotifications === true,
+            enableTestBilling: data.enableTestBilling === true,
+          })
+        }
+      } catch {
+        if (!cancelled) {
+          setIntegrationFlags({
+            enableTestNotifications: false,
+            enableTestBilling: false,
+          })
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   React.useEffect(() => {
     function refresh() {
@@ -576,7 +617,7 @@ export function SendingHistorySection() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [logRefreshTick])
 
   React.useEffect(() => {
     if (logFilter !== "needs_attention") return
@@ -644,6 +685,7 @@ export function SendingHistorySection() {
         if (typeFilter === "booking_cancelled_by_company") return ["booking_cancelled_by_company", "company_cancelled_booking"].includes(resolvedType)
         if (typeFilter === "booking_cancelled_by_client") return ["booking_cancelled_by_client", "client_cancelled_booking"].includes(resolvedType)
         if (typeFilter === "no_show_follow_up") return ["followup_noshow", "follow_up_no_show", "no_show_follow_up"].includes(resolvedType)
+        if (typeFilter === "integration_test") return resolvedType === "integration_test"
         return true
       })
   }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs])
@@ -745,6 +787,15 @@ export function SendingHistorySection() {
         </p>
       ) : null}
 
+      {access.ready &&
+      access.effectiveRole === "admin" &&
+      integrationFlags?.enableTestNotifications ? (
+        <TestNotificationsPanel
+          flags={{ enableTestNotifications: true }}
+          onSent={() => setLogRefreshTick((n) => n + 1)}
+        />
+      ) : null}
+
       <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
         <CardHeader className="space-y-3 pb-0">
           <div
@@ -797,6 +848,7 @@ export function SendingHistorySection() {
               <option value="booking_cancelled_by_company">Firma anuluje wizytę</option>
               <option value="booking_cancelled_by_client">Klient anuluje wizytę</option>
               <option value="no_show_follow_up">Follow-up po nieobecności</option>
+              <option value="integration_test">{t("messagesLog.integrationTestLine")}</option>
             </select>
           </div>
         </CardHeader>
@@ -927,7 +979,11 @@ export function SendingHistorySection() {
                         ? preview.msg.recipientName || "-"
                         : preview.kind === "planned"
                           ? preview.row.client_name || "-"
-                        : previewClientName || "-"}
+                          : preview.kind === "db" &&
+                              (!preview.row.booking_id ||
+                                String(preview.row.type ?? "").trim() === "integration_test")
+                            ? t("messagesLog.fieldClientIntegrationTest")
+                            : previewClientName || "-"}
                     </dd>
                   </div>
                   <div>

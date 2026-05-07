@@ -1,12 +1,17 @@
-/** Treści prawne (placeholder) oddzielone od głównego słownika ze względu na rozmiar. */
+import {
+  LEGAL_BETA_OPERATOR_PUBLIC_NOTICE,
+  LEGAL_BETA_OPERATOR_PUBLIC_NOTICE_EN,
+} from "@/content/legal/beta-notice"
+
+/** Treści prawne oddzielone od głównego słownika ze względu na rozmiar. */
 
 export const plTermsPage = {
   title: "Regulamin",
   lead: "Zasady korzystania z aplikacji WizytaOK.",
   draftNotice:
     "To jest robocza wersja regulaminu. Przed publicznym uruchomieniem aplikacji skonsultuj treść z prawnikiem lub doradcą.",
-  operatorLine: "Operator aplikacji: [uzupełnij dane operatora]",
-  contactLine: "Kontakt: [uzupełnij e-mail kontaktowy]",
+  operatorLine: LEGAL_BETA_OPERATOR_PUBLIC_NOTICE,
+  contactLine: LEGAL_BETA_OPERATOR_PUBLIC_NOTICE,
   sec1Title: "1. Postanowienia ogólne",
   sec1Body:
     "Niniejszy regulamin określa ogólne zasady korzystania z aplikacji WizytaOK przez osoby prowadzące działalność lub zarządzające wizytami.",
@@ -50,8 +55,8 @@ export const enTermsPage = {
   lead: "Rules for using the WizytaOK application.",
   draftNotice:
     "This is a draft version of the terms. Before launching the application publicly, consult it with a lawyer or advisor.",
-  operatorLine: "Application operator: [add operator details]",
-  contactLine: "Contact: [add contact email]",
+  operatorLine: LEGAL_BETA_OPERATOR_PUBLIC_NOTICE_EN,
+  contactLine: LEGAL_BETA_OPERATOR_PUBLIC_NOTICE_EN,
   sec1Title: "1. General provisions",
   sec1Body:
     "These terms outline how you may use WizytaOK when managing services, appointments or related workflows.",

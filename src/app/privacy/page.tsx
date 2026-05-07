@@ -3,6 +3,7 @@ import Link from "next/link"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
 import {
   PRIVACY_DRAFT_BADGE,
   PRIVACY_DRAFT_VERSION,
@@ -35,8 +36,8 @@ export default function PrivacyPage() {
           role="status"
           className="rounded-2xl border border-amber-500/35 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-50"
         >
-          Dokument roboczy przed startem komercyjnym. Uzupełnij dane Operatora oraz dokumentację
-          powierzenia przetwarzania danych (DPA), a następnie wykonaj finalną weryfikację prawną.
+          {LEGAL_BETA_OPERATOR_PUBLIC_NOTICE} Przed uruchomieniem komercyjnym zostanie uzupełniona dokumentacja
+          powierzenia przetwarzania danych (DPA) oraz dane Administratora — przy weryfikacji prawnej.
         </div>
 
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card/80 p-5 text-sm text-muted-foreground shadow-sm">
@@ -78,10 +79,7 @@ export default function PrivacyPage() {
               <Link href="/developer-contact">Kontakt techniczny</Link>
             </Button>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Placeholdery do uzupełnienia: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM], [NAZWA
-            FIRMY], [ADRES], [NIP], [REGON], [E-MAIL KONTAKTOWY], [DATA WEJŚCIA W ŻYCIE].
-          </p>
+          <p className="text-xs leading-relaxed text-muted-foreground">{LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}</p>
         </footer>
       </main>
     </div>

@@ -626,7 +626,7 @@ export interface Database {
         Row: {
           id: string
           business_id: string
-          booking_id: string
+          booking_id: string | null
           channel: string
           type: string
           recipient: string | null
@@ -642,7 +642,7 @@ export interface Database {
         Insert: {
           id?: string
           business_id: string
-          booking_id: string
+          booking_id?: string | null
           channel: string
           type?: string
           recipient?: string | null
@@ -658,7 +658,7 @@ export interface Database {
         Update: {
           id?: string
           business_id?: string
-          booking_id?: string
+          booking_id?: string | null
           channel?: string
           type?: string
           recipient?: string | null

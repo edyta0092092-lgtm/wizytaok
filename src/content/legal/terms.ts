@@ -1,7 +1,9 @@
+import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
+
 export const TERMS_DRAFT_BADGE =
   "Dokument roboczy - wymaga uzupełnienia danych operatora przed startem komercyjnym"
 
-export const TERMS_DRAFT_VERSION = "Wersja robocza: [DATA DO UZUPEŁNIENIA]"
+export const TERMS_DRAFT_VERSION = "Wersja robocza — okres testowy."
 
 export const TERMS_INTRO = [
   "Niniejszy Regulamin dotyczy korzystania z aplikacji WizytaOK w modelu usługi cyfrowej (SaaS).",
@@ -20,7 +22,7 @@ export const TERMS_SECTIONS: Array<{ title: string; paragraphs: string[] }> = [
     title: "2. Definicje",
     paragraphs: [
       "WizytaOK - aplikacja SaaS do zarządzania rezerwacjami online, wizytami, zespołem, grafikiem, klientami i komunikacją.",
-      "Operator - podmiot udostępniający WizytaOK: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM], [NAZWA FIRMY], [ADRES], [NIP], [REGON], [E-MAIL KONTAKTOWY].",
+      `Operator - podmiot udostępniający WizytaOK. ${LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}`,
       "Użytkownik - osoba korzystająca z konta w WizytaOK w imieniu własnym lub Firmy/Organizacji.",
       "Firma / Organizacja - podmiot korzystający z WizytaOK do obsługi swojej działalności usługowej.",
       "Klient końcowy - osoba dokonująca rezerwacji usługi u Firmy/Organizacji przez formularz online lub inny kanał obsługiwany przez WizytaOK.",
@@ -101,7 +103,7 @@ export const TERMS_SECTIONS: Array<{ title: string; paragraphs: string[] }> = [
     title: "12. Płatności i abonament",
     paragraphs: [
       "Warunki płatności i abonamentu zostaną doprecyzowane przed komercyjnym startem usługi.",
-      "Miejsce na link do cennika: [LINK DO CENNIKA DO UZUPEŁNIENIA].",
+      "Szczegóły cen i warunków komercyjnych zostaną opublikowane przed uruchomieniem płatnej wersji usługi.",
     ],
   },
   {
@@ -114,7 +116,7 @@ export const TERMS_SECTIONS: Array<{ title: string; paragraphs: string[] }> = [
   {
     title: "14. Reklamacje",
     paragraphs: [
-      "Reklamacje dotyczące działania WizytaOK można zgłaszać na adres: [E-MAIL KONTAKTOWY].",
+      "Reklamacje dotyczące działania WizytaOK w okresie testowym można zgłaszać poprzez formularz kontaktu udostępniony w aplikacji. Po uruchomieniu komercyjnym zostanie podany dedykowany kanał kontaktu z Operatorem.",
       "Opis zgłoszenia powinien zawierać co najmniej dane kontaktowe zgłaszającego, opis problemu i oczekiwany sposób rozwiązania.",
       "Operator udziela odpowiedzi w rozsądnym terminie, nie dłuższym niż wymagany przez przepisy prawa.",
     ],
@@ -145,21 +147,20 @@ export const TERMS_SECTIONS: Array<{ title: string; paragraphs: string[] }> = [
     title: "18. Zmiany Regulaminu",
     paragraphs: [
       "Operator może zmienić Regulamin z ważnych przyczyn, w szczególności zmian prawa, zakresu usługi lub wymogów bezpieczeństwa.",
-      "Nowa wersja Regulaminu będzie publikowana w aplikacji wraz z informacją o dacie wejścia w życie: [DATA WEJŚCIA W ŻYCIE].",
+      "Nowa wersja Regulaminu będzie publikowana w aplikacji wraz z informacją o dacie wejścia w życie — po zakończeniu okresu testowego i przed pełnym uruchomieniem komercyjnym zostanie to doprecyzowane.",
     ],
   },
   {
     title: "19. Kontakt",
     paragraphs: [
-      "Kontakt z Operatorem: [E-MAIL KONTAKTOWY].",
-      "Dane formalne Operatora do uzupełnienia przed startem komercyjnym: [DANE OPERATORA DO UZUPEŁNIENIA PRZED STARTEM KOMERCYJNYM].",
+      `Kontakt z Operatorem w okresie testowym: poprzez formularz kontaktu w aplikacji. ${LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}`,
     ],
   },
   {
     title: "20. Postanowienia końcowe",
     paragraphs: [
       "W sprawach nieuregulowanych Regulaminem stosuje się przepisy prawa polskiego oraz bezwzględnie obowiązujące przepisy prawa konsumenckiego i ochrony danych.",
-      "Regulamin w wersji roboczej obowiązuje od: [DATA WEJŚCIA W ŻYCIE].",
+      "Regulamin w wersji roboczej obowiązuje na czas publicznego testu WizytaOK do czasu publikacji wersji finalnej.",
     ],
   },
 ]

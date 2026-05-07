@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
 import { AccessDenied } from "@/components/shared/access-denied"
+import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
@@ -931,6 +932,8 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          <TestBillingSettingsCard />
 
               <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardHeader className="border-b border-border/70 py-4">

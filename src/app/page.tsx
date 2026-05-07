@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { CalendarCheck, MessageCircle, ShieldCheck } from "lucide-react"
 
+import { MarketingFaq } from "@/components/marketing/marketing-faq"
 import { BRAND } from "@/config/brand"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -111,6 +112,70 @@ export default function HomePage() {
         </div>
       </section>
 
+      <div className="border-b border-border/90 bg-muted/20">
+        <div className="mx-auto max-w-6xl px-6 py-4">
+          <p
+            role="status"
+            className="text-center text-sm leading-relaxed text-muted-foreground sm:text-left"
+          >
+            {t("marketing.homeBetaNotice")}
+          </p>
+        </div>
+      </div>
+
+      <section className="border-y border-border/90 bg-muted/25">
+        <div className="mx-auto max-w-6xl px-6 py-14">
+          <h2 className="text-2xl font-semibold">{t("marketing.whoForTitle")}</h2>
+          <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                "marketing.whoForBullet1",
+                "marketing.whoForBullet2",
+                "marketing.whoForBullet3",
+                "marketing.whoForBullet4",
+                "marketing.whoForBullet5",
+                "marketing.whoForBullet6",
+                "marketing.whoForBullet7",
+                "marketing.whoForBullet8",
+              ] as const
+            ).map((key) => (
+              <li
+                key={key}
+                className="flex gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed"
+              >
+                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+                <span>{t(key)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-6xl px-6 py-14">
+        <h2 className="text-2xl font-semibold">{t("marketing.gainsTitle")}</h2>
+        <ul className="mt-5 grid gap-3 sm:grid-cols-2">
+          {(
+            [
+              "marketing.gainBullet1",
+              "marketing.gainBullet2",
+              "marketing.gainBullet3",
+              "marketing.gainBullet4",
+              "marketing.gainBullet5",
+              "marketing.gainBullet6",
+              "marketing.gainBullet7",
+            ] as const
+          ).map((key) => (
+            <li
+              key={key}
+              className="flex gap-3 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm leading-relaxed"
+            >
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+              <span>{t(key)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section className="border-y border-border/90 bg-card/70">
         <div className="mx-auto grid max-w-6xl gap-4 px-6 py-10 md:grid-cols-3">
           <Feature
@@ -138,8 +203,49 @@ export default function HomePage() {
           <Step number="1" title={t("marketing.step1Title")} text={t("marketing.step1Text")} />
           <Step number="2" title={t("marketing.step2Title")} text={t("marketing.step2Text")} />
           <Step number="3" title={t("marketing.step3Title")} text={t("marketing.step3Text")} />
+          <Step number="4" title={t("marketing.step4Title")} text={t("marketing.step4Text")} />
+          <Step number="5" title={t("marketing.step5Title")} text={t("marketing.step5Text")} />
         </div>
       </section>
+
+      <MarketingFaq variant="home" />
+
+      <section className="border-y border-border/90 bg-primary/10">
+        <div className="mx-auto max-w-6xl px-6 py-14 text-center">
+          <h2 className="text-2xl font-semibold text-foreground sm:text-3xl">
+            {t("marketing.ctaPilotTitle")}
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+            {t("marketing.ctaHelper")}
+          </p>
+          <Link
+            href="/signup"
+            className="mt-8 inline-flex rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--primary-hover)]"
+          >
+            {t("marketing.ctaTryFree")}
+          </Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-border/90 bg-card/50">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-foreground">{BRAND.name}</p>
+          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
+            <Link href="/pricing" className="hover:text-foreground">
+              {t("marketing.navPricing")}
+            </Link>
+            <Link href="/login" className="hover:text-foreground">
+              {t("marketing.navLogin")}
+            </Link>
+            <Link href="/terms" className="hover:text-foreground">
+              {t("marketing.footerTerms")}
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground">
+              {t("marketing.footerPrivacy")}
+            </Link>
+          </nav>
+        </div>
+      </footer>
     </main>
   )
 }
@@ -173,6 +279,7 @@ function Step({
   title: string
   text: string
 }) {
+  const detail = text.trim()
   return (
     <div className="flex gap-4 border-b border-border p-5 last:border-b-0">
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-sm font-medium">
@@ -180,7 +287,9 @@ function Step({
       </span>
       <div>
         <p className="font-semibold">{title}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+        {detail ? (
+          <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+        ) : null}
       </div>
     </div>
   )

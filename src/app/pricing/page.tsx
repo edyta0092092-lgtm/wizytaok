@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Check } from "lucide-react"
 
 import { Logo } from "@/components/brand/logo"
+import { MarketingFaq } from "@/components/marketing/marketing-faq"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -141,6 +142,8 @@ export default function PricingPage() {
             </Card>
           </div>
         </div>
+
+        <MarketingFaq variant="pricing" />
       </main>
     </div>
   )
