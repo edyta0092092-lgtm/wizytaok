@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AccessDenied } from "@/components/shared/access-denied"
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Badge } from "@/components/ui/badge"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
@@ -47,6 +48,11 @@ import {
 } from "@/lib/staff/staff-store"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
 import type { Service, StaffMember } from "@/types/domain"
+import {
+  buildStoredInternationalPhone,
+  splitStoredPhoneIntoParts,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const
 
@@ -56,7 +62,8 @@ type FormState = {
   firstName: string
   lastName: string
   email: string
-  phone: string
+  phoneDialCode: string
+  phoneNational: string
   isActive: boolean
   serviceIds: string[]
   useBusinessHours: boolean
@@ -65,7 +72,10 @@ type FormState = {
   panelMemberRole: PanelRole
 }
 
-type SavedProfileSnapshot = Pick<FormState, "firstName" | "lastName" | "email" | "phone" | "isActive" | "panelMemberRole">
+type SavedProfileSnapshot = Pick<
+  FormState,
+  "firstName" | "lastName" | "email" | "phoneDialCode" | "phoneNational" | "isActive" | "panelMemberRole"
+>
 
 type PolishHoliday = {
   date: string
@@ -90,29 +100,13 @@ type ExceptionPreviewGroup = {
   specialHours?: { startTime: string; endTime: string }
 }
 
-function normalizePolishPhone(input: string): string | null {
-  const trimmed = input.trim()
-  if (!trimmed) return ""
-  const plus = trimmed.startsWith("+")
-  const digits = trimmed.replace(/[^\d]/g, "")
-  if (plus && digits.startsWith("48") && digits.length === 11) {
-    return `+${digits}`
-  }
-  if (!plus && digits.length === 9) {
-    return `+48${digits}`
-  }
-  if (!plus && digits.startsWith("48") && digits.length === 11) {
-    return `+${digits}`
-  }
-  return null
-}
-
 function emptyForm(): FormState {
   return {
     firstName: "",
     lastName: "",
     email: "",
-    phone: "",
+    phoneDialCode: "+48",
+    phoneNational: "",
     isActive: true,
     serviceIds: [],
     useBusinessHours: true,
@@ -415,6 +409,8 @@ export default function TeamPage() {
   const [inviteHighlightId, setInviteHighlightId] = React.useState<string | null>(null)
   const [isScheduleEditing, setIsScheduleEditing] = React.useState(false)
   const [isExceptionsEditing, setIsExceptionsEditing] = React.useState(false)
+  /** Gdy false przy dodawaniu osoby — zwinięty podgląd wyjątków (jak po „Zapisz wyjątek”). */
+  const [isNewStaffExceptionsExpanded, setIsNewStaffExceptionsExpanded] = React.useState(true)
   const [savedScheduleState, setSavedScheduleState] = React.useState<{
     useBusinessHours: boolean
     rules: StaffAvailabilityRuleInput[]
@@ -427,7 +423,8 @@ export default function TeamPage() {
     firstName: "",
     lastName: "",
     email: "",
-    phone: "",
+    phoneDialCode: "+48",
+    phoneNational: "",
     isActive: true,
     panelMemberRole: "staff",
   })
@@ -643,6 +640,7 @@ export default function TeamPage() {
     setInviteHighlightId(null)
     setIsScheduleEditing(false)
     setIsExceptionsEditing(false)
+    setIsNewStaffExceptionsExpanded(true)
   }
 
   const buildFormFromSavedSnapshot = React.useCallback((): FormState => {
@@ -670,6 +668,7 @@ export default function TeamPage() {
       setIsScheduleEditing(false)
       setIsExceptionsEditing(false)
     }
+    setIsNewStaffExceptionsExpanded(true)
     setNotice(t("team.changesReverted"))
     setNoticeDetail(null)
   }
@@ -732,11 +731,13 @@ export default function TeamPage() {
       })),
     )
     const splitName = splitPersonName(staff.name)
+    const phoneParts = splitStoredPhoneIntoParts(staff.phone ?? "")
     setForm({
       firstName: splitName.firstName,
       lastName: splitName.lastName,
       email: staff.email ?? "",
-      phone: staff.phone ?? "",
+      phoneDialCode: phoneParts.dialCode,
+      phoneNational: phoneParts.nationalDigits,
       isActive: staff.isActive,
       serviceIds,
       useBusinessHours: rules.length === 0,
@@ -753,7 +754,8 @@ export default function TeamPage() {
       firstName: splitName.firstName,
       lastName: splitName.lastName,
       email: staff.email ?? "",
-      phone: staff.phone ?? "",
+      phoneDialCode: phoneParts.dialCode,
+      phoneNational: phoneParts.nationalDigits,
       isActive: staff.isActive,
       panelMemberRole,
     })
@@ -818,37 +820,8 @@ export default function TeamPage() {
     }))
   }
 
-  const validateForm = (): boolean => {
-    const firstName = form.firstName.trim()
-    const name = joinPersonName(form.firstName, form.lastName)
-    const emailTrim = form.email.trim()
-    const phoneNormalized = normalizePolishPhone(form.phone)
-    if (!firstName || !name) {
-      setNotice(language === "en" ? "First name is required." : "Imię jest wymagane.")
-      setNoticeDetail(null)
-      return false
-    }
-    if (emailTrim && !EMAIL_RE.test(emailTrim)) {
-      setNotice(t("team.validationEmailInvalid"))
-      setNoticeDetail(null)
-      return false
-    }
-    if (phoneNormalized === null) {
-      setNotice(t("team.validationPhoneInvalid"))
-      setNoticeDetail(null)
-      return false
-    }
-    if (access.canManageInvitations && !emailTrim) {
-      setNotice(t("team.validationEmailRequiredForInvite"))
-      setNoticeDetail(null)
-      return false
-    }
-    if (form.panelMemberRole !== "admin" && form.panelMemberRole !== "staff") {
-      setNotice(t("team.validationPanelRoleRequired"))
-      setNoticeDetail(null)
-      return false
-    }
-    for (const ex of form.exceptions) {
+  const validateScheduleExceptionsList = (exceptions: StaffAvailabilityExceptionInput[]): boolean => {
+    for (const ex of exceptions) {
       const date = ex.exceptionDate.trim().slice(0, 10)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         setNotice(t("team.exceptionStartDateRequired"))
@@ -878,13 +851,106 @@ export default function TeamPage() {
     return true
   }
 
+  const validateForm = (): boolean => {
+    const firstName = form.firstName.trim()
+    const name = joinPersonName(form.firstName, form.lastName)
+    const emailTrim = form.email.trim()
+    const nationalDigits = form.phoneNational.replace(/\D/g, "")
+    if (!firstName || !name) {
+      setNotice(language === "en" ? "First name is required." : "Imię jest wymagane.")
+      setNoticeDetail(null)
+      return false
+    }
+    if (emailTrim && !EMAIL_RE.test(emailTrim)) {
+      setNotice(t("team.validationEmailInvalid"))
+      setNoticeDetail(null)
+      return false
+    }
+    if (nationalDigits) {
+      const v = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
+      if (!v.ok) {
+        setNotice(t("team.validationPhoneInvalid"))
+        setNoticeDetail(null)
+        return false
+      }
+    }
+    if (access.canManageInvitations && !emailTrim) {
+      setNotice(t("team.validationEmailRequiredForInvite"))
+      setNoticeDetail(null)
+      return false
+    }
+    if (form.panelMemberRole !== "admin" && form.panelMemberRole !== "staff") {
+      setNotice(t("team.validationPanelRoleRequired"))
+      setNoticeDetail(null)
+      return false
+    }
+    return validateScheduleExceptionsList(form.exceptions)
+  }
+
+  const saveScheduleExceptionsAndCollapse = async () => {
+    setNoticeDetail(null)
+    if (!validateScheduleExceptionsList(form.exceptions)) return
+
+    if (editing && isSupabaseConfigured()) {
+      const client = getBrowserClient()
+      const bid =
+        businessProfileId ??
+        (client ? await getCurrentBusinessProfileIdForClient(client) : null)
+      if (!client || !bid) {
+        setNotice(language === "en" ? "Business profile was not found." : "Nie znaleziono profilu firmy.")
+        setNoticeDetail(null)
+        return
+      }
+      setSaving(true)
+      try {
+        const out = await saveStaffAvailabilityExceptions(client, bid, editing.id, form.exceptions)
+        if (!out.ok) {
+          setNotice(t("team.scheduleExceptionsSaveError"))
+          if (process.env.NODE_ENV === "development" && out.error?.trim()) {
+            setNoticeDetail(`${t("team.errorDetailsPrefix")} ${out.error.trim()}`)
+          } else {
+            setNoticeDetail(null)
+          }
+          return
+        }
+        const ctx = await getStaffAvailabilityContextForBusiness(client, bid, editing.id)
+        const normalizedExceptions = groupExceptionsForEditing(
+          ctx.exceptions.map((ex) => ({
+            exceptionDate: ex.exceptionDate,
+            exceptionEndDate: ex.exceptionDate,
+            isClosed: ex.isUnavailable,
+            startTime: ex.startTime ?? "09:00",
+            endTime: ex.endTime ?? "17:00",
+            reason: ex.reason ?? "",
+          })),
+        )
+        setForm((prev) => ({ ...prev, exceptions: normalizedExceptions }))
+        setSavedExceptionsState(normalizedExceptions.map((ex) => ({ ...ex })))
+        setIsExceptionsEditing(false)
+        setNotice(t("team.scheduleExceptionsSaved"))
+        setNoticeDetail(null)
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
+    setSavedExceptionsState(form.exceptions.map((ex) => ({ ...ex })))
+    if (editing) {
+      setIsExceptionsEditing(false)
+    } else {
+      setIsNewStaffExceptionsExpanded(false)
+    }
+    setNotice(t("team.scheduleExceptionsSaved"))
+    setNoticeDetail(null)
+  }
+
   const performSave = async () => {
     setNoticeDetail(null)
     if (!validateForm()) return
     const name = joinPersonName(form.firstName, form.lastName)
     const emailTrim = form.email.trim()
-    const phoneNormalized = normalizePolishPhone(form.phone)
-    const phoneForSave = phoneNormalized ?? ""
+    const phoneForSave = buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational)
     if (!form.useBusinessHours) {
       for (const r of form.rules) {
         if (!r.isAvailable) continue
@@ -920,7 +986,7 @@ export default function TeamPage() {
       if (!businessProfileId && bid) {
         setBusinessProfileId(bid)
       }
-      const notices: string[] = []
+      let partialNotices: string[] = []
       const msgAllSaved =
         language === "en" ? "Changes were saved." : "Zmiany zostały zapisane."
       const msgPartialSaved =
@@ -972,7 +1038,7 @@ export default function TeamPage() {
         }
         const newStaffId = created.id
         if (created.servicesLinked === false) {
-          notices.push(t("team.servicesPartialSaved"))
+          partialNotices = [...partialNotices, t("team.servicesPartialSaved")]
         }
         if (isDev) {
           console.debug("[team.schedule.save.call] create", {
@@ -989,14 +1055,14 @@ export default function TeamPage() {
           form.useBusinessHours ? [] : form.rules,
         )
         if (!rulesOutCreate.ok) {
-          notices.push(mapScheduleSaveError(rulesOutCreate.error))
+          partialNotices = [...partialNotices, mapScheduleSaveError(rulesOutCreate.error)]
           if (process.env.NODE_ENV === "development" && rulesOutCreate.error?.trim()) {
             setNoticeDetail(`${t("team.errorDetailsPrefix")} ${rulesOutCreate.error.trim()}`)
           }
         }
         const excOut = await saveStaffAvailabilityExceptions(client, bid, newStaffId, form.exceptions)
         if (!excOut.ok) {
-          notices.push(t("team.scheduleExceptionsSaveError"))
+          partialNotices = [...partialNotices, t("team.scheduleExceptionsSaveError")]
           if (process.env.NODE_ENV === "development" && excOut.error?.trim()) {
             setNoticeDetail(`${t("team.errorDetailsPrefix")} ${excOut.error.trim()}`)
           }
@@ -1014,7 +1080,7 @@ export default function TeamPage() {
             user?.id ?? null,
           )
           if (!panelOut.ok) {
-            notices.push(msgInviteWarn)
+            partialNotices = [...partialNotices, msgInviteWarn]
           } else {
             inviteToken = panelOut.invitationToken
           }
@@ -1054,10 +1120,10 @@ export default function TeamPage() {
           false,
         )
         if (highlightId) setInviteHighlightId(highlightId)
-        if (notices.length > 0) {
-          setNotice(notices[0] ?? msgPartialSaved)
+        if (partialNotices.length > 0) {
+          setNotice(partialNotices[0] ?? msgPartialSaved)
           if (!noticeDetail) {
-            setNoticeDetail(notices.length > 1 ? notices.slice(1).join("\n") : null)
+            setNoticeDetail(partialNotices.length > 1 ? partialNotices.slice(1).join("\n") : null)
           }
         } else {
           setNotice(msgAllSaved)
@@ -1141,7 +1207,7 @@ export default function TeamPage() {
       )
       await refetchStaffMembers(client, bid)
       if (out.servicesLinked === false) {
-        notices.push(t("team.servicesPartialSaved"))
+        partialNotices = [...partialNotices, t("team.servicesPartialSaved")]
       }
       const rulesOut = await saveStaffAvailabilityRules(
         client,
@@ -1159,14 +1225,14 @@ export default function TeamPage() {
         })
       }
       if (!rulesOut.ok) {
-        notices.push(mapScheduleSaveError(rulesOut.error))
+        partialNotices = [...partialNotices, mapScheduleSaveError(rulesOut.error)]
         if (process.env.NODE_ENV === "development" && rulesOut.error?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${rulesOut.error.trim()}`)
         }
       }
       const excOut = await saveStaffAvailabilityExceptions(client, bid, editing.id, form.exceptions)
       if (!excOut.ok) {
-        notices.push(t("team.scheduleExceptionsSaveError"))
+        partialNotices = [...partialNotices, t("team.scheduleExceptionsSaveError")]
         if (process.env.NODE_ENV === "development" && excOut.error?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${excOut.error.trim()}`)
         }
@@ -1184,7 +1250,7 @@ export default function TeamPage() {
           user?.id ?? null,
         )
         if (!panelOut.ok) {
-          notices.push(msgInviteWarn)
+          partialNotices = [...partialNotices, msgInviteWarn]
         } else {
           editInviteToken = panelOut.invitationToken
         }
@@ -1201,10 +1267,10 @@ export default function TeamPage() {
         if (invRow?.id) editHighlightId = invRow.id as string
       }
       if (editHighlightId) setInviteHighlightId(editHighlightId)
-      if (notices.length > 0) {
-        setNotice(notices[0] ?? msgPartialSaved)
+      if (partialNotices.length > 0) {
+        setNotice(partialNotices[0] ?? msgPartialSaved)
         if (!noticeDetail) {
-          setNoticeDetail(notices.length > 1 ? notices.slice(1).join("\n") : null)
+          setNoticeDetail(partialNotices.length > 1 ? partialNotices.slice(1).join("\n") : null)
         }
       } else {
         setNotice(msgAllSaved)
@@ -1242,7 +1308,8 @@ export default function TeamPage() {
         firstName: form.firstName,
         lastName: form.lastName,
         email: form.email,
-        phone: form.phone,
+        phoneDialCode: form.phoneDialCode,
+        phoneNational: form.phoneNational,
         isActive: form.isActive,
         serviceIds: refreshedServiceIds,
         useBusinessHours: refreshedRules.length === 0,
@@ -1258,7 +1325,8 @@ export default function TeamPage() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: emailTrim,
-        phone: phoneForSave,
+        phoneDialCode: form.phoneDialCode,
+        phoneNational: form.phoneNational,
         isActive: form.isActive,
         panelMemberRole: form.panelMemberRole,
       })
@@ -1291,6 +1359,15 @@ export default function TeamPage() {
       )
       setIsScheduleEditing(false)
       setIsExceptionsEditing(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "unknown_error"
+      setNotice(t("team.saveError"))
+      if (process.env.NODE_ENV === "development") {
+        setNoticeDetail(`${t("team.errorDetailsPrefix")} ${message}`)
+        console.error("[team.staff.save.unhandled]", message)
+      } else {
+        setNoticeDetail(null)
+      }
     } finally {
       setSaving(false)
     }
@@ -1307,22 +1384,6 @@ export default function TeamPage() {
     if (editing?.id === staffId) resetFormToCreate()
     await load()
     setNotice(t("team.deleted"))
-  }
-
-  const deactivateStaff = async (staff: StaffMember) => {
-    if (!window.confirm(t("team.deactivateConfirm"))) return
-    const client = getBrowserClient()
-    const bid = businessProfileId
-    const out = await updateStaffMember(client, bid, staff.id, { isActive: false })
-    if (!out.ok) {
-      setNotice(t("team.saveError"))
-      return
-    }
-    await load()
-    if (editing?.id === staff.id) {
-      setForm((f) => ({ ...f, isActive: false }))
-    }
-    setNotice(t("team.saved"))
   }
 
   const activateStaff = async (staff: StaffMember) => {
@@ -1404,7 +1465,9 @@ export default function TeamPage() {
     : `${t("team.addPersonCard")}${livePersonName ? ` — ${livePersonName}` : ""}`
   const submitLabel = editing ? t("team.saveChanges") : t("team.save")
   const showSchedulePreview = Boolean(editing) && !isScheduleEditing
-  const showExceptionsPreview = Boolean(editing) && !isExceptionsEditing
+  const showExceptionsCompact =
+    (Boolean(editing) && !isExceptionsEditing) ||
+    (!editing && !isNewStaffExceptionsExpanded)
   const calendarMonthLabel = monthLabelFmt.format(calendarMonth)
   const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
   const jsWeekday = firstDay.getDay()
@@ -1610,16 +1673,7 @@ export default function TeamPage() {
               <CardTitle className="text-lg">{formCardTitle}</CardTitle>
               {editing ? (
                 <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                  {editing.isActive ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 rounded-xl px-3"
-                      onClick={() => void deactivateStaff(editing)}
-                    >
-                      {t("team.deactivate")}
-                    </Button>
-                  ) : (
+                  {!editing.isActive ? (
                     <Button
                       type="button"
                       variant="outline"
@@ -1628,7 +1682,7 @@ export default function TeamPage() {
                     >
                       {t("team.activate")}
                     </Button>
-                  )}
+                  ) : null}
                   <Button
                     type="button"
                     variant="destructive"
@@ -1695,16 +1749,17 @@ export default function TeamPage() {
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="staff-phone">{t("team.phone")}</Label>
-                      <Input
-                        id="staff-phone"
-                        value={form.phone}
-                        onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                        className="h-11 rounded-xl"
-                        autoComplete="tel"
-                      />
-                    </div>
+                    <InternationalPhoneFieldGroup
+                      label={t("team.phone")}
+                      dialCode={form.phoneDialCode}
+                      nationalDigits={form.phoneNational}
+                      onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
+                      onNationalChange={(digits) =>
+                        setForm((f) => ({ ...f, phoneNational: digits }))
+                      }
+                      dialSelectId="staff-phone-dial"
+                      nationalInputId="staff-phone"
+                    />
                     <div className="space-y-2">
                       <Label htmlFor="staff-email">{t("team.contactEmail")}</Label>
                       <Input
@@ -1977,7 +2032,7 @@ export default function TeamPage() {
                                 </p>
                               </div>
                             ) : null}
-                            {showExceptionsPreview ? (
+                            {showExceptionsCompact ? (
                               <div className="space-y-3">
                                 {form.exceptions.length === 0 ? (
                                   <p className="text-xs text-muted-foreground">
@@ -2015,7 +2070,10 @@ export default function TeamPage() {
                                     type="button"
                                     variant="outline"
                                     className="h-10 rounded-xl"
-                                    onClick={() => setIsExceptionsEditing(true)}
+                                    onClick={() => {
+                                      setIsExceptionsEditing(true)
+                                      setIsNewStaffExceptionsExpanded(true)
+                                    }}
                                   >
                                     {t("team.editExceptions")}
                                   </Button>
@@ -2137,14 +2195,23 @@ export default function TeamPage() {
                                             className="h-11 rounded-xl"
                                           />
                                         </div>
-                                        <div className="mt-4 flex justify-end">
+                                        <div className="mt-4 flex flex-wrap justify-end gap-2">
                                           <Button
                                             type="button"
                                             variant="outline"
                                             className="h-10 rounded-xl"
+                                            disabled={saving}
                                             onClick={() => removeException(idx)}
                                           >
                                             {t("team.deleteException")}
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            className="h-10 rounded-xl"
+                                            disabled={saving}
+                                            onClick={() => void saveScheduleExceptionsAndCollapse()}
+                                          >
+                                            {t("team.saveException")}
                                           </Button>
                                         </div>
                                       </div>

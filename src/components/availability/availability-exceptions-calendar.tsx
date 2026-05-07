@@ -35,7 +35,7 @@ type Props = {
   t: Translate
 }
 
-type DayMode = "regular" | "closed" | "special"
+type DayMode = "closed" | "special"
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0")
@@ -84,6 +84,73 @@ function formatDateKeyForUi(dateKey: string, lang: Language): string {
   }).format(dt)
 }
 
+function expandInclusiveDateKeys(a: string, b: string): string[] {
+  const start = a.trim().slice(0, 10)
+  const end = b.trim().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return []
+  let from = start
+  let to = end
+  if (to < from) {
+    const swap = from
+    from = to
+    to = swap
+  }
+  const out: string[] = []
+  const [sy, sm, sd] = from.split("-").map(Number)
+  const cur = new Date(sy, sm - 1, sd)
+  const [ey, em, ed] = to.split("-").map(Number)
+  const endDt = new Date(ey, em - 1, ed)
+  while (cur <= endDt) {
+    out.push(toLocalDateKeyFromParts(cur.getFullYear(), cur.getMonth(), cur.getDate()))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return out
+}
+
+function nextCalendarDateKey(dateKey: string): string | null {
+  const k = dateKey.trim().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) return null
+  const [y, m, d] = k.split("-").map(Number)
+  const dt = new Date(y, m - 1, d)
+  if (!Number.isFinite(dt.getTime())) return null
+  dt.setDate(dt.getDate() + 1)
+  return toLocalDateKeyFromParts(dt.getFullYear(), dt.getMonth(), dt.getDate())
+}
+
+/** Ten sam „kształt” wyjątku — do scalania kolejnych dni w liście. */
+function exceptionMergeSignature(r: AvailabilityExceptionRecord): string {
+  const st = r.is_closed ? "" : String(r.start_time ?? "").trim().slice(0, 8)
+  const en = r.is_closed ? "" : String(r.end_time ?? "").trim().slice(0, 8)
+  const reason = (r.reason ?? "").trim()
+  return [r.is_closed ? "1" : "0", st, en, reason].join("\u0000")
+}
+
+type MergedAvailabilityExceptionGroup = {
+  fromKey: string
+  toKey: string
+  rows: AvailabilityExceptionRecord[]
+}
+
+function mergeContiguousExceptionGroups(sorted: AvailabilityExceptionRecord[]): MergedAvailabilityExceptionGroup[] {
+  const out: MergedAvailabilityExceptionGroup[] = []
+  for (const r of sorted) {
+    const key = String(r.exception_date).slice(0, 10)
+    const prev = out[out.length - 1]
+    const sig = exceptionMergeSignature(r)
+    if (
+      prev &&
+      exceptionMergeSignature(prev.rows[0]!) === sig &&
+      nextCalendarDateKey(prev.toKey) === key
+    ) {
+      prev.toKey = key
+      prev.rows.push(r)
+    } else {
+      out.push({ fromKey: key, toKey: key, rows: [r] })
+    }
+  }
+  return out
+}
+
 export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, language, t }: Props) {
   const initialMonth = React.useMemo(() => {
     const n = new Date()
@@ -101,7 +168,9 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
   const [notice, setNotice] = React.useState<"saved" | "deleted" | "error" | null>(null)
 
   const [activeKey, setActiveKey] = React.useState<string | null>(null)
-  const [mode, setMode] = React.useState<DayMode>("regular")
+  /** Koniec zakresu (włącznie); domyślnie równy dniowi z kalendarza. */
+  const [rangeEndKey, setRangeEndKey] = React.useState<string | null>(null)
+  const [mode, setMode] = React.useState<DayMode>("closed")
   const [formStart, setFormStart] = React.useState("09:00")
   const [formEnd, setFormEnd] = React.useState("17:00")
   const [formReason, setFormReason] = React.useState("")
@@ -139,28 +208,36 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
     return () => window.clearTimeout(tid)
   }, [notice])
 
-  const selectDay = (dateKey: string) => {
-    const d = parseLocalDateKey(dateKey)
-    const ex = exceptionForKey(rows, dateKey)
-    const hol = isPolishPublicHoliday(d)
-    setActiveKey(dateKey)
-    if (ex) {
-      if (ex.is_closed) {
-        setMode("closed")
+  const syncFormFromDay = React.useCallback(
+    (dateKey: string) => {
+      const d = parseLocalDateKey(dateKey)
+      const ex = exceptionForKey(rows, dateKey)
+      const hol = isPolishPublicHoliday(d)
+      if (ex) {
+        if (ex.is_closed) {
+          setMode("closed")
+        } else {
+          setMode("special")
+          setFormStart(ex.start_time ? String(ex.start_time).slice(0, 5) : "09:00")
+          setFormEnd(ex.end_time ? String(ex.end_time).slice(0, 5) : "17:00")
+        }
+        setFormReason(ex.reason ?? "")
       } else {
-        setMode("special")
-        setFormStart(ex.start_time ? String(ex.start_time).slice(0, 5) : "09:00")
-        setFormEnd(ex.end_time ? String(ex.end_time).slice(0, 5) : "17:00")
+        setMode(hol ? "closed" : "special")
+        const wd = d.getDay()
+        const tpl = weeklyDays.find((x) => x.weekday === wd)
+        setFormStart(tpl?.startTime ?? "09:00")
+        setFormEnd(tpl?.endTime ?? "17:00")
+        setFormReason("")
       }
-      setFormReason(ex.reason ?? "")
-    } else {
-      setMode(hol ? "closed" : "regular")
-      const wd = d.getDay()
-      const tpl = weeklyDays.find((x) => x.weekday === wd)
-      setFormStart(tpl?.startTime ?? "09:00")
-      setFormEnd(tpl?.endTime ?? "17:00")
-      setFormReason("")
-    }
+    },
+    [rows, weeklyDays],
+  )
+
+  const selectDay = (dateKey: string) => {
+    setActiveKey(dateKey)
+    setRangeEndKey(dateKey)
+    syncFormFromDay(dateKey)
   }
 
   const submitSave = () => {
@@ -168,7 +245,14 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
       if (!businessProfileId || !activeKey) return
       const client = getBrowserClient()
       if (!client) return
-      const d = parseLocalDateKey(activeKey)
+
+      const start = activeKey.trim().slice(0, 10)
+      const end = (rangeEndKey ?? activeKey).trim().slice(0, 10)
+      const dateKeys = expandInclusiveDateKeys(start, end)
+      if (dateKeys.length === 0) {
+        setNotice("error")
+        return
+      }
 
       if (mode === "special") {
         if (toMinutes(formEnd) <= toMinutes(formStart)) {
@@ -179,73 +263,35 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
 
       setSaving(true)
       try {
-        if (mode === "regular") {
-          const existing = exceptionForKey(rows, activeKey)
-          if (existing) {
-            const del = await deleteAvailabilityExceptionByDate(client, businessProfileId, activeKey)
-            if (!del.ok) {
+        for (const dateKey of dateKeys) {
+          if (mode === "closed") {
+            const res = await saveAvailabilityException(client, businessProfileId, {
+              exceptionDate: dateKey,
+              isClosed: true,
+              reason: formReason.trim() ? formReason.trim() : null,
+            })
+            if (!res.ok) {
               setNotice("error")
               return
             }
-          } else if (isPolishPublicHoliday(d)) {
-            const wd = d.getDay()
-            const tpl = weeklyDays.find((x) => x.weekday === wd)
-            if (tpl?.isOpen) {
-              const res = await saveAvailabilityException(client, businessProfileId, {
-                exceptionDate: activeKey,
-                isClosed: false,
-                startTime: tpl.startTime,
-                endTime: tpl.endTime,
-                reason: formReason.trim() ? formReason.trim() : null,
-              })
-              if (!res.ok) {
-                setNotice("error")
-                return
-              }
-            } else {
-              const res = await saveAvailabilityException(client, businessProfileId, {
-                exceptionDate: activeKey,
-                isClosed: true,
-                reason: formReason.trim() ? formReason.trim() : null,
-              })
-              if (!res.ok) {
-                setNotice("error")
-                return
-              }
-            }
+            continue
           }
-          setNotice("saved")
-          await refresh()
-          return
-        }
 
-        if (mode === "closed") {
           const res = await saveAvailabilityException(client, businessProfileId, {
-            exceptionDate: activeKey,
-            isClosed: true,
+            exceptionDate: dateKey,
+            isClosed: false,
+            startTime: formStart,
+            endTime: formEnd,
             reason: formReason.trim() ? formReason.trim() : null,
           })
           if (!res.ok) {
             setNotice("error")
             return
           }
-          setNotice("saved")
-          await refresh()
-          return
-        }
-
-        const res = await saveAvailabilityException(client, businessProfileId, {
-          exceptionDate: activeKey,
-          isClosed: false,
-          startTime: formStart,
-          endTime: formEnd,
-          reason: formReason.trim() ? formReason.trim() : null,
-        })
-        if (!res.ok) {
-          setNotice("error")
-          return
         }
         setNotice("saved")
+        setActiveKey(null)
+        setRangeEndKey(null)
         await refresh()
       } finally {
         setSaving(false)
@@ -258,15 +304,22 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
       if (!businessProfileId || !activeKey) return
       const client = getBrowserClient()
       if (!client) return
+      const start = activeKey.trim().slice(0, 10)
+      const end = (rangeEndKey ?? activeKey).trim().slice(0, 10)
+      const dateKeys = expandInclusiveDateKeys(start, end)
       setSaving(true)
       try {
-        const res = await deleteAvailabilityExceptionByDate(client, businessProfileId, activeKey)
-        if (!res.ok) {
-          setNotice("error")
-          return
+        for (const dateKey of dateKeys) {
+          if (!exceptionForKey(rows, dateKey)) continue
+          const res = await deleteAvailabilityExceptionByDate(client, businessProfileId, dateKey)
+          if (!res.ok) {
+            setNotice("error")
+            return
+          }
         }
         setNotice("deleted")
         setActiveKey(null)
+        setRangeEndKey(null)
         await refresh()
       } finally {
         setSaving(false)
@@ -274,20 +327,31 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
     })()
   }
 
-  const deleteExceptionById = (id: string, dateKey: string) => {
+  const deleteExceptionGroup = (group: MergedAvailabilityExceptionGroup) => {
     void (async () => {
       if (!window.confirm(t("availability.deleteExceptionConfirm"))) return
       const client = getBrowserClient()
       if (!client || !businessProfileId) return
       setSaving(true)
       try {
-        const res = await deleteAvailabilityException(client, businessProfileId, id)
-        if (!res.ok) {
-          setNotice("error")
-          return
+        for (const r of group.rows) {
+          const res = await deleteAvailabilityException(client, businessProfileId, r.id)
+          if (!res.ok) {
+            setNotice("error")
+            return
+          }
         }
         setNotice("deleted")
-        if (activeKey === dateKey) setActiveKey(null)
+        const delKeys = new Set(expandInclusiveDateKeys(group.fromKey, group.toKey))
+        const selA = activeKey?.trim().slice(0, 10)
+        const selB = (rangeEndKey ?? activeKey ?? "").trim().slice(0, 10)
+        if (selA && selB && /^\d{4}-\d{2}-\d{2}$/.test(selA) && /^\d{4}-\d{2}-\d{2}$/.test(selB)) {
+          const overlap = expandInclusiveDateKeys(selA, selB).some((k) => delKeys.has(k))
+          if (overlap) {
+            setActiveKey(null)
+            setRangeEndKey(null)
+          }
+        }
         await refresh()
       } finally {
         setSaving(false)
@@ -341,8 +405,11 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
 
   const weekdayLabels = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"] as const
 
-  const sortedExceptions = React.useMemo(() => {
-    return [...rows].sort((a, b) => String(a.exception_date).localeCompare(String(b.exception_date)))
+  const mergedExceptionGroups = React.useMemo(() => {
+    const sorted = [...rows].sort((a, b) =>
+      String(a.exception_date).localeCompare(String(b.exception_date)),
+    )
+    return mergeContiguousExceptionGroups(sorted)
   }, [rows])
 
   const startAddException = () => {
@@ -351,18 +418,29 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
     selectDay(key)
   }
 
-  const openExceptionEditor = (dateKey: string) => {
-    const d = parseLocalDateKey(dateKey)
+  const openExceptionEditor = (fromKey: string, toKey?: string) => {
+    const start = fromKey.trim().slice(0, 10)
+    const rawEnd = (toKey ?? fromKey).trim().slice(0, 10)
+    const [a, b] = start <= rawEnd ? [start, rawEnd] : [rawEnd, start]
+    const d = parseLocalDateKey(a)
     if (Number.isFinite(d.getTime())) {
       setViewYear(d.getFullYear())
       setViewMonth(d.getMonth())
     }
-    if (activeKey === dateKey) {
+    const currentEnd = (rangeEndKey ?? activeKey ?? "").trim().slice(0, 10) || a
+    if (activeKey === a && currentEnd === b) {
       setActiveKey(null)
-      queueMicrotask(() => selectDay(dateKey))
+      setRangeEndKey(null)
+      queueMicrotask(() => {
+        setActiveKey(a)
+        setRangeEndKey(b)
+        syncFormFromDay(a)
+      })
       return
     }
-    selectDay(dateKey)
+    setActiveKey(a)
+    setRangeEndKey(b)
+    syncFormFromDay(a)
   }
 
   if (!isSupabaseConfigured() || !businessProfileId) {
@@ -371,6 +449,18 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
 
   const activeDate = activeKey ? parseLocalDateKey(activeKey) : null
   const holidayDisplay = activeDate ? getPolishHolidayDisplayName(activeDate, language) : null
+  const rangeStartUi = activeKey ? activeKey.trim().slice(0, 10) : ""
+  const rangeEndUi = (rangeEndKey ?? activeKey ?? "").trim().slice(0, 10) || rangeStartUi
+  const rangeLabel =
+    activeKey && rangeStartUi && rangeEndUi
+      ? rangeStartUi === rangeEndUi
+        ? formatDateKeyForUi(rangeStartUi, language)
+        : `${formatDateKeyForUi(rangeStartUi, language)} — ${formatDateKeyForUi(rangeEndUi, language)}`
+      : ""
+  const rangeHasSavedException =
+    rangeStartUi && rangeEndUi
+      ? expandInclusiveDateKeys(rangeStartUi, rangeEndUi).some((k) => Boolean(exceptionForKey(rows, k)))
+      : false
 
   return (
     <Card className="mt-5 rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
@@ -391,7 +481,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
         ) : null}
         {notice === "saved" ? (
           <p className="text-sm text-emerald-700 dark:text-emerald-300" role="status">
-            {t("availability.dayOffSavedBanner")}
+            {t("availability.exceptionsSavedBanner")}
           </p>
         ) : null}
         {notice === "deleted" ? (
@@ -574,7 +664,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 space-y-1">
                     <p className="text-xs font-medium text-muted-foreground">{t("availability.daySettingsTitle")}</p>
-                    <p className="text-sm font-semibold text-foreground">{activeKey}</p>
+                    <p className="text-sm font-semibold text-foreground">{rangeLabel}</p>
                     {holidayDisplay ? (
                       <p className="text-sm font-medium text-rose-700 dark:text-rose-200">
                         {t("availability.holidayTitle").replace("{name}", holidayDisplay)}
@@ -589,7 +679,10 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                     variant="ghost"
                     size="sm"
                     className="h-8 shrink-0 rounded-lg text-xs text-muted-foreground"
-                    onClick={() => setActiveKey(null)}
+                    onClick={() => {
+                      setActiveKey(null)
+                      setRangeEndKey(null)
+                    }}
                   >
                     {t("availability.cancelDay")}
                   </Button>
@@ -616,10 +709,50 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                   </p>
                 ) : null}
 
+                <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                  <div className="min-w-0 space-y-1">
+                    <Label htmlFor="ex-range-from" className="text-xs">
+                      {t("availability.exceptionRangeFrom")}
+                    </Label>
+                    <Input
+                      id="ex-range-from"
+                      type="date"
+                      value={rangeStartUi}
+                      onChange={(e) => {
+                        const v = e.target.value.trim().slice(0, 10)
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return
+                        setActiveKey(v)
+                        setRangeEndKey((prev) => {
+                          const end = (prev ?? v).trim().slice(0, 10)
+                          if (!/^\d{4}-\d{2}-\d{2}$/.test(end) || end < v) return v
+                          return end
+                        })
+                      }}
+                      className="h-11 max-w-full rounded-xl text-sm"
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <Label htmlFor="ex-range-to" className="text-xs">
+                      {t("availability.exceptionRangeTo")}
+                    </Label>
+                    <Input
+                      id="ex-range-to"
+                      type="date"
+                      value={rangeEndUi}
+                      min={rangeStartUi || undefined}
+                      onChange={(e) => {
+                        const v = e.target.value.trim().slice(0, 10)
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return
+                        setRangeEndKey(v)
+                      }}
+                      className="h-11 max-w-full rounded-xl text-sm"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{t("availability.exceptionDate")}</p>
-                  <div className="grid grid-cols-3 gap-1 rounded-lg border border-border/70 bg-background/80 p-0.5">
-                    {(["regular", "closed", "special"] as const).map((m) => (
+                  <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/70 bg-background/80 p-0.5">
+                    {(["closed", "special"] as const).map((m) => (
                       <button
                         key={m}
                         type="button"
@@ -631,11 +764,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                         )}
                       >
-                        {m === "regular"
-                          ? t("availability.dayTypeRegular")
-                          : m === "closed"
-                            ? t("availability.dayTypeClosed")
-                            : t("availability.dayTypeSpecial")}
+                        {m === "closed" ? t("availability.dayTypeClosed") : t("availability.dayTypeSpecial")}
                       </button>
                     ))}
                   </div>
@@ -690,9 +819,9 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                     disabled={saving}
                     onClick={() => void submitSave()}
                   >
-                    {t("availability.saveDay")}
+                    {t("availability.saveException")}
                   </Button>
-                  {activeKey && exceptionForKey(rows, activeKey) ? (
+                  {rangeHasSavedException ? (
                     <Button
                       type="button"
                       variant="destructive"
@@ -709,16 +838,19 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
 
             <div className="min-w-0 space-y-2">
               <p className="text-sm font-semibold text-foreground">{t("availability.exceptionsListTitle")}</p>
-              {sortedExceptions.length === 0 ? (
+              {mergedExceptionGroups.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border/70 bg-muted/10 px-3 py-3 text-sm text-muted-foreground">
                   {t("availability.noExceptions")}
                 </p>
               ) : (
                 <ul className="max-h-[min(22rem,48vh)] space-y-2 overflow-y-auto overflow-x-hidden pr-0.5">
-                  {sortedExceptions.map((r) => {
-                    const key = String(r.exception_date).slice(0, 10)
-                    const d = parseLocalDateKey(key)
-                    const holName = getPolishHolidayDisplayName(d, language)
+                  {mergedExceptionGroups.map((g) => {
+                    const r = g.rows[0]!
+                    const fromKey = g.fromKey
+                    const toKey = g.toKey
+                    const d = parseLocalDateKey(fromKey)
+                    const singleDay = fromKey === toKey
+                    const holName = singleDay ? getPolishHolidayDisplayName(d, language) : null
                     const typeLabel = r.is_closed
                       ? t("availability.exceptionClosedAllDay")
                       : t("availability.exceptionCustomHours")
@@ -726,12 +858,16 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                       !r.is_closed && r.start_time && r.end_time
                         ? `${String(r.start_time).slice(0, 5)}-${String(r.end_time).slice(0, 5)}`
                         : ""
-                    const dateStr = formatDateKeyForUi(key, language)
+                    const dateStr = singleDay
+                      ? formatDateKeyForUi(fromKey, language)
+                      : `${formatDateKeyForUi(fromKey, language)} — ${formatDateKeyForUi(toKey, language)}`
                     const tail = r.is_closed ? typeLabel : `${typeLabel}${timePart ? ` (${timePart})` : ""}`
-                    const mainLine = holName ? `${dateStr} - ${holName} - ${tail}` : `${dateStr} - ${tail}`
+                    const mainLine =
+                      holName && singleDay ? `${dateStr} - ${holName} - ${tail}` : `${dateStr} - ${tail}`
+                    const listKey = g.rows.map((x) => x.id).join("|")
                     return (
                       <li
-                        key={r.id}
+                        key={listKey}
                         className="rounded-lg border border-border/70 bg-background/90 px-3 py-2.5 text-sm shadow-sm"
                       >
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -746,7 +882,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                               type="button"
                               variant="outline"
                               className="h-10 w-full rounded-xl text-xs sm:w-auto"
-                              onClick={() => openExceptionEditor(key)}
+                              onClick={() => openExceptionEditor(fromKey, toKey)}
                             >
                               {t("availability.editExceptionFull")}
                             </Button>
@@ -755,7 +891,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                               variant="outline"
                               className="h-10 w-full rounded-xl text-xs text-destructive hover:text-destructive sm:w-auto"
                               disabled={saving}
-                              onClick={() => deleteExceptionById(r.id, key)}
+                              onClick={() => deleteExceptionGroup(g)}
                             >
                               {t("availability.deleteExceptionFull")}
                             </Button>

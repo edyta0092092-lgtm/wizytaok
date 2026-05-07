@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 
 import { FormActions } from "@/components/shared/form-actions"
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,7 +24,8 @@ import type { Service, StaffMember } from "@/types/domain"
 export type ManualAppointmentFormState = {
   clientFirstName: string
   clientLastName: string
-  clientPhone: string
+  clientPhoneDialCode: string
+  clientPhoneNational: string
   clientEmail: string
   serviceId: string
   manualStaffId: string
@@ -96,15 +98,17 @@ export function ManualAppointmentSheet({
                 />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="ma-phone">{t("appointments.fieldPhone")}</Label>
-              <Input
-                id="ma-phone"
-                required
-                value={form.clientPhone}
-                onChange={(e) => setForm((f) => ({ ...f, clientPhone: e.target.value }))}
-              />
-            </div>
+            <InternationalPhoneFieldGroup
+              label={t("appointments.fieldPhone")}
+              dialCode={form.clientPhoneDialCode}
+              nationalDigits={form.clientPhoneNational}
+              onDialCodeChange={(v) => setForm((f) => ({ ...f, clientPhoneDialCode: v }))}
+              onNationalChange={(digits) =>
+                setForm((f) => ({ ...f, clientPhoneNational: digits }))
+              }
+              dialSelectId="ma-phone-dial"
+              nationalInputId="ma-phone"
+            />
             <div className="space-y-1">
               <Label htmlFor="ma-email">{t("appointments.fieldEmail")}</Label>
               <Input

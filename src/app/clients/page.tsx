@@ -13,8 +13,10 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { ClientRiskTierBadge } from "@/components/shared/client-risk-tier-badge"
 import { EmptyState } from "@/components/shared/empty-state"
 import { FormActions } from "@/components/shared/form-actions"
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,15 +49,22 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
   buildPriorIdentity,
+  deriveRiskScoreFromStats,
   isLikelyUuidClientId,
   loadClientsWorkspace,
   type ClientsLoadMode,
   persistClientsCatalog,
   persistClientUpdates,
+  riskTierFromScore,
 } from "@/lib/clients/clients-store"
 import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import {
+  buildStoredInternationalPhone,
+  splitStoredPhoneIntoParts,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
 import type { Client } from "@/types/domain"
 
 let localFallbackClientSeq = 0
@@ -75,7 +84,8 @@ function normalizeQuery(s: string) {
 type FormState = {
   firstName: string
   lastName: string
-  phone: string
+  phoneDialCode: string
+  phoneNational: string
   email: string
   notes: string
 }
@@ -83,7 +93,8 @@ type FormState = {
 const emptyForm = (): FormState => ({
   firstName: "",
   lastName: "",
-  phone: "",
+  phoneDialCode: "+48",
+  phoneNational: "",
   email: "",
   notes: "",
 })
@@ -136,13 +147,17 @@ function dedupeClientsForRender(rows: Client[]): Client[] {
     const mergedVisitHistory = Array.from(visitHistoryMap.values()).sort(
       (a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
     )
-    const mergedVisitCount = Math.max(
-      prev.visitCount + row.visitCount,
-      mergedVisitHistory.length
-    )
-    const mergedConfirmed = prev.confirmedVisitCount + row.confirmedVisitCount
-    const mergedNoShow = prev.noShowCount + row.noShowCount
-    const mergedCancelled = (prev.cancelledVisitCount ?? 0) + (row.cancelledVisitCount ?? 0)
+    let mergedNoShow = 0
+    let mergedConfirmed = 0
+    let mergedCancelled = 0
+    for (const h of mergedVisitHistory) {
+      if (h.status === "no_show") mergedNoShow += 1
+      if (h.status === "confirmed" || h.status === "completed") mergedConfirmed += 1
+      if (h.status === "cancelled") mergedCancelled += 1
+    }
+    const mergedVisitCount = mergedVisitHistory.length
+    const mergedRiskScore = deriveRiskScoreFromStats(mergedVisitCount, mergedNoShow, mergedConfirmed)
+    const mergedRiskTier = riskTierFromScore(mergedRiskScore)
     byId.set(key, {
       ...row,
       id: key,
@@ -154,8 +169,8 @@ function dedupeClientsForRender(rows: Client[]): Client[] {
       confirmedVisitCount: mergedConfirmed,
       noShowCount: mergedNoShow,
       cancelledVisitCount: mergedCancelled,
-      riskScore: row.riskScore,
-      riskTier: row.riskTier,
+      riskScore: mergedRiskScore,
+      riskTier: mergedRiskTier,
       visitHistory: mergedVisitHistory,
     })
   }
@@ -268,9 +283,11 @@ export default function ClientsPage() {
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     const fullName = joinPersonName(form.firstName, form.lastName)
-    const phone = form.phone.trim()
+    const phone = buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational).trim()
     const email = form.email.trim()
     if (!fullName) return
+    if (!phone) return
+    if (!validateNationalPhoneLength(form.phoneDialCode, form.phoneNational).ok) return
     if (!isEmailFormatValid(email)) return
 
     const sb = isSupabaseConfigured() ? getBrowserClient() : null
@@ -360,10 +377,12 @@ export default function ClientsPage() {
   const startDetailsEdit = () => {
     if (!detailsClient) return
     const split = splitPersonName(detailsClient.fullName)
+    const phoneParts = splitStoredPhoneIntoParts(detailsClient.phone)
     setDetailForm({
       firstName: split.firstName,
       lastName: split.lastName,
-      phone: detailsClient.phone,
+      phoneDialCode: phoneParts.dialCode,
+      phoneNational: phoneParts.nationalDigits,
       email: detailsClient.email,
       notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
     })
@@ -376,10 +395,12 @@ export default function ClientsPage() {
     setDetailFieldError(null)
     if (detailsClient) {
       const split = splitPersonName(detailsClient.fullName)
+      const phoneParts = splitStoredPhoneIntoParts(detailsClient.phone)
       setDetailForm({
         firstName: split.firstName,
         lastName: split.lastName,
-        phone: detailsClient.phone,
+        phoneDialCode: phoneParts.dialCode,
+        phoneNational: phoneParts.nationalDigits,
         email: detailsClient.email,
         notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
       })
@@ -391,11 +412,19 @@ export default function ClientsPage() {
     if (!detailsClient || !workspace) return
 
     const fullName = joinPersonName(detailForm.firstName, detailForm.lastName)
-    const phone = detailForm.phone.trim()
+    const phone = buildStoredInternationalPhone(detailForm.phoneDialCode, detailForm.phoneNational).trim()
     const email = detailForm.email.trim()
 
     if (!fullName) {
       setDetailFieldError(t("clients.validationFullName"))
+      return
+    }
+    if (!phone) {
+      setDetailFieldError(t("clients.validationPhoneRequired"))
+      return
+    }
+    if (!validateNationalPhoneLength(detailForm.phoneDialCode, detailForm.phoneNational).ok) {
+      setDetailFieldError(t("clients.validationPhoneInvalid"))
       return
     }
     if (!isEmailFormatValid(email)) {
@@ -458,6 +487,10 @@ export default function ClientsPage() {
     (sum, c) => sum + (c.confirmedVisitCount ?? 0),
     0
   )
+  const cancelledTotal = uniqueClients.reduce(
+    (sum, c) => sum + (c.cancelledVisitCount ?? 0),
+    0
+  )
 
   return (
     <AppShell
@@ -486,7 +519,7 @@ export default function ClientsPage() {
             {showSaved === "added" ? t("clients.addedBanner") : t("clients.updatedBanner")}
           </div>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardContent className="px-4 py-3.5">
               <p className="text-xs font-medium text-muted-foreground">
@@ -512,6 +545,16 @@ export default function ClientsPage() {
               </p>
               <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
                 {confirmedTotal}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+            <CardContent className="px-4 py-3.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                {t("clients.cancelled")}
+              </p>
+              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+                {cancelledTotal}
               </p>
             </CardContent>
           </Card>
@@ -664,29 +707,46 @@ export default function ClientsPage() {
                             ) : null}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <span className="tabular-nums">
-                              <span className="font-semibold text-foreground">{row.visitCount}</span>{" "}
-                              {t("clients.visitsShort")}
-                            </span>
-                            <span className="tabular-nums">
-                              <span className="font-semibold text-success">
-                                {row.confirmedVisitCount}
-                              </span>{" "}
-                              {t("clients.confirmedShort")}
-                            </span>
-                            <span className="tabular-nums">
-                              <span className="font-semibold text-foreground">
-                                {row.noShowCount}
-                              </span>{" "}
-                              {t("clients.noShow")}
-                            </span>
-                            <span className="tabular-nums">
-                              <span className="font-semibold text-foreground">
-                                {row.cancelledVisitCount}
-                              </span>{" "}
-                              {t("clients.cancelledShort")}
-                            </span>
+                          <div className="flex min-w-0 flex-col gap-2">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span className="tabular-nums">
+                                <span className="font-semibold text-foreground">{row.visitCount}</span>{" "}
+                                {t("clients.visitsShort")}
+                              </span>
+                              <span className="tabular-nums">
+                                <span className="font-semibold text-success">
+                                  {row.confirmedVisitCount}
+                                </span>{" "}
+                                {t("clients.confirmedShort")}
+                              </span>
+                              <span className="tabular-nums">
+                                <span className="font-semibold text-foreground">
+                                  {row.noShowCount}
+                                </span>{" "}
+                                {t("clients.noShow")}
+                              </span>
+                              <span className="tabular-nums">
+                                <span className="font-semibold text-foreground">
+                                  {row.cancelledVisitCount}
+                                </span>{" "}
+                                {t("clients.cancelledShort")}
+                              </span>
+                            </div>
+                            <div
+                              className="flex flex-wrap items-center gap-2"
+                              title={t("clients.riskScoreNativeTooltip").replace(
+                                "{score}",
+                                String(row.riskScore)
+                              )}
+                            >
+                              <span className="text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
+                                {t("clients.tableRisk")}
+                              </span>
+                              <ClientRiskTierBadge tier={row.riskTier} className="text-[0.65rem]" />
+                              <span className="tabular-nums text-xs text-muted-foreground">
+                                {row.riskScore}/100
+                              </span>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
@@ -776,18 +836,17 @@ export default function ClientsPage() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="client-phone">{t("clients.fieldPhoneShort")}</Label>
-                <Input
-                  id="client-phone"
-                  required
-                  type="tel"
-                  autoComplete="tel"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="+48 500 600 700"
-                />
-              </div>
+              <InternationalPhoneFieldGroup
+                label={t("clients.fieldPhoneShort")}
+                dialCode={form.phoneDialCode}
+                nationalDigits={form.phoneNational}
+                onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
+                onNationalChange={(digits) =>
+                  setForm((f) => ({ ...f, phoneNational: digits }))
+                }
+                dialSelectId="client-phone-dial"
+                nationalInputId="client-phone-national"
+              />
               <div className="space-y-2">
                 <Label htmlFor="client-email">{t("clients.fieldEmailShort")}</Label>
                 <Input
@@ -894,19 +953,19 @@ export default function ClientsPage() {
                         {t("clients.sectionContactHead")}
                       </h3>
                       <div className="min-w-0 space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="detail-phone">{t("clients.fieldPhoneShort")}</Label>
-                          <Input
-                            id="detail-phone"
-                            type="tel"
-                            autoComplete="tel"
-                            className="h-11 rounded-xl"
-                            value={detailForm.phone}
-                            onChange={(e) =>
-                              setDetailForm((prev) => ({ ...prev, phone: e.target.value }))
-                            }
-                          />
-                        </div>
+                        <InternationalPhoneFieldGroup
+                          label={t("clients.fieldPhoneShort")}
+                          dialCode={detailForm.phoneDialCode}
+                          nationalDigits={detailForm.phoneNational}
+                          onDialCodeChange={(v) =>
+                            setDetailForm((prev) => ({ ...prev, phoneDialCode: v }))
+                          }
+                          onNationalChange={(digits) =>
+                            setDetailForm((prev) => ({ ...prev, phoneNational: digits }))
+                          }
+                          dialSelectId="detail-phone-dial"
+                          nationalInputId="detail-phone-national"
+                        />
                         <div className="space-y-2">
                           <Label htmlFor="detail-email">{t("clients.fieldEmailShort")}</Label>
                           <Input
@@ -920,6 +979,29 @@ export default function ClientsPage() {
                             }
                           />
                         </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("clients.sectionRiskHead")}
+                      </h3>
+                      <div
+                        className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4"
+                        title={t("clients.riskScoreNativeTooltip").replace(
+                          "{score}",
+                          String(detailsClient.riskScore)
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ClientRiskTierBadge tier={detailsClient.riskTier} />
+                          <span className="tabular-nums text-sm text-muted-foreground">
+                            {detailsClient.riskScore}/100
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                          {t("clients.riskBasedOnHistory")} {t("clients.riskHowBody")}
+                        </p>
                       </div>
                     </section>
 
@@ -1013,6 +1095,29 @@ export default function ClientsPage() {
                             </p>
                           </div>
                         </div>
+                      </div>
+                    </section>
+
+                    <section className="space-y-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {t("clients.sectionRiskHead")}
+                      </h3>
+                      <div
+                        className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4"
+                        title={t("clients.riskScoreNativeTooltip").replace(
+                          "{score}",
+                          String(detailsClient.riskScore)
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <ClientRiskTierBadge tier={detailsClient.riskTier} />
+                          <span className="tabular-nums text-sm text-muted-foreground">
+                            {detailsClient.riskScore}/100
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs leading-snug text-muted-foreground">
+                          {t("clients.riskBasedOnHistory")} {t("clients.riskHowBody")}
+                        </p>
                       </div>
                     </section>
 

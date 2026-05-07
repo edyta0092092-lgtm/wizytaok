@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
 import { AccessDenied } from "@/components/shared/access-denied"
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { loadClientsWorkspace } from "@/lib/clients/clients-store"
@@ -34,7 +35,14 @@ import {
   type SecondReminderSetting,
 } from "@/lib/settings/reminder-lead"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
+import {
+  buildStoredInternationalPhone,
+  splitStoredPhoneIntoParts,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
 import type { AppointmentStatus } from "@/types/domain"
 
 type ReminderLead = "2h" | "6h" | "12h" | "24h" | "48h"
@@ -49,10 +57,11 @@ const SETTINGS_STORAGE_KEY = "pw_settings_form_v2"
 type SettingsForm = {
   businessName: string
   publicSlug: string
-  ownerName: string
   email: string
-  phone: string
+  phoneDialCode: string
+  phoneNational: string
   taxId: string
+  taxIdEntryEnabled: boolean
   reminderLead: ReminderLead
   secondReminderLead: SecondReminderLead
   reminderChannel: ReminderChannel
@@ -63,11 +72,12 @@ type SettingsForm = {
 
 const defaultSettings: SettingsForm = {
   businessName: "Studio WizytaOK",
-  publicSlug: "studio-potwierdzen",
-  ownerName: "Jan Kowalski",
+  publicSlug: "rezerwacje",
   email: "kontakt@example.pl",
-  phone: "+48 600 000 000",
+  phoneDialCode: "+48",
+  phoneNational: "600000000",
   taxId: "",
+  taxIdEntryEnabled: false,
   reminderLead: "24h",
   secondReminderLead: "2h",
   reminderChannel: "both",
@@ -87,15 +97,32 @@ export default function SettingsPage() {
   const [saveError, setSaveError] = React.useState<string | null>(null)
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
   const [saving, setSaving] = React.useState(false)
+  const [taxIdEmptySaveError, setTaxIdEmptySaveError] = React.useState(false)
 
   const taxIdDigitsHint = React.useMemo(() => {
-    const compact = form.taxId.replace(/[\s-]/g, "")
+    if (!form.taxIdEntryEnabled) return null
+    const compact = form.taxId.replace(/[\s-]/g, "").trim()
     if (!compact) return null
     if (!/^\d+$/.test(compact)) return t("settings.taxIdDigitsHint")
     if (compact.length !== 10) return t("settings.taxIdDigitsHint")
+    if (!isPolishNip10Valid(compact)) return t("settings.taxIdInvalidChecksum")
     return null
-  }, [form.taxId, t])
+  }, [form.taxId, form.taxIdEntryEnabled, t])
 
+  const taxIdFieldError = taxIdDigitsHint ?? (taxIdEmptySaveError ? t("settings.taxIdRequiredOrUncheck") : null)
+
+  const phoneNationalError = React.useMemo(() => {
+    const v = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
+    if (v.ok) return null
+    if (v.min === v.max) {
+      return t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(v.min))
+    }
+    return t("settings.phoneInvalidNationalLength")
+      .replace("{min}", String(v.min))
+      .replace("{max}", String(v.max))
+  }, [form.phoneDialCode, form.phoneNational, t])
+
+  const settingsSaveBlocked = Boolean(taxIdDigitsHint || phoneNationalError)
   React.useEffect(() => {
     queueMicrotask(() => {
       setDraftLanguage(language)
@@ -113,9 +140,26 @@ export default function SettingsPage() {
     try {
       const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
       if (raw) {
-        const parsed = JSON.parse(raw) as Partial<SettingsForm>
+        const parsed = JSON.parse(raw) as Partial<SettingsForm> & { phone?: string; ownerName?: string }
+        const { phone: legacyPhone, ownerName, ...rest } = parsed
+        void ownerName
+        const fromStorage: Partial<SettingsForm> = { ...rest }
+        if (
+          typeof legacyPhone === "string" &&
+          fromStorage.phoneDialCode === undefined &&
+          fromStorage.phoneNational === undefined
+        ) {
+          const parts = splitStoredPhoneIntoParts(legacyPhone)
+          fromStorage.phoneDialCode = parts.dialCode
+          fromStorage.phoneNational = parts.nationalDigits
+        }
+        if (fromStorage.taxIdEntryEnabled === undefined) {
+          const tid =
+            typeof fromStorage.taxId === "string" ? fromStorage.taxId.replace(/[\s-]/g, "").trim() : ""
+          fromStorage.taxIdEntryEnabled = tid.length > 0
+        }
         queueMicrotask(() => {
-          setForm((prev) => ({ ...prev, ...parsed }))
+          setForm((prev) => ({ ...prev, ...fromStorage }))
         })
       }
     } catch {
@@ -143,14 +187,21 @@ export default function SettingsPage() {
             typeof data.default_reminder_hours === "number" && Number.isFinite(data.default_reminder_hours)
               ? data.default_reminder_hours
               : 24
+          const phoneParts = splitStoredPhoneIntoParts(
+            typeof data.phone === "string" ? data.phone : "",
+          )
           setForm((f) => ({
             ...f,
             businessName: data.business_name,
             publicSlug: data.slug,
-            ownerName: data.owner_name ?? "",
             email: data.email ?? user.email ?? f.email,
-            phone: data.phone ?? "",
-            taxId: typeof data.tax_id === "string" ? data.tax_id : f.taxId,
+            phoneDialCode: phoneParts.dialCode,
+            phoneNational: phoneParts.nationalDigits,
+            taxId: typeof data.tax_id === "string" ? data.tax_id : "",
+            taxIdEntryEnabled: (() => {
+              const raw = typeof data.tax_id === "string" ? data.tax_id : ""
+              return raw.replace(/[\s-]/g, "").trim().length > 0
+            })(),
             reminderLead: hoursToReminderLead(hours),
             secondReminderLead: minutesToSecondReminder(
               typeof data.second_reminder_minutes === "number" && Number.isFinite(data.second_reminder_minutes)
@@ -274,6 +325,27 @@ export default function SettingsPage() {
   const saveAll = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaveError(null)
+    setTaxIdEmptySaveError(false)
+    const taxForSave = form.taxIdEntryEnabled ? normalizeTaxIdPayload(form.taxId) : null
+    if (form.taxIdEntryEnabled && taxForSave === null) {
+      setTaxIdEmptySaveError(true)
+      return
+    }
+    if (form.taxIdEntryEnabled && taxForSave !== null && !isPolishNip10Valid(taxForSave)) {
+      setSaveError(t("settings.taxIdInvalidChecksum"))
+      return
+    }
+    const pv = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
+    if (!pv.ok) {
+      setSaveError(
+        pv.min === pv.max
+          ? t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(pv.min))
+          : t("settings.phoneInvalidNationalLength")
+              .replace("{min}", String(pv.min))
+              .replace("{max}", String(pv.max)),
+      )
+      return
+    }
     setSaving(true)
     try {
       try {
@@ -286,10 +358,9 @@ export default function SettingsPage() {
         const result = await saveBusinessProfileAction({
           businessName: form.businessName,
           slug: form.publicSlug,
-          ownerName: form.ownerName,
           email: form.email,
-          phone: form.phone,
-          taxId: normalizeTaxIdPayload(form.taxId),
+          phone: buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational),
+          taxId: form.taxIdEntryEnabled ? normalizeTaxIdPayload(form.taxId) : null,
           defaultReminderHours: reminderLeadToHours(form.reminderLead),
           secondReminderMinutes: secondReminderToMinutes(form.secondReminderLead),
           reminderChannel: form.reminderChannel,
@@ -306,6 +377,10 @@ export default function SettingsPage() {
           }
           if (result.code === "slug_invalid") {
             setSaveError(t("auth.slugInvalid"))
+            return
+          }
+          if (result.code === "tax_id_invalid") {
+            setSaveError(t("settings.taxIdInvalidChecksum"))
             return
           }
           const fallbackError =
@@ -418,7 +493,7 @@ export default function SettingsPage() {
           form="settings-form"
           size="sm"
           className="h-10 rounded-xl px-4 text-sm"
-          disabled={saving}
+          disabled={saving || settingsSaveBlocked}
         >
           {saving ? "..." : t("common.saveChanges")}
         </Button>
@@ -691,33 +766,80 @@ export default function SettingsPage() {
                   className="h-11 rounded-xl font-mono text-sm"
                 />
               </div>
+              <div className="sm:col-span-2 w-full max-w-md rounded-xl border border-border/70 bg-muted/20 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("settings.bookingLiveLinkTitle")}
+                </p>
+                <div className="mt-2">
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <Link
+                      href={`/book/${form.publicSlug || "rezerwacje"}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t("settings.openBookingPage")}
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+              <InternationalPhoneFieldGroup
+                className="sm:col-span-2"
+                label={t("settings.phoneLabel")}
+                dialCode={form.phoneDialCode}
+                nationalDigits={form.phoneNational}
+                onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
+                onNationalChange={(digits) =>
+                  setForm((f) => ({ ...f, phoneNational: digits }))
+                }
+                dialSelectId="settings-phone-dial"
+                nationalInputId="settings-phone-national"
+              />
               <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="tax-id">{t("settings.taxIdLabel")}</Label>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                  <Label htmlFor="tax-id" className={cn(!form.taxIdEntryEnabled && "text-muted-foreground")}>
+                    {t("settings.taxIdLabel")}
+                  </Label>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={form.taxIdEntryEnabled}
+                      onChange={(e) => {
+                        const on = e.target.checked
+                        setTaxIdEmptySaveError(false)
+                        setForm((f) => ({
+                          ...f,
+                          taxIdEntryEnabled: on,
+                          taxId: on ? f.taxId : "",
+                        }))
+                      }}
+                      className="size-4 shrink-0 rounded border border-input bg-background accent-primary"
+                    />
+                    <span>{t("settings.taxIdProvideToggle")}</span>
+                  </label>
+                </div>
                 <p className="text-xs text-muted-foreground">{t("settings.taxIdHint")}</p>
                 <Input
                   id="tax-id"
                   autoComplete="off"
                   value={form.taxId}
-                  onChange={(e) => setForm((f) => ({ ...f, taxId: e.target.value }))}
+                  onChange={(e) => {
+                    setTaxIdEmptySaveError(false)
+                    setForm((f) => ({ ...f, taxId: e.target.value }))
+                  }}
                   placeholder={t("settings.taxIdPlaceholder")}
-                  className="h-11 rounded-xl"
+                  disabled={!form.taxIdEntryEnabled}
+                  aria-invalid={Boolean(taxIdFieldError)}
+                  className={cn(
+                    "h-11 rounded-xl",
+                    !form.taxIdEntryEnabled && "opacity-60",
+                    taxIdFieldError ? "border-destructive focus-visible:ring-destructive/30" : null,
+                  )}
                 />
-                {taxIdDigitsHint ? (
-                  <p className="text-xs text-amber-800 dark:text-amber-200">{taxIdDigitsHint}</p>
+                {taxIdFieldError ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {taxIdFieldError}
+                  </p>
                 ) : null}
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="ownerName">{t("settings.ownerNameLabel")}</Label>
-                <Input
-                  id="ownerName"
-                  autoComplete="name"
-                  value={form.ownerName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, ownerName: e.target.value }))
-                  }
-                  placeholder={t("settings.placeholderOwnerExample")}
-                  className="h-11 rounded-xl"
-                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="settings-email">{t("settings.emailLabel")}</Label>
@@ -732,36 +854,6 @@ export default function SettingsPage() {
                   placeholder="kontakt@twojadomena.pl"
                   className="h-11 rounded-xl"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="settings-phone">{t("settings.phoneLabel")}</Label>
-                <Input
-                  id="settings-phone"
-                  type="tel"
-                  autoComplete="tel"
-                  value={form.phone}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, phone: e.target.value }))
-                  }
-                  placeholder="+48 600 000 000"
-                  className="h-11 rounded-xl"
-                />
-              </div>
-              <div className="sm:col-span-2 rounded-xl border border-border/70 bg-muted/20 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t("settings.bookingLiveLinkTitle")}
-                </p>
-                <div className="mt-2">
-                  <Button type="button" variant="outline" size="sm" asChild>
-                    <Link
-                      href={`/book/${form.publicSlug || "studio-potwierdzen"}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t("settings.openBookingPage")}
-                    </Link>
-                  </Button>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -892,6 +984,7 @@ export default function SettingsPage() {
               type="submit"
               form="settings-form"
               className="h-10 w-full rounded-xl"
+              disabled={saving || settingsSaveBlocked}
             >
               {saving ? "..." : t("common.saveChanges")}
             </Button>

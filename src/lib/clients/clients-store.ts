@@ -225,13 +225,29 @@ function bookingGroupKeyFromPrior(prior: PriorClientIdentity): string {
   )
 }
 
-function deriveRiskScoreFromStats(total: number, noShowCount: number, confirmedCount: number): number {
-  const t = Math.max(total, 1)
+/** Licznik wizyt = 0: neutralna ocena (np. klient bez historii lub po usunięciu wszystkich wizyt z bazy). */
+export function deriveRiskScoreFromStats(total: number, noShowCount: number, confirmedCount: number): number {
+  if (total <= 0) return 44
+  const t = total
   let score = 26 + Math.round((noShowCount / t) * 58)
   score -= Math.round((confirmedCount / t) * 22)
   const cancelledCount = Math.max(0, total - noShowCount - confirmedCount)
   score += Math.round((cancelledCount / t) * 12)
   return Math.max(10, Math.min(92, score))
+}
+
+function clientWithClearedVisitStats(row: Client): Client {
+  const riskScore = deriveRiskScoreFromStats(0, 0, 0)
+  return {
+    ...row,
+    visitCount: 0,
+    confirmedVisitCount: 0,
+    noShowCount: 0,
+    cancelledVisitCount: 0,
+    visitHistory: [],
+    riskScore,
+    riskTier: riskTierFromScore(riskScore),
+  }
 }
 
 function belongsToScopedBusiness(appt: Appointment, slugNormalized: string | null): boolean {
@@ -349,13 +365,26 @@ function clientSnapshotKey(c: Pick<Client, "fullName" | "phone" | "email">): str
 
 function mergeClientsKeepingSnapshot(snapshot: Client[], derived: Client[]): Client[] {
   if (snapshot.length === 0) return derived
-  if (derived.length === 0) return snapshot
-  const byKey = new Map<string, Client>()
-  for (const row of snapshot) {
-    byKey.set(clientSnapshotKey(row), row)
+  if (derived.length === 0) {
+    return snapshot
+      .map((row) => clientWithClearedVisitStats(row))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }))
   }
+  const byKey = new Map<string, Client>()
   for (const row of derived) {
     byKey.set(clientSnapshotKey(row), row)
+  }
+  for (const row of snapshot) {
+    const key = clientSnapshotKey(row)
+    const existing = byKey.get(key)
+    if (existing) {
+      byKey.set(key, {
+        ...existing,
+        notes: existing.notes?.trim() ? existing.notes : row.notes,
+      })
+    } else {
+      byKey.set(key, clientWithClearedVisitStats(row))
+    }
   }
   return Array.from(byKey.values()).sort((a, b) =>
     a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" })
@@ -450,8 +479,7 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
       visitCount = Math.max(0, noShowCount + confirmedVisitCount + cancelledVisitCount)
     }
 
-    const riskScore =
-      visitHistory.length > 0 ? deriveRiskScoreFromStats(visitCount, noShowCount, confirmedVisitCount) : 44
+    const riskScore = deriveRiskScoreFromStats(visitCount, noShowCount, confirmedVisitCount)
 
     const notesVal =
       typeof r.notes === "string" && r.notes.trim().length > 0 ? r.notes.trim() : undefined

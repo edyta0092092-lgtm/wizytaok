@@ -27,8 +27,8 @@ export function GuideQuickStartCard({
   icon: Icon,
 }: GuideQuickStartCardProps) {
   return (
-    <Card className="h-full rounded-2xl border border-border/70 bg-card/95 shadow-sm shadow-slate-900/5 dark:shadow-black/15">
-      <CardHeader className="space-y-3 pb-2">
+    <Card className="flex h-full flex-col rounded-2xl border border-border/70 bg-card/95 shadow-sm shadow-slate-900/5 dark:shadow-black/15">
+      <CardHeader className="shrink-0 space-y-3 pb-2">
         <div className="flex flex-wrap items-start gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-teal-500/20 bg-muted/65 text-xs font-semibold tabular-nums text-teal-700 dark:border-teal-400/25 dark:bg-muted/40 dark:text-teal-400">
@@ -41,12 +41,15 @@ export function GuideQuickStartCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 pt-0">
-        <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
-        <p className="text-xs leading-relaxed text-muted-foreground">
+      <CardContent className="flex flex-1 flex-col gap-4 pt-0">
+        <p className="min-h-[5rem] text-sm leading-relaxed text-muted-foreground sm:min-h-[4.5rem]">
+          {description}
+        </p>
+        <p className="shrink-0 text-xs leading-relaxed text-muted-foreground">
           <span className="font-medium text-foreground/90">{whereToClick}</span>
         </p>
-        <div className="flex w-full flex-col gap-2">
+        <div className="min-h-0 flex-1" />
+        <div className="flex w-full shrink-0 flex-col gap-2">
           <Button asChild variant="outline" className="h-11 w-full rounded-xl sm:h-10">
             <Link href={href}>
               {actionLabel}

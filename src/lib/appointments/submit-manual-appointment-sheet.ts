@@ -1,4 +1,5 @@
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
+import { manualAppointmentFormPhoneE164 } from "@/lib/appointments/can-submit-manual-appointment"
 import { createOnlineBooking, updateBooking } from "@/lib/bookings/bookings-store"
 import { MANUAL_BOOKING_ANY_STAFF, resolveManualBookingStaffSelection } from "@/lib/bookings/manual-booking-staff"
 import { saveManualAppointment, type ManualAppointment } from "@/lib/appointments/manual-appointments"
@@ -42,7 +43,7 @@ export async function submitManualAppointmentSheet(input: {
     const manual: ManualAppointment = {
       id: crypto.randomUUID(),
       clientName,
-      clientPhone: form.clientPhone.trim(),
+      clientPhone: manualAppointmentFormPhoneE164(form),
       clientEmail: form.clientEmail.trim() || undefined,
       serviceName,
       date: form.date,
@@ -95,7 +96,7 @@ export async function submitManualAppointmentSheet(input: {
       businessSlug: slug,
       serviceId: svc.id,
       clientName,
-      clientPhone: form.clientPhone.trim(),
+      clientPhone: manualAppointmentFormPhoneE164(form),
       clientEmail: form.clientEmail.trim() || undefined,
       appointmentDate: form.date,
       appointmentTime: form.time,

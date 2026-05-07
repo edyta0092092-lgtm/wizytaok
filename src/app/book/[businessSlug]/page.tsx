@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import {
   PublicBookingCalendar,
@@ -55,6 +56,10 @@ import {
   normalizePublicSlug,
 } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import {
+  buildStoredInternationalPhone,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
 import { BRAND } from "@/config/brand"
 import { getActiveServicesForBusinessSlug } from "@/lib/services/services-store"
 import type { AvailabilityDay, Service } from "@/types/domain"
@@ -74,7 +79,8 @@ import {
 type BookingForm = {
   firstName: string
   lastName: string
-  phone: string
+  phoneDialCode: string
+  phoneNational: string
   email: string
   note: string
 }
@@ -92,7 +98,8 @@ export default function PublicBookingPage() {
   const [form, setForm] = React.useState<BookingForm>({
     firstName: "",
     lastName: "",
-    phone: "",
+    phoneDialCode: "+48",
+    phoneNational: "",
     email: "",
     note: "",
   })
@@ -709,12 +716,27 @@ export default function PublicBookingPage() {
 
   const confirmBooking = () => {
     const clientName = joinPersonName(form.firstName, form.lastName)
+    const customerPhone = buildStoredInternationalPhone(
+      form.phoneDialCode,
+      form.phoneNational,
+    ).trim()
     if (!selectedServiceId || !selectedDayKey || !selectedTime) {
       setError(t("bookingPublic.required"))
       return
     }
-    if (!form.firstName.trim() || !form.phone.trim()) {
+    if (!form.firstName.trim() || !customerPhone) {
       setError(t("bookingPublic.fillRequired"))
+      return
+    }
+    const pv = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
+    if (!pv.ok) {
+      setError(
+        pv.min === pv.max
+          ? t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(pv.min))
+          : t("settings.phoneInvalidNationalLength")
+              .replace("{min}", String(pv.min))
+              .replace("{max}", String(pv.max)),
+      )
       return
     }
     if (selectedServiceId && serviceStaff.length === 0) {
@@ -767,7 +789,7 @@ export default function PublicBookingPage() {
             serviceId: selectedServiceId,
             staffId: resolvedStaffId,
             clientName,
-            clientPhone: form.phone.trim(),
+            clientPhone: customerPhone,
             clientEmail: form.email.trim() || undefined,
             appointmentDate: selectedDayKey,
             appointmentTime: selectedTime,
@@ -806,7 +828,7 @@ export default function PublicBookingPage() {
             date: selectedDayKey,
             time: selectedTime,
             customerName: clientName,
-            customerPhone: form.phone.trim(),
+            customerPhone: customerPhone,
             customerEmail: form.email.trim() || undefined,
             note: form.note.trim() || undefined,
             status: "booked",
@@ -858,7 +880,7 @@ export default function PublicBookingPage() {
         date: selectedDayKey,
         time: selectedTime,
         customerName: clientName,
-        customerPhone: form.phone.trim(),
+        customerPhone: customerPhone,
         customerEmail: form.email.trim() || undefined,
         note: form.note.trim() || undefined,
         status: "booked",
@@ -1083,16 +1105,17 @@ export default function PublicBookingPage() {
                     }
                   />
                 </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="book-phone">{t("bookingPublic.phone")}</Label>
-                  <Input
-                    id="book-phone"
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, phone: e.target.value }))
-                    }
-                  />
-                </div>
+                <InternationalPhoneFieldGroup
+                  label={t("bookingPublic.phone")}
+                  dialCode={form.phoneDialCode}
+                  nationalDigits={form.phoneNational}
+                  onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
+                  onNationalChange={(digits) =>
+                    setForm((f) => ({ ...f, phoneNational: digits }))
+                  }
+                  dialSelectId="book-phone-dial"
+                  nationalInputId="book-phone"
+                />
                 <div className="grid gap-1.5">
                   <Label htmlFor="book-email">{t("bookingPublic.email")}</Label>
                   <Input
@@ -1178,8 +1201,9 @@ export default function PublicBookingPage() {
                 <p>
                   <span className="text-muted-foreground">{t("bookingPublic.clientDetails")}:</span>{" "}
                   <span className="font-medium text-foreground">
-                    {joinPersonName(form.firstName, form.lastName) || form.phone
-                      ? `${joinPersonName(form.firstName, form.lastName) || "-"} (${form.phone || "-"})`
+                    {joinPersonName(form.firstName, form.lastName) ||
+                    buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational).trim()
+                      ? `${joinPersonName(form.firstName, form.lastName) || "-"} (${buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational).trim() || "-"})`
                       : t("bookingPublic.noSelection")}
                   </span>
                 </p>

@@ -744,7 +744,8 @@ export async function getStaffServiceIds(
     .select("service_id")
     .eq("business_id", businessId!)
     .eq("staff_id", staffId)
-  if (!error && data) return data.map((x) => x.service_id)
+  const primaryIds = !error && data ? data.map((x) => x.service_id).filter(Boolean) : []
+  if (primaryIds.length > 0) return primaryIds
   const fallback = await (client!.from("staff_services") as unknown as {
     select: (fields: string) => {
       eq: (column: string, value: string) => {
@@ -756,7 +757,8 @@ export async function getStaffServiceIds(
     .eq("business_id", businessId!)
     .eq("staff_member_id", staffId)
   const fallbackData = (fallback as { data?: Array<{ service_id: string }>; error?: { message?: string } }).data
-  if (fallbackData) return fallbackData.map((x) => x.service_id)
+  const fallbackIds = (fallbackData ?? []).map((x) => x.service_id).filter(Boolean)
+  if (fallbackIds.length > 0) return fallbackIds
   const fallbackNoBusiness = await (client!.from("staff_services") as unknown as {
     select: (fields: string) => { eq: (column: string, value: string) => Promise<unknown> }
   })
@@ -766,7 +768,8 @@ export async function getStaffServiceIds(
     data?: Array<{ service_id: string }>
     error?: { message?: string }
   }).data
-  if (fallbackNoBusinessData) return fallbackNoBusinessData.map((x) => x.service_id)
+  const fallbackNoBusinessIds = (fallbackNoBusinessData ?? []).map((x) => x.service_id).filter(Boolean)
+  if (fallbackNoBusinessIds.length > 0) return fallbackNoBusinessIds
   const fallbackStaffIdNoBusiness = await (client!.from("staff_services") as unknown as {
     select: (fields: string) => { eq: (column: string, value: string) => Promise<unknown> }
   })
@@ -776,7 +779,10 @@ export async function getStaffServiceIds(
     data?: Array<{ service_id: string }>
     error?: { message?: string }
   }).data
-  if (fallbackStaffIdNoBusinessData) return fallbackStaffIdNoBusinessData.map((x) => x.service_id)
+  const fallbackStaffIdNoBusinessIds = (fallbackStaffIdNoBusinessData ?? [])
+    .map((x) => x.service_id)
+    .filter(Boolean)
+  if (fallbackStaffIdNoBusinessIds.length > 0) return fallbackStaffIdNoBusinessIds
   return []
 }
 

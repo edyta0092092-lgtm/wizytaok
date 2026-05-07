@@ -1,5 +1,13 @@
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
+import {
+  buildStoredInternationalPhone,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
+
+export function manualAppointmentFormPhoneE164(form: ManualAppointmentFormState): string {
+  return buildStoredInternationalPhone(form.clientPhoneDialCode, form.clientPhoneNational).trim()
+}
 
 export function canSubmitManualAppointment(input: {
   form: ManualAppointmentFormState
@@ -7,7 +15,11 @@ export function canSubmitManualAppointment(input: {
   manualStaffForServiceCount: number
 }): boolean {
   const { form, hasActiveTeamMembers, manualStaffForServiceCount } = input
-  if (!form.clientFirstName.trim() || !form.clientPhone.trim() || !form.date || !form.time) {
+  const phone = manualAppointmentFormPhoneE164(form)
+  if (!form.clientFirstName.trim() || !phone || !form.date || !form.time) {
+    return false
+  }
+  if (!validateNationalPhoneLength(form.clientPhoneDialCode, form.clientPhoneNational).ok) {
     return false
   }
   if (!form.serviceId.trim()) return false

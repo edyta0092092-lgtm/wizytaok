@@ -296,20 +296,14 @@ export default function DashboardPage() {
   const confirmedToday = stats.confirmedTodayCount
   const toConfirm = stats.pendingTodayCount
   const needsActionAll = React.useMemo(() => {
+    // Defer heavier list prep until dashboard stats are ready.
+    if (!statsReady || allAppointments.length === 0) return []
     const rows = allAppointments.filter((a) => bookingNeedsAction(a))
     rows.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     return rows
-  }, [allAppointments])
+  }, [allAppointments, statsReady])
   const needsAttention = React.useMemo(() => needsActionAll.slice(0, 12), [needsActionAll])
   const needsActionCount = stats.requiresActionCount
-  const pendingConfirmationAll = React.useMemo(() => {
-    const todayStart = new Date(appToday)
-    todayStart.setHours(0, 0, 0, 0)
-    return allAppointments.filter((row) => {
-      if (row.status !== "pending") return false
-      return new Date(row.startsAt).getTime() >= todayStart.getTime()
-    }).length
-  }, [allAppointments, appToday])
   const reminderIssuesAll = stats.reminderErrorsCount
 
   const timeFmt = React.useMemo(
@@ -673,7 +667,7 @@ export default function DashboardPage() {
               appointmentsReady={appointmentsReady}
               appointmentsError={appointmentsLoadError}
               needsActionCount={needsActionCount}
-              pendingConfirmationCount={pendingConfirmationAll}
+              pendingConfirmationCount={toConfirm}
               reminderIssuesCount={reminderIssuesAll}
             />
             <TipCard />

@@ -126,9 +126,6 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
             ? ` · ${t("dashboard.needsActionSummary").replace("{count}", String(needsActionCount))}`
             : ""}
         </p>
-        <p className="mt-2 rounded-xl border border-border/60 bg-muted/35 px-2.5 py-1 text-[0.65rem] text-muted-foreground">
-          {t("sidebar.trialDisclaimer")}
-        </p>
       </div>
 
       <nav

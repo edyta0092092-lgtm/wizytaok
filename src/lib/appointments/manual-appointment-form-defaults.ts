@@ -3,7 +3,8 @@ import type { ManualAppointmentFormState } from "@/components/appointments/manua
 export const EMPTY_MANUAL_APPOINTMENT_FORM: ManualAppointmentFormState = {
   clientFirstName: "",
   clientLastName: "",
-  clientPhone: "",
+  clientPhoneDialCode: "+48",
+  clientPhoneNational: "",
   clientEmail: "",
   serviceId: "",
   manualStaffId: "",

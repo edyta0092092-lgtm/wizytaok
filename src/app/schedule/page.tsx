@@ -8,12 +8,19 @@ import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
+import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
+import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { bookingNeedsAction } from "@/lib/bookings/booking-needs-action"
-import { getPolishHolidayEntryForDateKey } from "@/lib/calendar/polish-holidays"
+import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -146,6 +153,27 @@ export default function SchedulePage() {
   const [viewFilter, setViewFilter] = React.useState<ViewFilter>("all")
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
+  const [statusNotice, setStatusNotice] = React.useState("")
+
+  React.useEffect(() => {
+    if (!statusNotice) return
+    const tid = window.setTimeout(() => setStatusNotice(""), 2500)
+    return () => window.clearTimeout(tid)
+  }, [statusNotice])
+
+  const changeScheduleBookingStatus = React.useCallback(
+    (appointmentUiId: string, status: AppointmentStatus) => {
+      void (async () => {
+        const ok = await updateAppointmentStatus(appointmentUiId, status, {
+          lastUpdatedBy: "business",
+          lastStatusChangeSource: "manual",
+        })
+        if (!ok) return
+        setStatusNotice(t("appointments.statusUpdated"))
+      })()
+    },
+    [t]
+  )
 
   const mapAppointmentToEntry = React.useCallback((row: Appointment): CalendarEntry | null => {
     const dt = new Date(row.startsAt)
@@ -429,7 +457,10 @@ export default function SchedulePage() {
                   return <div key={`empty-${idx}`} className="hidden min-h-[8.5rem] rounded-xl border border-transparent bg-muted/5 md:block" />
                 }
                 const key = dateKey(ym.year, ym.month, dayNum)
-                const holiday = getPolishHolidayEntryForDateKey(key)
+                const holidayLabel = getPolishHolidayDisplayName(
+                  new Date(ym.year, ym.month - 1, dayNum),
+                  language === "en" ? "en" : "pl"
+                )
                 const rows = bookingsByDate.get(key) ?? []
                 const preview = rows.slice(0, DAY_PREVIEW_LIMIT)
                 const more = Math.max(0, rows.length - DAY_PREVIEW_LIMIT)
@@ -449,9 +480,12 @@ export default function SchedulePage() {
                         <p className="text-sm font-semibold text-foreground">{dayNum}</p>
                         <p className="text-[11px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
                       </div>
-                      {holiday ? (
-                        <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:text-amber-100">
-                          Święto
+                      {holidayLabel ? (
+                        <span
+                          title={holidayLabel}
+                          className="max-w-[10rem] truncate rounded bg-amber-500/15 px-1.5 py-0.5 text-right text-[10px] font-medium leading-tight text-amber-900 dark:text-amber-100"
+                        >
+                          {holidayLabel}
                         </span>
                       ) : null}
                     </div>
@@ -502,16 +536,18 @@ export default function SchedulePage() {
                 : ""}
             </SheetTitle>
           </SheetHeader>
-          <div className="flex-1 space-y-3 overflow-y-auto py-4">
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {detailRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
             ) : (
-              detailRows.map((row) => (
+              detailRows.map((row) => {
+                const isCancelled = normalizeStatus(row.status) === "cancelled"
+                return (
                 <div
                   key={row.id}
                   className={cn(
                     "rounded-xl border border-border p-3",
-                    normalizeStatus(row.status) === "cancelled" && "opacity-70"
+                    isCancelled && "opacity-70"
                   )}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -532,19 +568,68 @@ export default function SchedulePage() {
                       Notatka: {row.customer_note?.trim() || row.internal_note?.trim()}
                     </p>
                   ) : null}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" size="sm" asChild>
+                  <div
+                    className={cn(
+                      "mt-2 grid w-full gap-1.5",
+                      isCancelled ? "grid-cols-1" : "grid-cols-3"
+                    )}
+                  >
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
+                      asChild
+                    >
                       <Link href="/appointments">Otwórz wizytę</Link>
                     </Button>
-                    <Button type="button" variant="outline" size="sm" asChild>
-                      <Link href={`/appointments?edit=${encodeURIComponent(row.id)}`}>Edytuj wizytę</Link>
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" asChild>
-                      <Link href={`/appointments?focus=${encodeURIComponent(row.id)}`}>Zmień status</Link>
-                    </Button>
+                    {!isCancelled ? (
+                      <>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
+                          asChild
+                        >
+                          <Link href={`/appointments?edit=${encodeURIComponent(row.id)}`}>
+                            Edytuj wizytę
+                          </Link>
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
+                            >
+                              {t("appointments.changeStatusAction")}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="w-56">
+                            <div className="px-2 pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                              {t("appointments.manualStatusChange")}
+                            </div>
+                            <div className="px-2 py-1 text-xs text-muted-foreground">
+                              {t("appointments.chooseStatus")}
+                            </div>
+                            {APPOINTMENT_ROW_STATUS_ORDER.map((status) => (
+                              <DropdownMenuItem
+                                key={status}
+                                onClick={() => changeScheduleBookingStatus(row.id, status)}
+                              >
+                                {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </>
+                    ) : null}
                   </div>
                 </div>
-              ))
+                )
+              })
             )}
           </div>
         </SheetContent>

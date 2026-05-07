@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { isValidPublicSlugFormat, normalizePublicSlug } from "@/lib/business/slug"
+import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import { getServerAuthUser } from "@/lib/supabase/auth"
 import {
   getBusinessProfileByOwnerId,
@@ -15,7 +16,6 @@ import { getServerClient } from "@/lib/supabase/server"
 export type SaveBusinessProfileInput = {
   businessName: string
   slug: string
-  ownerName: string
   email: string
   phone: string
   /** Znormalizowany NIP lub null, gdy pusty. */
@@ -29,7 +29,7 @@ export type SaveBusinessProfileResult =
   | { ok: true }
   | {
       ok: false
-      code: "unauthorized" | "slug_invalid" | "slug_taken" | "unknown"
+      code: "unauthorized" | "slug_invalid" | "slug_taken" | "tax_id_invalid" | "unknown"
       details?: string
     }
 
@@ -109,10 +109,13 @@ export async function saveBusinessProfileAction(
     return s.length > 0 ? s : null
   })()
 
+  if (taxNormalized !== null && !isPolishNip10Valid(taxNormalized)) {
+    return { ok: false, code: "tax_id_invalid" }
+  }
+
   const patch = {
     business_name: input.businessName.trim(),
     slug,
-    owner_name: input.ownerName.trim() || null,
     email: input.email.trim() || null,
     phone: input.phone.trim() || null,
     tax_id: taxNormalized,
@@ -130,7 +133,7 @@ export async function saveBusinessProfileAction(
       owner_id: user.id,
       business_name: patch.business_name,
       slug: patch.slug,
-      owner_name: patch.owner_name,
+      owner_name: null,
       email: patch.email,
       phone: patch.phone,
       tax_id: patch.tax_id,
