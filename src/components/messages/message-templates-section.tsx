@@ -263,10 +263,12 @@ function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplat
 
 export type MessageTemplatesSectionProps = {
   onRegisterPrimaryAction?: (openCreate: () => void) => void
+  readOnly?: boolean
 }
 
 export function MessageTemplatesSection({
   onRegisterPrimaryAction,
+  readOnly = false,
 }: MessageTemplatesSectionProps) {
   const { t } = useTranslations()
   const [templates, setTemplates] = React.useState<GroupedTemplate[]>([])
@@ -280,12 +282,13 @@ export function MessageTemplatesSection({
   const [showSaved, setShowSaved] = React.useState(false)
 
   const openCreate = React.useCallback(() => {
+    if (readOnly) return
     const first = templates[0]
     if (!first) return
     setEditingType(first.type)
     setForm(first)
     setSheetOpen(true)
-  }, [templates])
+  }, [templates, readOnly])
 
   React.useEffect(() => {
     onRegisterPrimaryAction?.(openCreate)
@@ -350,7 +353,7 @@ export function MessageTemplatesSection({
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form || !businessId || templatesUnavailable) return
+    if (!form || !businessId || templatesUnavailable || readOnly) return
     const submitFormData = form
     void (async () => {
       const client = getBrowserClient()
@@ -465,17 +468,19 @@ export function MessageTemplatesSection({
                     {row.timingMinutesBefore != null ? ` · ${formatTimingLabel(row.timingMinutesBefore)}` : ""}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openEdit(row)}
-                      disabled={templatesUnavailable}
-                      className="h-8 rounded-lg px-2.5 text-xs"
-                    >
-                      <Pencil className="size-3" />
-                      Edytuj
-                    </Button>
+                    {!readOnly ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openEdit(row)}
+                        disabled={templatesUnavailable}
+                        className="h-8 rounded-lg px-2.5 text-xs"
+                      >
+                        <Pencil className="size-3" />
+                        Edytuj
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -484,7 +489,7 @@ export function MessageTemplatesSection({
         )}
       </section>
 
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+      <Sheet open={!readOnly && sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent
           side="right"
           className="flex w-full flex-col overflow-hidden border-border/80 bg-card p-0 sm:max-w-xl"

@@ -29,7 +29,12 @@ function MessagesPageContent() {
     openCreateRef.current = fn
   }, [])
 
-  if (access.ready && !access.canViewMessageSendHistory) {
+  const canOpenMessages =
+    access.canAccessMessages ||
+    access.canViewMessageSendHistory ||
+    access.effectiveRole === "staff"
+
+  if (access.ready && !canOpenMessages) {
     return (
       <AppShell title={t("navigation.messages")} pageDescription={t("messages.description")}>
         <PageShell>
@@ -58,8 +63,11 @@ function MessagesPageContent() {
       }
     >
       <PageShell>
-        {access.canManageMessageTemplates ? (
-          <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} />
+        {canOpenMessages ? (
+          <MessageTemplatesSection
+            onRegisterPrimaryAction={registerOpen}
+            readOnly={!access.canManageMessageTemplates}
+          />
         ) : (
           <p className="mb-4 text-sm text-muted-foreground">{t("messages.staffHistoryIntro")}</p>
         )}

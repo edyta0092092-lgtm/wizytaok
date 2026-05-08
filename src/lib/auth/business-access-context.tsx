@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import {
+  canAccessMessages,
   canCustomizeAppearancePreferences,
   canDeleteBookings,
   canInviteUsers,
@@ -55,6 +56,7 @@ export type BusinessAccessContextValue = BusinessAccessState & {
   canManageClients: boolean
   canSendReminders: boolean
   canSendMessages: boolean
+  canAccessMessages: boolean
   canManageInvitations: boolean
   canInviteUsers: boolean
   canManageMessageTemplates: boolean
@@ -168,6 +170,7 @@ function buildPermissions(role: PanelRole | null) {
     canManageClients: canManageClients(role),
     canSendReminders: canSendReminders(role),
     canSendMessages: canSendMessages(role),
+    canAccessMessages: canAccessMessages(role),
     canManageMessageTemplates: canManageMessageTemplates(role),
     canViewMessageSendHistory: canViewMessageSendHistory(role),
     canManageInvitations: canManageInvitations(role),
