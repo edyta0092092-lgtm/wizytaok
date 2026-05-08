@@ -107,17 +107,41 @@ export async function ensureBusinessProfileFromUserMetadata(
   const ownerNameLegacyFallback =
     [ownerFirst, ownerLast].filter((s): s is string => s != null && s.length > 0).join(" ") || null
 
+  const isUniqueViolation = (msg: string | undefined): boolean => {
+    const m = (msg ?? "").toLowerCase()
+    return m.includes("duplicate") || m.includes("unique") || m.includes("already exists")
+  }
+
+  let insertSlug = slug
   let { error: insertError } = await supabase.from("business_profiles").insert(fullInsertPayload)
   if (insertError && isMissingColumnError(insertError.message)) {
     const { error: fallbackError } = await supabase.from("business_profiles").insert({
       owner_id: user.id,
       business_name: businessName,
-      slug,
+      slug: insertSlug,
       email: user.email ?? null,
       owner_name: ownerNameLegacyFallback,
       tax_id: companyTaxIdRaw || null,
     })
     insertError = fallbackError ?? null
+  }
+
+  if (insertError && allowFallbackProfile && isUniqueViolation(insertError.message)) {
+    insertSlug = buildFallbackSlug(user.id)
+    const retryPayload = { ...fullInsertPayload, slug: insertSlug }
+    const retry = await supabase.from("business_profiles").insert(retryPayload)
+    insertError = retry.error
+    if (insertError && isMissingColumnError(insertError.message)) {
+      const { error: fallbackError } = await supabase.from("business_profiles").insert({
+        owner_id: user.id,
+        business_name: businessName,
+        slug: insertSlug,
+        email: user.email ?? null,
+        owner_name: ownerNameLegacyFallback,
+        tax_id: companyTaxIdRaw || null,
+      })
+      insertError = fallbackError ?? null
+    }
   }
 
   if (!insertError) {

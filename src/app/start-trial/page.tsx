@@ -114,6 +114,7 @@ function StartTrialContent() {
     const source = searchParams.get("source")?.trim() || "landing_trial_signup"
     const checkoutRes = await fetch("/api/test-billing/checkout", {
       method: "POST",
+      credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ source }),
     })
@@ -157,7 +158,19 @@ function StartTrialContent() {
       } else if (reason === "subscription_already_exists" || reason === "subscription_already_active") {
         setError("Twój okres próbny jest aktywny.")
       } else {
-        const backendMessage = payload?.message?.trim() || payload?.hint?.trim() || ""
+        const rawErr = typeof payload?.error === "string" ? payload.error.trim() : ""
+        const backendMessage =
+          payload?.message?.trim() ||
+          payload?.hint?.trim() ||
+          (rawErr === "unauthorized"
+            ? "Sesja wygasła lub nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie."
+            : rawErr === "no_business"
+              ? "Nie znaleziono profilu firmy powiązanego z kontem."
+              : rawErr === "test_billing_disabled"
+                ? "Brak konfiguracji Stripe dla okresu próbnego (sprawdź zmienne na serwerze)."
+                : rawErr.length > 0
+                  ? rawErr
+                  : "")
         setError(
           backendMessage.length > 0
             ? backendMessage

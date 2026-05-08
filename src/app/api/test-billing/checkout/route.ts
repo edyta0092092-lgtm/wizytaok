@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
-import { readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
+import { isTrialStripeCheckoutEnvReady, readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -28,6 +28,14 @@ function hasBlockedStatus(status: string | null | undefined): boolean {
   return Boolean(normalized && BLOCKED_SUBSCRIPTION_STATUSES.has(normalized))
 }
 
+function isSkTestSecret(secret: string): boolean {
+  return secret.startsWith("sk_test_")
+}
+
+function isSkLiveSecret(secret: string): boolean {
+  return secret.startsWith("sk_live_")
+}
+
 function collectConfigErrors(): string[] {
   const errs: string[] = []
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -38,18 +46,20 @@ function collectConfigErrors(): string[] {
   const secret = process.env.STRIPE_SECRET_KEY?.trim()
   if (!secret) {
     errs.push("Brak STRIPE_SECRET_KEY.")
-  } else if (secret.startsWith("sk_live_")) {
-    errs.push("STRIPE_SECRET_KEY nie może być kluczem produkcyjnym (sk_live_).")
-  } else if (!secret.startsWith("sk_test_")) {
-    errs.push("STRIPE_SECRET_KEY musi być kluczem testowym (sk_test_...).")
+  } else if (!isSkTestSecret(secret) && !isSkLiveSecret(secret)) {
+    errs.push("STRIPE_SECRET_KEY musi być kluczem sk_test_... lub sk_live_....")
   }
 
   const pk = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim()
-  if (pk) {
-    if (pk.startsWith("pk_live_")) {
-      errs.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY nie może być pk_live_.")
-    } else if (!pk.startsWith("pk_test_")) {
-      errs.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY musi zaczynać się od pk_test_.")
+  if (pk && secret) {
+    if (isSkLiveSecret(secret) && pk.startsWith("pk_test_")) {
+      errs.push("Przy STRIPE_SECRET_KEY sk_live_ ustaw NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY na pk_live_....")
+    }
+    if (isSkTestSecret(secret) && pk.startsWith("pk_live_")) {
+      errs.push("Przy STRIPE_SECRET_KEY sk_test_ ustaw NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY na pk_test_....")
+    }
+    if (!pk.startsWith("pk_test_") && !pk.startsWith("pk_live_")) {
+      errs.push("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY musi być pk_test_... lub pk_live_....")
     }
   }
 
@@ -68,13 +78,17 @@ function collectConfigErrors(): string[] {
  */
 export async function POST(request: Request) {
   const flags = readTestIntegrationFlags()
-  if (!flags.enableTestBilling) {
+  const checkoutAllowed = flags.enableTestBilling || isTrialStripeCheckoutEnvReady()
+  if (!checkoutAllowed) {
     return NextResponse.json(
       {
         ok: false,
         reason: "test_billing_disabled",
         error: "test_billing_disabled",
-        hint: "Testowy billing jest wyłączony (ENABLE_TEST_BILLING / NEXT_PUBLIC_ENABLE_TEST_BILLING).",
+        hint:
+          "Brak konfiguracji Stripe dla okresu próbnego. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
+        message:
+          "Brak konfiguracji Stripe dla okresu próbnego. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
         debug: {
           enableTestBilling: false,
           hasStripePriceId: Boolean(process.env.STRIPE_PRICE_ID?.trim()),
@@ -123,11 +137,21 @@ export async function POST(request: Request) {
   const base = siteBaseRaw.replace(/\/$/, "")
   const resolution = await resolveAdminBusinessForUser()
   if (!resolution.ok) {
+    const resolutionMessage =
+      resolution.error === "unauthorized"
+        ? "Sesja wygasła lub nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie."
+        : resolution.error === "no_business"
+          ? "Nie znaleziono profilu firmy powiązanego z kontem."
+          : resolution.error === "forbidden"
+            ? "Brak uprawnień do włączenia subskrypcji dla tej firmy."
+            : "Nie udało się zweryfikować firmy."
     return NextResponse.json(
       {
         ok: false,
         reason: "business_resolution_failed",
         error: resolution.error,
+        message: resolutionMessage,
+        hint: resolutionMessage,
         debug: {
           enableTestBilling: true,
           hasStripePriceId: Boolean(priceId),

@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
   if (code) {
     await supabase.auth.exchangeCodeForSession(code)
-    await ensureBusinessProfileFromUserMetadata(supabase)
+    await ensureBusinessProfileFromUserMetadata(supabase, { allowFallbackProfile: true })
   }
 
   let next = requestedNext

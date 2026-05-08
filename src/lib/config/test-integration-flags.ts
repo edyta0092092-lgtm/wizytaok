@@ -24,3 +24,14 @@ export function readTestIntegrationFlags(): TestIntegrationFlags {
       readEnvFlagEnabled(process.env.NEXT_PUBLIC_ENABLE_TEST_BILLING),
   }
 }
+
+/**
+ * Checkout okresu próbnego (`/start-trial`) — włączony przy fladze test billing **albo** gdy
+ * w ENV są minimalne dane Stripe (bez wymuszania ENABLE_TEST_BILLING na Vercel).
+ */
+export function isTrialStripeCheckoutEnvReady(): boolean {
+  const sk = process.env.STRIPE_SECRET_KEY?.trim()
+  const price = process.env.STRIPE_PRICE_ID?.trim()
+  if (!sk || !price) return false
+  return sk.startsWith("sk_test_") || sk.startsWith("sk_live_")
+}
