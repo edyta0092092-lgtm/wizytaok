@@ -376,6 +376,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">{t("auth.password")}</Label>
+                <p className="text-xs text-muted-foreground">{t("auth.passwordRequirementsHint")}</p>
                 <Input
                   id="signup-password"
                   type="password"
@@ -387,7 +388,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     "h-11 rounded-xl",
                     passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
                   )}
-                  minLength={6}
+                  minLength={8}
                   required
                 />
                 {passwordLiveHint ? (

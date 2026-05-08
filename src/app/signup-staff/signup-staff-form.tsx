@@ -123,7 +123,7 @@ export function SignupStaffForm() {
                 "h-11 rounded-xl",
                 passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
               )}
-              minLength={6}
+              minLength={8}
             />
             {passwordLiveHint ? (
               <p className="text-xs text-destructive" role="alert">

@@ -112,7 +112,7 @@ export default function ResetPasswordPage() {
                     "h-11 rounded-xl",
                     passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
                   )}
-                  minLength={6}
+                  minLength={8}
                   required
                 />
                 {passwordLiveHint ? (
@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="h-11 rounded-xl"
-                  minLength={6}
+                  minLength={8}
                   required
                 />
               </div>
