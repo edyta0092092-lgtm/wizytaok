@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,7 @@ type SignupFormProps = {
 }
 
 export function SignupForm({ startTrial = false }: SignupFormProps) {
+  const router = useRouter()
   const { t } = useTranslations()
 
   const [businessName, setBusinessName] = React.useState("")
@@ -44,6 +46,42 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
+
+  React.useEffect(() => {
+    if (!startTrial) return
+    if (!isSupabaseConfigured()) return
+    const client = getBrowserClient()
+    if (!client) return
+    let cancelled = false
+    void (async () => {
+      const {
+        data: { user },
+      } = await client.auth.getUser()
+
+      if (cancelled) return
+      if (user) {
+        router.replace("/start-trial?source=landing_trial_signup")
+        return
+      }
+
+      const hasTrialCookie =
+        typeof document !== "undefined" && document.cookie.includes("wizytaok_trial_intent=1")
+      const hasTrialStorage = (() => {
+        if (typeof window === "undefined") return false
+        try {
+          return window.localStorage.getItem("wizytaok_trial_intent") === "1"
+        } catch {
+          return false
+        }
+      })()
+      if (hasTrialCookie || hasTrialStorage) {
+        router.replace("/login?next=%2Fstart-trial")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [router, startTrial])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

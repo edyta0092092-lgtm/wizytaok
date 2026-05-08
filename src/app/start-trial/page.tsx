@@ -51,7 +51,7 @@ function StartTrialContent() {
     } = await client.auth.getUser()
 
     if (!user) {
-      router.replace("/signup?startTrial=true")
+      router.replace("/login?next=%2Fstart-trial")
       return
     }
 
