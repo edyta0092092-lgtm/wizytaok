@@ -15,6 +15,8 @@ type StartTrialDiagnostic = {
   userEmail: string | null
   businessId: string | null
   businessProfileExists: boolean
+  businessProfileCreated: boolean
+  membershipCreated: boolean
   subscriptionStatus: string | null
   stripeSubscriptionStatus: string | null
   stripeCustomerId: string | null
@@ -32,6 +34,8 @@ const EMPTY_DIAGNOSTIC: StartTrialDiagnostic = {
   userEmail: null,
   businessId: null,
   businessProfileExists: false,
+  businessProfileCreated: false,
+  membershipCreated: false,
   subscriptionStatus: null,
   stripeSubscriptionStatus: null,
   stripeCustomerId: null,
@@ -122,9 +126,13 @@ function StartTrialContent() {
 
     let { data: profile } = await loadProfile()
 
+    let businessProfileCreated = false
+    let membershipCreated = false
     if (!profile?.id) {
       try {
-        await ensureBusinessProfileFromUserMetadata(client)
+        const ensureResult = await ensureBusinessProfileFromUserMetadata(client)
+        businessProfileCreated = ensureResult.businessProfileCreated
+        membershipCreated = ensureResult.membershipCreated
       } catch {
         // best effort fallback for flows that skipped auth/callback profile creation
       }
@@ -138,6 +146,8 @@ function StartTrialContent() {
       userEmail: user.email ?? null,
       businessId: profile?.id ?? null,
       businessProfileExists: Boolean(profile?.id),
+      businessProfileCreated,
+      membershipCreated,
       subscriptionStatus: profile?.subscription_status?.trim() || null,
       stripeSubscriptionStatus: null,
       stripeCustomerId: profile?.stripe_customer_id?.trim() || null,
