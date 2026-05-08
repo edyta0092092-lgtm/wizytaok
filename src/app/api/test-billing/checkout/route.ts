@@ -58,8 +58,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
+        reason: "test_billing_disabled",
         error: "test_billing_disabled",
         hint: "Testowy billing jest wyłączony (ENABLE_TEST_BILLING / NEXT_PUBLIC_ENABLE_TEST_BILLING).",
+        debug: {
+          enableTestBilling: false,
+          hasStripePriceId: Boolean(process.env.STRIPE_PRICE_ID?.trim()),
+        },
       },
       { status: 403 }
     )
@@ -70,9 +75,14 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
+        reason: "stripe_config_invalid",
         error: "stripe_config_invalid",
         hint: configErrors.join(" "),
         details: configErrors,
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: Boolean(process.env.STRIPE_PRICE_ID?.trim()),
+        },
       },
       { status: 400 }
     )
@@ -83,19 +93,50 @@ export async function POST(request: Request) {
   const priceId = process.env.STRIPE_PRICE_ID?.trim()
   if (!siteBaseRaw || !secret || !priceId) {
     return NextResponse.json(
-      { ok: false, error: "stripe_config_invalid", hint: "Niepełna konfiguracja Stripe lub NEXT_PUBLIC_SITE_URL." },
+      {
+        ok: false,
+        reason: "stripe_config_invalid",
+        error: "stripe_config_invalid",
+        hint: "Niepełna konfiguracja Stripe lub NEXT_PUBLIC_SITE_URL.",
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: Boolean(priceId),
+        },
+      },
       { status: 500 }
     )
   }
   const base = siteBaseRaw.replace(/\/$/, "")
   const resolution = await resolveAdminBusinessForUser()
   if (!resolution.ok) {
-    return NextResponse.json({ ok: false, error: resolution.error }, { status: resolution.status })
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "business_resolution_failed",
+        error: resolution.error,
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: Boolean(priceId),
+        },
+      },
+      { status: resolution.status }
+    )
   }
 
   const admin = getServiceRoleClient()
   if (!admin) {
-    return NextResponse.json({ ok: false, error: "service_role_missing" }, { status: 500 })
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "service_role_missing",
+        error: "service_role_missing",
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: Boolean(priceId),
+        },
+      },
+      { status: 500 }
+    )
   }
 
   const { data: bp } = await admin
@@ -109,8 +150,15 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
+        reason: "subscription_already_active",
         error: "subscription_already_active",
         hint: "Dla tej firmy trial/subskrypcja jest juz aktywna.",
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: true,
+          subscriptionStatus: status,
+          businessId: resolution.businessId,
+        },
       },
       { status: 409 }
     )
@@ -160,8 +208,29 @@ export async function POST(request: Request) {
   const session = await stripe.checkout.sessions.create(sessionParams)
 
   if (!session.url) {
-    return NextResponse.json({ ok: false, error: "no_checkout_url" }, { status: 500 })
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "checkout_url_missing",
+        error: "checkout_url_missing",
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: true,
+          businessId: resolution.businessId,
+        },
+      },
+      { status: 500 }
+    )
   }
 
-  return NextResponse.json({ ok: true, url: session.url })
+  return NextResponse.json({
+    ok: true,
+    reason: "checkout_created",
+    url: session.url,
+    debug: {
+      enableTestBilling: true,
+      hasStripePriceId: true,
+      businessId: resolution.businessId,
+    },
+  })
 }
