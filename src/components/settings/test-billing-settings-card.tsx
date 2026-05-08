@@ -85,6 +85,7 @@ export function TestBillingSettingsCard() {
   const [serverFlags, setServerFlags] = React.useState<ServerIntegrationFlags | null>(null)
   const [billingRow, setBillingRow] = React.useState<BillingRow | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const [checkoutError, setCheckoutError] = React.useState<string | null>(null)
 
   const isPanelAdmin = Boolean(ready && (isOwner || effectiveRole === "admin"))
 
@@ -193,32 +194,64 @@ export function TestBillingSettingsCard() {
             </p>
           </div>
           <p className="text-xs text-muted-foreground">{t("settings.testBillingStripeNote")}</p>
+          {checkoutError ? (
+            <p
+              className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              role="alert"
+            >
+              {checkoutError}
+            </p>
+          ) : null}
           <Button
             type="button"
             className="h-11 rounded-xl"
             disabled={busy}
             onClick={async () => {
+              setCheckoutError(null)
               setBusy(true)
               try {
-                const res = await fetch("/api/test-billing/checkout", { method: "POST" })
-                const data = (await res.json()) as {
+                const res = await fetch("/api/test-billing/checkout", {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: { Accept: "application/json" },
+                })
+                type CheckoutJson = {
                   ok?: boolean
                   url?: string
                   error?: string
                   hint?: string
                   details?: string[]
                 }
-                if (res.ok && data.url) {
+                let data: CheckoutJson = {}
+                try {
+                  data = (await res.json()) as CheckoutJson
+                } catch {
+                  data = {}
+                }
+                const fallbackMsg = t("settings.testBillingCheckoutUnavailable")
+                if (res.ok && typeof data.url === "string" && data.url.length > 0) {
                   window.location.href = data.url
                   return
                 }
-                const msg =
+                const detailMsg =
                   Array.isArray(data.details) && data.details.length > 0
                     ? data.details.join(" ")
-                    : data.hint || data.error || t("settings.testBillingFailed")
+                    : null
+                const hintMsg =
+                  typeof data.hint === "string" && data.hint.trim().length > 0
+                    ? data.hint.trim()
+                    : null
+                const errorMsg =
+                  typeof data.error === "string" && data.error.trim().length > 0
+                    ? data.error.trim()
+                    : null
+                const msg = detailMsg ?? hintMsg ?? errorMsg ?? fallbackMsg
+                setCheckoutError(msg)
                 toast.error(msg)
               } catch {
-                toast.error(t("settings.testBillingFailed"))
+                const msg = t("settings.testBillingCheckoutUnavailable")
+                setCheckoutError(msg)
+                toast.error(msg)
               } finally {
                 setBusy(false)
               }

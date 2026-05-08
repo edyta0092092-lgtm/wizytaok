@@ -5,18 +5,16 @@ import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-s
 import { readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
-function billingSiteBase(): string {
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-  if (site) return site.replace(/\/$/, "")
-  const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
-  if (explicit) return explicit.replace(/\/$/, "")
-  const vercel = process.env.VERCEL_URL?.trim()
-  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
-  return "http://localhost:3000"
-}
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 function collectConfigErrors(): string[] {
   const errs: string[] = []
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  if (!siteUrl) {
+    errs.push("Brak NEXT_PUBLIC_SITE_URL (wymagany do success_url / cancel_url w Stripe Checkout).")
+  }
+
   const secret = process.env.STRIPE_SECRET_KEY?.trim()
   if (!secret) {
     errs.push("Brak STRIPE_SECRET_KEY.")
@@ -51,7 +49,14 @@ function collectConfigErrors(): string[] {
 export async function POST() {
   const flags = readTestIntegrationFlags()
   if (!flags.enableTestBilling) {
-    return NextResponse.json({ ok: false, error: "disabled" }, { status: 404 })
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "test_billing_disabled",
+        hint: "Testowy billing jest wyłączony (ENABLE_TEST_BILLING / NEXT_PUBLIC_ENABLE_TEST_BILLING).",
+      },
+      { status: 403 }
+    )
   }
 
   const configErrors = collectConfigErrors()
@@ -67,8 +72,16 @@ export async function POST() {
     )
   }
 
-  const secret = process.env.STRIPE_SECRET_KEY!.trim()
-  const priceId = process.env.STRIPE_PRICE_ID!.trim()
+  const siteBaseRaw = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+  const secret = process.env.STRIPE_SECRET_KEY?.trim()
+  const priceId = process.env.STRIPE_PRICE_ID?.trim()
+  if (!siteBaseRaw || !secret || !priceId) {
+    return NextResponse.json(
+      { ok: false, error: "stripe_config_invalid", hint: "Niepełna konfiguracja Stripe lub NEXT_PUBLIC_SITE_URL." },
+      { status: 500 }
+    )
+  }
+  const base = siteBaseRaw.replace(/\/$/, "")
   const resolution = await resolveAdminBusinessForUser()
   if (!resolution.ok) {
     return NextResponse.json({ ok: false, error: resolution.error }, { status: resolution.status })
@@ -86,7 +99,6 @@ export async function POST() {
     .maybeSingle()
 
   const stripe = new Stripe(secret)
-  const base = billingSiteBase()
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",

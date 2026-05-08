@@ -19,6 +19,8 @@ export function readEnvFlagEnabled(raw: string | undefined): boolean {
 export function readTestIntegrationFlags(): TestIntegrationFlags {
   return {
     enableTestNotifications: readEnvFlagEnabled(process.env.ENABLE_TEST_NOTIFICATIONS),
-    enableTestBilling: readEnvFlagEnabled(process.env.ENABLE_TEST_BILLING),
+    enableTestBilling:
+      readEnvFlagEnabled(process.env.ENABLE_TEST_BILLING) ||
+      readEnvFlagEnabled(process.env.NEXT_PUBLIC_ENABLE_TEST_BILLING),
   }
 }
