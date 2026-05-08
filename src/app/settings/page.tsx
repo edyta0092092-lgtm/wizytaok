@@ -765,7 +765,7 @@ export default function SettingsPage() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("settings.bookingLiveLinkTitle")}
                 </p>
-                <p className="mt-2 break-all font-mono text-sm text-foreground">
+                <p className="mt-3 break-all font-mono text-sm text-foreground">
                   {`/book/${form.publicSlug || "rezerwacje"}`}
                 </p>
                 <div className="mt-3">

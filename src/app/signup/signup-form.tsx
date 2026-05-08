@@ -16,18 +16,9 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  PUBLIC_SLUG_MAX_LENGTH,
-  PUBLIC_SLUG_MIN_LENGTH,
-  DEMO_BOOKING_SLUG,
-  isValidPublicSlugFormat,
-  normalizePublicSlug,
-} from "@/lib/business/slug"
+import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import {
-  BUSINESS_PUBLIC_SLUG_COLUMN,
-  checkBusinessSlugAvailability,
-} from "@/lib/supabase/repositories/business-profile.repository"
+import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 type SignupFormProps = {
@@ -45,7 +36,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const { t } = useTranslations()
 
   const [businessName, setBusinessName] = React.useState("")
-  const [slug, setSlug] = React.useState("")
   const [ownerFirstName, setOwnerFirstName] = React.useState("")
   const [ownerLastName, setOwnerLastName] = React.useState("")
   const [accountType, setAccountType] = React.useState<AccountType>("registered_business")
@@ -108,25 +98,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       return
     }
 
-    const normalized = normalizePublicSlug(slug)
     const taxIdNormalized = normalizeDigits(companyTaxId)
     const contactPhoneNormalized = normalizeDigits(contactPhone)
-    if (!normalized) {
-      setError(t("auth.slugRequired"))
-      return
-    }
-    if (
-      normalized.length < PUBLIC_SLUG_MIN_LENGTH ||
-      normalized.length > PUBLIC_SLUG_MAX_LENGTH ||
-      !isValidPublicSlugFormat(normalized)
-    ) {
-      setError(t("auth.slugInvalid"))
-      return
-    }
-    if (normalized === DEMO_BOOKING_SLUG) {
-      setError(t("auth.slugTaken"))
-      return
-    }
     if (startTrial && accountType === "registered_business") {
       if (taxIdNormalized.length !== 10) {
         setError("Podaj poprawny NIP (10 cyfr).")
@@ -151,28 +124,20 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         }
       }
 
-      const slugCheck = await checkBusinessSlugAvailability(client, normalized)
+      const slugPick = await allocateSignupBookingSlug(client, businessName.trim())
+      if (!slugPick.ok) {
+        setError(
+          slugPick.code === "check_failed" ? t("auth.slugCheckError") : t("auth.signupSlugReserveFailed"),
+        )
+        return
+      }
+      const normalized = slugPick.slug
+
       if (process.env.NODE_ENV === "development") {
-        console.info("[signup.slug.check]", {
-          rawSlug: slug,
+        console.info("[signup.slug.allocated]", {
           normalizedSlug: normalized,
           slugColumn: BUSINESS_PUBLIC_SLUG_COLUMN,
-          rpcError: slugCheck.rpcError?.message,
-          selectError: slugCheck.selectError?.message,
-          available: slugCheck.available,
         })
-      }
-      if (slugCheck.error) {
-        const errorMessage =
-          process.env.NODE_ENV === "development"
-            ? `${t("auth.slugCheckError")} ${t("help.errorDetailsPrefix")} ${slugCheck.error.message}`
-            : t("auth.slugCheckError")
-        setError(errorMessage)
-        return
-      }
-      if (slugCheck.available !== true) {
-        setError(t("auth.slugTaken"))
-        return
       }
 
       const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -271,21 +236,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-slug">{t("auth.publicSlug")}</Label>
-                <Input
-                  id="signup-slug"
-                  autoComplete="off"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value.toLowerCase())}
-                  placeholder="moja-firma"
-                  className="h-11 rounded-xl font-mono text-sm"
-                  required
-                />
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-owner-first">{t("auth.ownerFirstNameOptional")}</Label>
+                  <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
                   <Input
                     id="signup-owner-first"
                     autoComplete="given-name"
@@ -295,7 +248,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-owner-last">{t("auth.ownerLastNameOptional")}</Label>
+                  <Label htmlFor="signup-owner-last">{t("bookingPublic.lastName")}</Label>
                   <Input
                     id="signup-owner-last"
                     autoComplete="family-name"
