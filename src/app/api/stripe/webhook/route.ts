@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server"
 import Stripe from "stripe"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
   normalizeStripeBusinessId,
-  upsertBusinessStripeFromSubscription,
 } from "@/lib/stripe/business-subscription-sync"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { Database } from "@/types/database"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -13,7 +14,6 @@ export const dynamic = "force-dynamic"
 type HandlerOutcome =
   | { kind: "ok" }
   | { kind: "skipped"; reason: string }
-  | { kind: "failed"; error: string }
 
 function stripeLog(payload: Record<string, unknown>) {
   console.info(
@@ -22,6 +22,103 @@ function stripeLog(payload: Record<string, unknown>) {
       ts: new Date().toISOString(),
     })
   )
+}
+
+function extractMissingSchemaColumn(message: string): string | null {
+  const m = /'([^']+)'\s+column/i.exec(message)
+  return m?.[1]?.trim() || null
+}
+
+async function updateBusinessProfile(
+  admin: SupabaseClient<Database>,
+  businessId: string,
+  patch: Record<string, unknown>
+): Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }> {
+  const mutablePatch: Record<string, unknown> = { ...patch }
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const result = await admin
+      .from("business_profiles")
+      .update(mutablePatch as never)
+      .eq("id", businessId)
+      .select("id")
+
+    if (!result.error) {
+      return {
+        data: result.data as Array<{ id: string }> | null,
+        error: null,
+      }
+    }
+
+    const missingCol = extractMissingSchemaColumn(result.error.message)
+    if (!missingCol || !(missingCol in mutablePatch)) {
+      return {
+        data: result.data as Array<{ id: string }> | null,
+        error: result.error as { message: string } | null,
+      }
+    }
+
+    delete mutablePatch[missingCol]
+    stripeLog({
+      message: "stripe_webhook_update_retry_without_missing_column",
+      stripe_webhook_business_id: businessId,
+      stripe_webhook_missing_column: missingCol,
+    })
+  }
+
+  return { data: null, error: { message: "update_retry_limit_exceeded" } }
+}
+
+function toIsoFromSeconds(v: number | null | undefined): string | null {
+  return typeof v === "number" && v > 0 ? new Date(v * 1000).toISOString() : null
+}
+
+function getSubscriptionCurrentPeriodEndIso(sub: Stripe.Subscription): string | null {
+  const items = sub.items?.data
+  if (!items?.length) return null
+  let max: number | null = null
+  for (const item of items) {
+    const end = item.current_period_end
+    if (typeof end === "number" && end > 0 && (max === null || end > max)) {
+      max = end
+    }
+  }
+  return max ? new Date(max * 1000).toISOString() : null
+}
+
+function buildSubscriptionPatch(input: {
+  customerId: string | null
+  subscriptionId: string
+  status: string
+  trialEndSec: number | null | undefined
+  currentPeriodEndIso: string | null
+  cancelAtPeriodEnd: boolean | null | undefined
+}): Record<string, unknown> {
+  const nowIso = new Date().toISOString()
+  const trialEndsAtIso = toIsoFromSeconds(input.trialEndSec)
+  const cancelAtPeriodEnd = input.cancelAtPeriodEnd ?? false
+
+  return {
+    stripe_customer_id: input.customerId,
+    stripe_subscription_id: input.subscriptionId,
+
+    subscription_status: input.status,
+    stripe_subscription_status: input.status,
+
+    subscription_trial_ends_at: trialEndsAtIso,
+    stripe_subscription_trial_ends_at: trialEndsAtIso,
+
+    subscription_current_period_end: input.currentPeriodEndIso,
+    stripe_subscription_current_period_end: input.currentPeriodEndIso,
+
+    subscription_cancel_at_period_end: cancelAtPeriodEnd,
+    stripe_subscription_cancel_at_period_end: cancelAtPeriodEnd,
+
+    subscription_updated_at: nowIso,
+    stripe_subscription_updated_at: nowIso,
+    stripe_subscription_synced_at: nowIso,
+    updated_at: nowIso,
+  }
 }
 
 function getStripeForWebhook(): Stripe | NextResponse {
@@ -76,6 +173,19 @@ async function resolveBusinessIdFromSubscription(sub: Stripe.Subscription): Prom
   return data?.id?.trim() ?? null
 }
 
+async function resolveBusinessIdByCustomerId(
+  admin: SupabaseClient<Database>,
+  customerId: string | null
+): Promise<string | null> {
+  if (!customerId) return null
+  const { data } = await admin
+    .from("business_profiles")
+    .select("id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle()
+  return data?.id?.trim() ?? null
+}
+
 async function resolveBusinessIdFromInvoice(stripe: Stripe, invoice: Stripe.Invoice): Promise<string | null> {
   const subRef = getInvoiceSubscriptionRef(invoice)
   const subId = typeof subRef === "string" ? subRef : subRef?.id
@@ -85,6 +195,7 @@ async function resolveBusinessIdFromInvoice(stripe: Stripe, invoice: Stripe.Invo
 }
 
 async function handleCheckoutCompleted(
+  admin: SupabaseClient<Database>,
   stripe: Stripe,
   session: Stripe.Checkout.Session
 ): Promise<HandlerOutcome> {
@@ -93,7 +204,7 @@ async function handleCheckoutCompleted(
   const businessId = normalizeStripeBusinessId(session.metadata?.business_id)
   const customerId = customerIdFromStripe(session.customer)
   const subRef = session.subscription
-  const subId = typeof subRef === "string" ? subRef : subRef?.id
+  const subId = (typeof subRef === "string" ? subRef : subRef?.id) ?? null
 
   stripeLog({
     message: "stripe_webhook_received",
@@ -104,114 +215,103 @@ async function handleCheckoutCompleted(
   })
 
   if (!businessId) {
-    stripeLog({
-      message: "stripe_webhook_missing_business_id",
-      stripe_webhook_event_type: "checkout.session.completed",
-      stripe_webhook_business_id: null,
-      stripe_webhook_subscription_id: subId ?? null,
-      stripe_webhook_customer_id: customerId,
-    })
-    return { kind: "failed", error: "missing_business_id" }
-  }
-
-  if (!customerId || !subId) {
-    stripeLog({
-      message: "stripe_webhook_update_error",
-      stripe_webhook_event_type: "checkout.session.completed",
-      stripe_webhook_business_id: businessId,
-      stripe_webhook_subscription_id: subId ?? null,
-      stripe_webhook_customer_id: customerId,
-      error: "missing_customer_id_or_subscription_id",
-    })
-    return { kind: "failed", error: "missing_customer_id_or_subscription_id" }
-  }
-
-  const admin = getServiceRoleClient()
-  if (!admin) {
-    stripeLog({
-      message: "stripe_webhook_update_error",
-      stripe_webhook_event_type: "checkout.session.completed",
-      error: "service_role_missing",
-    })
-    return { kind: "failed", error: "service_role_missing" }
-  }
-
-  // Checkout event: pobieramy pełny obiekt subscription z Stripe (zgodnie z wymaganiami).
-  const subscription = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
-
-  const nowIso = new Date().toISOString()
-  const trialEndsAtIso =
-    typeof subscription.trial_end === "number" && subscription.trial_end > 0
-      ? new Date(subscription.trial_end * 1000).toISOString()
-      : null
-  // W typach Stripe SDK v20 `current_period_end` jest na subscription.items.data[].current_period_end,
-  // więc bierzemy maksimum z pozycji.
-  let endSec: number | null = null
-  const items = subscription.items?.data
-  if (items?.length) {
-    for (const item of items) {
-      const sec = item.current_period_end
-      if (typeof sec === "number" && sec > 0 && (endSec === null || sec > endSec)) {
-        endSec = sec
-      }
+    const fallbackByCustomer = await resolveBusinessIdByCustomerId(admin, customerId)
+    if (!fallbackByCustomer) {
+      stripeLog({
+        message: "stripe_webhook_business_not_found",
+        stripe_webhook_event_type: "checkout.session.completed",
+        stripe_webhook_subscription_id: subId ?? null,
+        stripe_webhook_customer_id: customerId,
+      })
+      stripeLog({
+        message: "stripe_webhook_subscription_sync_skipped",
+        stripe_webhook_event_type: "checkout.session.completed",
+        reason: "missing_business_id",
+      })
+      return { kind: "skipped", reason: "missing_business_id" }
     }
+    const synced = await syncCheckoutByBusiness(admin, stripe, fallbackByCustomer, customerId, subId)
+    return synced
   }
-  const currentPeriodEndIso = endSec ? new Date(endSec * 1000).toISOString() : null
-  if (!currentPeriodEndIso) {
+
+  return syncCheckoutByBusiness(admin, stripe, businessId, customerId, subId)
+}
+
+async function syncCheckoutByBusiness(
+  admin: SupabaseClient<Database>,
+  stripe: Stripe,
+  businessId: string,
+  customerId: string | null,
+  subId: string | null
+): Promise<HandlerOutcome> {
+  if (!subId) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_skipped",
       stripe_webhook_event_type: "checkout.session.completed",
       stripe_webhook_business_id: businessId,
-      stripe_webhook_subscription_id: subscription.id,
+      stripe_webhook_subscription_id: subId ?? null,
       stripe_webhook_customer_id: customerId,
-      error: "missing_current_period_end",
+      reason: "missing_subscription_id",
     })
-    return { kind: "failed", error: "missing_current_period_end" }
+    return { kind: "skipped", reason: "missing_subscription_id" }
   }
 
-  const patch = {
-    stripe_customer_id: customerId,
-    stripe_subscription_id: subscription.id,
-    subscription_status: subscription.status,
-    subscription_trial_ends_at: trialEndsAtIso,
-    subscription_current_period_end: currentPeriodEndIso,
-    subscription_cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-    subscription_updated_at: nowIso,
-    updated_at: nowIso,
+  let subscription: Stripe.Subscription
+  try {
+    subscription = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "subscription_retrieve_failed"
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_error",
+      stripe_webhook_event_type: "checkout.session.completed",
+      stripe_webhook_business_id: businessId,
+      stripe_webhook_subscription_id: subId,
+      stripe_webhook_customer_id: customerId,
+      error: msg,
+    })
+    return { kind: "skipped", reason: "subscription_retrieve_failed" }
   }
 
-  const { data, error } = await admin
-    .from("business_profiles")
-    .update(patch)
-    .eq("id", businessId)
-    .select("id")
+  const patch = buildSubscriptionPatch({
+    customerId,
+    subscriptionId: subscription.id,
+    status: subscription.status,
+    trialEndSec: subscription.trial_end,
+    currentPeriodEndIso: getSubscriptionCurrentPeriodEndIso(subscription),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  })
+  const { data, error } = await updateBusinessProfile(admin, businessId, patch)
 
   if (error) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_error",
       stripe_webhook_event_type: "checkout.session.completed",
       stripe_webhook_business_id: businessId,
       stripe_webhook_subscription_id: subscription.id,
       stripe_webhook_customer_id: customerId,
       error: error.message,
     })
-    return { kind: "failed", error: error.message }
+    return { kind: "skipped", reason: "db_update_failed" }
   }
 
   if (!data?.length) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_business_not_found",
       stripe_webhook_event_type: "checkout.session.completed",
       stripe_webhook_business_id: businessId,
       stripe_webhook_subscription_id: subscription.id,
       stripe_webhook_customer_id: customerId,
-      error: "no_row_updated",
     })
-    return { kind: "failed", error: "no_row_updated" }
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_skipped",
+      stripe_webhook_event_type: "checkout.session.completed",
+      reason: "no_row_updated",
+    })
+    return { kind: "skipped", reason: "no_row_updated" }
   }
 
   stripeLog({
-    message: "stripe_webhook_update_success",
+    message: "stripe_webhook_subscription_sync_success",
     stripe_webhook_event_type: "checkout.session.completed",
     stripe_webhook_business_id: businessId,
     stripe_webhook_subscription_id: subscription.id,
@@ -220,7 +320,11 @@ async function handleCheckoutCompleted(
   return { kind: "ok" }
 }
 
-async function handleSubscriptionEvent(sub: Stripe.Subscription, eventType: string): Promise<HandlerOutcome> {
+async function handleSubscriptionEvent(
+  admin: SupabaseClient<Database>,
+  sub: Stripe.Subscription,
+  eventType: string
+): Promise<HandlerOutcome> {
   const customerId = customerIdFromStripe(sub.customer)
 
   stripeLog({
@@ -230,100 +334,65 @@ async function handleSubscriptionEvent(sub: Stripe.Subscription, eventType: stri
     stripe_webhook_customer_id: customerId,
   })
 
-  const businessId = await resolveBusinessIdFromSubscription(sub)
-  const admin = getServiceRoleClient()
-  if (!admin) {
-    stripeLog({
-      message: "stripe_webhook_update_error",
-      stripe_webhook_event_type: eventType,
-      error: "service_role_missing",
-    })
-    return { kind: "failed", error: "service_role_missing" }
-  }
+  const businessId = (await resolveBusinessIdFromSubscription(sub)) ?? (await resolveBusinessIdByCustomerId(admin, customerId))
 
   if (!businessId || !customerId) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_business_not_found",
       stripe_webhook_event_type: eventType,
       stripe_webhook_business_id: businessId ?? null,
       stripe_webhook_subscription_id: sub.id,
       stripe_webhook_customer_id: customerId ?? null,
-      error: "business_unresolved_or_missing_customer",
     })
-    return { kind: "failed", error: "business_unresolved_or_missing_customer" }
-  }
-
-  const nowIso = new Date().toISOString()
-  const trialEndsAtIso =
-    typeof sub.trial_end === "number" && sub.trial_end > 0 ? new Date(sub.trial_end * 1000).toISOString() : null
-  // W typach Stripe SDK v20 `current_period_end` jest na subscription.items.data[].current_period_end.
-  let endSec: number | null = null
-  const items = sub.items?.data
-  if (items?.length) {
-    for (const item of items) {
-      const sec = item.current_period_end
-      if (typeof sec === "number" && sec > 0 && (endSec === null || sec > endSec)) {
-        endSec = sec
-      }
-    }
-  }
-  const currentPeriodEndIso = endSec ? new Date(endSec * 1000).toISOString() : null
-
-  if (!currentPeriodEndIso) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_skipped",
       stripe_webhook_event_type: eventType,
-      stripe_webhook_business_id: businessId,
-      stripe_webhook_subscription_id: sub.id,
-      stripe_webhook_customer_id: customerId,
-      error: "missing_current_period_end",
+      reason: "business_unresolved_or_missing_customer",
     })
-    return { kind: "failed", error: "missing_current_period_end" }
+    return { kind: "skipped", reason: "business_unresolved_or_missing_customer" }
   }
 
-  const patch = {
-    stripe_customer_id: customerId,
-    stripe_subscription_id: sub.id,
-    subscription_status: sub.status,
-    subscription_trial_ends_at: trialEndsAtIso,
-    subscription_current_period_end: currentPeriodEndIso,
-    subscription_cancel_at_period_end: sub.cancel_at_period_end ?? false,
-    subscription_updated_at: nowIso,
-    updated_at: nowIso,
-  }
+  const patch = buildSubscriptionPatch({
+    customerId,
+    subscriptionId: sub.id,
+    status: sub.status,
+    trialEndSec: sub.trial_end,
+    currentPeriodEndIso: getSubscriptionCurrentPeriodEndIso(sub),
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
+  })
 
-  const { data, error } = await admin
-    .from("business_profiles")
-    .update(patch)
-    .eq("id", businessId)
-    .select("id")
+  const { data, error } = await updateBusinessProfile(admin, businessId, patch)
 
   if (error) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_error",
       stripe_webhook_event_type: eventType,
       stripe_webhook_business_id: businessId,
       stripe_webhook_subscription_id: sub.id,
       stripe_webhook_customer_id: customerId,
       error: error.message,
     })
-    return { kind: "failed", error: error.message }
+    return { kind: "skipped", reason: "db_update_failed" }
   }
 
   if (!data?.length) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_business_not_found",
       stripe_webhook_event_type: eventType,
       stripe_webhook_business_id: businessId,
       stripe_webhook_subscription_id: sub.id,
       stripe_webhook_customer_id: customerId,
-      error: "no_row_updated",
     })
-    return { kind: "failed", error: "no_row_updated" }
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_skipped",
+      stripe_webhook_event_type: eventType,
+      reason: "no_row_updated",
+    })
+    return { kind: "skipped", reason: "no_row_updated" }
   }
 
   stripeLog({
-    message: "stripe_webhook_update_success",
+    message: "stripe_webhook_subscription_sync_success",
     stripe_webhook_event_type: eventType,
     stripe_webhook_business_id: businessId,
     stripe_webhook_subscription_id: sub.id,
@@ -332,59 +401,16 @@ async function handleSubscriptionEvent(sub: Stripe.Subscription, eventType: stri
   return { kind: "ok" }
 }
 
-async function handleSubscriptionDeleted(sub: Stripe.Subscription, eventType: string): Promise<HandlerOutcome> {
-  const customerId = customerIdFromStripe(sub.customer)
-  const businessId = await resolveBusinessIdFromSubscription(sub)
-
-  stripeLog({
-    message: "stripe_webhook_received",
-    stripe_webhook_event_type: eventType,
-    stripe_webhook_business_id: businessId,
-    stripe_webhook_subscription_id: sub.id,
-    stripe_webhook_customer_id: customerId,
-  })
-
-  if (!businessId) {
-    stripeLog({
-      message: "stripe_webhook_update_error",
-      stripe_webhook_event_type: eventType,
-      stripe_webhook_subscription_id: sub.id,
-      stripe_webhook_customer_id: customerId,
-      error: "business_unresolved",
-    })
-    return { kind: "skipped", reason: "business_unresolved" }
-  }
-
-  const admin = getServiceRoleClient()
-  if (!admin) {
-    return { kind: "failed", error: "service_role_missing" }
-  }
-
-  const upd = await upsertBusinessStripeFromSubscription(admin, businessId, {
-    stripeCustomerId: customerId,
-    subscription: sub,
-  })
-
-  if (!upd.ok) {
-    stripeLog({
-      message: "stripe_webhook_update_error",
-      stripe_webhook_event_type: eventType,
-      stripe_webhook_business_id: businessId,
-      error: upd.error,
-    })
-    return { kind: "failed", error: upd.error }
-  }
-
-  stripeLog({
-    message: "stripe_webhook_update_success",
-    stripe_webhook_event_type: eventType,
-    stripe_webhook_business_id: businessId,
-    stripe_webhook_subscription_id: sub.id,
-  })
-  return { kind: "ok" }
+async function handleSubscriptionDeleted(
+  admin: SupabaseClient<Database>,
+  sub: Stripe.Subscription,
+  eventType: string
+): Promise<HandlerOutcome> {
+  return handleSubscriptionEvent(admin, sub, eventType)
 }
 
 async function handleInvoice(
+  admin: SupabaseClient<Database>,
   stripe: Stripe,
   invoice: Stripe.Invoice,
   eventType: string
@@ -404,36 +430,58 @@ async function handleInvoice(
 
   if (!businessId || !subId) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_business_not_found",
       stripe_webhook_event_type: eventType,
-      error: "invoice_business_or_subscription_unresolved",
+      stripe_webhook_subscription_id: subId ?? null,
+      stripe_webhook_customer_id: customerId,
+    })
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_skipped",
+      stripe_webhook_event_type: eventType,
+      reason: "invoice_business_or_subscription_unresolved",
     })
     return { kind: "skipped", reason: "invoice_unresolved" }
   }
 
-  const admin = getServiceRoleClient()
-  if (!admin) {
-    return { kind: "failed", error: "service_role_missing" }
-  }
-
   const sub = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
-  const upd = await upsertBusinessStripeFromSubscription(admin, businessId, {
-    stripeCustomerId: customerId,
-    subscription: sub,
+  const patch = buildSubscriptionPatch({
+    customerId,
+    subscriptionId: sub.id,
+    status: sub.status,
+    trialEndSec: sub.trial_end,
+    currentPeriodEndIso: getSubscriptionCurrentPeriodEndIso(sub),
+    cancelAtPeriodEnd: sub.cancel_at_period_end,
   })
+  const upd = await updateBusinessProfile(admin, businessId, patch)
 
-  if (!upd.ok) {
+  if (upd.error) {
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_error",
       stripe_webhook_event_type: eventType,
       stripe_webhook_business_id: businessId,
-      error: upd.error,
+      error: upd.error.message,
     })
-    return { kind: "failed", error: upd.error }
+    return { kind: "skipped", reason: "db_update_failed" }
+  }
+
+  if (!upd.data?.length) {
+    stripeLog({
+      message: "stripe_webhook_business_not_found",
+      stripe_webhook_event_type: eventType,
+      stripe_webhook_business_id: businessId,
+      stripe_webhook_subscription_id: sub.id,
+      stripe_webhook_customer_id: customerId,
+    })
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_skipped",
+      stripe_webhook_event_type: eventType,
+      reason: "no_row_updated",
+    })
+    return { kind: "skipped", reason: "no_row_updated" }
   }
 
   stripeLog({
-    message: "stripe_webhook_update_success",
+    message: "stripe_webhook_subscription_sync_success",
     stripe_webhook_event_type: eventType,
     stripe_webhook_business_id: businessId,
     stripe_webhook_subscription_id: sub.id,
@@ -449,6 +497,11 @@ export async function POST(req: Request) {
   const stripeRaw = getStripeForWebhook()
   if (stripeRaw instanceof NextResponse) return stripeRaw
   const stripe = stripeRaw
+
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    return NextResponse.json({ error: "service_role_missing" }, { status: 500 })
+  }
 
   const sig = req.headers.get("stripe-signature")
   if (!sig) {
@@ -474,24 +527,24 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session
-        outcome = await handleCheckoutCompleted(stripe, session)
+        outcome = await handleCheckoutCompleted(admin, stripe, session)
         break
       }
       case "customer.subscription.created":
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription
-        outcome = await handleSubscriptionEvent(sub, event.type)
+        outcome = await handleSubscriptionEvent(admin, sub, event.type)
         break
       }
       case "customer.subscription.deleted": {
         const sub = event.data.object as Stripe.Subscription
-        outcome = await handleSubscriptionDeleted(sub, event.type)
+        outcome = await handleSubscriptionDeleted(admin, sub, event.type)
         break
       }
       case "invoice.payment_succeeded":
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice
-        outcome = await handleInvoice(stripe, invoice, event.type)
+        outcome = await handleInvoice(admin, stripe, invoice, event.type)
         break
       }
       default:
@@ -501,19 +554,12 @@ export async function POST(req: Request) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "handler_threw"
     stripeLog({
-      message: "stripe_webhook_update_error",
+      message: "stripe_webhook_subscription_sync_error",
       stripe_webhook_event_type: event.type,
       error: msg,
     })
-    return NextResponse.json({ received: false, error: "handler_failed" }, { status: 500 })
+    return NextResponse.json({ received: true, skipped: true, reason: "handler_threw" })
   }
 
-  if (outcome.kind === "failed") {
-    return NextResponse.json(
-      { received: false, error: outcome.error },
-      { status: 500 }
-    )
-  }
-
-  return NextResponse.json({ received: true })
+  return NextResponse.json({ received: true, outcome })
 }

@@ -68,11 +68,28 @@ export async function upsertBusinessStripeFromSubscription(
     patch.subscription_updated_at = nowIso
   }
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("business_profiles")
     .update(patch)
     .eq("id", businessId)
     .select("id")
+
+  if (
+    error?.message &&
+    error.message.toLowerCase().includes("schema cache") &&
+    error.message.toLowerCase().includes("stripe_customer_id") &&
+    "stripe_customer_id" in patch
+  ) {
+    const retryPatch = { ...patch }
+    delete retryPatch.stripe_customer_id
+    const retry = await admin
+      .from("business_profiles")
+      .update(retryPatch)
+      .eq("id", businessId)
+      .select("id")
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) {
     return { ok: false, error: error.message }
