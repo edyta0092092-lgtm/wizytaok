@@ -388,6 +388,8 @@ export const dictionaries = {
       signupOwnerFirstRequired: "Podaj imię.",
       signupOwnerLastRequired: "Podaj nazwisko.",
       signupTaxIdRequiredHint: "Wymagany przy firmie z NIP (10 cyfr, suma kontrolna).",
+      signupTaxIdOptionalHint:
+        "Możesz podać numer NIP (np. przyszłej firmy) — wtedy sprawdzimy format. Pole nie jest wymagane.",
       publicSlug: "Adres strony rezerwacji",
       slugManualRequiredHint:
         "Wpisz adres (min. trzy znaki: małe litery, cyfry, myślniki). Bez tego nie zarejestrujesz konta.",
@@ -2467,6 +2469,8 @@ Pozdrawiamy,
       signupOwnerFirstRequired: "Enter your first name.",
       signupOwnerLastRequired: "Enter your last name.",
       signupTaxIdRequiredHint: "Required for a business with a tax ID (10 digits, checksum).",
+      signupTaxIdOptionalHint:
+        "You may enter a tax ID (e.g. for a future business): we validate the format when filled. Field is optional.",
       publicSlug: "Booking page address",
       slugManualRequiredHint:
         "Enter your booking address (min. 3 chars: lowercase letters, digits, hyphens). Required to register.",

@@ -103,15 +103,14 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const nipRelevant = accountKind === "registered_business"
   const nipFieldHint = React.useMemo(() => {
-    if (!nipRelevant) return null
     const digits = normalizeDigits(companyTaxId)
     if (digits.length === 0) return null
     if (digits.length !== 10) return t("settings.taxIdDigitsHint")
     if (!isPolishNip10Valid(digits)) return t("settings.taxIdInvalidChecksum")
     return null
-  }, [nipRelevant, companyTaxId, t])
+  }, [companyTaxId, t])
 
-  /** Wymuszony NIP: brak lub błędny format przy bloku przycisku. */
+  /** Przy „firma z NIP” pole jest obowiązkowe — pusty NIP blokuje wysłanie. */
   const nipEmptyBlocksSubmit = nipRelevant && normalizeDigits(companyTaxId).length === 0
   const nipBlocksSubmit = Boolean(nipFieldHint) || nipEmptyBlocksSubmit
 
@@ -156,8 +155,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
 
     const taxIdNormalized = normalizeDigits(companyTaxId)
-    const needsValidatedNip = accountKind === "registered_business"
-    if (needsValidatedNip) {
+    let companyTaxIdForSignup: string | undefined
+    let companyTaxIdNormalizedForSignup: string | undefined
+
+    if (accountKind === "registered_business") {
       if (taxIdNormalized.length !== 10) {
         setError(t("settings.taxIdDigitsHint"))
         return
@@ -166,6 +167,19 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         setError(t("settings.taxIdInvalidChecksum"))
         return
       }
+      companyTaxIdForSignup = companyTaxId.trim() || undefined
+      companyTaxIdNormalizedForSignup = taxIdNormalized
+    } else if (taxIdNormalized.length > 0) {
+      if (taxIdNormalized.length !== 10) {
+        setError(t("settings.taxIdDigitsHint"))
+        return
+      }
+      if (!isPolishNip10Valid(taxIdNormalized)) {
+        setError(t("settings.taxIdInvalidChecksum"))
+        return
+      }
+      companyTaxIdForSignup = companyTaxId.trim() || undefined
+      companyTaxIdNormalizedForSignup = taxIdNormalized
     }
 
     const pwdViol = assertPasswordPolicy(password)
@@ -247,8 +261,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             owner_last_name: ownerLastName.trim(),
             trial_intent: startTrial || undefined,
             account_type: accountKind,
-            company_tax_id: needsValidatedNip ? (companyTaxId.trim() || undefined) : undefined,
-            company_tax_id_normalized: needsValidatedNip ? taxIdNormalized : undefined,
+            company_tax_id: companyTaxIdForSignup,
+            company_tax_id_normalized: companyTaxIdNormalizedForSignup,
           },
         },
       })
@@ -395,7 +409,31 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     <p className="text-xs text-muted-foreground">{t("auth.trialOnePerBusinessFootnote")}</p>
                   ) : null}
                 </div>
-              ) : null}
+              ) : (
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-tax-id-optional">{t("settings.taxIdLabel")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdOptionalHint")}</p>
+                    <Input
+                      id="signup-tax-id-optional"
+                      autoComplete="off"
+                      value={companyTaxId}
+                      onChange={(e) => setCompanyTaxId(e.target.value)}
+                      placeholder={t("settings.taxIdPlaceholder")}
+                      aria-invalid={Boolean(nipFieldHint)}
+                      className={cn(
+                        "h-11 rounded-xl",
+                        nipFieldHint ? "border-destructive focus-visible:ring-destructive/30" : null,
+                      )}
+                    />
+                    {nipFieldHint ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {nipFieldHint}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
