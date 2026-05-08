@@ -86,18 +86,62 @@ function StartTrialContent() {
       } catch {
         // best effort fallback for flows that skipped auth/callback profile creation
       }
-      const retry = await loadProfile()
+      let retry = await loadProfile()
       profile = retry.data ?? null
     }
 
     if (!profile?.id) {
-      if (process.env.NODE_ENV === "development") {
-        console.info("[start-trial]", {
-          reason: "business_profile_missing_after_retry",
-          businessProfileCreated,
-          membershipCreated,
-        })
+      const serverEnsure = await fetch("/api/auth/ensure-business-profile", {
+        method: "POST",
+        credentials: "same-origin",
+      })
+      let serverPayload: { ok?: boolean; error?: string } | null = null
+      try {
+        serverPayload = (await serverEnsure.json()) as { ok?: boolean; error?: string }
+      } catch {
+        serverPayload = null
       }
+      if (serverEnsure.ok && serverPayload?.ok === true) {
+        const afterServer = await loadProfile()
+        profile = afterServer.data ?? null
+      } else {
+        if (serverEnsure.status === 401) {
+          router.replace("/login?next=%2Fstart-trial")
+          return
+        }
+        const code = typeof serverPayload?.error === "string" ? serverPayload.error.trim() : ""
+        if (process.env.NODE_ENV === "development") {
+          console.info("[start-trial]", {
+            reason: "business_profile_missing_after_retry",
+            businessProfileCreated,
+            membershipCreated,
+            serverEnsure: serverEnsure.status,
+            serverError: code,
+          })
+        }
+        setState("error")
+        if (code === "service_role_required") {
+          setError(
+            "Serwer nie może utworzyć profilu firmy. Dodaj zmienną SUPABASE_SERVICE_ROLE_KEY w ustawieniach Vercel (Project → Settings → Environment Variables) i wdróż ponownie."
+          )
+        } else if (code === "incomplete_user_metadata") {
+          setError(
+            "Konto nie ma danych rejestracji (slug / nazwa firmy). Zarejestruj się ponownie lub skontaktuj się z pomocą."
+          )
+        } else if (code === "profile_insert_failed") {
+          setError(
+            "Nie udało się zapisać profilu firmy w bazie. Spróbuj ponownie za chwilę lub skontaktuj się z pomocą."
+          )
+        } else {
+          setError(
+            "Nie znaleziono profilu firmy po zalogowaniu. Spróbuj wylogować się i zalogować ponownie albo skontaktuj się z pomocą."
+          )
+        }
+        return
+      }
+    }
+
+    if (!profile?.id) {
       setState("error")
       setError(
         "Nie znaleziono profilu firmy po zalogowaniu. Spróbuj wylogować się i zalogować ponownie albo skontaktuj się z pomocą."
