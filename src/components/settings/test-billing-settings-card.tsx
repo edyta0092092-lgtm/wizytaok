@@ -81,6 +81,21 @@ function uiStatusTranslationKey(s: SubscriptionUiStatus): string {
   }
 }
 
+function uiStatusInfoTranslationKey(s: SubscriptionUiStatus): string | null {
+  switch (s) {
+    case "trialing":
+      return "testBillingTrialActiveInfo"
+    case "active":
+      return "testBillingActiveInfo"
+    case "payment_required":
+      return "testBillingPaymentRequiredInfo"
+    case "canceled":
+      return "testBillingCanceledInfo"
+    default:
+      return null
+  }
+}
+
 export function TestBillingSettingsCard() {
   const { t } = useTranslations()
   const { ready, isOwner, effectiveRole, businessId } = useBusinessAccess()
@@ -155,6 +170,10 @@ export function TestBillingSettingsCard() {
     statusRaw.length > 0 ? statusRaw : undefined
   )
   const statusLabel = t(`settings.${uiStatusTranslationKey(uiStatus)}` as "settings.testSubStatusNone")
+  const statusInfoKey = uiStatusInfoTranslationKey(uiStatus)
+  const statusInfo = statusInfoKey
+    ? t(`settings.${statusInfoKey}` as "settings.testBillingTrialActiveInfo")
+    : null
 
   const periodEndRaw = billingRow?.subscription_current_period_end?.trim()
   const trialEndRaw = billingRow?.subscription_trial_ends_at?.trim()
@@ -169,16 +188,10 @@ export function TestBillingSettingsCard() {
         timeStyle: "short",
       }).format(new Date(relevantEndRaw))
     : "—"
+  const canStartTrial = uiStatus === "none"
 
   return (
     <div className="mb-6 space-y-3">
-      <p
-        className="rounded-lg border border-dashed border-primary/35 bg-primary/5 px-3 py-2 text-xs font-medium text-foreground"
-        role="status"
-        data-testid="test-billing-flag-diagnostic"
-      >
-        {t("settings.testBillingDiagnosticFlagOn")}
-      </p>
       <Card className="rounded-2xl border border-dashed border-violet-500/35 bg-violet-50/30 shadow-sm dark:bg-violet-950/20">
         <CardHeader className="border-b border-border/70 py-4">
           <CardTitle className="text-sm font-semibold">{t("settings.testBillingTitle")}</CardTitle>
@@ -194,11 +207,13 @@ export function TestBillingSettingsCard() {
           <div className="space-y-1 text-xs">
             <p className="font-medium text-foreground">{t("settings.testBillingStatusLabel")}</p>
             <p className="text-foreground">{statusLabel}</p>
+            {statusInfo ? (
+              <p className="text-muted-foreground">{statusInfo}</p>
+            ) : null}
             <p className="text-muted-foreground">
               {endHeading}: {endLabel}
             </p>
           </div>
-          <p className="text-xs text-muted-foreground">{t("settings.testBillingStripeNote")}</p>
           {checkoutError ? (
             <p
               className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
@@ -207,63 +222,65 @@ export function TestBillingSettingsCard() {
               {checkoutError}
             </p>
           ) : null}
-          <Button
-            type="button"
-            className="h-11 rounded-xl"
-            disabled={busy}
-            onClick={async () => {
-              setCheckoutError(null)
-              setBusy(true)
-              try {
-                const res = await fetch("/api/test-billing/checkout", {
-                  method: "POST",
-                  credentials: "same-origin",
-                  headers: { Accept: "application/json" },
-                })
-                type CheckoutJson = {
-                  ok?: boolean
-                  url?: string
-                  error?: string
-                  hint?: string
-                  details?: string[]
-                }
-                let data: CheckoutJson = {}
+          {canStartTrial ? (
+            <Button
+              type="button"
+              className="h-11 rounded-xl"
+              disabled={busy}
+              onClick={async () => {
+                setCheckoutError(null)
+                setBusy(true)
                 try {
-                  data = (await res.json()) as CheckoutJson
+                  const res = await fetch("/api/test-billing/checkout", {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { Accept: "application/json" },
+                  })
+                  type CheckoutJson = {
+                    ok?: boolean
+                    url?: string
+                    error?: string
+                    hint?: string
+                    details?: string[]
+                  }
+                  let data: CheckoutJson = {}
+                  try {
+                    data = (await res.json()) as CheckoutJson
+                  } catch {
+                    data = {}
+                  }
+                  const fallbackMsg = t("settings.testBillingCheckoutUnavailable")
+                  if (res.ok && typeof data.url === "string" && data.url.length > 0) {
+                    window.location.href = data.url
+                    return
+                  }
+                  const detailMsg =
+                    Array.isArray(data.details) && data.details.length > 0
+                      ? data.details.join(" ")
+                      : null
+                  const hintMsg =
+                    typeof data.hint === "string" && data.hint.trim().length > 0
+                      ? data.hint.trim()
+                      : null
+                  const errorMsg =
+                    typeof data.error === "string" && data.error.trim().length > 0
+                      ? data.error.trim()
+                      : null
+                  const msg = detailMsg ?? hintMsg ?? errorMsg ?? fallbackMsg
+                  setCheckoutError(msg)
+                  toast.error(msg)
                 } catch {
-                  data = {}
+                  const msg = t("settings.testBillingCheckoutUnavailable")
+                  setCheckoutError(msg)
+                  toast.error(msg)
+                } finally {
+                  setBusy(false)
                 }
-                const fallbackMsg = t("settings.testBillingCheckoutUnavailable")
-                if (res.ok && typeof data.url === "string" && data.url.length > 0) {
-                  window.location.href = data.url
-                  return
-                }
-                const detailMsg =
-                  Array.isArray(data.details) && data.details.length > 0
-                    ? data.details.join(" ")
-                    : null
-                const hintMsg =
-                  typeof data.hint === "string" && data.hint.trim().length > 0
-                    ? data.hint.trim()
-                    : null
-                const errorMsg =
-                  typeof data.error === "string" && data.error.trim().length > 0
-                    ? data.error.trim()
-                    : null
-                const msg = detailMsg ?? hintMsg ?? errorMsg ?? fallbackMsg
-                setCheckoutError(msg)
-                toast.error(msg)
-              } catch {
-                const msg = t("settings.testBillingCheckoutUnavailable")
-                setCheckoutError(msg)
-                toast.error(msg)
-              } finally {
-                setBusy(false)
-              }
-            }}
-          >
-            {busy ? t("settings.testBillingBusy") : t("settings.testBillingCta")}
-          </Button>
+              }}
+            >
+              {busy ? t("settings.testBillingBusy") : t("settings.testBillingCta")}
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </div>
