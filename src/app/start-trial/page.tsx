@@ -153,7 +153,7 @@ function StartTrialContent() {
       }
       setState("error")
       if (reason === "trial_already_used") {
-        setError("Darmowy okres próbny został już wykorzystany.")
+        setError("Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.")
       } else if (reason === "subscription_already_exists" || reason === "subscription_already_active") {
         setError("Twój okres próbny jest aktywny.")
       } else {
@@ -204,7 +204,7 @@ function StartTrialContent() {
                 variant={state === "error" ? "outline" : "default"}
                 onClick={() => router.push("/settings")}
               >
-                Przejdź do panelu
+                {error?.includes("wykorzystany") ? "Przejdź do subskrypcji" : "Przejdź do panelu"}
               </Button>
             </div>
           ) : null}

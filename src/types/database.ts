@@ -116,6 +116,11 @@ export interface Database {
           email: string | null
           phone: string | null
           tax_id: string | null
+          account_type: string | null
+          company_tax_id: string | null
+          company_tax_id_normalized: string | null
+          contact_phone: string | null
+          contact_phone_normalized: string | null
           default_reminder_hours: number
           second_reminder_minutes: number
           reminder_channel: string
@@ -136,6 +141,7 @@ export interface Database {
           stripe_subscription_synced_at: string | null
           trial_started_at: string | null
           trial_used_at: string | null
+          stripe_payment_method_fingerprint: string | null
         }
         Insert: {
           id?: string
@@ -146,6 +152,11 @@ export interface Database {
           email?: string | null
           phone?: string | null
           tax_id?: string | null
+          account_type?: string | null
+          company_tax_id?: string | null
+          company_tax_id_normalized?: string | null
+          contact_phone?: string | null
+          contact_phone_normalized?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
           reminder_channel?: string
@@ -166,6 +177,7 @@ export interface Database {
           stripe_subscription_synced_at?: string | null
           trial_started_at?: string | null
           trial_used_at?: string | null
+          stripe_payment_method_fingerprint?: string | null
         }
         Update: {
           id?: string
@@ -176,6 +188,11 @@ export interface Database {
           email?: string | null
           phone?: string | null
           tax_id?: string | null
+          account_type?: string | null
+          company_tax_id?: string | null
+          company_tax_id_normalized?: string | null
+          contact_phone?: string | null
+          contact_phone_normalized?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
           reminder_channel?: string
@@ -196,6 +213,7 @@ export interface Database {
           stripe_subscription_synced_at?: string | null
           trial_started_at?: string | null
           trial_used_at?: string | null
+          stripe_payment_method_fingerprint?: string | null
         }
         Relationships: []
       }

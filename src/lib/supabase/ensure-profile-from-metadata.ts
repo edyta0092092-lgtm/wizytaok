@@ -13,6 +13,12 @@ function buildFallbackSlug(userId: string): string {
   return normalizePublicSlug(`moja-firma-${suffix || "new"}`) || "moja-firma-new"
 }
 
+function normalizeDigits(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const normalized = raw.replace(/\D/g, "")
+  return normalized.length > 0 ? normalized : null
+}
+
 /**
  * Po potwierdzeniu e-maila (auth callback) tworzy `business_profiles` z `user_metadata`, jeśli brak wiersza.
  */
@@ -63,6 +69,17 @@ export async function ensureBusinessProfileFromUserMetadata(
 
   const ownerNameRaw = typeof meta.owner_name === "string" ? meta.owner_name.trim() : ""
   const ownerName = ownerNameRaw.length > 0 ? ownerNameRaw : null
+  const accountTypeRaw = typeof meta.account_type === "string" ? meta.account_type.trim() : ""
+  const accountType =
+    accountTypeRaw === "registered_business" || accountTypeRaw === "unregistered_activity"
+      ? accountTypeRaw
+      : null
+  const companyTaxIdRaw = typeof meta.company_tax_id === "string" ? meta.company_tax_id.trim() : ""
+  const companyTaxIdNormalized =
+    normalizeDigits(meta.company_tax_id_normalized) ?? normalizeDigits(companyTaxIdRaw)
+  const contactPhoneRaw = typeof meta.contact_phone === "string" ? meta.contact_phone.trim() : ""
+  const contactPhoneNormalized =
+    normalizeDigits(meta.contact_phone_normalized) ?? normalizeDigits(contactPhoneRaw)
 
   const { error: insertError } = await supabase.from("business_profiles").insert({
     owner_id: user.id,
@@ -70,6 +87,12 @@ export async function ensureBusinessProfileFromUserMetadata(
     slug,
     email: user.email ?? null,
     owner_name: ownerName,
+    tax_id: companyTaxIdRaw || null,
+    account_type: accountType,
+    company_tax_id: companyTaxIdRaw || null,
+    company_tax_id_normalized: companyTaxIdNormalized,
+    contact_phone: contactPhoneRaw || null,
+    contact_phone_normalized: contactPhoneNormalized,
   })
   if (!insertError) {
     businessProfileCreated = true

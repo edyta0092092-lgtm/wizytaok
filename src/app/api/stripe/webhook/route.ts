@@ -190,6 +190,52 @@ function customerIdFromStripe(
   return ref.id ?? null
 }
 
+function fingerprintFromPaymentMethod(
+  paymentMethod: Stripe.PaymentMethod | null | undefined
+): string | null {
+  const fp = paymentMethod?.card?.fingerprint
+  return typeof fp === "string" && fp.trim().length > 0 ? fp.trim() : null
+}
+
+async function resolveFingerprintFromCheckoutSession(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session
+): Promise<string | null> {
+  try {
+    const setupIntentRef = session.setup_intent
+    const setupIntentId = typeof setupIntentRef === "string" ? setupIntentRef : setupIntentRef?.id
+    if (setupIntentId) {
+      const setupIntent = await stripe.setupIntents.retrieve(setupIntentId, { expand: ["payment_method"] })
+      const pmRef = setupIntent.payment_method
+      if (typeof pmRef === "string") {
+        const pm = await stripe.paymentMethods.retrieve(pmRef)
+        return fingerprintFromPaymentMethod(pm)
+      }
+      return fingerprintFromPaymentMethod(pmRef)
+    }
+  } catch {
+    // best effort only
+  }
+
+  try {
+    const paymentIntentRef = session.payment_intent
+    const paymentIntentId =
+      typeof paymentIntentRef === "string" ? paymentIntentRef : paymentIntentRef?.id
+    if (!paymentIntentId) return null
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ["payment_method"],
+    })
+    const pmRef = paymentIntent.payment_method
+    if (typeof pmRef === "string") {
+      const pm = await stripe.paymentMethods.retrieve(pmRef)
+      return fingerprintFromPaymentMethod(pm)
+    }
+    return fingerprintFromPaymentMethod(pmRef)
+  } catch {
+    return null
+  }
+}
+
 async function resolveBusinessIdFromSubscription(sub: Stripe.Subscription): Promise<string | null> {
   const fromMeta = normalizeStripeBusinessId(sub.metadata?.business_id)
   if (fromMeta) return fromMeta
@@ -262,11 +308,13 @@ async function handleCheckoutCompleted(
       })
       return { kind: "skipped", reason: "missing_business_id" }
     }
-    const synced = await syncCheckoutByBusiness(admin, stripe, fallbackByCustomer, customerId, subId)
+    const fingerprint = await resolveFingerprintFromCheckoutSession(stripe, session)
+    const synced = await syncCheckoutByBusiness(admin, stripe, fallbackByCustomer, customerId, subId, fingerprint)
     return synced
   }
 
-  return syncCheckoutByBusiness(admin, stripe, businessId, customerId, subId)
+  const fingerprint = await resolveFingerprintFromCheckoutSession(stripe, session)
+  return syncCheckoutByBusiness(admin, stripe, businessId, customerId, subId, fingerprint)
 }
 
 async function syncCheckoutByBusiness(
@@ -274,7 +322,8 @@ async function syncCheckoutByBusiness(
   stripe: Stripe,
   businessId: string,
   customerId: string | null,
-  subId: string | null
+  subId: string | null,
+  paymentMethodFingerprint: string | null
 ): Promise<HandlerOutcome> {
   if (!subId) {
     stripeLog({
@@ -312,6 +361,9 @@ async function syncCheckoutByBusiness(
     currentPeriodEndIso: getSubscriptionCurrentPeriodEndIso(subscription),
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
   })
+  if (paymentMethodFingerprint) {
+    patch.stripe_payment_method_fingerprint = paymentMethodFingerprint
+  }
   const { data, error } = await updateBusinessProfile(admin, businessId, patch)
 
   if (error) {

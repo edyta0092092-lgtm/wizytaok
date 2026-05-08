@@ -34,6 +34,12 @@ type SignupFormProps = {
   startTrial?: boolean
 }
 
+type AccountType = "registered_business" | "unregistered_activity"
+
+function normalizeDigits(raw: string): string {
+  return raw.replace(/\D/g, "")
+}
+
 export function SignupForm({ startTrial = false }: SignupFormProps) {
   const router = useRouter()
   const { t } = useTranslations()
@@ -41,6 +47,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [businessName, setBusinessName] = React.useState("")
   const [slug, setSlug] = React.useState("")
   const [ownerName, setOwnerName] = React.useState("")
+  const [accountType, setAccountType] = React.useState<AccountType>("registered_business")
+  const [companyTaxId, setCompanyTaxId] = React.useState("")
+  const [contactPhone, setContactPhone] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
@@ -99,6 +108,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
 
     const normalized = normalizePublicSlug(slug)
+    const taxIdNormalized = normalizeDigits(companyTaxId)
+    const contactPhoneNormalized = normalizeDigits(contactPhone)
     if (!normalized) {
       setError(t("auth.slugRequired"))
       return
@@ -114,6 +125,18 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     if (normalized === DEMO_BOOKING_SLUG) {
       setError(t("auth.slugTaken"))
       return
+    }
+    if (startTrial && accountType === "registered_business") {
+      if (taxIdNormalized.length !== 10) {
+        setError("Podaj poprawny NIP (10 cyfr).")
+        return
+      }
+    }
+    if (startTrial && accountType === "unregistered_activity") {
+      if (contactPhoneNormalized.length < 9) {
+        setError("Podaj telefon kontaktowy.")
+        return
+      }
     }
 
     setLoading(true)
@@ -166,6 +189,15 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             slug: normalized,
             owner_name: ownerName.trim() || undefined,
             trial_intent: startTrial || undefined,
+            account_type: startTrial ? accountType : undefined,
+            company_tax_id: startTrial ? (companyTaxId.trim() || undefined) : undefined,
+            company_tax_id_normalized:
+              startTrial && accountType === "registered_business" ? taxIdNormalized : undefined,
+            contact_phone: startTrial ? (contactPhone.trim() || undefined) : undefined,
+            contact_phone_normalized:
+              startTrial && accountType === "unregistered_activity"
+                ? contactPhoneNormalized
+                : undefined,
           },
         },
       })
@@ -259,6 +291,65 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   className="h-11 rounded-xl"
                 />
               </div>
+              {startTrial ? (
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                  <p className="text-sm font-medium text-foreground">Typ działalności</p>
+                  <div className="grid gap-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="radio"
+                        name="accountType"
+                        value="registered_business"
+                        checked={accountType === "registered_business"}
+                        onChange={() => setAccountType("registered_business")}
+                      />
+                      <span>Firma z NIP</span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="radio"
+                        name="accountType"
+                        value="unregistered_activity"
+                        checked={accountType === "unregistered_activity"}
+                        onChange={() => setAccountType("unregistered_activity")}
+                      />
+                      <span>Działalność nierejestrowana / osoba bez NIP</span>
+                    </label>
+                  </div>
+                  {accountType === "registered_business" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-tax-id">NIP</Label>
+                      <Input
+                        id="signup-tax-id"
+                        autoComplete="off"
+                        inputMode="numeric"
+                        value={companyTaxId}
+                        onChange={(e) => setCompanyTaxId(e.target.value)}
+                        placeholder="np. 123-456-32-18"
+                        className="h-11 rounded-xl"
+                        required={startTrial}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-contact-phone">Telefon kontaktowy</Label>
+                      <Input
+                        id="signup-contact-phone"
+                        autoComplete="tel"
+                        inputMode="tel"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                        placeholder="np. +48 600 123 456"
+                        className="h-11 rounded-xl"
+                        required={startTrial}
+                      />
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    Darmowy okres próbny przysługuje jednej firmie lub osobie tylko raz.
+                  </p>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
                 <Input

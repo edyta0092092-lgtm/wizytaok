@@ -14,6 +14,19 @@ const ALLOWED_SOURCES = new Set([
   "landing_trial_existing_user",
 ])
 const BLOCKED_SUBSCRIPTION_STATUSES = new Set(["trialing", "active", "past_due", "unpaid", "incomplete"])
+const ACCOUNT_TYPE_REGISTERED = "registered_business"
+const ACCOUNT_TYPE_UNREGISTERED = "unregistered_activity"
+
+function normalizeDigits(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const normalized = raw.replace(/\D/g, "")
+  return normalized.length > 0 ? normalized : null
+}
+
+function hasBlockedStatus(status: string | null | undefined): boolean {
+  const normalized = status?.trim().toLowerCase()
+  return Boolean(normalized && BLOCKED_SUBSCRIPTION_STATUSES.has(normalized))
+}
 
 function collectConfigErrors(): string[] {
   const errs: string[] = []
@@ -143,10 +156,22 @@ export async function POST(request: Request) {
   const { data: bp } = await admin
     .from("business_profiles")
     .select(
-      "stripe_customer_id, stripe_subscription_id, subscription_status, stripe_subscription_status, trial_started_at, trial_used_at"
+      "id, stripe_customer_id, stripe_subscription_id, subscription_status, stripe_subscription_status, trial_started_at, trial_used_at, account_type, company_tax_id_normalized, contact_phone_normalized"
     )
     .eq("id", resolution.businessId)
     .maybeSingle()
+
+  if (!bp?.id) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "business_profile_missing",
+        error: "business_profile_missing",
+        message: "Nie znaleziono profilu firmy.",
+      },
+      { status: 404 }
+    )
+  }
 
   const status = bp?.subscription_status?.trim().toLowerCase() ?? null
   const stripeStatus = bp?.stripe_subscription_status?.trim().toLowerCase() ?? null
@@ -177,8 +202,8 @@ export async function POST(request: Request) {
   }
 
   if (
-    (status && BLOCKED_SUBSCRIPTION_STATUSES.has(status)) ||
-    (stripeStatus && BLOCKED_SUBSCRIPTION_STATUSES.has(stripeStatus)) ||
+    hasBlockedStatus(status) ||
+    hasBlockedStatus(stripeStatus) ||
     hasStripeSubscriptionId
   ) {
     return NextResponse.json(
@@ -199,6 +224,67 @@ export async function POST(request: Request) {
       },
       { status: 409 }
     )
+  }
+
+  const accountType =
+    bp.account_type === ACCOUNT_TYPE_REGISTERED || bp.account_type === ACCOUNT_TYPE_UNREGISTERED
+      ? bp.account_type
+      : null
+  const companyTaxIdNormalized = normalizeDigits(bp.company_tax_id_normalized)
+  const contactPhoneNormalized = normalizeDigits(bp.contact_phone_normalized)
+
+  if (accountType === ACCOUNT_TYPE_REGISTERED && companyTaxIdNormalized) {
+    const { data: sameTaxProfiles } = await admin
+      .from("business_profiles")
+      .select(
+        "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
+      )
+      .eq("company_tax_id_normalized", companyTaxIdNormalized)
+      .neq("id", bp.id)
+
+    const blockedByTax = (sameTaxProfiles ?? []).some((row) => {
+      const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
+      const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
+      return hasUsedTrial || hasAnySubscription || hasBlockedStatus(row.subscription_status) || hasBlockedStatus(row.stripe_subscription_status)
+    })
+    if (blockedByTax) {
+      return NextResponse.json(
+        {
+          ok: false,
+          reason: "trial_already_used",
+          error: "trial_already_used",
+          message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
+        },
+        { status: 409 }
+      )
+    }
+  }
+
+  if (accountType === ACCOUNT_TYPE_UNREGISTERED && contactPhoneNormalized) {
+    const { data: samePhoneProfiles } = await admin
+      .from("business_profiles")
+      .select(
+        "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
+      )
+      .eq("contact_phone_normalized", contactPhoneNormalized)
+      .neq("id", bp.id)
+
+    const blockedByPhone = (samePhoneProfiles ?? []).some((row) => {
+      const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
+      const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
+      return hasUsedTrial || hasAnySubscription || hasBlockedStatus(row.subscription_status) || hasBlockedStatus(row.stripe_subscription_status)
+    })
+    if (blockedByPhone) {
+      return NextResponse.json(
+        {
+          ok: false,
+          reason: "trial_already_used",
+          error: "trial_already_used",
+          message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
+        },
+        { status: 409 }
+      )
+    }
   }
 
   let source = "wizytaok_test_billing"
@@ -222,6 +308,9 @@ export async function POST(request: Request) {
       metadata: {
         business_id: resolution.businessId,
         user_id: resolution.userId,
+        account_type: accountType ?? "",
+        company_tax_id_normalized: companyTaxIdNormalized ?? "",
+        contact_phone_normalized: contactPhoneNormalized ?? "",
         source,
       },
     },
@@ -231,6 +320,9 @@ export async function POST(request: Request) {
     metadata: {
       business_id: resolution.businessId,
       user_id: resolution.userId,
+      account_type: accountType ?? "",
+      company_tax_id_normalized: companyTaxIdNormalized ?? "",
+      contact_phone_normalized: contactPhoneNormalized ?? "",
       source,
     },
   }
