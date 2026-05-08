@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
+import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import {
@@ -21,6 +22,10 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
+import {
+  buildStoredInternationalPhone,
+  validateNationalPhoneLength,
+} from "@/lib/validation/international-phone"
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import {
   assertPasswordPolicy,
@@ -49,6 +54,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [accountKind, setAccountKind] = React.useState<SignupAccountKind>(() =>
     startTrial ? "registered_business" : "unregistered_activity",
   )
+  const [phoneDialCode, setPhoneDialCode] = React.useState("+48")
+  const [phoneNational, setPhoneNational] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
@@ -117,6 +124,21 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const passwordBlocksSubmit = Boolean(passwordLiveHint)
 
+  const phoneFieldHint = React.useMemo(() => {
+    const national = phoneNational.replace(/\D/g, "")
+    if (national.length === 0) return t("auth.signupPhoneRequired")
+    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
+    if (v.ok) return null
+    if (v.min === v.max) {
+      return t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(v.min))
+    }
+    return t("settings.phoneInvalidNationalLength")
+      .replace("{min}", String(v.min))
+      .replace("{max}", String(v.max))
+  }, [phoneDialCode, phoneNational, t])
+
+  const phoneBlocksSubmit = Boolean(phoneFieldHint)
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -144,6 +166,25 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setError(t("auth.signupOwnerLastRequired"))
       return
     }
+
+    const nationalPhone = phoneNational.replace(/\D/g, "")
+    if (nationalPhone.length === 0) {
+      setError(t("auth.signupPhoneRequired"))
+      return
+    }
+    const phoneLen = validateNationalPhoneLength(phoneDialCode, phoneNational)
+    if (!phoneLen.ok) {
+      setError(
+        phoneLen.min === phoneLen.max
+          ? t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(phoneLen.min))
+          : t("settings.phoneInvalidNationalLength")
+              .replace("{min}", String(phoneLen.min))
+              .replace("{max}", String(phoneLen.max)),
+      )
+      return
+    }
+    const contactPhoneStored = buildStoredInternationalPhone(phoneDialCode, phoneNational)
+    const contactPhoneNormalized = normalizeDigits(contactPhoneStored)
 
     const taxIdNormalized = normalizeDigits(companyTaxId)
     let companyTaxIdForSignup: string | undefined
@@ -215,6 +256,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             account_type: accountKind,
             company_tax_id: companyTaxIdForSignup,
             company_tax_id_normalized: companyTaxIdNormalizedForSignup,
+            contact_phone: contactPhoneStored || undefined,
+            contact_phone_normalized: contactPhoneNormalized || undefined,
           },
         },
       })
@@ -362,6 +405,22 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 ) : null}
               </fieldset>
 
+              <InternationalPhoneFieldGroup
+                label={t("settings.phoneLabel")}
+                dialCode={phoneDialCode}
+                nationalDigits={phoneNational}
+                onDialCodeChange={setPhoneDialCode}
+                onNationalChange={setPhoneNational}
+                dialSelectId="signup-phone-dial"
+                nationalInputId="signup-phone-national"
+                showInlineError={false}
+              />
+              {phoneFieldHint ? (
+                <p className="-mt-2 text-xs text-destructive" role="alert">
+                  {phoneFieldHint}
+                </p>
+              ) : null}
+
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
                 <Input
@@ -421,7 +480,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <Button
                 type="submit"
                 className="h-11 w-full rounded-xl"
-                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit}
+                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit || phoneBlocksSubmit}
               >
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>

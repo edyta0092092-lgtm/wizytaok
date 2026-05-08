@@ -392,6 +392,7 @@ export const dictionaries = {
       signupBusinessNameRequired: "Podaj nazwę firmy.",
       signupOwnerFirstRequired: "Podaj imię.",
       signupOwnerLastRequired: "Podaj nazwisko.",
+      signupPhoneRequired: "Podaj numer telefonu firmy.",
       signupTaxIdRequiredHint: "Wymagany przy firmie z NIP (10 cyfr, suma kontrolna).",
       signupTaxIdOptionalHint:
         "Możesz podać numer NIP (np. przyszłej firmy) — wtedy sprawdzimy format. Pole nie jest wymagane.",
@@ -2473,6 +2474,7 @@ Pozdrawiamy,
       signupBusinessNameRequired: "Enter your business name.",
       signupOwnerFirstRequired: "Enter your first name.",
       signupOwnerLastRequired: "Enter your last name.",
+      signupPhoneRequired: "Enter your business phone number.",
       signupTaxIdRequiredHint: "Required for a business with a tax ID (10 digits, checksum).",
       signupTaxIdOptionalHint:
         "You may enter a tax ID (e.g. for a future business): we validate the format when filled. Field is optional.",
