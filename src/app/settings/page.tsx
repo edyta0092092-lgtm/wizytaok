@@ -761,32 +761,14 @@ export default function SettingsPage() {
                   className="h-11 rounded-xl"
                 />
               </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="publicSlug">{t("settings.bookingAddressLabel")}</Label>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  {t("settings.bookingAddressHint")}
-                </p>
-                <p className="text-xs font-medium text-foreground">
-                  {t("settings.bookingAddressExample")}
-                </p>
-                <Input
-                  id="publicSlug"
-                  autoComplete="off"
-                  value={form.publicSlug}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      publicSlug: e.target.value.trim().toLowerCase(),
-                    }))
-                  }
-                  className="h-11 rounded-xl font-mono text-sm"
-                />
-              </div>
               <div className="sm:col-span-2 w-full max-w-md rounded-xl border border-border/70 bg-muted/20 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("settings.bookingLiveLinkTitle")}
                 </p>
-                <div className="mt-2">
+                <p className="mt-2 break-all font-mono text-sm text-foreground">
+                  {`/book/${form.publicSlug || "rezerwacje"}`}
+                </p>
+                <div className="mt-3">
                   <Button type="button" variant="outline" size="sm" asChild>
                     <Link
                       href={`/book/${form.publicSlug || "rezerwacje"}`}

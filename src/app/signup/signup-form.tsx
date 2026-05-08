@@ -46,7 +46,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const [businessName, setBusinessName] = React.useState("")
   const [slug, setSlug] = React.useState("")
-  const [ownerName, setOwnerName] = React.useState("")
+  const [ownerFirstName, setOwnerFirstName] = React.useState("")
+  const [ownerLastName, setOwnerLastName] = React.useState("")
   const [accountType, setAccountType] = React.useState<AccountType>("registered_business")
   const [companyTaxId, setCompanyTaxId] = React.useState("")
   const [contactPhone, setContactPhone] = React.useState("")
@@ -187,7 +188,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
           data: {
             business_name: businessName.trim(),
             slug: normalized,
-            owner_name: ownerName.trim() || undefined,
+            owner_name: ownerFirstName.trim() || undefined,
+            owner_last_name: ownerLastName.trim() || undefined,
             trial_intent: startTrial || undefined,
             account_type: startTrial ? accountType : undefined,
             company_tax_id: startTrial ? (companyTaxId.trim() || undefined) : undefined,
@@ -281,15 +283,27 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-owner">{t("auth.ownerNameOptional")}</Label>
-                <Input
-                  id="signup-owner"
-                  autoComplete="name"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  className="h-11 rounded-xl"
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-owner-first">{t("auth.ownerFirstNameOptional")}</Label>
+                  <Input
+                    id="signup-owner-first"
+                    autoComplete="given-name"
+                    value={ownerFirstName}
+                    onChange={(e) => setOwnerFirstName(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-owner-last">{t("auth.ownerLastNameOptional")}</Label>
+                  <Input
+                    id="signup-owner-last"
+                    autoComplete="family-name"
+                    value={ownerLastName}
+                    onChange={(e) => setOwnerLastName(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                </div>
               </div>
               {startTrial ? (
                 <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">

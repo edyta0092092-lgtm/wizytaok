@@ -72,8 +72,11 @@ export async function ensureBusinessProfileFromUserMetadata(
     return { businessProfileCreated, membershipCreated }
   }
 
-  const ownerNameRaw = typeof meta.owner_name === "string" ? meta.owner_name.trim() : ""
-  const ownerName = ownerNameRaw.length > 0 ? ownerNameRaw : null
+  const ownerFirstRaw = typeof meta.owner_name === "string" ? meta.owner_name.trim() : ""
+  const ownerLastRaw =
+    typeof meta.owner_last_name === "string" ? meta.owner_last_name.trim() : ""
+  const ownerFirst = ownerFirstRaw.length > 0 ? ownerFirstRaw : null
+  const ownerLast = ownerLastRaw.length > 0 ? ownerLastRaw : null
   const accountTypeRaw = typeof meta.account_type === "string" ? meta.account_type.trim() : ""
   const accountType =
     accountTypeRaw === "registered_business" || accountTypeRaw === "unregistered_activity"
@@ -91,7 +94,8 @@ export async function ensureBusinessProfileFromUserMetadata(
     business_name: businessName,
     slug,
     email: user.email ?? null,
-    owner_name: ownerName,
+    owner_name: ownerFirst,
+    owner_last_name: ownerLast,
     tax_id: companyTaxIdRaw || null,
     account_type: accountType,
     company_tax_id: companyTaxIdRaw || null,
@@ -100,6 +104,9 @@ export async function ensureBusinessProfileFromUserMetadata(
     contact_phone_normalized: contactPhoneNormalized,
   }
 
+  const ownerNameLegacyFallback =
+    [ownerFirst, ownerLast].filter((s): s is string => s != null && s.length > 0).join(" ") || null
+
   let { error: insertError } = await supabase.from("business_profiles").insert(fullInsertPayload)
   if (insertError && isMissingColumnError(insertError.message)) {
     const { error: fallbackError } = await supabase.from("business_profiles").insert({
@@ -107,7 +114,7 @@ export async function ensureBusinessProfileFromUserMetadata(
       business_name: businessName,
       slug,
       email: user.email ?? null,
-      owner_name: ownerName,
+      owner_name: ownerNameLegacyFallback,
       tax_id: companyTaxIdRaw || null,
     })
     insertError = fallbackError ?? null

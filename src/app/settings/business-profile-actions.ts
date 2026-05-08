@@ -134,6 +134,7 @@ export async function saveBusinessProfileAction(
       business_name: patch.business_name,
       slug: patch.slug,
       owner_name: null,
+      owner_last_name: null,
       email: patch.email,
       phone: patch.phone,
       tax_id: patch.tax_id,

@@ -247,6 +247,7 @@ export type BusinessProfileRecord = {
   businessName: string
   slug: string
   ownerName: string | null
+  ownerLastName: string | null
   email: string | null
   phone: string | null
   /** Opcjonalny NIP lub inny identyfikator podatkowy (pole `tax_id` w bazie). */

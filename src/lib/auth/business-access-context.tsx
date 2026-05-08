@@ -98,14 +98,15 @@ async function loadAccessState(): Promise<BusinessAccessState> {
   await client.rpc("ensure_owner_membership")
   const { data: owned } = await client
     .from("business_profiles")
-    .select("id, business_name, owner_name")
+    .select("id, business_name, owner_name, owner_last_name")
     .eq("owner_id", user.id)
     .maybeSingle()
   if (owned?.id) {
-    const label =
-      (typeof owned.owner_name === "string" && owned.owner_name.trim()
-        ? owned.owner_name.trim()
-        : null) ?? owned.business_name
+    const first = typeof owned.owner_name === "string" ? owned.owner_name.trim() : ""
+    const last =
+      typeof owned.owner_last_name === "string" ? owned.owner_last_name.trim() : ""
+    const combined = [first, last].filter((p) => p.length > 0).join(" ")
+    const label = combined.length > 0 ? combined : owned.business_name
     return {
       ready: true,
       businessId: owned.id,

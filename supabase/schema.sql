@@ -206,6 +206,7 @@ create table public.business_profiles (
   business_name text not null,
   slug text not null,
   owner_name text,
+  owner_last_name text,
   email text,
   phone text,
   created_at timestamptz not null default now(),
