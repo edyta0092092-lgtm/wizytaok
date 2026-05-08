@@ -31,11 +31,7 @@ function MessagesPageContent() {
     openCreateRef.current = fn
   }, [])
 
-  const canOpenMessages =
-    access.canManageBookings ||
-    access.canAccessMessages ||
-    access.canViewMessageSendHistory ||
-    access.effectiveRole === "staff"
+  const canOpenMessages = access.canAccessMessages || access.canViewMessageSendHistory
 
   React.useEffect(() => {
     if (!access.ready || canOpenMessages) return
@@ -47,7 +43,6 @@ function MessagesPageContent() {
           currentUserId: null,
           businessId: access.businessId,
           effectiveRole: access.effectiveRole,
-          canManageBookings: access.canManageBookings,
           canAccessMessages: access.canAccessMessages,
           canViewMessageSendHistory: access.canViewMessageSendHistory,
           rawBusinessMemberRole: null,
@@ -93,7 +88,6 @@ function MessagesPageContent() {
         currentUserId: user?.id ?? null,
         businessId: access.businessId,
         effectiveRole: access.effectiveRole,
-        canManageBookings: access.canManageBookings,
         canAccessMessages: access.canAccessMessages,
         canViewMessageSendHistory: access.canViewMessageSendHistory,
         rawBusinessMemberRole: selectedMember?.role ?? null,
@@ -109,7 +103,6 @@ function MessagesPageContent() {
     }
   }, [
     access.businessId,
-    access.canManageBookings,
     access.canAccessMessages,
     access.canViewMessageSendHistory,
     access.effectiveRole,

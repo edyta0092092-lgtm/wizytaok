@@ -39,7 +39,6 @@ const staffNav: NavItem[] = [
   { href: "/appointments", icon: CalendarDays, labelKey: "navigation.appointments" },
   { href: "/schedule", icon: CalendarRange, labelKey: "navigation.schedule" },
   { href: "/clients", icon: Users, labelKey: "navigation.clients" },
-  { href: "/messages", icon: MessageSquare, labelKey: "navigation.messages" },
   { href: "/settings", icon: Settings, labelKey: "navigation.settings" },
   { href: "/help", icon: LifeBuoy, labelKey: "navigation.help" },
   { href: "/account", icon: UserCircle, labelKey: "navigation.myAccount" },

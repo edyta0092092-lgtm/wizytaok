@@ -135,9 +135,9 @@ export function canManageMessageTemplates(role: PanelRole | null): boolean {
   return role === "admin"
 }
 
-/** Dostęp do modułu Wiadomości (historia + podgląd), także dla obsługi. */
+/** Dostęp do modułu Wiadomości tylko dla administratora/właściciela. */
 export function canAccessMessages(role: PanelRole | null): boolean {
-  return role === "admin" || role === "staff"
+  return role === "admin"
 }
 
 export function canViewMessageSendHistory(role: PanelRole | null): boolean {
