@@ -124,9 +124,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const passwordBlocksSubmit = Boolean(passwordLiveHint)
 
+  /** Tylko błąd długości po wpisaniu cyfr — bez czerwonego tekstu przy pustym polu. */
   const phoneFieldHint = React.useMemo(() => {
     const national = phoneNational.replace(/\D/g, "")
-    if (national.length === 0) return t("auth.signupPhoneRequired")
+    if (national.length === 0) return null
     const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
     if (v.ok) return null
     if (v.min === v.max) {
@@ -169,7 +170,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
     const nationalPhone = phoneNational.replace(/\D/g, "")
     if (nationalPhone.length === 0) {
-      setError(t("auth.signupPhoneRequired"))
+      setError(t("clients.validationPhoneRequired"))
       return
     }
     const phoneLen = validateNationalPhoneLength(phoneDialCode, phoneNational)
