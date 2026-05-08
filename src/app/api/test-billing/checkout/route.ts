@@ -8,6 +8,12 @@ import { getServiceRoleClient } from "@/lib/supabase/service-role"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
+const ALLOWED_SOURCES = new Set([
+  "wizytaok_test_billing",
+  "landing_trial_signup",
+  "landing_trial_existing_user",
+])
+
 function collectConfigErrors(): string[] {
   const errs: string[] = []
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -46,7 +52,7 @@ function collectConfigErrors(): string[] {
 /**
  * Stripe Checkout — subskrypcja testowa (trial 30 dni), wyłącznie sk_test_ / price_.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const flags = readTestIntegrationFlags()
   if (!flags.enableTestBilling) {
     return NextResponse.json(
@@ -94,9 +100,32 @@ export async function POST() {
 
   const { data: bp } = await admin
     .from("business_profiles")
-    .select("stripe_customer_id")
+    .select("stripe_customer_id, subscription_status")
     .eq("id", resolution.businessId)
     .maybeSingle()
+
+  const status = bp?.subscription_status?.trim().toLowerCase()
+  if (status === "trialing" || status === "active") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "subscription_already_active",
+        hint: "Dla tej firmy trial/subskrypcja jest juz aktywna.",
+      },
+      { status: 409 }
+    )
+  }
+
+  let source = "wizytaok_test_billing"
+  try {
+    const payload = (await request.json()) as { source?: unknown } | undefined
+    const candidate = typeof payload?.source === "string" ? payload.source.trim() : ""
+    if (candidate && ALLOWED_SOURCES.has(candidate)) {
+      source = candidate
+    }
+  } catch {
+    // body is optional
+  }
 
   const stripe = new Stripe(secret)
 
@@ -108,7 +137,7 @@ export async function POST() {
       metadata: {
         business_id: resolution.businessId,
         user_id: resolution.userId,
-        source: "wizytaok_test_billing",
+        source,
       },
     },
     success_url: `${base}/settings?stripe_test=success`,
@@ -117,7 +146,7 @@ export async function POST() {
     metadata: {
       business_id: resolution.businessId,
       user_id: resolution.userId,
-      source: "wizytaok_test_billing",
+      source,
     },
   }
 

@@ -29,7 +29,11 @@ import {
 } from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
-export function SignupForm() {
+type SignupFormProps = {
+  startTrial?: boolean
+}
+
+export function SignupForm({ startTrial = false }: SignupFormProps) {
   const { t } = useTranslations()
 
   const [businessName, setBusinessName] = React.useState("")
@@ -101,11 +105,12 @@ export function SignupForm() {
       }
 
       const origin = window.location.origin
+      const afterConfirmPath = startTrial ? "/start-trial?source=landing_trial_signup" : "/login"
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/login")}`,
+          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`,
           data: {
             business_name: businessName.trim(),
             slug: normalized,
@@ -158,6 +163,11 @@ export function SignupForm() {
             <CardDescription className="text-sm leading-relaxed">
               {t("auth.signupDescription")}
             </CardDescription>
+            {startTrial ? (
+              <p className="text-sm text-muted-foreground">
+                Utworz konto, a nastepnie przejdziesz do bezpiecznego podpniecia karty w Stripe.
+              </p>
+            ) : null}
           </CardHeader>
           <CardContent>
             <form className="space-y-4" onSubmit={onSubmit}>
@@ -249,7 +259,7 @@ export function SignupForm() {
             <p>
               {t("auth.hasAccount")}{" "}
               <Link
-                href="/login"
+                href={startTrial ? "/login?next=%2Fstart-trial%3Fsource%3Dlanding_trial_signup" : "/login"}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("auth.loginFromSignupCta")}
