@@ -17,7 +17,8 @@ function buildFallbackSlug(userId: string): string {
  * Po potwierdzeniu e-maila (auth callback) tworzy `business_profiles` z `user_metadata`, jeśli brak wiersza.
  */
 export async function ensureBusinessProfileFromUserMetadata(
-  supabase: SupabaseClient<Database>
+  supabase: SupabaseClient<Database>,
+  options?: { allowFallbackProfile?: boolean }
 ): Promise<EnsureProfileResult> {
   let businessProfileCreated = false
   let membershipCreated = false
@@ -39,16 +40,24 @@ export async function ensureBusinessProfileFromUserMetadata(
   }
 
   const meta = user.user_metadata ?? {}
+  const allowFallbackProfile = options?.allowFallbackProfile === true
   const normalizedSlugCandidate =
     typeof meta.slug === "string" ? normalizePublicSlug(meta.slug) : ""
-  const slug = isValidPublicSlugFormat(normalizedSlugCandidate)
+  const hasValidMetadataSlug = isValidPublicSlugFormat(normalizedSlugCandidate)
+  const slug = hasValidMetadataSlug
     ? normalizedSlugCandidate
-    : buildFallbackSlug(user.id)
+    : allowFallbackProfile
+      ? buildFallbackSlug(user.id)
+      : ""
   const businessNameRaw =
     typeof meta.business_name === "string" ? meta.business_name.trim() : ""
-  const businessName = businessNameRaw.length > 0 ? businessNameRaw : "Moja firma"
+  const businessName =
+    businessNameRaw.length > 0 ? businessNameRaw : allowFallbackProfile ? "Moja firma" : ""
 
   if (!slug || !isValidPublicSlugFormat(slug)) {
+    return { businessProfileCreated, membershipCreated }
+  }
+  if (!businessName) {
     return { businessProfileCreated, membershipCreated }
   }
 

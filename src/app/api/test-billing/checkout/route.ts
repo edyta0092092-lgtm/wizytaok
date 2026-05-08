@@ -13,6 +13,7 @@ const ALLOWED_SOURCES = new Set([
   "landing_trial_signup",
   "landing_trial_existing_user",
 ])
+const BLOCKED_SUBSCRIPTION_STATUSES = new Set(["trialing", "active", "past_due", "unpaid", "incomplete"])
 
 function collectConfigErrors(): string[] {
   const errs: string[] = []
@@ -141,22 +142,58 @@ export async function POST(request: Request) {
 
   const { data: bp } = await admin
     .from("business_profiles")
-    .select("stripe_customer_id, subscription_status")
+    .select(
+      "stripe_customer_id, stripe_subscription_id, subscription_status, stripe_subscription_status, trial_started_at, trial_used_at"
+    )
     .eq("id", resolution.businessId)
     .maybeSingle()
 
-  const status = bp?.subscription_status?.trim().toLowerCase()
-  if (status === "trialing" || status === "active") {
+  const status = bp?.subscription_status?.trim().toLowerCase() ?? null
+  const stripeStatus = bp?.stripe_subscription_status?.trim().toLowerCase() ?? null
+  const hasStripeSubscriptionId = Boolean(bp?.stripe_subscription_id?.trim())
+  const trialAlreadyUsed = Boolean(bp?.trial_used_at) || Boolean(bp?.trial_started_at)
+
+  if (trialAlreadyUsed) {
     return NextResponse.json(
       {
         ok: false,
-        reason: "subscription_already_active",
-        error: "subscription_already_active",
-        hint: "Dla tej firmy trial/subskrypcja jest juz aktywna.",
+        reason: "trial_already_used",
+        error: "trial_already_used",
+        message: "Darmowy okres próbny został już wykorzystany dla tej firmy.",
+        hint: "Darmowy okres próbny został już wykorzystany dla tej firmy.",
         debug: {
           enableTestBilling: true,
           hasStripePriceId: true,
           subscriptionStatus: status,
+          stripeSubscriptionStatus: stripeStatus,
+          hasStripeSubscriptionId,
+          businessId: resolution.businessId,
+          trialStartedAt: bp?.trial_started_at ?? null,
+          trialUsedAt: bp?.trial_used_at ?? null,
+        },
+      },
+      { status: 409 }
+    )
+  }
+
+  if (
+    (status && BLOCKED_SUBSCRIPTION_STATUSES.has(status)) ||
+    (stripeStatus && BLOCKED_SUBSCRIPTION_STATUSES.has(stripeStatus)) ||
+    hasStripeSubscriptionId
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "subscription_already_exists",
+        error: "subscription_already_exists",
+        message: "Ta firma ma już aktywną lub istniejącą subskrypcję.",
+        hint: "Ta firma ma już aktywną lub istniejącą subskrypcję.",
+        debug: {
+          enableTestBilling: true,
+          hasStripePriceId: true,
+          subscriptionStatus: status,
+          stripeSubscriptionStatus: stripeStatus,
+          hasStripeSubscriptionId,
           businessId: resolution.businessId,
         },
       },

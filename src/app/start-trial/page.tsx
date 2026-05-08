@@ -9,44 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ensureBusinessProfileFromUserMetadata } from "@/lib/supabase/ensure-profile-from-metadata"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
-type StartTrialState = "loading" | "error"
-type StartTrialDiagnostic = {
-  currentUserId: string | null
-  userEmail: string | null
-  businessId: string | null
-  businessProfileExists: boolean
-  businessProfileCreated: boolean
-  membershipCreated: boolean
-  subscriptionStatus: string | null
-  stripeSubscriptionStatus: string | null
-  stripeCustomerId: string | null
-  stripeSubscriptionId: string | null
-  enableTestBilling: boolean | null
-  hasStripePriceId: boolean | null
-  checkoutEndpointCalled: boolean
-  checkoutResponseStatus: number | null
-  checkoutResponseBody: Record<string, unknown> | null
-  reason: string | null
-}
-
-const EMPTY_DIAGNOSTIC: StartTrialDiagnostic = {
-  currentUserId: null,
-  userEmail: null,
-  businessId: null,
-  businessProfileExists: false,
-  businessProfileCreated: false,
-  membershipCreated: false,
-  subscriptionStatus: null,
-  stripeSubscriptionStatus: null,
-  stripeCustomerId: null,
-  stripeSubscriptionId: null,
-  enableTestBilling: null,
-  hasStripePriceId: null,
-  checkoutEndpointCalled: false,
-  checkoutResponseStatus: null,
-  checkoutResponseBody: null,
-  reason: null,
-}
+type StartTrialState = "loading" | "error" | "active"
 
 function isActiveSubscriptionStatus(status: string | null | undefined): boolean {
   const normalized = String(status ?? "").trim().toLowerCase()
@@ -66,17 +29,15 @@ function StartTrialContent() {
   const searchParams = useSearchParams()
   const [state, setState] = React.useState<StartTrialState>("loading")
   const [error, setError] = React.useState<string | null>(null)
-  const [diagnostic, setDiagnostic] = React.useState<StartTrialDiagnostic>(EMPTY_DIAGNOSTIC)
 
   const beginCheckout = React.useCallback(async () => {
     setError(null)
     setState("loading")
-    setDiagnostic(EMPTY_DIAGNOSTIC)
 
     if (!isSupabaseConfigured()) {
-      const next = { ...EMPTY_DIAGNOSTIC, reason: "supabase_not_configured" }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", { reason: "supabase_not_configured" })
+      }
       setState("error")
       setError("Konfiguracja aplikacji jest niepelna. Sprobuj ponownie za chwile.")
       return
@@ -84,21 +45,12 @@ function StartTrialContent() {
 
     const client = getBrowserClient()
     if (!client) {
-      const next = { ...EMPTY_DIAGNOSTIC, reason: "browser_client_missing" }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", { reason: "browser_client_missing" })
+      }
       setState("error")
       setError("Nie mozna uruchomic sesji. Odswiez strone i sprobuj ponownie.")
       return
-    }
-
-    let enableTestBilling: boolean | null = null
-    try {
-      const cfgRes = await fetch("/api/config/test-integrations", { method: "GET" })
-      const cfgPayload = (await cfgRes.json()) as { enableTestBilling?: boolean } | null
-      enableTestBilling = cfgPayload?.enableTestBilling === true
-    } catch {
-      enableTestBilling = null
     }
 
     const {
@@ -106,13 +58,9 @@ function StartTrialContent() {
     } = await client.auth.getUser()
 
     if (!user) {
-      const next = {
-        ...EMPTY_DIAGNOSTIC,
-        enableTestBilling,
-        reason: "login_required",
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", { reason: "login_required" })
       }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
       router.replace("/login?next=%2Fstart-trial")
       return
     }
@@ -130,7 +78,9 @@ function StartTrialContent() {
     let membershipCreated = false
     if (!profile?.id) {
       try {
-        const ensureResult = await ensureBusinessProfileFromUserMetadata(client)
+        const ensureResult = await ensureBusinessProfileFromUserMetadata(client, {
+          allowFallbackProfile: true,
+        })
         businessProfileCreated = ensureResult.businessProfileCreated
         membershipCreated = ensureResult.membershipCreated
       } catch {
@@ -140,46 +90,24 @@ function StartTrialContent() {
       profile = retry.data ?? null
     }
 
-    const currentDiagnostic: StartTrialDiagnostic = {
-      ...EMPTY_DIAGNOSTIC,
-      currentUserId: user.id,
-      userEmail: user.email ?? null,
-      businessId: profile?.id ?? null,
-      businessProfileExists: Boolean(profile?.id),
-      businessProfileCreated,
-      membershipCreated,
-      subscriptionStatus: profile?.subscription_status?.trim() || null,
-      stripeSubscriptionStatus: null,
-      stripeCustomerId: profile?.stripe_customer_id?.trim() || null,
-      stripeSubscriptionId: profile?.stripe_subscription_id?.trim() || null,
-      enableTestBilling,
-      hasStripePriceId: null,
-      checkoutEndpointCalled: false,
-      checkoutResponseStatus: null,
-      checkoutResponseBody: null,
-      reason: null,
-    }
-
     if (!profile?.id) {
-      const next = {
-        ...currentDiagnostic,
-        reason: "business_profile_missing_after_retry",
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", {
+          reason: "business_profile_missing_after_retry",
+          businessProfileCreated,
+          membershipCreated,
+        })
       }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
       setState("error")
-      setError("Nie udało się rozpocząć okresu próbnego.")
+      setError("Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.")
       return
     }
 
     if (isActiveSubscriptionStatus(profile.subscription_status)) {
-      const next = {
-        ...currentDiagnostic,
-        reason: "subscription_already_active",
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", { reason: "subscription_already_active" })
       }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
-      router.replace("/settings")
+      setState("active")
       return
     }
 
@@ -194,6 +122,7 @@ function StartTrialContent() {
       url?: string
       hint?: string
       error?: string
+      message?: string
       reason?: string
       debug?: { hasStripePriceId?: boolean }
     } | null = null
@@ -202,6 +131,7 @@ function StartTrialContent() {
         url?: string
         hint?: string
         error?: string
+        message?: string
         reason?: string
         debug?: { hasStripePriceId?: boolean }
       }
@@ -214,24 +144,21 @@ function StartTrialContent() {
         payload?.reason?.trim() ||
         payload?.error?.trim() ||
         (!payload?.url ? "checkout_url_missing" : "checkout_failed")
-      const next = {
-        ...currentDiagnostic,
-        checkoutEndpointCalled: true,
-        checkoutResponseStatus: checkoutRes.status,
-        checkoutResponseBody: payload as Record<string, unknown> | null,
-        hasStripePriceId:
-          payload?.debug && typeof payload.debug.hasStripePriceId === "boolean"
-            ? payload.debug.hasStripePriceId
-            : null,
-        reason,
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial]", {
+          reason,
+          status: checkoutRes.status,
+          payload,
+        })
       }
-      setDiagnostic(next)
-      console.info("[start-trial.diagnostic]", next)
       setState("error")
-      setError(
-        payload?.hint?.trim() ||
-          "Nie udało się rozpocząć triala. Spróbuj ponownie."
-      )
+      if (reason === "trial_already_used") {
+        setError("Darmowy okres próbny został już wykorzystany.")
+      } else if (reason === "subscription_already_exists" || reason === "subscription_already_active") {
+        setError("Twój okres próbny jest aktywny.")
+      } else {
+        setError("Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.")
+      }
       return
     }
 
@@ -248,27 +175,36 @@ function StartTrialContent() {
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>{state === "loading" ? "Przygotowujemy Twój 30-dniowy okres próbny..." : "Nie udało się rozpocząć triala."}</CardTitle>
+          <CardTitle>
+            {state === "loading"
+              ? "Przygotowujemy Twój 30-dniowy okres próbny..."
+              : state === "active"
+                ? "Twój okres próbny jest aktywny."
+                : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."}
+          </CardTitle>
           <CardDescription>
             {state === "loading"
               ? "Sprawdzamy konto i przekierowujemy do bezpiecznego checkoutu Stripe."
-              : "Możesz spróbować ponownie albo przejść do ustawień subskrypcji."}
+              : state === "active"
+                ? "Możesz przejść do panelu i kontynuować pracę."
+                : "Możesz spróbować ponownie albo przejść do panelu."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {state === "error" ? <p className="text-sm text-destructive">{error}</p> : null}
-          {state === "error" ? (
-            <pre className="overflow-x-auto rounded border bg-muted/20 p-3 text-xs text-muted-foreground">
-              {JSON.stringify(diagnostic, null, 2)}
-            </pre>
-          ) : null}
-          {state === "error" ? (
+          {state === "error" || state === "active" ? (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => void beginCheckout()}>
-                Spróbuj ponownie
-              </Button>
-              <Button type="button" variant="outline" onClick={() => router.push("/settings")}>
-                Przejdź do ustawień
+              {state === "error" ? (
+                <Button type="button" onClick={() => void beginCheckout()}>
+                  Spróbuj ponownie
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant={state === "error" ? "outline" : "default"}
+                onClick={() => router.push("/settings")}
+              >
+                Przejdź do panelu
               </Button>
             </div>
           ) : null}

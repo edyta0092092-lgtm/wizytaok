@@ -35,6 +35,33 @@ async function updateBusinessProfile(
   patch: Record<string, unknown>
 ): Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }> {
   const mutablePatch: Record<string, unknown> = { ...patch }
+  const nowIso = new Date().toISOString()
+
+  const { data: existing } = await admin
+    .from("business_profiles")
+    .select(
+      "trial_started_at, trial_used_at, subscription_trial_ends_at, stripe_subscription_trial_ends_at"
+    )
+    .eq("id", businessId)
+    .maybeSingle()
+
+  const statusRaw = typeof mutablePatch.subscription_status === "string" ? mutablePatch.subscription_status : ""
+  const status = statusRaw.trim().toLowerCase()
+  if (status === "trialing") {
+    if (!existing?.trial_started_at) {
+      mutablePatch.trial_started_at = nowIso
+    }
+    if (!existing?.trial_used_at) {
+      mutablePatch.trial_used_at = nowIso
+    }
+  }
+
+  if (!("subscription_trial_ends_at" in mutablePatch) && existing?.subscription_trial_ends_at) {
+    mutablePatch.subscription_trial_ends_at = existing.subscription_trial_ends_at
+  }
+  if (!("stripe_subscription_trial_ends_at" in mutablePatch) && existing?.stripe_subscription_trial_ends_at) {
+    mutablePatch.stripe_subscription_trial_ends_at = existing.stripe_subscription_trial_ends_at
+  }
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const result = await admin
@@ -98,15 +125,12 @@ function buildSubscriptionPatch(input: {
   const trialEndsAtIso = toIsoFromSeconds(input.trialEndSec)
   const cancelAtPeriodEnd = input.cancelAtPeriodEnd ?? false
 
-  return {
+  const patch: Record<string, unknown> = {
     stripe_customer_id: input.customerId,
     stripe_subscription_id: input.subscriptionId,
 
     subscription_status: input.status,
     stripe_subscription_status: input.status,
-
-    subscription_trial_ends_at: trialEndsAtIso,
-    stripe_subscription_trial_ends_at: trialEndsAtIso,
 
     subscription_current_period_end: input.currentPeriodEndIso,
     stripe_subscription_current_period_end: input.currentPeriodEndIso,
@@ -119,6 +143,14 @@ function buildSubscriptionPatch(input: {
     stripe_subscription_synced_at: nowIso,
     updated_at: nowIso,
   }
+
+  // Nie resetujemy trial_end przy odnowieniach (gdy Stripe zwraca null).
+  if (trialEndsAtIso) {
+    patch.subscription_trial_ends_at = trialEndsAtIso
+    patch.stripe_subscription_trial_ends_at = trialEndsAtIso
+  }
+
+  return patch
 }
 
 function getStripeForWebhook(): Stripe | NextResponse {
