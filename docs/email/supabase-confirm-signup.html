@@ -1,0 +1,68 @@
+<!--
+  Szablon: „Confirm signup” (potwierdzenie rejestracji) — Supabase Auth.
+
+  GDZIE WKLEIĆ:
+  Supabase Dashboard → Authentication → Email Templates → „Confirm signup”
+  - Subject: np. Potwierdź konto w WizytaOK
+  - Body: wklej poniższy HTML (bez tego komentarza).
+
+  ZMIENNE Supabase (nie zamieniaj ręcznie):
+  {{ .ConfirmationURL }} — pełny link potwierdzający
+
+  Opcjonalnie: Authentication → SMTP Settings — własny nadawca (np. noreply@twojadomena.pl).
+  Dokumentacja: https://supabase.com/docs/guides/auth/auth-email-templates
+-->
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Potwierdź konto</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f4f4f5;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+            <tr>
+              <td style="padding:28px 32px 8px 32px;text-align:left;">
+                <p style="margin:0;font-size:13px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#0d9488;">WizytaOK</p>
+                <h1 style="margin:12px 0 0 0;font-size:22px;font-weight:700;line-height:1.25;color:#0f172a;">Potwierdź założenie konta</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 24px 32px;">
+                <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#475569;">
+                  Dziękujemy za rejestrację. Kliknij przycisk poniżej, aby aktywować konto i dokończyć konfigurację.
+                </p>
+                <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
+                  <tr>
+                    <td style="border-radius:10px;background-color:#0d9488;">
+                      <a href="{{ .ConfirmationURL }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Potwierdź adres e-mail</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 8px 0;font-size:13px;line-height:1.5;color:#64748b;">
+                  Jeśli przycisk nie działa, skopiuj i wklej ten link w przeglądarce:
+                </p>
+                <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;color:#0d9488;">
+                  {{ .ConfirmationURL }}
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:20px 32px 28px 32px;border-top:1px solid #e2e8f0;background-color:#f8fafc;">
+                <p style="margin:0;font-size:12px;line-height:1.5;color:#94a3b8;">
+                  Jeśli nie zakładałeś/aś konta w WizytaOK, zignoruj tę wiadomość.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:20px 0 0 0;font-size:11px;color:#94a3b8;text-align:center;">
+            © WizytaOK — rezerwacje i potwierdzanie wizyt
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
