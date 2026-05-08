@@ -32,6 +32,7 @@ function MessagesPageContent() {
   }, [])
 
   const canOpenMessages =
+    access.canManageBookings ||
     access.canAccessMessages ||
     access.canViewMessageSendHistory ||
     access.effectiveRole === "staff"
@@ -42,10 +43,11 @@ function MessagesPageContent() {
       queueMicrotask(() => {
         setAccessDebug({
           path: "/messages",
-          blocker: "messages_guard",
+          blockedBy: "messages_guard",
           currentUserId: null,
           businessId: access.businessId,
           effectiveRole: access.effectiveRole,
+          canManageBookings: access.canManageBookings,
           canAccessMessages: access.canAccessMessages,
           canViewMessageSendHistory: access.canViewMessageSendHistory,
           rawBusinessMemberRole: null,
@@ -87,10 +89,11 @@ function MessagesPageContent() {
 
       const payload = {
         path: "/messages",
-        blocker: "messages_guard",
+        blockedBy: "messages_guard",
         currentUserId: user?.id ?? null,
         businessId: access.businessId,
         effectiveRole: access.effectiveRole,
+        canManageBookings: access.canManageBookings,
         canAccessMessages: access.canAccessMessages,
         canViewMessageSendHistory: access.canViewMessageSendHistory,
         rawBusinessMemberRole: selectedMember?.role ?? null,
@@ -106,6 +109,7 @@ function MessagesPageContent() {
     }
   }, [
     access.businessId,
+    access.canManageBookings,
     access.canAccessMessages,
     access.canViewMessageSendHistory,
     access.effectiveRole,
