@@ -80,6 +80,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
     setLoading(true)
     try {
+      if (startTrial && typeof document !== "undefined") {
+        document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
+      }
+
       const slugCheck = await checkBusinessSlugAvailability(client, normalized)
       if (process.env.NODE_ENV === "development") {
         console.info("[signup.slug.check]", {
@@ -110,7 +114,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`,
+          emailRedirectTo: startTrial
+            ? `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}&trial=1`
+            : `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`,
           data: {
             business_name: businessName.trim(),
             slug: normalized,

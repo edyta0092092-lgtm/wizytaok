@@ -38,6 +38,11 @@ export function LoginForm() {
   const [loading, setLoading] = React.useState(false)
   const [sendingReset, setSendingReset] = React.useState(false)
 
+  const isActiveSubscriptionStatus = React.useCallback((status: string | null | undefined) => {
+    const normalized = String(status ?? "").trim().toLowerCase()
+    return normalized === "trialing" || normalized === "active"
+  }, [])
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -69,13 +74,29 @@ export function LoginForm() {
       }
       const { data: profile } = await client
         .from("business_profiles")
-        .select("id")
+        .select("id, subscription_status")
         .eq("owner_id", user.id)
         .maybeSingle()
 
+      const rawTrialIntent = user.user_metadata?.trial_intent
+      const wantsTrial =
+        rawTrialIntent === true ||
+        rawTrialIntent === "true" ||
+        rawTrialIntent === 1 ||
+        rawTrialIntent === "1"
+      const shouldStartTrialAfterLogin =
+        !postLoginPath &&
+        wantsTrial &&
+        Boolean(profile?.id) &&
+        !isActiveSubscriptionStatus(profile?.subscription_status)
+
       const dest =
         postLoginPath ??
-        (profile ? "/dashboard" : "/settings?setup=business")
+        (shouldStartTrialAfterLogin
+          ? "/start-trial"
+          : profile
+            ? "/dashboard"
+            : "/settings?setup=business")
       router.replace(dest)
       router.refresh()
     } finally {

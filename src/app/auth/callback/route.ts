@@ -23,11 +23,13 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )!.trim()
   const code = requestUrl.searchParams.get("code")
+  const trialParam = requestUrl.searchParams.get("trial")
   const requestedNext = safeInternalRedirectOrDashboard(
     requestUrl.searchParams.get("next") ?? requestUrl.searchParams.get("redirectTo")
   )
 
   const cookieStore = await cookies()
+  const trialCookie = cookieStore.get("wizytaok_trial_intent")?.value
 
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -52,16 +54,31 @@ export async function GET(request: Request) {
   }
 
   let next = requestedNext
-  if (next === "/dashboard") {
+  const trialFromQuery = trialParam === "1" || trialParam?.toLowerCase() === "true"
+  const trialFromCookie = trialCookie === "1" || trialCookie?.toLowerCase() === "true"
+  if (trialFromQuery || trialFromCookie) {
+    next = "/start-trial"
+  } else if (next === "/dashboard") {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+    const rawTrialIntent = user?.user_metadata?.trial_intent
     const wantsTrial =
-      typeof user?.user_metadata?.trial_intent === "boolean" && user.user_metadata.trial_intent
+      rawTrialIntent === true ||
+      rawTrialIntent === "true" ||
+      rawTrialIntent === 1 ||
+      rawTrialIntent === "1"
     if (wantsTrial) {
       next = "/start-trial"
     }
   }
 
-  return NextResponse.redirect(new URL(next, origin))
+  const response = NextResponse.redirect(new URL(next, origin))
+  if (trialFromQuery || trialFromCookie) {
+    response.cookies.set("wizytaok_trial_intent", "", {
+      path: "/",
+      maxAge: 0,
+    })
+  }
+  return response
 }
