@@ -105,9 +105,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       }
 
       const origin = window.location.origin
-      const afterConfirmPath = startTrial
-        ? "/start-trial?source=landing_trial_signup&emailConfirmed=true"
-        : "/login"
+      const afterConfirmPath = startTrial ? "/start-trial" : "/login"
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
@@ -265,7 +263,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             <p>
               {t("auth.hasAccount")}{" "}
               <Link
-                href={startTrial ? "/login?next=%2Fstart-trial%3Fsource%3Dlanding_trial_signup" : "/login"}
+                href={startTrial ? "/login?next=%2Fstart-trial" : "/login"}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("auth.loginFromSignupCta")}

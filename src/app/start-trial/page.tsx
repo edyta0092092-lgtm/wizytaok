@@ -28,7 +28,6 @@ function StartTrialContent() {
   const searchParams = useSearchParams()
   const [state, setState] = React.useState<StartTrialState>("loading")
   const [error, setError] = React.useState<string | null>(null)
-  const emailConfirmed = searchParams.get("emailConfirmed") === "true"
 
   const beginCheckout = React.useCallback(async () => {
     setError(null)
@@ -115,13 +114,7 @@ function StartTrialContent() {
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>
-            {state === "loading"
-              ? emailConfirmed
-                ? "E-mail potwierdzony. Przygotowujemy Twój okres próbny."
-                : "Uruchamianie checkout..."
-              : "Nie udało się rozpocząć triala."}
-          </CardTitle>
+          <CardTitle>{state === "loading" ? "Przygotowujemy Twój 30-dniowy okres próbny..." : "Nie udało się rozpocząć triala."}</CardTitle>
           <CardDescription>
             {state === "loading"
               ? "Sprawdzamy konto i przekierowujemy do bezpiecznego checkoutu Stripe."
