@@ -27,7 +27,6 @@ export async function upsertBusinessStripeFromSubscription(
   const nowIso = new Date().toISOString()
   const patch: TablesUpdate<"business_profiles"> = {
     updated_at: nowIso,
-    stripe_subscription_synced_at: nowIso,
   }
 
   if (input.stripeCustomerId) {
@@ -37,14 +36,11 @@ export async function upsertBusinessStripeFromSubscription(
   if (input.subscription) {
     const status = input.subscription.status
     patch.stripe_subscription_id = input.subscription.id
-    patch.stripe_subscription_status = status
     const trialEnd = input.subscription.trial_end
     const trialEndIso =
       typeof trialEnd === "number" && trialEnd > 0
         ? new Date(trialEnd * 1000).toISOString()
         : null
-    patch.stripe_subscription_trial_ends_at = trialEndIso
-    patch.stripe_subscription_cancel_at_period_end = Boolean(input.subscription.cancel_at_period_end)
 
     const items = input.subscription.items?.data
     let endSec: number | null = null
@@ -58,19 +54,13 @@ export async function upsertBusinessStripeFromSubscription(
     }
     const periodEndIso =
       endSec !== null && endSec > 0 ? new Date(endSec * 1000).toISOString() : null
-    patch.stripe_subscription_current_period_end = periodEndIso
 
     patch.subscription_status = status
     patch.subscription_trial_ends_at = trialEndIso
     patch.subscription_current_period_end = periodEndIso
-    patch.subscription_cancel_at_period_end = Boolean(input.subscription.cancel_at_period_end)
+    patch.subscription_cancel_at_period_end = input.subscription.cancel_at_period_end ?? false
     patch.subscription_updated_at = nowIso
   } else {
-    patch.stripe_subscription_status = "canceled"
-    patch.stripe_subscription_current_period_end = null
-    patch.stripe_subscription_trial_ends_at = null
-    patch.stripe_subscription_cancel_at_period_end = false
-
     patch.subscription_status = "canceled"
     patch.subscription_current_period_end = null
     patch.subscription_trial_ends_at = null

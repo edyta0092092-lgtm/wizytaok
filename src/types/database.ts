@@ -123,11 +123,6 @@ export interface Database {
           updated_at: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
-          stripe_subscription_status: string | null
-          stripe_subscription_current_period_end: string | null
-          stripe_subscription_trial_ends_at: string | null
-          stripe_subscription_cancel_at_period_end: boolean | null
-          stripe_subscription_synced_at: string | null
           subscription_status: string | null
           subscription_trial_ends_at: string | null
           subscription_current_period_end: string | null
@@ -150,11 +145,6 @@ export interface Database {
           updated_at?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
-          stripe_subscription_status?: string | null
-          stripe_subscription_current_period_end?: string | null
-          stripe_subscription_trial_ends_at?: string | null
-          stripe_subscription_cancel_at_period_end?: boolean | null
-          stripe_subscription_synced_at?: string | null
           subscription_status?: string | null
           subscription_trial_ends_at?: string | null
           subscription_current_period_end?: string | null
@@ -177,11 +167,6 @@ export interface Database {
           updated_at?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
-          stripe_subscription_status?: string | null
-          stripe_subscription_current_period_end?: string | null
-          stripe_subscription_trial_ends_at?: string | null
-          stripe_subscription_cancel_at_period_end?: boolean | null
-          stripe_subscription_synced_at?: string | null
           subscription_status?: string | null
           subscription_trial_ends_at?: string | null
           subscription_current_period_end?: string | null

@@ -175,15 +175,9 @@ async function handleCheckoutCompleted(
     subscription_status: subscription.status,
     subscription_trial_ends_at: trialEndsAtIso,
     subscription_current_period_end: currentPeriodEndIso,
-    subscription_cancel_at_period_end: subscription.cancel_at_period_end,
+    subscription_cancel_at_period_end: subscription.cancel_at_period_end ?? false,
     subscription_updated_at: nowIso,
-
-    // Mirror (dla wstecznej kompatybilności, jeśli gdzieś UI/pobieranie używa stripe_*).
-    stripe_subscription_status: subscription.status,
-    stripe_subscription_trial_ends_at: trialEndsAtIso,
-    stripe_subscription_current_period_end: currentPeriodEndIso,
-    stripe_subscription_cancel_at_period_end: subscription.cancel_at_period_end,
-    stripe_subscription_synced_at: nowIso,
+    updated_at: nowIso,
   }
 
   const { data, error } = await admin
@@ -293,15 +287,9 @@ async function handleSubscriptionEvent(sub: Stripe.Subscription, eventType: stri
     subscription_status: sub.status,
     subscription_trial_ends_at: trialEndsAtIso,
     subscription_current_period_end: currentPeriodEndIso,
-    subscription_cancel_at_period_end: sub.cancel_at_period_end,
+    subscription_cancel_at_period_end: sub.cancel_at_period_end ?? false,
     subscription_updated_at: nowIso,
-
-    // Mirror (dla kompatybilności).
-    stripe_subscription_status: sub.status,
-    stripe_subscription_trial_ends_at: trialEndsAtIso,
-    stripe_subscription_current_period_end: currentPeriodEndIso,
-    stripe_subscription_cancel_at_period_end: sub.cancel_at_period_end,
-    stripe_subscription_synced_at: nowIso,
+    updated_at: nowIso,
   }
 
   const { data, error } = await admin

@@ -20,11 +20,8 @@ type ServerIntegrationFlags = {
 
 type BillingRow = {
   stripe_subscription_id: string | null
-  stripe_subscription_status: string | null
   subscription_status: string | null
-  stripe_subscription_current_period_end: string | null
   subscription_current_period_end: string | null
-  stripe_subscription_trial_ends_at: string | null
   subscription_trial_ends_at: string | null
 }
 
@@ -37,18 +34,15 @@ async function fetchBillingRowForBusiness(
   const { data, error } = await client
     .from("business_profiles")
     .select(
-      "stripe_subscription_id, stripe_subscription_status, subscription_status, stripe_subscription_current_period_end, subscription_current_period_end, stripe_subscription_trial_ends_at, subscription_trial_ends_at"
+      "stripe_subscription_id, subscription_status, subscription_current_period_end, subscription_trial_ends_at"
     )
     .eq("id", businessId)
     .maybeSingle()
   if (error || !data) return null
   return {
     stripe_subscription_id: data.stripe_subscription_id ?? null,
-    stripe_subscription_status: data.stripe_subscription_status ?? null,
     subscription_status: data.subscription_status ?? null,
-    stripe_subscription_current_period_end: data.stripe_subscription_current_period_end ?? null,
     subscription_current_period_end: data.subscription_current_period_end ?? null,
-    stripe_subscription_trial_ends_at: data.stripe_subscription_trial_ends_at ?? null,
     subscription_trial_ends_at: data.subscription_trial_ends_at ?? null,
   }
 }
@@ -154,8 +148,7 @@ export function TestBillingSettingsCard() {
 
   if (!serverFlags?.testBillingEnabled) return null
 
-  const statusRaw =
-    billingRow?.subscription_status?.trim() || billingRow?.stripe_subscription_status?.trim() || ""
+  const statusRaw = billingRow?.subscription_status?.trim() ?? ""
 
   const uiStatus = mapStripeSubscriptionToUiStatus(
     billingRow?.stripe_subscription_id,
@@ -163,12 +156,8 @@ export function TestBillingSettingsCard() {
   )
   const statusLabel = t(`settings.${uiStatusTranslationKey(uiStatus)}` as "settings.testSubStatusNone")
 
-  const periodEndRaw =
-    billingRow?.subscription_current_period_end?.trim() ||
-    billingRow?.stripe_subscription_current_period_end?.trim()
-  const trialEndRaw =
-    billingRow?.subscription_trial_ends_at?.trim() ||
-    billingRow?.stripe_subscription_trial_ends_at?.trim()
+  const periodEndRaw = billingRow?.subscription_current_period_end?.trim()
+  const trialEndRaw = billingRow?.subscription_trial_ends_at?.trim()
   const showTrialEnd = uiStatus === "trialing" && Boolean(trialEndRaw)
   const relevantEndRaw = showTrialEnd ? trialEndRaw : periodEndRaw
   const endHeading = showTrialEnd
