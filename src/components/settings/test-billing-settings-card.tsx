@@ -24,6 +24,27 @@ type BillingRow = {
   stripe_subscription_current_period_end: string | null
 }
 
+async function fetchBillingRowForBusiness(
+  businessId: string
+): Promise<BillingRow | null> {
+  if (!isSupabaseConfigured()) return null
+  const client = getBrowserClient()
+  if (!client) return null
+  const { data, error } = await client
+    .from("business_profiles")
+    .select(
+      "stripe_subscription_id, stripe_subscription_status, stripe_subscription_current_period_end"
+    )
+    .eq("id", businessId)
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    stripe_subscription_id: data.stripe_subscription_id ?? null,
+    stripe_subscription_status: data.stripe_subscription_status ?? null,
+    stripe_subscription_current_period_end: data.stripe_subscription_current_period_end ?? null,
+  }
+}
+
 function parseIntegrationResponse(data: unknown): ServerIntegrationFlags {
   if (!data || typeof data !== "object") {
     return { testBillingEnabled: false, testNotificationsEnabled: false }
@@ -67,34 +88,6 @@ export function TestBillingSettingsCard() {
 
   const isPanelAdmin = Boolean(ready && (isOwner || effectiveRole === "admin"))
 
-  const loadBillingRow = React.useCallback(async () => {
-    if (!businessId || !isSupabaseConfigured()) {
-      setBillingRow(null)
-      return
-    }
-    const client = getBrowserClient()
-    if (!client) {
-      setBillingRow(null)
-      return
-    }
-    const { data, error } = await client
-      .from("business_profiles")
-      .select(
-        "stripe_subscription_id, stripe_subscription_status, stripe_subscription_current_period_end"
-      )
-      .eq("id", businessId)
-      .maybeSingle()
-    if (error || !data) {
-      setBillingRow(null)
-      return
-    }
-    setBillingRow({
-      stripe_subscription_id: data.stripe_subscription_id ?? null,
-      stripe_subscription_status: data.stripe_subscription_status ?? null,
-      stripe_subscription_current_period_end: data.stripe_subscription_current_period_end ?? null,
-    })
-  }, [businessId])
-
   React.useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -116,20 +109,40 @@ export function TestBillingSettingsCard() {
   }, [])
 
   React.useEffect(() => {
-    void loadBillingRow()
-  }, [loadBillingRow])
+    let cancelled = false
+    void (async () => {
+      const row = businessId ? await fetchBillingRowForBusiness(businessId) : null
+      if (!cancelled) setBillingRow(row)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [businessId])
 
+  const stripeReturnHandledRef = React.useRef(false)
   React.useEffect(() => {
     if (typeof window === "undefined") return
     const p = new URLSearchParams(window.location.search).get("stripe_test")
-    if (p === "success") {
+    if (p !== "success" && p !== "cancel") return
+    if (stripeReturnHandledRef.current) return
+    stripeReturnHandledRef.current = true
+
+    let cancelled = false
+    void (async () => {
+      if (p === "cancel") {
+        toast(t("settings.testBillingCancel"))
+        return
+      }
       toast.success(t("settings.testBillingSuccess"))
-      void loadBillingRow()
+      if (!businessId) return
+      const row = await fetchBillingRowForBusiness(businessId)
+      if (!cancelled) setBillingRow(row)
+    })()
+
+    return () => {
+      cancelled = true
     }
-    if (p === "cancel") {
-      toast(t("settings.testBillingCancel"))
-    }
-  }, [loadBillingRow, t])
+  }, [businessId, t])
 
   if (!ready) return null
 

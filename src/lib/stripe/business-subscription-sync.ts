@@ -25,9 +25,18 @@ export async function upsertBusinessStripeFromSubscription(
   if (input.subscription) {
     patch.stripe_subscription_id = input.subscription.id
     patch.stripe_subscription_status = input.subscription.status
-    const endSec = input.subscription.current_period_end
+    const items = input.subscription.items?.data
+    let endSec: number | null = null
+    if (items?.length) {
+      let max = 0
+      for (const item of items) {
+        const end = item.current_period_end
+        if (typeof end === "number" && end > max) max = end
+      }
+      endSec = max > 0 ? max : null
+    }
     patch.stripe_subscription_current_period_end =
-      typeof endSec === "number" && endSec > 0
+      endSec !== null && endSec > 0
         ? new Date(endSec * 1000).toISOString()
         : null
   } else {

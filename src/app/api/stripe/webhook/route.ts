@@ -25,6 +25,18 @@ function getWebhookSecret(): string | NextResponse {
   return wh
 }
 
+/** Subscription reference on invoices (Stripe API 2025+ / SDK v20: under `parent.subscription_details`). */
+function getInvoiceSubscriptionRef(
+  invoice: Stripe.Invoice
+): string | Stripe.Subscription | null {
+  const parent = invoice.parent
+  if (parent?.type === "subscription_details") {
+    const sub = parent.subscription_details?.subscription
+    if (sub) return sub
+  }
+  return null
+}
+
 async function resolveBusinessIdFromSubscription(
   stripe: Stripe,
   sub: Stripe.Subscription
@@ -44,7 +56,7 @@ async function resolveBusinessIdFromSubscription(
 }
 
 async function resolveBusinessIdFromInvoice(stripe: Stripe, invoice: Stripe.Invoice): Promise<string | null> {
-  const subRef = invoice.subscription
+  const subRef = getInvoiceSubscriptionRef(invoice)
   const subId = typeof subRef === "string" ? subRef : subRef?.id
   if (!subId) return null
   const sub = await stripe.subscriptions.retrieve(subId)
@@ -97,7 +109,7 @@ async function handleSubscriptionDeleted(stripe: Stripe, sub: Stripe.Subscriptio
 async function handleInvoice(stripe: Stripe, invoice: Stripe.Invoice) {
   const businessId = await resolveBusinessIdFromInvoice(stripe, invoice)
   if (!businessId) return
-  const subRef = invoice.subscription
+  const subRef = getInvoiceSubscriptionRef(invoice)
   const subId = typeof subRef === "string" ? subRef : subRef?.id
   if (!subId) return
   const sub = await stripe.subscriptions.retrieve(subId)
