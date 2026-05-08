@@ -367,14 +367,17 @@ export const dictionaries = {
       loginDescription: "Wejdź do panelu swojej firmy.",
       email: "E-mail",
       password: "Hasło",
-      passwordRequirementsHint: "Co najmniej 6 znaków.",
-      passwordPolicyTooShort: "Hasło musi mieć co najmniej 6 znaków.",
+      passwordRequirementsHint:
+        "Co najmniej 8 znaków, jedna wielka litera i jeden znak specjalny.",
+      passwordPolicyTooShort: "Hasło musi mieć co najmniej 8 znaków.",
+      passwordPolicyUppercase: "Hasło musi zawierać co najmniej jedną wielką literę.",
+      passwordPolicySpecial: "Hasło musi zawierać co najmniej jeden znak specjalny.",
       logIn: "Zaloguj się",
       noAccount: "Nie masz konta?",
       loginSignupCta: "Utwórz konto",
       signupTitle: "Utwórz konto firmy",
       signupDescription:
-        "Załóż konto dla swojej firmy. Link do publicznej rezerwacji utworzymy automatycznie z jej nazwy.",
+        "Załóż konto dla swojej firmy. Link do publicznej rezerwacji utworzymy automatycznie z nazwy — adres strony rezerwacji możesz w każdej chwili zmienić w ustawieniach.",
       signupTrialStripeLead:
         "Utwórz konto, a następnie przejdziesz do bezpiecznego podpięcia karty w Stripe.",
       signupAccountTypeLabel: "Typ działalności",
@@ -392,11 +395,6 @@ export const dictionaries = {
       signupTaxIdRequiredHint: "Wymagany przy firmie z NIP (10 cyfr, suma kontrolna).",
       signupTaxIdOptionalHint:
         "Możesz podać numer NIP (np. przyszłej firmy) — wtedy sprawdzimy format. Pole nie jest wymagane.",
-      publicSlug: "Adres strony rezerwacji",
-      slugManualRequiredHint:
-        "Wpisz adres (min. trzy znaki: małe litery, cyfry, myślniki). Bez tego nie zarejestrujesz konta.",
-      slugOptionalHint:
-        "Zostaw puste — uzupełnimy z nazwy firmy. Minimalnie trzy znaki przy ręcznym wpisaniu.",
       signupSubmit: "Utwórz konto",
       hasAccount: "Masz już konto?",
       loginFromSignupCta: "Zaloguj się",
@@ -2451,14 +2449,17 @@ Pozdrawiamy,
       loginDescription: "Access your business panel.",
       email: "Email",
       password: "Password",
-      passwordRequirementsHint: "At least 6 characters.",
-      passwordPolicyTooShort: "Password must be at least 6 characters long.",
+      passwordRequirementsHint:
+        "At least 8 characters, one uppercase letter and one special character.",
+      passwordPolicyTooShort: "Password must be at least 8 characters long.",
+      passwordPolicyUppercase: "Password must contain at least one uppercase letter.",
+      passwordPolicySpecial: "Password must contain at least one special character.",
       logIn: "Log in",
       noAccount: "No account?",
       loginSignupCta: "Create one",
       signupTitle: "Create business account",
       signupDescription:
-        "Create an account for your business. We will create your public booking link automatically from its name.",
+        "Create an account for your business. We will create your public booking link automatically from the name — you can change the booking page address anytime in Settings.",
       signupTrialStripeLead:
         "After you register, you will continue to securely add your payment card with Stripe.",
       signupAccountTypeLabel: "Type of activity",
@@ -2475,11 +2476,6 @@ Pozdrawiamy,
       signupTaxIdRequiredHint: "Required for a business with a tax ID (10 digits, checksum).",
       signupTaxIdOptionalHint:
         "You may enter a tax ID (e.g. for a future business): we validate the format when filled. Field is optional.",
-      publicSlug: "Booking page address",
-      slugManualRequiredHint:
-        "Enter your booking address (min. 3 chars: lowercase letters, digits, hyphens). Required to register.",
-      slugOptionalHint:
-        "Leave blank — we will derive it from your business name when possible (min. 3 characters if typed).",
       signupSubmit: "Create account",
       hasAccount: "Already have an account?",
       loginFromSignupCta: "Log in",
