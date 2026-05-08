@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   AlertCircle,
   CheckCircle2,
@@ -240,6 +241,7 @@ function FirstStepsCard() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { t, language } = useTranslations()
   const {
     appointments: allAppointments,
@@ -258,6 +260,11 @@ export default function DashboardPage() {
     requiresActionCount: 0,
     reminderErrorsCount: 0,
   })
+
+  const isActiveSubscriptionStatus = React.useCallback((status: string | null | undefined): boolean => {
+    const normalized = String(status ?? "").trim().toLowerCase()
+    return normalized === "trialing" || normalized === "active"
+  }, [])
 
   const statsReady = appointmentsReady && !appointmentsLoadError && !statsLoading && !statsError
 
@@ -324,6 +331,43 @@ export default function DashboardPage() {
     if (rs === "not_configured" || rs === "simulated_dev") return t("appointments.reminderStatusNotConfigured")
     return t("appointments.reminderStatusScheduled")
   }
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      if (!isSupabaseConfigured()) return
+      if (typeof window === "undefined") return
+      const hash = window.location.hash || ""
+      if (!hash.includes("error_code=otp_expired")) return
+      const trialIntentCookie = document.cookie.includes("wizytaok_trial_intent=1")
+      const client = getBrowserClient()
+      if (!client) return
+      const {
+        data: { user },
+      } = await client.auth.getUser()
+      if (!user) return
+      const rawTrialIntent = user.user_metadata?.trial_intent
+      const wantsTrialFromMetadata =
+        rawTrialIntent === true ||
+        rawTrialIntent === "true" ||
+        rawTrialIntent === 1 ||
+        rawTrialIntent === "1"
+      if (!trialIntentCookie && !wantsTrialFromMetadata) return
+      const { data: profile } = await client
+        .from("business_profiles")
+        .select("id, subscription_status")
+        .eq("owner_id", user.id)
+        .maybeSingle()
+      if (!profile?.id) return
+      if (isActiveSubscriptionStatus(profile.subscription_status)) return
+      if (!cancelled) {
+        router.replace("/start-trial?source=landing_trial_signup")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isActiveSubscriptionStatus, router])
 
   React.useEffect(() => {
     let cancelled = false

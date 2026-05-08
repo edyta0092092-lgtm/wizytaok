@@ -84,11 +84,28 @@ export function LoginForm() {
         rawTrialIntent === "true" ||
         rawTrialIntent === 1 ||
         rawTrialIntent === "1"
+      const wantsTrialFromCookie =
+        typeof document !== "undefined" && document.cookie.includes("wizytaok_trial_intent=1")
+      const wantsTrialFromStorage = (() => {
+        if (typeof window === "undefined") return false
+        try {
+          return window.localStorage.getItem("wizytaok_trial_intent") === "1"
+        } catch {
+          return false
+        }
+      })()
       const shouldStartTrialAfterLogin =
         !postLoginPath &&
-        wantsTrial &&
-        Boolean(profile?.id) &&
+        (wantsTrial || wantsTrialFromCookie || wantsTrialFromStorage) &&
         !isActiveSubscriptionStatus(profile?.subscription_status)
+
+      if (shouldStartTrialAfterLogin) {
+        try {
+          window.localStorage.removeItem("wizytaok_trial_intent")
+        } catch {
+          // ignore storage failures
+        }
+      }
 
       const dest =
         postLoginPath ??

@@ -82,6 +82,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     try {
       if (startTrial && typeof document !== "undefined") {
         document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
+        try {
+          window.localStorage.setItem("wizytaok_trial_intent", "1")
+        } catch {
+          // ignore storage failures (private mode, restricted browser settings)
+        }
       }
 
       const slugCheck = await checkBusinessSlugAvailability(client, normalized)
