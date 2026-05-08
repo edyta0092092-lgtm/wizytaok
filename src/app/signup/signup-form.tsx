@@ -115,6 +115,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             business_name: businessName.trim(),
             slug: normalized,
             owner_name: ownerName.trim() || undefined,
+            trial_intent: startTrial || undefined,
           },
         },
       })

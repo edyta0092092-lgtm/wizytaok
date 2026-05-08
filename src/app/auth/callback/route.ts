@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )!.trim()
   const code = requestUrl.searchParams.get("code")
-  const next = safeInternalRedirectOrDashboard(
+  const requestedNext = safeInternalRedirectOrDashboard(
     requestUrl.searchParams.get("next") ?? requestUrl.searchParams.get("redirectTo")
   )
 
@@ -49,6 +49,18 @@ export async function GET(request: Request) {
   if (code) {
     await supabase.auth.exchangeCodeForSession(code)
     await ensureBusinessProfileFromUserMetadata(supabase)
+  }
+
+  let next = requestedNext
+  if (next === "/dashboard") {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    const wantsTrial =
+      typeof user?.user_metadata?.trial_intent === "boolean" && user.user_metadata.trial_intent
+    if (wantsTrial) {
+      next = "/start-trial"
+    }
   }
 
   return NextResponse.redirect(new URL(next, origin))
