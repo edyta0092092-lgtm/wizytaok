@@ -3,7 +3,9 @@ import Stripe from "stripe"
 
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import { isTrialStripeCheckoutEnvReady, readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
+import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { Database } from "@/types/database"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -16,6 +18,8 @@ const ALLOWED_SOURCES = new Set([
 const BLOCKED_SUBSCRIPTION_STATUSES = new Set(["trialing", "active", "past_due", "unpaid", "incomplete"])
 const ACCOUNT_TYPE_REGISTERED = "registered_business"
 const ACCOUNT_TYPE_UNREGISTERED = "unregistered_activity"
+
+type BusinessProfileRow = Database["public"]["Tables"]["business_profiles"]["Row"]
 
 function normalizeDigits(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -74,7 +78,7 @@ function collectConfigErrors(): string[] {
 }
 
 /**
- * Stripe Checkout — subskrypcja testowa (trial 30 dni), wyłącznie sk_test_ / price_.
+ * Stripe Checkout — subskrypcja z okresem próbnym (30 dni); klucze sk_test_ lub sk_live_ + price_.
  */
 export async function POST(request: Request) {
   const flags = readTestIntegrationFlags()
@@ -100,12 +104,14 @@ export async function POST(request: Request) {
 
   const configErrors = collectConfigErrors()
   if (configErrors.length > 0) {
+    const configHint = configErrors.join(" ")
     return NextResponse.json(
       {
         ok: false,
         reason: "stripe_config_invalid",
         error: "stripe_config_invalid",
-        hint: configErrors.join(" "),
+        message: configHint,
+        hint: configHint,
         details: configErrors,
         debug: {
           enableTestBilling: true,
@@ -120,12 +126,14 @@ export async function POST(request: Request) {
   const secret = process.env.STRIPE_SECRET_KEY?.trim()
   const priceId = process.env.STRIPE_PRICE_ID?.trim()
   if (!siteBaseRaw || !secret || !priceId) {
+    const hint = "Niepełna konfiguracja Stripe lub NEXT_PUBLIC_SITE_URL."
     return NextResponse.json(
       {
         ok: false,
         reason: "stripe_config_invalid",
         error: "stripe_config_invalid",
-        hint: "Niepełna konfiguracja Stripe lub NEXT_PUBLIC_SITE_URL.",
+        message: hint,
+        hint,
         debug: {
           enableTestBilling: true,
           hasStripePriceId: Boolean(priceId),
@@ -162,12 +170,28 @@ export async function POST(request: Request) {
   }
 
   const admin = getServiceRoleClient()
-  if (!admin) {
+  const userSb = await getServerClient()
+
+  let bp: BusinessProfileRow | null = null
+
+  if (admin) {
+    const { data } = await admin.from("business_profiles").select("*").eq("id", resolution.businessId).maybeSingle()
+    bp = data ?? null
+  } else if (userSb) {
+    const { data } = await userSb
+      .from("business_profiles")
+      .select("*")
+      .eq("id", resolution.businessId)
+      .maybeSingle()
+    bp = data ?? null
+  } else {
     return NextResponse.json(
       {
         ok: false,
-        reason: "service_role_missing",
-        error: "service_role_missing",
+        reason: "supabase_server_missing",
+        error: "supabase_server_missing",
+        message: "Brak konfiguracji Supabase po stronie serwera.",
+        hint: "Brak konfiguracji Supabase po stronie serwera.",
         debug: {
           enableTestBilling: true,
           hasStripePriceId: Boolean(priceId),
@@ -177,19 +201,18 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: bp } = await admin
-    .from("business_profiles")
-    .select("*")
-    .eq("id", resolution.businessId)
-    .maybeSingle()
-
   if (!bp?.id) {
+    const hint =
+      admin == null
+        ? "Nie znaleziono profilu firmy (być może konto członkowskie). Dodaj SUPABASE_SERVICE_ROLE_KEY w Vercel albo zaloguj się na konto właściciela."
+        : "Nie znaleziono profilu firmy."
     return NextResponse.json(
       {
         ok: false,
         reason: "business_profile_missing",
         error: "business_profile_missing",
-        message: "Nie znaleziono profilu firmy.",
+        message: hint,
+        hint,
       },
       { status: 404 }
     )
@@ -265,57 +288,69 @@ export async function POST(request: Request) {
     typeof bp.contact_phone_normalized === "string" ? bp.contact_phone_normalized : null
   )
 
-  if (accountType === ACCOUNT_TYPE_REGISTERED && companyTaxIdNormalized) {
-    const { data: sameTaxProfiles } = await admin
-      .from("business_profiles")
-      .select(
-        "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
-      )
-      .eq("company_tax_id_normalized", companyTaxIdNormalized)
-      .neq("id", bp.id)
+  if (admin) {
+    if (accountType === ACCOUNT_TYPE_REGISTERED && companyTaxIdNormalized) {
+      const { data: sameTaxProfiles } = await admin
+        .from("business_profiles")
+        .select(
+          "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
+        )
+        .eq("company_tax_id_normalized", companyTaxIdNormalized)
+        .neq("id", bp.id)
 
-    const blockedByTax = (sameTaxProfiles ?? []).some((row) => {
-      const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
-      const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
-      return hasUsedTrial || hasAnySubscription || hasBlockedStatus(row.subscription_status) || hasBlockedStatus(row.stripe_subscription_status)
-    })
-    if (blockedByTax) {
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: "trial_already_used",
-          error: "trial_already_used",
-          message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
-        },
-        { status: 409 }
-      )
+      const blockedByTax = (sameTaxProfiles ?? []).some((row) => {
+        const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
+        const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
+        return (
+          hasUsedTrial ||
+          hasAnySubscription ||
+          hasBlockedStatus(row.subscription_status) ||
+          hasBlockedStatus(row.stripe_subscription_status)
+        )
+      })
+      if (blockedByTax) {
+        return NextResponse.json(
+          {
+            ok: false,
+            reason: "trial_already_used",
+            error: "trial_already_used",
+            message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
+          },
+          { status: 409 }
+        )
+      }
     }
-  }
 
-  if (accountType === ACCOUNT_TYPE_UNREGISTERED && contactPhoneNormalized) {
-    const { data: samePhoneProfiles } = await admin
-      .from("business_profiles")
-      .select(
-        "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
-      )
-      .eq("contact_phone_normalized", contactPhoneNormalized)
-      .neq("id", bp.id)
+    if (accountType === ACCOUNT_TYPE_UNREGISTERED && contactPhoneNormalized) {
+      const { data: samePhoneProfiles } = await admin
+        .from("business_profiles")
+        .select(
+          "id, trial_used_at, trial_started_at, stripe_subscription_id, subscription_status, stripe_subscription_status"
+        )
+        .eq("contact_phone_normalized", contactPhoneNormalized)
+        .neq("id", bp.id)
 
-    const blockedByPhone = (samePhoneProfiles ?? []).some((row) => {
-      const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
-      const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
-      return hasUsedTrial || hasAnySubscription || hasBlockedStatus(row.subscription_status) || hasBlockedStatus(row.stripe_subscription_status)
-    })
-    if (blockedByPhone) {
-      return NextResponse.json(
-        {
-          ok: false,
-          reason: "trial_already_used",
-          error: "trial_already_used",
-          message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
-        },
-        { status: 409 }
-      )
+      const blockedByPhone = (samePhoneProfiles ?? []).some((row) => {
+        const hasUsedTrial = Boolean(row.trial_used_at) || Boolean(row.trial_started_at)
+        const hasAnySubscription = Boolean(row.stripe_subscription_id?.trim())
+        return (
+          hasUsedTrial ||
+          hasAnySubscription ||
+          hasBlockedStatus(row.subscription_status) ||
+          hasBlockedStatus(row.stripe_subscription_status)
+        )
+      })
+      if (blockedByPhone) {
+        return NextResponse.json(
+          {
+            ok: false,
+            reason: "trial_already_used",
+            error: "trial_already_used",
+            message: "Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.",
+          },
+          { status: 409 }
+        )
+      }
     }
   }
 
@@ -366,32 +401,58 @@ export async function POST(request: Request) {
     sessionParams.customer_email = resolution.userEmail.trim()
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams)
+  try {
+    const session = await stripe.checkout.sessions.create(sessionParams)
 
-  if (!session.url) {
+    if (!session.url) {
+      const msg = "Stripe nie zwrócił adresu płatności."
+      return NextResponse.json(
+        {
+          ok: false,
+          reason: "checkout_url_missing",
+          error: "checkout_url_missing",
+          message: msg,
+          hint: msg,
+          debug: {
+            enableTestBilling: true,
+            hasStripePriceId: true,
+            businessId: resolution.businessId,
+          },
+        },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      ok: true,
+      reason: "checkout_created",
+      url: session.url,
+      debug: {
+        enableTestBilling: true,
+        hasStripePriceId: true,
+        businessId: resolution.businessId,
+      },
+    })
+  } catch (err) {
+    const stripeMsg = err instanceof Stripe.errors.StripeError ? err.message : null
+    const msg =
+      stripeMsg && stripeMsg.trim().length > 0
+        ? stripeMsg.trim()
+        : "Nie udało się utworzyć sesji płatności Stripe. Sprawdź STRIPE_PRICE_ID i tryb kluczy (test/live)."
     return NextResponse.json(
       {
         ok: false,
-        reason: "checkout_url_missing",
-        error: "checkout_url_missing",
+        reason: "stripe_checkout_failed",
+        error: "stripe_checkout_failed",
+        message: msg,
+        hint: msg,
         debug: {
           enableTestBilling: true,
           hasStripePriceId: true,
           businessId: resolution.businessId,
         },
       },
-      { status: 500 }
+      { status: 502 }
     )
   }
-
-  return NextResponse.json({
-    ok: true,
-    reason: "checkout_created",
-    url: session.url,
-    debug: {
-      enableTestBilling: true,
-      hasStripePriceId: true,
-      businessId: resolution.businessId,
-    },
-  })
 }

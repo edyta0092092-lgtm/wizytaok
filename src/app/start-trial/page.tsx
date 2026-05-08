@@ -99,7 +99,9 @@ function StartTrialContent() {
         })
       }
       setState("error")
-      setError("Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.")
+      setError(
+        "Nie znaleziono profilu firmy po zalogowaniu. Spróbuj wylogować się i zalogować ponownie albo skontaktuj się z pomocą."
+      )
       return
     }
 
@@ -119,25 +121,30 @@ function StartTrialContent() {
       body: JSON.stringify({ source }),
     })
 
+    const rawBody = await checkoutRes.text()
     let payload: {
       url?: string
       hint?: string
       error?: string
       message?: string
       reason?: string
+      details?: string[]
       debug?: { hasStripePriceId?: boolean }
     } | null = null
-    try {
-      payload = (await checkoutRes.json()) as {
-        url?: string
-        hint?: string
-        error?: string
-        message?: string
-        reason?: string
-        debug?: { hasStripePriceId?: boolean }
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody) as {
+          url?: string
+          hint?: string
+          error?: string
+          message?: string
+          reason?: string
+          details?: string[]
+          debug?: { hasStripePriceId?: boolean }
+        }
+      } catch {
+        payload = null
       }
-    } catch {
-      payload = null
     }
 
     if (!checkoutRes.ok || !payload?.url) {
@@ -150,6 +157,7 @@ function StartTrialContent() {
           reason,
           status: checkoutRes.status,
           payload,
+          rawBodyPreview: rawBody.slice(0, 500),
         })
       }
       setState("error")
@@ -159,9 +167,14 @@ function StartTrialContent() {
         setError("Twój okres próbny jest aktywny.")
       } else {
         const rawErr = typeof payload?.error === "string" ? payload.error.trim() : ""
+        const detailsJoined =
+          Array.isArray(payload?.details) && payload.details.length > 0
+            ? payload.details.filter((s) => typeof s === "string" && s.trim().length > 0).join(" ")
+            : ""
         const backendMessage =
           payload?.message?.trim() ||
           payload?.hint?.trim() ||
+          detailsJoined ||
           (rawErr === "unauthorized"
             ? "Sesja wygasła lub nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie."
             : rawErr === "no_business"
@@ -170,11 +183,15 @@ function StartTrialContent() {
                 ? "Brak konfiguracji Stripe dla okresu próbnego (sprawdź zmienne na serwerze)."
                 : rawErr.length > 0
                   ? rawErr
-                  : "")
+                  : !payload && rawBody.trim().length > 0
+                    ? `Odpowiedź serwera (${checkoutRes.status}): ${rawBody.slice(0, 280)}${rawBody.length > 280 ? "…" : ""}`
+                    : "")
         setError(
           backendMessage.length > 0
             ? backendMessage
-            : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."
+            : checkoutRes.status >= 500
+              ? `Błąd serwera (${checkoutRes.status}). Spróbuj za chwilę lub skontaktuj się z pomocą.`
+              : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."
         )
       }
       return
