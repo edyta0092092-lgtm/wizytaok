@@ -71,9 +71,7 @@ function StartTrialContent() {
       return
     }
 
-    const source =
-      searchParams.get("source")?.trim() ||
-      (user ? "landing_trial_existing_user" : "landing_trial_signup")
+    const source = searchParams.get("source")?.trim() || "landing_trial_signup"
     const checkoutRes = await fetch("/api/test-billing/checkout", {
       method: "POST",
       headers: { "content-type": "application/json" },

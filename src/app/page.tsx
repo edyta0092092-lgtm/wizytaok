@@ -29,7 +29,7 @@ export default function HomePage() {
               {t("marketing.navLogin")}
             </Link>
             <Link
-              href="/start-trial"
+              href="/signup?startTrial=true"
               className="rounded-xl bg-primary px-3 py-2 text-center text-xs font-medium text-primary-foreground hover:bg-[var(--primary-hover)] sm:px-4 sm:text-sm"
             >
               {t("marketing.ctaTryFree")}
@@ -60,7 +60,7 @@ export default function HomePage() {
           <div className="mt-8 flex flex-col gap-2">
             <div className="flex flex-wrap gap-3">
               <Link
-                href="/start-trial"
+                href="/signup?startTrial=true"
                 className="rounded-xl bg-primary px-5 py-3 text-center text-sm font-semibold leading-snug text-primary-foreground hover:bg-[var(--primary-hover)]"
               >
                 {t("marketing.ctaTryFree")}
@@ -219,7 +219,7 @@ export default function HomePage() {
             {t("marketing.ctaHelper")}
           </p>
           <Link
-            href="/start-trial"
+            href="/signup?startTrial=true"
             className="mt-8 inline-flex rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-[var(--primary-hover)]"
           >
             {t("marketing.ctaTryFree")}

@@ -151,15 +151,16 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         return
       }
 
-      const origin = window.location.origin
+      const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+      const siteBase = (configuredSiteUrl && configuredSiteUrl.length > 0 ? configuredSiteUrl : window.location.origin).replace(/\/$/, "")
       const afterConfirmPath = startTrial ? "/start-trial" : "/login"
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
         options: {
           emailRedirectTo: startTrial
-            ? `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}&trial=1`
-            : `${origin}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`,
+            ? `${siteBase}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`
+            : `${siteBase}/auth/callback`,
           data: {
             business_name: businessName.trim(),
             slug: normalized,

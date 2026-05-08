@@ -49,11 +49,13 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/signup-staff")) {
-      const afterLogin =
-        safeInternalRedirect(
-          request.nextUrl.searchParams.get("next") ??
-            request.nextUrl.searchParams.get("redirectTo")
-        ) ?? "/dashboard"
+      const isSignupTrial = pathname === "/signup" && request.nextUrl.searchParams.get("startTrial") === "true"
+      const afterLogin = isSignupTrial
+        ? "/start-trial"
+        : safeInternalRedirect(
+            request.nextUrl.searchParams.get("next") ??
+              request.nextUrl.searchParams.get("redirectTo")
+          ) ?? "/dashboard"
       return NextResponse.redirect(new URL(afterLogin, request.url))
     }
     return response
