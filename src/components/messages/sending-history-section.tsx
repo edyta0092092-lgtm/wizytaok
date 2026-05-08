@@ -432,15 +432,20 @@ export function SendingHistorySection() {
     let cancelled = false
     void (async () => {
       try {
-        const res = await fetch("/api/config/test-integrations")
+        const res = await fetch("/api/config/test-integrations", { cache: "no-store" })
         const data = (await res.json()) as {
+          testNotificationsEnabled?: boolean
           enableTestNotifications?: boolean
+          testBillingEnabled?: boolean
           enableTestBilling?: boolean
         }
         if (!cancelled) {
           setIntegrationFlags({
-            enableTestNotifications: data.enableTestNotifications === true,
-            enableTestBilling: data.enableTestBilling === true,
+            enableTestNotifications:
+              data.testNotificationsEnabled === true ||
+              data.enableTestNotifications === true,
+            enableTestBilling:
+              data.testBillingEnabled === true || data.enableTestBilling === true,
           })
         }
       } catch {

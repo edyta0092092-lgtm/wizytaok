@@ -23,6 +23,7 @@ import {
   canViewMessageSendHistory,
   getCurrentBusinessMembership,
   getCurrentUserRole,
+  normalizeBusinessMemberPanelRole,
   type PanelRole,
 } from "@/lib/auth/permissions"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -140,7 +141,7 @@ async function loadAccessState(): Promise<BusinessAccessState> {
       userEmail: user.email ?? null,
     }
   }
-  const r = member.role === "admin" ? "admin" : "staff"
+  const r = normalizeBusinessMemberPanelRole(member.role)
   return {
     ready: true,
     businessId: member.business_id,

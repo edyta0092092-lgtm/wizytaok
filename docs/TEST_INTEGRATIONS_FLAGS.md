@@ -16,9 +16,10 @@ Integracje testowe są **wyłącznie opcjonalne** i sterowane zmiennymi środowi
 
 ## `ENABLE_TEST_BILLING`
 
-- **Co robi:** po ustawieniu na `true` pokazuje w **Ustawieniach** kartę testowej płatności Stripe **tylko dla administratora**.
-- **Backend:** `POST /api/test-billing/checkout` akceptuje **wyłącznie** klucz `STRIPE_SECRET_KEY` z prefiksem `sk_test_` (klucze produkcyjne są odrzucane).
-- **Produkcja:** domyślnie zostaw **`false`** — prawdziwa sprzedaż i subskrypcje wymagają osobnego wdrożenia i nie są tym trybem objęte.
+- **Co robi:** po ustawieniu na `true` pokazuje w **Ustawieniach** kartę **testowej subskrypcji** Stripe (plan 149 zł / miesiąc, trial 30 dni) **tylko dla administratora / właściciela**.
+- **Backend:** `POST /api/test-billing/checkout` — `mode: subscription`, wymaga **`STRIPE_PRICE_ID`** (`price_…`, cena miesięczna skonfigurowana w Stripe), **`STRIPE_SECRET_KEY`** (`sk_test_`), opcjonalnie **`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`** (jeśli ustawione — musi być `pk_test_`). Powrót z Checkout: **`NEXT_PUBLIC_SITE_URL`** (fallback: `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `VERCEL_URL`).
+- **Webhook:** `POST /api/stripe/webhook` — wymaga **`STRIPE_WEBHOOK_SECRET`** (`whsec_…`, tryb testowy w Stripe). Zdarzenia aktualizują pola `stripe_*` w `business_profiles` (status jest **tylko informacyjny** — brak blokady panelu).
+- **Produkcja:** domyślnie zostaw **`false`**, dopóki nie chcesz tego świadomie udostępnić.
 
 ## Włączanie testów lokalnie
 
@@ -29,8 +30,9 @@ Integracje testowe są **wyłącznie opcjonalne** i sterowane zmiennymi środowi
    ENABLE_TEST_BILLING=true
    ```
 3. Dla wysyłki: uzupełnij `RESEND_API_KEY`, `RESEND_FROM` i/lub zmienne Twilio.
-4. Dla Stripe: `STRIPE_SECRET_KEY=sk_test_...` (tylko testowy).
-5. Uruchom `npm run dev`.
+4. Dla Stripe: `STRIPE_SECRET_KEY=sk_test_...`, `STRIPE_PRICE_ID=price_...`, `STRIPE_WEBHOOK_SECRET=whsec_...`, `NEXT_PUBLIC_SITE_URL`, opcjonalnie `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...`.
+5. Zastosuj migrację `044_business_profiles_stripe_subscription.sql` w Supabase (kolumny `stripe_*` na `business_profiles`).
+6. Uruchom `npm run dev`.
 
 ## Wyłączanie testów
 
@@ -59,4 +61,5 @@ Po zmianie ENV zrestartuj serwer deweloperski / ponownie wdróż aplikację.
 
 ## Baza danych
 
-Migracja `043_notification_logs_booking_id_nullable.sql` zezwala na wpisy `notification_logs` bez powiązanej rezerwacji (`booking_id` opcjonalne), aby logować wysyłki testowe z panelu. Nie usuwa ani nie czyści danych.
+- Migracja `043_notification_logs_booking_id_nullable.sql` — logi testowych SMS/e-mail bez `booking_id`.
+- Migracja `044_business_profiles_stripe_subscription.sql` — pola `stripe_customer_id`, `stripe_subscription_id`, `stripe_subscription_status`, `stripe_subscription_current_period_end` (dodanie kolumn, bez usuwania danych).

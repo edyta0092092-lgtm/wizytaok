@@ -5,6 +5,13 @@
 
 export type PanelRole = "admin" | "staff"
 
+/** Mapowanie roli z `business_members.role` na rolę panelu (obsługa synonimów). */
+export function normalizeBusinessMemberPanelRole(raw: string | null | undefined): PanelRole {
+  const n = String(raw ?? "").trim().toLowerCase()
+  if (n === "admin" || n === "administrator" || n === "owner") return "admin"
+  return "staff"
+}
+
 export type BusinessMembershipInfo = {
   businessId: string | null
   role: PanelRole | null

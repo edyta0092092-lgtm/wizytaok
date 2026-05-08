@@ -1,4 +1,4 @@
-import { getCurrentUserRole, isAdminRole, type PanelRole } from "@/lib/auth/permissions"
+import { getCurrentUserRole, isAdminRole, normalizeBusinessMemberPanelRole } from "@/lib/auth/permissions"
 import { getServerClient } from "@/lib/supabase/server"
 
 export type AdminBusinessResolution =
@@ -63,7 +63,7 @@ export async function resolveAdminBusinessForUser(): Promise<AdminBusinessResolu
     return { ok: false, status: 403, error: "no_business" }
   }
 
-  const role: PanelRole = member.role === "admin" ? "admin" : "staff"
+  const role = normalizeBusinessMemberPanelRole(member.role)
   const effective = getCurrentUserRole(false, role)
   if (!isAdminRole(effective)) {
     return { ok: false, status: 403, error: "forbidden" }
