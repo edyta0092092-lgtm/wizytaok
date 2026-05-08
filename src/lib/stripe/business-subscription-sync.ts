@@ -3,6 +3,16 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import type { Database, TablesUpdate } from "@/types/database"
 
+/** Normalizuje business_id z metadanych Stripe (trim, opcjonalne cudzysłowy). */
+export function normalizeStripeBusinessId(raw: string | null | undefined): string | null {
+  if (raw == null) return null
+  let v = raw.trim()
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim()
+  }
+  return v.length > 0 ? v : null
+}
+
 /**
  * Aktualizuje rekord firmy po zdarzeniach Stripe (webhook). Service role — tylko serwer.
  */
@@ -25,13 +35,15 @@ export async function upsertBusinessStripeFromSubscription(
   }
 
   if (input.subscription) {
+    const status = input.subscription.status
     patch.stripe_subscription_id = input.subscription.id
-    patch.stripe_subscription_status = input.subscription.status
+    patch.stripe_subscription_status = status
     const trialEnd = input.subscription.trial_end
-    patch.stripe_subscription_trial_ends_at =
+    const trialEndIso =
       typeof trialEnd === "number" && trialEnd > 0
         ? new Date(trialEnd * 1000).toISOString()
         : null
+    patch.stripe_subscription_trial_ends_at = trialEndIso
     patch.stripe_subscription_cancel_at_period_end = Boolean(input.subscription.cancel_at_period_end)
 
     const items = input.subscription.items?.data
@@ -44,15 +56,26 @@ export async function upsertBusinessStripeFromSubscription(
       }
       endSec = max > 0 ? max : null
     }
-    patch.stripe_subscription_current_period_end =
-      endSec !== null && endSec > 0
-        ? new Date(endSec * 1000).toISOString()
-        : null
+    const periodEndIso =
+      endSec !== null && endSec > 0 ? new Date(endSec * 1000).toISOString() : null
+    patch.stripe_subscription_current_period_end = periodEndIso
+
+    patch.subscription_status = status
+    patch.subscription_trial_ends_at = trialEndIso
+    patch.subscription_current_period_end = periodEndIso
+    patch.subscription_cancel_at_period_end = Boolean(input.subscription.cancel_at_period_end)
+    patch.subscription_updated_at = nowIso
   } else {
     patch.stripe_subscription_status = "canceled"
     patch.stripe_subscription_current_period_end = null
     patch.stripe_subscription_trial_ends_at = null
     patch.stripe_subscription_cancel_at_period_end = false
+
+    patch.subscription_status = "canceled"
+    patch.subscription_current_period_end = null
+    patch.subscription_trial_ends_at = null
+    patch.subscription_cancel_at_period_end = false
+    patch.subscription_updated_at = nowIso
   }
 
   const { data, error } = await admin

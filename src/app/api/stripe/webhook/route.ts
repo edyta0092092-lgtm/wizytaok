@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import {
+  normalizeStripeBusinessId,
   upsertBusinessStripeFromSubscription,
 } from "@/lib/stripe/business-subscription-sync"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -61,7 +62,7 @@ function customerIdFromStripe(
 }
 
 async function resolveBusinessIdFromSubscription(sub: Stripe.Subscription): Promise<string | null> {
-  const fromMeta = sub.metadata?.business_id?.trim()
+  const fromMeta = normalizeStripeBusinessId(sub.metadata?.business_id)
   if (fromMeta) return fromMeta
   const customerId = customerIdFromStripe(sub.customer)
   if (!customerId) return null
@@ -79,7 +80,7 @@ async function resolveBusinessIdFromInvoice(stripe: Stripe, invoice: Stripe.Invo
   const subRef = getInvoiceSubscriptionRef(invoice)
   const subId = typeof subRef === "string" ? subRef : subRef?.id
   if (!subId) return null
-  const sub = await stripe.subscriptions.retrieve(subId)
+  const sub = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
   return resolveBusinessIdFromSubscription(sub)
 }
 
@@ -91,7 +92,7 @@ async function handleCheckoutCompleted(
     return { kind: "skipped", reason: "not_subscription_mode" }
   }
 
-  const businessId = session.metadata?.business_id?.trim() ?? null
+  const businessId = normalizeStripeBusinessId(session.metadata?.business_id)
   const subRef = session.subscription
   const subId = typeof subRef === "string" ? subRef : subRef?.id
   const customerId = customerIdFromStripe(session.customer)
@@ -126,7 +127,7 @@ async function handleCheckoutCompleted(
     return { kind: "failed", error: "service_role_missing" }
   }
 
-  const sub = await stripe.subscriptions.retrieve(subId)
+  const sub = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
   const upd = await upsertBusinessStripeFromSubscription(admin, businessId, {
     stripeCustomerId: customerId,
     subscription: sub,
@@ -304,7 +305,7 @@ async function handleInvoice(
     return { kind: "failed", error: "service_role_missing" }
   }
 
-  const sub = await stripe.subscriptions.retrieve(subId)
+  const sub = await stripe.subscriptions.retrieve(subId, { expand: ["items.data"] })
   const upd = await upsertBusinessStripeFromSubscription(admin, businessId, {
     stripeCustomerId: customerId,
     subscription: sub,
