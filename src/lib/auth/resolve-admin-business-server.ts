@@ -1,5 +1,6 @@
 import { getCurrentUserRole, isAdminRole, normalizeBusinessMemberPanelRole } from "@/lib/auth/permissions"
 import { getServerClient } from "@/lib/supabase/server"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export type AdminBusinessResolution =
   | { ok: true; userId: string; businessId: string; userEmail: string | null }
@@ -60,6 +61,23 @@ export async function resolveAdminBusinessForUser(): Promise<AdminBusinessResolu
 
   const member = memberQuery.data?.[0]
   if (!member?.business_id) {
+    // Fallback: when user-scoped RLS blocks reads, resolve owner business via service role.
+    const admin = getServiceRoleClient()
+    if (admin) {
+      const { data: ownedByService } = await admin
+        .from("business_profiles")
+        .select("id")
+        .eq("owner_id", user.id)
+        .maybeSingle()
+      if (ownedByService?.id) {
+        return {
+          ok: true,
+          userId: user.id,
+          businessId: ownedByService.id,
+          userEmail: user.email ?? null,
+        }
+      }
+    }
     return { ok: false, status: 403, error: "no_business" }
   }
 

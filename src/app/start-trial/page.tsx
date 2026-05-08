@@ -157,7 +157,12 @@ function StartTrialContent() {
       } else if (reason === "subscription_already_exists" || reason === "subscription_already_active") {
         setError("Twój okres próbny jest aktywny.")
       } else {
-        setError("Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.")
+        const backendMessage = payload?.message?.trim() || payload?.hint?.trim() || ""
+        setError(
+          backendMessage.length > 0
+            ? backendMessage
+            : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."
+        )
       }
       return
     }
