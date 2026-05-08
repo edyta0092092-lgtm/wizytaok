@@ -16,18 +16,9 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  DEMO_BOOKING_SLUG,
-  isValidPublicSlugFormat,
-  normalizePublicSlug,
-  PUBLIC_SLUG_MAX_LENGTH,
-  PUBLIC_SLUG_MIN_LENGTH,
-} from "@/lib/business/slug"
+import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import {
-  BUSINESS_PUBLIC_SLUG_COLUMN,
-  checkBusinessSlugAvailability,
-} from "@/lib/supabase/repositories/business-profile.repository"
+import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
@@ -52,7 +43,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const { t } = useTranslations()
 
   const [businessName, setBusinessName] = React.useState("")
-  const [signupSlug, setSignupSlug] = React.useState("")
   const [ownerFirstName, setOwnerFirstName] = React.useState("")
   const [ownerLastName, setOwnerLastName] = React.useState("")
   const [companyTaxId, setCompanyTaxId] = React.useState("")
@@ -103,12 +93,13 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const nipRelevant = accountKind === "registered_business"
   const nipFieldHint = React.useMemo(() => {
+    if (!nipRelevant) return null
     const digits = normalizeDigits(companyTaxId)
     if (digits.length === 0) return null
     if (digits.length !== 10) return t("settings.taxIdDigitsHint")
     if (!isPolishNip10Valid(digits)) return t("settings.taxIdInvalidChecksum")
     return null
-  }, [companyTaxId, t])
+  }, [nipRelevant, companyTaxId, t])
 
   /** Przy „firma z NIP” pole jest obowiązkowe — pusty NIP blokuje wysłanie. */
   const nipEmptyBlocksSubmit = nipRelevant && normalizeDigits(companyTaxId).length === 0
@@ -169,17 +160,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       }
       companyTaxIdForSignup = companyTaxId.trim() || undefined
       companyTaxIdNormalizedForSignup = taxIdNormalized
-    } else if (taxIdNormalized.length > 0) {
-      if (taxIdNormalized.length !== 10) {
-        setError(t("settings.taxIdDigitsHint"))
-        return
-      }
-      if (!isPolishNip10Valid(taxIdNormalized)) {
-        setError(t("settings.taxIdInvalidChecksum"))
-        return
-      }
-      companyTaxIdForSignup = companyTaxId.trim() || undefined
-      companyTaxIdNormalizedForSignup = taxIdNormalized
     }
 
     const pwdViol = assertPasswordPolicy(password)
@@ -188,47 +168,19 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       return
     }
 
-    const slugManualRaw = signupSlug.trim()
-    if (slugManualRaw.length === 0) {
-      setError(t("auth.slugRequired"))
-      return
-    }
-
-    const normalized = normalizePublicSlug(slugManualRaw)
-    if (!normalized) {
-      setError(t("auth.slugRequired"))
-      return
-    }
-    if (
-      normalized.length < PUBLIC_SLUG_MIN_LENGTH ||
-      normalized.length > PUBLIC_SLUG_MAX_LENGTH ||
-      !isValidPublicSlugFormat(normalized)
-    ) {
-      setError(t("auth.slugInvalid"))
-      return
-    }
-    if (normalized === DEMO_BOOKING_SLUG) {
-      setError(t("auth.slugTaken"))
-      return
-    }
-    const slugCheckManual = await checkBusinessSlugAvailability(client, normalized)
-    if (slugCheckManual.error) {
+    const slugPick = await allocateSignupBookingSlug(client, businessName.trim())
+    if (!slugPick.ok) {
       setError(
-        process.env.NODE_ENV === "development"
-          ? `${t("auth.slugCheckError")} ${t("help.errorDetailsPrefix")} ${slugCheckManual.error.message}`
-          : t("auth.slugCheckError"),
+        slugPick.code === "check_failed" ? t("auth.slugCheckError") : t("auth.signupSlugReserveFailed"),
       )
       return
     }
-    if (slugCheckManual.available !== true) {
-      setError(t("auth.slugTaken"))
-      return
-    }
+    const normalized = slugPick.slug
 
     if (process.env.NODE_ENV === "development") {
       console.info("[signup.slug]", {
         normalizedSlug: normalized,
-        mode: "manual",
+        mode: "allocated_from_business_name",
         slugColumn: BUSINESS_PUBLIC_SLUG_COLUMN,
       })
     }
@@ -291,11 +243,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       // Zawsze wymagamy flow z potwierdzeniem e-mail.
       // Profil firmy tworzymy dopiero po kliknięciu linku (auth callback).
       await client.auth.signOut()
-      setInfo(
-        startTrial
-          ? "Konto zostało utworzone. Sprawdź e-mail i potwierdź konto."
-          : t("auth.signupSuccessCheckEmail")
-      )
+      setInfo(t("auth.signupSuccessCheckEmail"))
     } finally {
       setLoading(false)
     }
@@ -316,9 +264,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               {t("auth.signupDescription")}
             </CardDescription>
             {startTrial ? (
-              <p className="text-sm text-muted-foreground">
-                Utworz konto, a nastepnie przejdziesz do bezpiecznego podpniecia karty w Stripe.
-              </p>
+              <p className="text-sm text-muted-foreground">{t("auth.signupTrialStripeLead")}</p>
             ) : null}
           </CardHeader>
           <CardContent>
@@ -334,20 +280,32 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-slug">{t("auth.publicSlug")}</Label>
-                <p className="text-xs text-muted-foreground">{t("auth.slugManualRequiredHint")}</p>
-                <Input
-                  id="signup-slug"
-                  autoComplete="off"
-                  value={signupSlug}
-                  onChange={(e) => setSignupSlug(e.target.value.toLowerCase())}
-                  placeholder="moja-firma"
-                  className="h-11 rounded-xl font-mono text-sm"
-                  required
-                />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
+                  <Input
+                    id="signup-owner-first"
+                    autoComplete="given-name"
+                    value={ownerFirstName}
+                    onChange={(e) => setOwnerFirstName(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-owner-last">{t("bookingPublic.lastName")}</Label>
+                  <Input
+                    id="signup-owner-last"
+                    autoComplete="family-name"
+                    value={ownerLastName}
+                    onChange={(e) => setOwnerLastName(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                </div>
               </div>
-              <fieldset className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-3">
+
+              <fieldset className="space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
                 <legend className="px-1 text-sm font-medium text-foreground">
                   {t("auth.signupAccountTypeLabel")}
                 </legend>
@@ -373,19 +331,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     <span>{t("auth.signupAccountTypeUnregistered")}</span>
                   </label>
                 </div>
-              </fieldset>
-              {accountKind === "registered_business" ? (
-                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
-                  {startTrial ? (
-                    <p className="text-xs leading-relaxed text-muted-foreground">
-                      {t("auth.trialRequiresNip")}
-                    </p>
-                  ) : null}
+                {accountKind === "registered_business" ? (
                   <div className="space-y-2">
-                    <Label htmlFor="signup-tax-id">{t("settings.taxIdLabel")}</Label>
                     {!startTrial ? (
                       <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdRequiredHint")}</p>
                     ) : null}
+                    <Label htmlFor="signup-tax-id">{t("settings.taxIdLabel")}</Label>
                     <Input
                       id="signup-tax-id"
                       autoComplete="off"
@@ -405,59 +356,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                       </p>
                     ) : null}
                   </div>
-                  {startTrial ? (
-                    <p className="text-xs text-muted-foreground">{t("auth.trialOnePerBusinessFootnote")}</p>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-tax-id-optional">{t("settings.taxIdLabel")}</Label>
-                    <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdOptionalHint")}</p>
-                    <Input
-                      id="signup-tax-id-optional"
-                      autoComplete="off"
-                      value={companyTaxId}
-                      onChange={(e) => setCompanyTaxId(e.target.value)}
-                      placeholder={t("settings.taxIdPlaceholder")}
-                      aria-invalid={Boolean(nipFieldHint)}
-                      className={cn(
-                        "h-11 rounded-xl",
-                        nipFieldHint ? "border-destructive focus-visible:ring-destructive/30" : null,
-                      )}
-                    />
-                    {nipFieldHint ? (
-                      <p className="text-xs text-destructive" role="alert">
-                        {nipFieldHint}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
-                  <Input
-                    id="signup-owner-first"
-                    autoComplete="given-name"
-                    value={ownerFirstName}
-                    onChange={(e) => setOwnerFirstName(e.target.value)}
-                    className="h-11 rounded-xl"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-owner-last">{t("bookingPublic.lastName")}</Label>
-                  <Input
-                    id="signup-owner-last"
-                    autoComplete="family-name"
-                    value={ownerLastName}
-                    onChange={(e) => setOwnerLastName(e.target.value)}
-                    className="h-11 rounded-xl"
-                    required
-                  />
-                </div>
-              </div>
+                ) : null}
+                {startTrial && accountKind === "registered_business" ? (
+                  <p className="text-xs text-muted-foreground">{t("auth.trialOnePerBusinessFootnote")}</p>
+                ) : null}
+              </fieldset>
+
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
                 <Input
@@ -472,7 +376,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">{t("auth.password")}</Label>
-                <p className="text-xs text-muted-foreground">{t("auth.passwordRequirementsHint")}</p>
                 <Input
                   id="signup-password"
                   type="password"
@@ -533,12 +436,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 {t("auth.loginFromSignupCta")}
               </Link>
             </p>
-            <Link
-              href="/"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {t("auth.homeLink")}
-            </Link>
           </CardFooter>
         </Card>
       </div>

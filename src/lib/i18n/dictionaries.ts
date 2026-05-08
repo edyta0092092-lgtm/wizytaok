@@ -374,7 +374,9 @@ export const dictionaries = {
       loginSignupCta: "Utwórz konto",
       signupTitle: "Utwórz konto firmy",
       signupDescription:
-        "Załóż konto dla swojej firmy. Wpisz adres publicznej rezerwacji i pozostałe wymagane dane.",
+        "Załóż konto dla swojej firmy. Link do publicznej rezerwacji utworzymy automatycznie z jej nazwy.",
+      signupTrialStripeLead:
+        "Utwórz konto, a następnie przejdziesz do bezpiecznego podpięcia karty w Stripe.",
       signupAccountTypeLabel: "Typ działalności",
       signupAccountTypeRegistered: "Firma z NIP",
       signupAccountTypeUnregistered:
@@ -382,7 +384,7 @@ export const dictionaries = {
       trialRequiresNip:
         "Okres próbny jest dostępny dla firm z ważnym numerem NIP (10 cyfr, suma kontrolna).",
       trialOnePerBusinessFootnote:
-        "Darmowy okres próbny przysługuje jednej firmie (jeden NIP) tylko raz.",
+        "Darmowy okres próbny przysługuje jednej firmie lub osobie tylko raz.",
       businessName: "Nazwa firmy",
       signupBusinessNameRequired: "Podaj nazwę firmy.",
       signupOwnerFirstRequired: "Podaj imię.",
@@ -2456,14 +2458,16 @@ Pozdrawiamy,
       loginSignupCta: "Create one",
       signupTitle: "Create business account",
       signupDescription:
-        "Create an account for your business. Enter the public booking address and other required fields.",
-      signupAccountTypeLabel: "How you operate",
-      signupAccountTypeRegistered: "I have a tax ID (business or sole proprietorship)",
-      signupAccountTypeUnregistered: "No tax ID (unregistered activity or similar)",
+        "Create an account for your business. We will create your public booking link automatically from its name.",
+      signupTrialStripeLead:
+        "After you register, you will continue to securely add your payment card with Stripe.",
+      signupAccountTypeLabel: "Type of activity",
+      signupAccountTypeRegistered: "Business with tax ID",
+      signupAccountTypeUnregistered: "Unregistered activity / person without tax ID",
       trialRequiresNip:
         "The trial is available for registered businesses with a valid tax ID (10 digits, checksum).",
       trialOnePerBusinessFootnote:
-        "The free trial is available once per business (one tax ID).",
+        "The free trial period is available to one company or person only once.",
       businessName: "Business name",
       signupBusinessNameRequired: "Enter your business name.",
       signupOwnerFirstRequired: "Enter your first name.",
