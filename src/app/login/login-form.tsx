@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -23,7 +24,9 @@ export function LoginForm() {
   const { t } = useTranslations()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const next = searchParams.get("next")
+  const postLoginPath = safeInternalRedirect(
+    searchParams.get("next") ?? searchParams.get("redirectTo")
+  )
   const resetStatus = searchParams.get("reset")
 
   const [email, setEmail] = React.useState("")
@@ -71,11 +74,8 @@ export function LoginForm() {
         .maybeSingle()
 
       const dest =
-        next && next.startsWith("/") && !next.startsWith("//")
-          ? next
-          : profile
-            ? "/dashboard"
-            : "/settings?setup=business"
+        postLoginPath ??
+        (profile ? "/dashboard" : "/settings?setup=business")
       router.replace(dest)
       router.refresh()
     } finally {

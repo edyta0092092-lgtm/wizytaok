@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { Check, Download } from "lucide-react"
+import { toast } from "sonner"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
@@ -99,6 +100,20 @@ export default function SettingsPage() {
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [taxIdEmptySaveError, setTaxIdEmptySaveError] = React.useState(false)
+
+  const stripeReturnHandledRef = React.useRef(false)
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const p = new URLSearchParams(window.location.search).get("stripe_test")
+    if (p !== "success" && p !== "cancel") return
+    if (stripeReturnHandledRef.current) return
+    stripeReturnHandledRef.current = true
+    if (p === "success") {
+      toast.success(t("settings.testBillingSuccess"))
+    } else {
+      toast(t("settings.testBillingCancel"))
+    }
+  }, [t])
 
   const taxIdDigitsHint = React.useMemo(() => {
     if (!form.taxIdEntryEnabled) return null

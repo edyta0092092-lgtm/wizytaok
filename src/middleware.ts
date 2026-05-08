@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 
+import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { updateSession } from "@/lib/supabase/middleware"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 
@@ -48,14 +49,21 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/signup-staff")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
+      const afterLogin =
+        safeInternalRedirect(
+          request.nextUrl.searchParams.get("next") ??
+            request.nextUrl.searchParams.get("redirectTo")
+        ) ?? "/dashboard"
+      return NextResponse.redirect(new URL(afterLogin, request.url))
     }
     return response
   }
 
   if (isProtectedPath(pathname) && !user) {
     const loginUrl = new URL("/login", request.url)
-    loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`)
+    const returnTo = `${pathname}${request.nextUrl.search}`
+    loginUrl.searchParams.set("next", returnTo)
+    loginUrl.searchParams.set("redirectTo", returnTo)
     return NextResponse.redirect(loginUrl)
   }
 

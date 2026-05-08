@@ -14,8 +14,10 @@ export async function upsertBusinessStripeFromSubscription(
     subscription: Stripe.Subscription | null
   }
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const nowIso = new Date().toISOString()
   const patch: TablesUpdate<"business_profiles"> = {
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
+    stripe_subscription_synced_at: nowIso,
   }
 
   if (input.stripeCustomerId) {
@@ -25,6 +27,13 @@ export async function upsertBusinessStripeFromSubscription(
   if (input.subscription) {
     patch.stripe_subscription_id = input.subscription.id
     patch.stripe_subscription_status = input.subscription.status
+    const trialEnd = input.subscription.trial_end
+    patch.stripe_subscription_trial_ends_at =
+      typeof trialEnd === "number" && trialEnd > 0
+        ? new Date(trialEnd * 1000).toISOString()
+        : null
+    patch.stripe_subscription_cancel_at_period_end = Boolean(input.subscription.cancel_at_period_end)
+
     const items = input.subscription.items?.data
     let endSec: number | null = null
     if (items?.length) {
@@ -42,11 +51,21 @@ export async function upsertBusinessStripeFromSubscription(
   } else {
     patch.stripe_subscription_status = "canceled"
     patch.stripe_subscription_current_period_end = null
+    patch.stripe_subscription_trial_ends_at = null
+    patch.stripe_subscription_cancel_at_period_end = false
   }
 
-  const { error } = await admin.from("business_profiles").update(patch).eq("id", businessId)
+  const { data, error } = await admin
+    .from("business_profiles")
+    .update(patch)
+    .eq("id", businessId)
+    .select("id")
+
   if (error) {
     return { ok: false, error: error.message }
+  }
+  if (!data?.length) {
+    return { ok: false, error: "no_row_updated" }
   }
   return { ok: true }
 }
@@ -69,7 +88,7 @@ export function mapStripeSubscriptionToUiStatus(
   if (!sid && !s) return "none"
   if (s === "trialing") return "trialing"
   if (s === "active") return "active"
-  if (s === "past_due" || s === "unpaid") return "payment_required"
+  if (s === "past_due" || s === "unpaid" || s === "incomplete") return "payment_required"
   if (s === "canceled" || s === "incomplete_expired") return "canceled"
   return "unknown"
 }

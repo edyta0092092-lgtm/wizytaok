@@ -3,15 +3,11 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { safeInternalRedirectOrDashboard } from "@/lib/auth/safe-internal-redirect"
 import { ensureBusinessProfileFromUserMetadata } from "@/lib/supabase/ensure-profile-from-metadata"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 import { normalizeSupabaseUrl } from "@/lib/supabase/url"
 import type { Database } from "@/types/database"
-
-function safeNextParam(raw: string | null): string {
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard"
-  return raw
-}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -27,7 +23,9 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )!.trim()
   const code = requestUrl.searchParams.get("code")
-  const next = safeNextParam(requestUrl.searchParams.get("next"))
+  const next = safeInternalRedirectOrDashboard(
+    requestUrl.searchParams.get("next") ?? requestUrl.searchParams.get("redirectTo")
+  )
 
   const cookieStore = await cookies()
 

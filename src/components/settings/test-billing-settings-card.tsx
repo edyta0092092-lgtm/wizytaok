@@ -22,6 +22,7 @@ type BillingRow = {
   stripe_subscription_id: string | null
   stripe_subscription_status: string | null
   stripe_subscription_current_period_end: string | null
+  stripe_subscription_trial_ends_at: string | null
 }
 
 async function fetchBillingRowForBusiness(
@@ -33,7 +34,7 @@ async function fetchBillingRowForBusiness(
   const { data, error } = await client
     .from("business_profiles")
     .select(
-      "stripe_subscription_id, stripe_subscription_status, stripe_subscription_current_period_end"
+      "stripe_subscription_id, stripe_subscription_status, stripe_subscription_current_period_end, stripe_subscription_trial_ends_at"
     )
     .eq("id", businessId)
     .maybeSingle()
@@ -42,6 +43,7 @@ async function fetchBillingRowForBusiness(
     stripe_subscription_id: data.stripe_subscription_id ?? null,
     stripe_subscription_status: data.stripe_subscription_status ?? null,
     stripe_subscription_current_period_end: data.stripe_subscription_current_period_end ?? null,
+    stripe_subscription_trial_ends_at: data.stripe_subscription_trial_ends_at ?? null,
   }
 }
 
@@ -120,22 +122,17 @@ export function TestBillingSettingsCard() {
     }
   }, [businessId])
 
-  const stripeReturnHandledRef = React.useRef(false)
+  const stripeRefreshHandledRef = React.useRef(false)
   React.useEffect(() => {
     if (typeof window === "undefined") return
     const p = new URLSearchParams(window.location.search).get("stripe_test")
-    if (p !== "success" && p !== "cancel") return
-    if (stripeReturnHandledRef.current) return
-    stripeReturnHandledRef.current = true
+    if (p !== "success") return
+    if (!businessId) return
+    if (stripeRefreshHandledRef.current) return
+    stripeRefreshHandledRef.current = true
 
     let cancelled = false
     void (async () => {
-      if (p === "cancel") {
-        toast(t("settings.testBillingCancel"))
-        return
-      }
-      toast.success(t("settings.testBillingSuccess"))
-      if (!businessId) return
       const row = await fetchBillingRowForBusiness(businessId)
       if (!cancelled) setBillingRow(row)
     })()
@@ -143,7 +140,7 @@ export function TestBillingSettingsCard() {
     return () => {
       cancelled = true
     }
-  }, [businessId, t])
+  }, [businessId])
 
   if (!ready) return null
 
@@ -158,11 +155,17 @@ export function TestBillingSettingsCard() {
   const statusLabel = t(`settings.${uiStatusTranslationKey(uiStatus)}` as "settings.testSubStatusNone")
 
   const periodEndRaw = billingRow?.stripe_subscription_current_period_end?.trim()
-  const periodEndLabel = periodEndRaw
+  const trialEndRaw = billingRow?.stripe_subscription_trial_ends_at?.trim()
+  const showTrialEnd = uiStatus === "trialing" && Boolean(trialEndRaw)
+  const relevantEndRaw = showTrialEnd ? trialEndRaw : periodEndRaw
+  const endHeading = showTrialEnd
+    ? t("settings.testBillingTrialEnds")
+    : t("settings.testBillingPeriodEnd")
+  const endLabel = relevantEndRaw
     ? new Intl.DateTimeFormat(undefined, {
         dateStyle: "medium",
         timeStyle: "short",
-      }).format(new Date(periodEndRaw))
+      }).format(new Date(relevantEndRaw))
     : "—"
 
   return (
@@ -190,7 +193,7 @@ export function TestBillingSettingsCard() {
             <p className="font-medium text-foreground">{t("settings.testBillingStatusLabel")}</p>
             <p className="text-foreground">{statusLabel}</p>
             <p className="text-muted-foreground">
-              {t("settings.testBillingPeriodEnd")}: {periodEndLabel}
+              {endHeading}: {endLabel}
             </p>
           </div>
           <p className="text-xs text-muted-foreground">{t("settings.testBillingStripeNote")}</p>
