@@ -7,6 +7,7 @@ import { Moon, Sun } from "lucide-react"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { marketingSignupHref } from "@/lib/marketing/signup-href"
 import { cn } from "@/lib/utils"
 
 function Section({
@@ -78,7 +79,7 @@ export function LandingView() {
               {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </Button>
             <Button size="sm" className="h-9 px-3 text-xs font-semibold sm:text-sm" asChild>
-              <Link href="/signup?startTrial=true">{t("landing.ctaPrimary")}</Link>
+              <Link href={marketingSignupHref()}>{t("landing.ctaPrimary")}</Link>
             </Button>
           </div>
         </div>
@@ -99,7 +100,7 @@ export function LandingView() {
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button size="lg" className="h-12 w-full rounded-xl px-6 text-base font-semibold sm:w-auto sm:min-w-[220px]" asChild>
-                <Link href="/signup?startTrial=true">{t("landing.ctaPrimary")}</Link>
+                <Link href={marketingSignupHref()}>{t("landing.ctaPrimary")}</Link>
               </Button>
               <Button
                 size="lg"
@@ -325,7 +326,7 @@ export function LandingView() {
           <p className="mt-4 text-pretty text-muted-foreground sm:text-lg">{t("landing.trialLead")}</p>
           <p className="mt-3 text-sm text-muted-foreground">{t("landing.trialNoCard")}</p>
           <Button size="lg" className="mt-8 h-12 rounded-xl px-8 text-base font-semibold" asChild>
-            <Link href="/signup?startTrial=true">{t("landing.ctaPrimary")}</Link>
+            <Link href={marketingSignupHref()}>{t("landing.ctaPrimary")}</Link>
           </Button>
         </div>
       </Section>
@@ -363,7 +364,7 @@ export function LandingView() {
           <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{t("landing.finalTitle")}</h2>
           <p className="mt-4 text-pretty text-muted-foreground sm:text-lg">{t("landing.finalLead")}</p>
           <Button size="lg" className="mt-8 h-12 rounded-xl px-8 text-base font-semibold" asChild>
-            <Link href="/signup?startTrial=true">{t("landing.ctaPrimary")}</Link>
+            <Link href={marketingSignupHref()}>{t("landing.ctaPrimary")}</Link>
           </Button>
         </div>
       </Section>

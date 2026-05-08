@@ -1,6 +1,8 @@
 import React from "react";
 import { CalendarCheck, Bell, Users, MessageSquare, ShieldCheck, Clock, CheckCircle2, ArrowRight, Sparkles, CalendarDays, UserCheck, Send, HelpCircle } from "lucide-react";
 
+import { marketingSignupHref } from "@/lib/marketing/signup-href";
+
 export default function WizytaOKLandingPage() {
   const features = [
     {
@@ -96,7 +98,7 @@ export default function WizytaOKLandingPage() {
               WizytaOK pomaga przyjmować rezerwacje online, automatycznie przypominać klientom o wizytach i szybciej reagować na zmiany terminów.
             </p>
             <div className="mt-9 flex flex-col gap-4 sm:flex-row">
-              <a href="/signup?startTrial=true" className="inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
+              <a href={marketingSignupHref()} className="inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
                 Testuj za darmo przez 30 dni
                 <ArrowRight className="ml-2 h-5 w-5" />
               </a>
@@ -254,7 +256,7 @@ export default function WizytaOKLandingPage() {
                   <span className="font-semibold text-slate-100">{item}</span>
                 </div>
               ))}
-              <a href="/signup?startTrial=true" className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
+              <a href={marketingSignupHref()} className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
                 Testuj za darmo przez 30 dni
               </a>
               <p className="mt-3 text-center text-sm text-slate-400">Wymagana karta. Nie pobieramy oplaty przez 30 dni.</p>
@@ -289,7 +291,7 @@ export default function WizytaOKLandingPage() {
           <p className="mx-auto mt-4 max-w-2xl text-lg leading-8 text-slate-300">
             Ustaw usługi, dodaj dostępność i sprawdź, jak WizytaOK pomaga uporządkować rezerwacje.
           </p>
-          <a href="/signup?startTrial=true" className="mt-8 inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
+          <a href={marketingSignupHref()} className="mt-8 inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
             Testuj za darmo przez 30 dni
             <ArrowRight className="ml-2 h-5 w-5" />
           </a>

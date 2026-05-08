@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { marketingSignupHref } from "@/lib/marketing/signup-href"
 
 const PRICING_FEATURE_KEYS = [
   "marketing.pricingFeatureReminders",
@@ -46,7 +47,7 @@ export default function PricingPage() {
               <Link href="/login">{t("marketing.navLogin")}</Link>
             </Button>
             <Button size="sm" className="h-auto min-h-8 shrink px-2 text-center text-[11px] leading-tight sm:h-8 sm:px-3 sm:text-xs" asChild>
-              <Link href="/signup">{t("marketing.ctaTryFree")}</Link>
+              <Link href={marketingSignupHref()}>{t("marketing.ctaTryFree")}</Link>
             </Button>
           </div>
         </div>
@@ -96,7 +97,7 @@ export default function PricingPage() {
             </CardContent>
             <CardFooter className="flex flex-col gap-2 border-t border-border/60 bg-muted/20 py-4 sm:flex-row">
               <Button className="h-auto min-h-9 w-full whitespace-normal rounded-lg px-3 py-2 text-center text-sm leading-snug sm:flex-1" asChild>
-                <Link href="/signup">{t("marketing.ctaTryFree")}</Link>
+                <Link href={marketingSignupHref()}>{t("marketing.ctaTryFree")}</Link>
               </Button>
               <Button
                 variant="outline"
