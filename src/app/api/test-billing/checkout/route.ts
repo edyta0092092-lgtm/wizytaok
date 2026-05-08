@@ -155,9 +155,7 @@ export async function POST(request: Request) {
 
   const { data: bp } = await admin
     .from("business_profiles")
-    .select(
-      "id, stripe_customer_id, stripe_subscription_id, subscription_status, stripe_subscription_status, trial_started_at, trial_used_at, account_type, company_tax_id_normalized, contact_phone_normalized"
-    )
+    .select("*")
     .eq("id", resolution.businessId)
     .maybeSingle()
 
@@ -173,10 +171,15 @@ export async function POST(request: Request) {
     )
   }
 
-  const status = bp?.subscription_status?.trim().toLowerCase() ?? null
-  const stripeStatus = bp?.stripe_subscription_status?.trim().toLowerCase() ?? null
-  const hasStripeSubscriptionId = Boolean(bp?.stripe_subscription_id?.trim())
-  const trialAlreadyUsed = Boolean(bp?.trial_used_at) || Boolean(bp?.trial_started_at)
+  const status =
+    typeof bp.subscription_status === "string" ? bp.subscription_status.trim().toLowerCase() : null
+  const stripeStatus =
+    typeof bp.stripe_subscription_status === "string"
+      ? bp.stripe_subscription_status.trim().toLowerCase()
+      : null
+  const hasStripeSubscriptionId =
+    typeof bp.stripe_subscription_id === "string" && bp.stripe_subscription_id.trim().length > 0
+  const trialAlreadyUsed = Boolean(bp.trial_used_at) || Boolean(bp.trial_started_at)
 
   if (trialAlreadyUsed) {
     return NextResponse.json(
@@ -227,11 +230,16 @@ export async function POST(request: Request) {
   }
 
   const accountType =
-    bp.account_type === ACCOUNT_TYPE_REGISTERED || bp.account_type === ACCOUNT_TYPE_UNREGISTERED
+    (bp.account_type === ACCOUNT_TYPE_REGISTERED || bp.account_type === ACCOUNT_TYPE_UNREGISTERED
       ? bp.account_type
       : null
-  const companyTaxIdNormalized = normalizeDigits(bp.company_tax_id_normalized)
-  const contactPhoneNormalized = normalizeDigits(bp.contact_phone_normalized)
+    ) as string | null
+  const companyTaxIdNormalized = normalizeDigits(
+    typeof bp.company_tax_id_normalized === "string" ? bp.company_tax_id_normalized : null
+  )
+  const contactPhoneNormalized = normalizeDigits(
+    typeof bp.contact_phone_normalized === "string" ? bp.contact_phone_normalized : null
+  )
 
   if (accountType === ACCOUNT_TYPE_REGISTERED && companyTaxIdNormalized) {
     const { data: sameTaxProfiles } = await admin

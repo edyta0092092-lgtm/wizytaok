@@ -19,6 +19,11 @@ function normalizeDigits(raw: unknown): string | null {
   return normalized.length > 0 ? normalized : null
 }
 
+function isMissingColumnError(message: string | undefined): boolean {
+  const m = (message ?? "").toLowerCase()
+  return m.includes("column") && (m.includes("does not exist") || m.includes("schema cache"))
+}
+
 /**
  * Po potwierdzeniu e-maila (auth callback) tworzy `business_profiles` z `user_metadata`, jeśli brak wiersza.
  */
@@ -81,7 +86,7 @@ export async function ensureBusinessProfileFromUserMetadata(
   const contactPhoneNormalized =
     normalizeDigits(meta.contact_phone_normalized) ?? normalizeDigits(contactPhoneRaw)
 
-  const { error: insertError } = await supabase.from("business_profiles").insert({
+  const fullInsertPayload = {
     owner_id: user.id,
     business_name: businessName,
     slug,
@@ -93,7 +98,21 @@ export async function ensureBusinessProfileFromUserMetadata(
     company_tax_id_normalized: companyTaxIdNormalized,
     contact_phone: contactPhoneRaw || null,
     contact_phone_normalized: contactPhoneNormalized,
-  })
+  }
+
+  let { error: insertError } = await supabase.from("business_profiles").insert(fullInsertPayload)
+  if (insertError && isMissingColumnError(insertError.message)) {
+    const { error: fallbackError } = await supabase.from("business_profiles").insert({
+      owner_id: user.id,
+      business_name: businessName,
+      slug,
+      email: user.email ?? null,
+      owner_name: ownerName,
+      tax_id: companyTaxIdRaw || null,
+    })
+    insertError = fallbackError ?? null
+  }
+
   if (!insertError) {
     businessProfileCreated = true
   }
