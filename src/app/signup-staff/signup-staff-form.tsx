@@ -18,6 +18,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
+import {
+  assertPasswordPolicy,
+  getPasswordPolicyLiveHint,
+  PASSWORD_POLICY_I18N,
+} from "@/lib/validation/password-policy"
 
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard"
@@ -35,6 +41,13 @@ export function SignupStaffForm() {
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
 
+  const passwordLiveHint = React.useMemo(() => {
+    const v = getPasswordPolicyLiveHint(password)
+    return v ? t(PASSWORD_POLICY_I18N[v]) : null
+  }, [password, t])
+
+  const passwordBlocksSubmit = Boolean(passwordLiveHint)
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -46,6 +59,11 @@ export function SignupStaffForm() {
     const client = getBrowserClient()
     if (!client) {
       setError(t("auth.signupError"))
+      return
+    }
+    const pwdViol = assertPasswordPolicy(password)
+    if (pwdViol) {
+      setError(t(PASSWORD_POLICY_I18N[pwdViol]))
       return
     }
     const origin = window.location.origin
@@ -92,6 +110,7 @@ export function SignupStaffForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="staff-su-password">{t("auth.password")}</Label>
+            <p className="text-xs text-muted-foreground">{t("auth.passwordRequirementsHint")}</p>
             <Input
               id="staff-su-password"
               type="password"
@@ -99,14 +118,28 @@ export function SignupStaffForm() {
               required
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
-              className="h-11 rounded-xl"
+              aria-invalid={Boolean(passwordLiveHint)}
+              className={cn(
+                "h-11 rounded-xl",
+                passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
+              )}
+              minLength={6}
             />
+            {passwordLiveHint ? (
+              <p className="text-xs text-destructive" role="alert">
+                {passwordLiveHint}
+              </p>
+            ) : null}
           </div>
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           {info ? <p className="text-sm text-muted-foreground">{info}</p> : null}
         </CardContent>
         <CardFooter className="flex flex-col gap-3 border-t border-border/80 pt-4">
-          <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-xl"
+            disabled={loading || passwordBlocksSubmit}
+          >
             {t("auth.signupSubmit")}
           </Button>
           <Button type="button" variant="ghost" className="h-9 w-full rounded-xl text-sm" asChild>

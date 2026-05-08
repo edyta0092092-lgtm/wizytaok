@@ -761,6 +761,18 @@ export default function SettingsPage() {
                   className="h-11 rounded-xl"
                 />
               </div>
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="settings-public-slug">{t("settings.bookingAddressLabel")}</Label>
+                <Input
+                  id="settings-public-slug"
+                  autoComplete="off"
+                  value={form.publicSlug}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, publicSlug: e.target.value.toLowerCase() }))
+                  }
+                  className="h-11 max-w-md rounded-xl font-mono text-sm"
+                />
+              </div>
               <div className="sm:col-span-2 w-full max-w-md rounded-xl border border-border/70 bg-muted/20 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("settings.bookingLiveLinkTitle")}

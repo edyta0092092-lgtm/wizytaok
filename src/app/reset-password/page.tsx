@@ -11,6 +11,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
+import {
+  assertPasswordPolicy,
+  getPasswordPolicyLiveHint,
+  PASSWORD_POLICY_I18N,
+} from "@/lib/validation/password-policy"
 
 export default function ResetPasswordPage() {
   const { t } = useTranslations()
@@ -20,6 +26,13 @@ export default function ResetPasswordPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
 
+  const passwordLiveHint = React.useMemo(() => {
+    const v = getPasswordPolicyLiveHint(password)
+    return v ? t(PASSWORD_POLICY_I18N[v]) : null
+  }, [password, t])
+
+  const passwordBlocksSubmit = Boolean(passwordLiveHint)
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -28,8 +41,9 @@ export default function ResetPasswordPage() {
       setError(t("auth.supabaseNotConfigured"))
       return
     }
-    if (password.length < 6) {
-      setError(t("auth.resetPasswordTooShort"))
+    const pwdViol = assertPasswordPolicy(password)
+    if (pwdViol) {
+      setError(t(PASSWORD_POLICY_I18N[pwdViol]))
       return
     }
     if (password !== confirmPassword) {
@@ -86,16 +100,26 @@ export default function ResetPasswordPage() {
             <form className="space-y-4" onSubmit={onSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="new-password">{t("auth.resetPasswordNewLabel")}</Label>
+                <p className="text-xs text-muted-foreground">{t("auth.passwordRequirementsHint")}</p>
                 <Input
                   id="new-password"
                   type="password"
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-xl"
+                  aria-invalid={Boolean(passwordLiveHint)}
+                  className={cn(
+                    "h-11 rounded-xl",
+                    passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
+                  )}
                   minLength={6}
                   required
                 />
+                {passwordLiveHint ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {passwordLiveHint}
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">{t("auth.resetPasswordConfirmLabel")}</Label>
@@ -115,7 +139,11 @@ export default function ResetPasswordPage() {
                   {error}
                 </p>
               ) : null}
-              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
+              <Button
+                type="submit"
+                className="h-11 w-full rounded-xl"
+                disabled={loading || passwordBlocksSubmit}
+              >
                 {loading ? "…" : t("auth.resetPasswordSubmit")}
               </Button>
               <p className="text-center text-sm text-muted-foreground">

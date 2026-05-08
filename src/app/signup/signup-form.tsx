@@ -16,16 +16,32 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
+import {
+  DEMO_BOOKING_SLUG,
+  isValidPublicSlugFormat,
+  normalizePublicSlug,
+  PUBLIC_SLUG_MAX_LENGTH,
+  PUBLIC_SLUG_MIN_LENGTH,
+} from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
+import {
+  BUSINESS_PUBLIC_SLUG_COLUMN,
+  checkBusinessSlugAvailability,
+} from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
+import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
+import {
+  assertPasswordPolicy,
+  getPasswordPolicyLiveHint,
+  PASSWORD_POLICY_I18N,
+} from "@/lib/validation/password-policy"
 
 type SignupFormProps = {
   startTrial?: boolean
 }
 
-type AccountType = "registered_business" | "unregistered_activity"
+type SignupAccountKind = "registered_business" | "unregistered_activity"
 
 function normalizeDigits(raw: string): string {
   return raw.replace(/\D/g, "")
@@ -36,11 +52,13 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const { t } = useTranslations()
 
   const [businessName, setBusinessName] = React.useState("")
+  const [signupSlug, setSignupSlug] = React.useState("")
   const [ownerFirstName, setOwnerFirstName] = React.useState("")
   const [ownerLastName, setOwnerLastName] = React.useState("")
-  const [accountType, setAccountType] = React.useState<AccountType>("registered_business")
   const [companyTaxId, setCompanyTaxId] = React.useState("")
-  const [contactPhone, setContactPhone] = React.useState("")
+  const [accountKind, setAccountKind] = React.useState<SignupAccountKind>(() =>
+    startTrial ? "registered_business" : "unregistered_activity",
+  )
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
@@ -83,6 +101,32 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
   }, [router, startTrial])
 
+  const nipRelevant = accountKind === "registered_business"
+  const nipFieldHint = React.useMemo(() => {
+    if (!nipRelevant) return null
+    const digits = normalizeDigits(companyTaxId)
+    if (digits.length === 0) return null
+    if (digits.length !== 10) return t("settings.taxIdDigitsHint")
+    if (!isPolishNip10Valid(digits)) return t("settings.taxIdInvalidChecksum")
+    return null
+  }, [nipRelevant, companyTaxId, t])
+
+  /** Wymuszony NIP: brak lub błędny format przy bloku przycisku. */
+  const nipEmptyBlocksSubmit = nipRelevant && normalizeDigits(companyTaxId).length === 0
+  const nipBlocksSubmit = Boolean(nipFieldHint) || nipEmptyBlocksSubmit
+
+  function setAccountKindChoice(next: SignupAccountKind) {
+    setAccountKind(next)
+    if (next === "unregistered_activity") setCompanyTaxId("")
+  }
+
+  const passwordLiveHint = React.useMemo(() => {
+    const v = getPasswordPolicyLiveHint(password)
+    return v ? t(PASSWORD_POLICY_I18N[v]) : null
+  }, [password, t])
+
+  const passwordBlocksSubmit = Boolean(passwordLiveHint)
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -98,19 +142,81 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       return
     }
 
+    if (!businessName.trim()) {
+      setError(t("auth.signupBusinessNameRequired"))
+      return
+    }
+    if (!ownerFirstName.trim()) {
+      setError(t("auth.signupOwnerFirstRequired"))
+      return
+    }
+    if (!ownerLastName.trim()) {
+      setError(t("auth.signupOwnerLastRequired"))
+      return
+    }
+
     const taxIdNormalized = normalizeDigits(companyTaxId)
-    const contactPhoneNormalized = normalizeDigits(contactPhone)
-    if (startTrial && accountType === "registered_business") {
+    const needsValidatedNip = accountKind === "registered_business"
+    if (needsValidatedNip) {
       if (taxIdNormalized.length !== 10) {
-        setError("Podaj poprawny NIP (10 cyfr).")
+        setError(t("settings.taxIdDigitsHint"))
+        return
+      }
+      if (!isPolishNip10Valid(taxIdNormalized)) {
+        setError(t("settings.taxIdInvalidChecksum"))
         return
       }
     }
-    if (startTrial && accountType === "unregistered_activity") {
-      if (contactPhoneNormalized.length < 9) {
-        setError("Podaj telefon kontaktowy.")
-        return
-      }
+
+    const pwdViol = assertPasswordPolicy(password)
+    if (pwdViol) {
+      setError(t(PASSWORD_POLICY_I18N[pwdViol]))
+      return
+    }
+
+    const slugManualRaw = signupSlug.trim()
+    if (slugManualRaw.length === 0) {
+      setError(t("auth.slugRequired"))
+      return
+    }
+
+    const normalized = normalizePublicSlug(slugManualRaw)
+    if (!normalized) {
+      setError(t("auth.slugRequired"))
+      return
+    }
+    if (
+      normalized.length < PUBLIC_SLUG_MIN_LENGTH ||
+      normalized.length > PUBLIC_SLUG_MAX_LENGTH ||
+      !isValidPublicSlugFormat(normalized)
+    ) {
+      setError(t("auth.slugInvalid"))
+      return
+    }
+    if (normalized === DEMO_BOOKING_SLUG) {
+      setError(t("auth.slugTaken"))
+      return
+    }
+    const slugCheckManual = await checkBusinessSlugAvailability(client, normalized)
+    if (slugCheckManual.error) {
+      setError(
+        process.env.NODE_ENV === "development"
+          ? `${t("auth.slugCheckError")} ${t("help.errorDetailsPrefix")} ${slugCheckManual.error.message}`
+          : t("auth.slugCheckError"),
+      )
+      return
+    }
+    if (slugCheckManual.available !== true) {
+      setError(t("auth.slugTaken"))
+      return
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("[signup.slug]", {
+        normalizedSlug: normalized,
+        mode: "manual",
+        slugColumn: BUSINESS_PUBLIC_SLUG_COLUMN,
+      })
     }
 
     setLoading(true)
@@ -122,22 +228,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         } catch {
           // ignore storage failures (private mode, restricted browser settings)
         }
-      }
-
-      const slugPick = await allocateSignupBookingSlug(client, businessName.trim())
-      if (!slugPick.ok) {
-        setError(
-          slugPick.code === "check_failed" ? t("auth.slugCheckError") : t("auth.signupSlugReserveFailed"),
-        )
-        return
-      }
-      const normalized = slugPick.slug
-
-      if (process.env.NODE_ENV === "development") {
-        console.info("[signup.slug.allocated]", {
-          normalizedSlug: normalized,
-          slugColumn: BUSINESS_PUBLIC_SLUG_COLUMN,
-        })
       }
 
       const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
@@ -153,18 +243,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
           data: {
             business_name: businessName.trim(),
             slug: normalized,
-            owner_name: ownerFirstName.trim() || undefined,
-            owner_last_name: ownerLastName.trim() || undefined,
+            owner_name: ownerFirstName.trim(),
+            owner_last_name: ownerLastName.trim(),
             trial_intent: startTrial || undefined,
-            account_type: startTrial ? accountType : undefined,
-            company_tax_id: startTrial ? (companyTaxId.trim() || undefined) : undefined,
-            company_tax_id_normalized:
-              startTrial && accountType === "registered_business" ? taxIdNormalized : undefined,
-            contact_phone: startTrial ? (contactPhone.trim() || undefined) : undefined,
-            contact_phone_normalized:
-              startTrial && accountType === "unregistered_activity"
-                ? contactPhoneNormalized
-                : undefined,
+            account_type: accountKind,
+            company_tax_id: needsValidatedNip ? (companyTaxId.trim() || undefined) : undefined,
+            company_tax_id_normalized: needsValidatedNip ? taxIdNormalized : undefined,
           },
         },
       })
@@ -236,6 +320,82 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   required
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="signup-slug">{t("auth.publicSlug")}</Label>
+                <p className="text-xs text-muted-foreground">{t("auth.slugManualRequiredHint")}</p>
+                <Input
+                  id="signup-slug"
+                  autoComplete="off"
+                  value={signupSlug}
+                  onChange={(e) => setSignupSlug(e.target.value.toLowerCase())}
+                  placeholder="moja-firma"
+                  className="h-11 rounded-xl font-mono text-sm"
+                  required
+                />
+              </div>
+              <fieldset className="space-y-3 rounded-xl border border-border/70 bg-muted/15 p-3">
+                <legend className="px-1 text-sm font-medium text-foreground">
+                  {t("auth.signupAccountTypeLabel")}
+                </legend>
+                <div className="space-y-2">
+                  <label className="flex cursor-pointer items-start gap-2 text-sm leading-snug">
+                    <input
+                      type="radio"
+                      name="signup-account-kind"
+                      className="mt-0.5 size-4 shrink-0 rounded-full border border-input bg-background accent-primary"
+                      checked={accountKind === "registered_business"}
+                      onChange={() => setAccountKindChoice("registered_business")}
+                    />
+                    <span>{t("auth.signupAccountTypeRegistered")}</span>
+                  </label>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm leading-snug">
+                    <input
+                      type="radio"
+                      name="signup-account-kind"
+                      className="mt-0.5 size-4 shrink-0 rounded-full border border-input bg-background accent-primary"
+                      checked={accountKind === "unregistered_activity"}
+                      onChange={() => setAccountKindChoice("unregistered_activity")}
+                    />
+                    <span>{t("auth.signupAccountTypeUnregistered")}</span>
+                  </label>
+                </div>
+              </fieldset>
+              {accountKind === "registered_business" ? (
+                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
+                  {startTrial ? (
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {t("auth.trialRequiresNip")}
+                    </p>
+                  ) : null}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-tax-id">{t("settings.taxIdLabel")}</Label>
+                    {!startTrial ? (
+                      <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdRequiredHint")}</p>
+                    ) : null}
+                    <Input
+                      id="signup-tax-id"
+                      autoComplete="off"
+                      value={companyTaxId}
+                      onChange={(e) => setCompanyTaxId(e.target.value)}
+                      placeholder={t("settings.taxIdPlaceholder")}
+                      aria-invalid={Boolean(nipFieldHint)}
+                      required
+                      className={cn(
+                        "h-11 rounded-xl",
+                        nipFieldHint ? "border-destructive focus-visible:ring-destructive/30" : null,
+                      )}
+                    />
+                    {nipFieldHint ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {nipFieldHint}
+                      </p>
+                    ) : null}
+                  </div>
+                  {startTrial ? (
+                    <p className="text-xs text-muted-foreground">{t("auth.trialOnePerBusinessFootnote")}</p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
@@ -245,6 +405,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     value={ownerFirstName}
                     onChange={(e) => setOwnerFirstName(e.target.value)}
                     className="h-11 rounded-xl"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
@@ -255,68 +416,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     value={ownerLastName}
                     onChange={(e) => setOwnerLastName(e.target.value)}
                     className="h-11 rounded-xl"
+                    required
                   />
                 </div>
               </div>
-              {startTrial ? (
-                <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-3">
-                  <p className="text-sm font-medium text-foreground">Typ działalności</p>
-                  <div className="grid gap-2">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                      <input
-                        type="radio"
-                        name="accountType"
-                        value="registered_business"
-                        checked={accountType === "registered_business"}
-                        onChange={() => setAccountType("registered_business")}
-                      />
-                      <span>Firma z NIP</span>
-                    </label>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                      <input
-                        type="radio"
-                        name="accountType"
-                        value="unregistered_activity"
-                        checked={accountType === "unregistered_activity"}
-                        onChange={() => setAccountType("unregistered_activity")}
-                      />
-                      <span>Działalność nierejestrowana / osoba bez NIP</span>
-                    </label>
-                  </div>
-                  {accountType === "registered_business" ? (
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-tax-id">NIP</Label>
-                      <Input
-                        id="signup-tax-id"
-                        autoComplete="off"
-                        inputMode="numeric"
-                        value={companyTaxId}
-                        onChange={(e) => setCompanyTaxId(e.target.value)}
-                        placeholder="np. 123-456-32-18"
-                        className="h-11 rounded-xl"
-                        required={startTrial}
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-contact-phone">Telefon kontaktowy</Label>
-                      <Input
-                        id="signup-contact-phone"
-                        autoComplete="tel"
-                        inputMode="tel"
-                        value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                        placeholder="np. +48 600 123 456"
-                        className="h-11 rounded-xl"
-                        required={startTrial}
-                      />
-                    </div>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Darmowy okres próbny przysługuje jednej firmie lub osobie tylko raz.
-                  </p>
-                </div>
-              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
                 <Input
@@ -331,16 +434,26 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">{t("auth.password")}</Label>
+                <p className="text-xs text-muted-foreground">{t("auth.passwordRequirementsHint")}</p>
                 <Input
                   id="signup-password"
                   type="password"
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-xl"
+                  aria-invalid={Boolean(passwordLiveHint)}
+                  className={cn(
+                    "h-11 rounded-xl",
+                    passwordLiveHint ? "border-destructive focus-visible:ring-destructive/30" : null,
+                  )}
                   minLength={6}
                   required
                 />
+                {passwordLiveHint ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {passwordLiveHint}
+                  </p>
+                ) : null}
               </div>
               {error ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
@@ -363,7 +476,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 </Link>
                 .
               </p>
-              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
+              <Button
+                type="submit"
+                className="h-11 w-full rounded-xl"
+                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit}
+              >
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>
             </form>
