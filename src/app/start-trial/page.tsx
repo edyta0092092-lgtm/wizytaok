@@ -28,6 +28,7 @@ function StartTrialContent() {
   const searchParams = useSearchParams()
   const [state, setState] = React.useState<StartTrialState>("loading")
   const [error, setError] = React.useState<string | null>(null)
+  const emailConfirmed = searchParams.get("emailConfirmed") === "true"
 
   const beginCheckout = React.useCallback(async () => {
     setError(null)
@@ -96,7 +97,7 @@ function StartTrialContent() {
       setState("error")
       setError(
         payload?.hint?.trim() ||
-          "Nie udalo sie uruchomic Stripe Checkout. Sprawdz konfiguracje testowego billingu i sprobuj ponownie."
+          "Nie udało się rozpocząć triala. Spróbuj ponownie."
       )
       return
     }
@@ -114,11 +115,17 @@ function StartTrialContent() {
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
-          <CardTitle>{state === "loading" ? "Uruchamianie checkout..." : "Nie udalo sie uruchomic triala"}</CardTitle>
+          <CardTitle>
+            {state === "loading"
+              ? emailConfirmed
+                ? "E-mail potwierdzony. Przygotowujemy Twój okres próbny."
+                : "Uruchamianie checkout..."
+              : "Nie udało się rozpocząć triala."}
+          </CardTitle>
           <CardDescription>
             {state === "loading"
               ? "Sprawdzamy konto i przekierowujemy do bezpiecznego checkoutu Stripe."
-              : "Mozesz sprobowac ponownie albo przejsc do ustawien subskrypcji."}
+              : "Możesz spróbować ponownie albo przejść do ustawień subskrypcji."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -126,10 +133,10 @@ function StartTrialContent() {
           {state === "error" ? (
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={() => void beginCheckout()}>
-                Sprobuj ponownie
+                Spróbuj ponownie
               </Button>
               <Button type="button" variant="outline" onClick={() => router.push("/settings")}>
-                Przejdz do ustawien
+                Przejdź do ustawień
               </Button>
             </div>
           ) : null}

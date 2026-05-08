@@ -105,7 +105,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       }
 
       const origin = window.location.origin
-      const afterConfirmPath = startTrial ? "/start-trial?source=landing_trial_signup" : "/login"
+      const afterConfirmPath = startTrial
+        ? "/start-trial?source=landing_trial_signup&emailConfirmed=true"
+        : "/login"
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
@@ -143,7 +145,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       // Zawsze wymagamy flow z potwierdzeniem e-mail.
       // Profil firmy tworzymy dopiero po kliknięciu linku (auth callback).
       await client.auth.signOut()
-      setInfo(t("auth.signupSuccessCheckEmail"))
+      setInfo(
+        startTrial
+          ? "Konto zostało utworzone. Sprawdź e-mail i potwierdź konto."
+          : t("auth.signupSuccessCheckEmail")
+      )
     } finally {
       setLoading(false)
     }
