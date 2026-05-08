@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ensureBusinessProfileFromUserMetadata } from "@/lib/supabase/ensure-profile-from-metadata"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 type StartTrialState = "loading" | "error"
@@ -112,11 +113,24 @@ function StartTrialContent() {
       return
     }
 
-    const { data: profile } = await client
-      .from("business_profiles")
-      .select("id, subscription_status, stripe_customer_id, stripe_subscription_id")
-      .eq("owner_id", user.id)
-      .maybeSingle()
+    const loadProfile = async () =>
+      client
+        .from("business_profiles")
+        .select("id, subscription_status, stripe_customer_id, stripe_subscription_id")
+        .eq("owner_id", user.id)
+        .maybeSingle()
+
+    let { data: profile } = await loadProfile()
+
+    if (!profile?.id) {
+      try {
+        await ensureBusinessProfileFromUserMetadata(client)
+      } catch {
+        // best effort fallback for flows that skipped auth/callback profile creation
+      }
+      const retry = await loadProfile()
+      profile = retry.data ?? null
+    }
 
     const currentDiagnostic: StartTrialDiagnostic = {
       ...EMPTY_DIAGNOSTIC,
@@ -139,7 +153,7 @@ function StartTrialContent() {
     if (!profile?.id) {
       const next = {
         ...currentDiagnostic,
-        reason: "business_profile_missing",
+        reason: "business_profile_missing_after_retry",
       }
       setDiagnostic(next)
       console.info("[start-trial.diagnostic]", next)
