@@ -124,22 +124,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const passwordBlocksSubmit = Boolean(passwordLiveHint)
 
-  /** Tylko błąd długości po wpisaniu cyfr — bez czerwonego tekstu przy pustym polu. */
-  const phoneFieldHint = React.useMemo(() => {
-    const national = phoneNational.replace(/\D/g, "")
-    if (national.length === 0) return null
-    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
-    if (v.ok) return null
-    if (v.min === v.max) {
-      return t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(v.min))
-    }
-    return t("settings.phoneInvalidNationalLength")
-      .replace("{min}", String(v.min))
-      .replace("{max}", String(v.max))
-  }, [phoneDialCode, phoneNational, t])
-
-  const phoneBlocksSubmit = Boolean(phoneFieldHint)
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -416,11 +400,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 nationalInputId="signup-phone-national"
                 showInlineError={false}
               />
-              {phoneFieldHint ? (
-                <p className="-mt-2 text-xs text-destructive" role="alert">
-                  {phoneFieldHint}
-                </p>
-              ) : null}
 
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
@@ -481,7 +460,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <Button
                 type="submit"
                 className="h-11 w-full rounded-xl"
-                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit || phoneBlocksSubmit}
+                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit}
               >
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>
