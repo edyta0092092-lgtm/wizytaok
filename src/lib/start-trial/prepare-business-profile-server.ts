@@ -174,6 +174,29 @@ function buildEnrichedPlan(
 }
 
 /**
+ * Zapis NIP/telefon/typ działalności — osobno po głównym update, żeby nie zgubić account_type przy stripowaniu kolumn.
+ */
+async function syncBusinessProfileIdentityForTrial(
+  admin: SupabaseClient<Database>,
+  businessId: string,
+  plan: BusinessProfileInsertPlan
+): Promise<{ ok: true } | { ok: false; message: string; code?: string }> {
+  const row = plan.fullInsert
+  const payload: Database["public"]["Tables"]["business_profiles"]["Update"] = {
+    account_type: row.account_type ?? null,
+    company_tax_id: row.company_tax_id ?? null,
+    company_tax_id_normalized: row.company_tax_id_normalized ?? null,
+    contact_phone: row.contact_phone ?? null,
+    contact_phone_normalized: row.contact_phone_normalized ?? null,
+  }
+  const { error } = await admin.from("business_profiles").update(payload).eq("id", businessId)
+  if (error) {
+    return { ok: false, message: error.message ?? "identity sync failed", code: error.code }
+  }
+  return { ok: true }
+}
+
+/**
  * Tworzy / uzupełnia business_profiles z user_metadata (sesja cookie) — wyłącznie backend + service role.
  */
 export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusinessProfileResult> {
@@ -290,14 +313,8 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
     if (Object.keys(patch).length > 0) {
       let upErr = (await admin.from("business_profiles").update(patch).eq("id", existing.id)).error
       if (upErr && classifyBusinessProfileWriteError(upErr.message, upErr.code) === "missing_required_column") {
-        const stripKeys = [
-          "owner_last_name",
-          "account_type",
-          "company_tax_id",
-          "company_tax_id_normalized",
-          "contact_phone",
-          "contact_phone_normalized",
-        ] as const
+        // Nie usuwaj account_type / NIP / telefon — i tak dogrywamy je w syncBusinessProfileIdentityForTrial.
+        const stripKeys = ["owner_last_name"] as const
         const rest = { ...patch } as Record<string, unknown>
         for (const k of stripKeys) {
           delete rest[k]
@@ -350,6 +367,18 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
       logPrepareBusinessProfileError("upsert business_members (owner)", memRes.message)
       return { ok: false, error: "membership_insert_failed", supabaseMessage: memRes.message }
     }
+
+    const idSync = await syncBusinessProfileIdentityForTrial(admin, existing.id, enrichedPlan)
+    if (!idSync.ok) {
+      logPrepareBusinessProfileError("sync business_profiles identity (existing)", idSync.message)
+      const kind = classifyBusinessProfileWriteError(idSync.message, idSync.code)
+      return {
+        ok: false,
+        error: kind === "missing_required_column" || kind === "rls_blocked" ? kind : "business_profile_update_failed",
+        supabaseMessage: idSync.message,
+      }
+    }
+    updated = true
 
     const { data: finalRow, error: frErr } = await admin
       .from("business_profiles")
@@ -416,6 +445,17 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
   if (!memRes.ok) {
     logPrepareBusinessProfileError("upsert business_members (owner) after insert", memRes.message)
     return { ok: false, error: "membership_insert_failed", supabaseMessage: memRes.message }
+  }
+
+  const idSync = await syncBusinessProfileIdentityForTrial(admin, bpForMember.id, enrichedPlan)
+  if (!idSync.ok) {
+    logPrepareBusinessProfileError("sync business_profiles identity (after insert)", idSync.message)
+    const kind = classifyBusinessProfileWriteError(idSync.message, idSync.code)
+    return {
+      ok: false,
+      error: kind === "missing_required_column" || kind === "rls_blocked" ? kind : "business_profile_update_failed",
+      supabaseMessage: idSync.message,
+    }
   }
 
   const { data: insertedRow, error: insSelErr } = await admin
