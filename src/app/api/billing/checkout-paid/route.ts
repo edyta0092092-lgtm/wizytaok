@@ -2,8 +2,6 @@ import { NextResponse } from "next/server"
 import Stripe from "stripe"
 
 import {
-  ACCOUNT_TYPE_REGISTERED,
-  ACCOUNT_TYPE_UNREGISTERED,
   assertBusinessProfileIdentityForCheckout,
   applyCustomerToSession,
   buildSubscriptionMetadata,
@@ -11,26 +9,19 @@ import {
   hasBlockedSubscriptionStatus,
   loadBusinessProfileForCheckout,
   normalizeDigits,
-  trialBlockedByIdentityElsewhere,
-  type TrialBlockContext,
 } from "@/lib/billing/stripe-subscription-checkout-server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import { isTrialStripeCheckoutEnvReady, readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
-import { getServiceRoleClient } from "@/lib/supabase/service-role"
+
+const PAID_SOURCE = "paid_subscription_after_trial_used"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-const ALLOWED_SOURCES = new Set([
-  "wizytaok_test_billing",
-  "landing_trial_signup",
-  "landing_trial_existing_user",
-])
-
 /**
- * Stripe Checkout — subskrypcja z okresem próbnym (30 dni); klucze sk_test_ lub sk_live_ + price_.
+ * Stripe Checkout — płatna subskrypcja od razu (bez trial_period_days).
  */
-export async function POST(request: Request) {
+export async function POST() {
   const flags = readTestIntegrationFlags()
   const checkoutAllowed = flags.enableTestBilling || isTrialStripeCheckoutEnvReady()
   if (!checkoutAllowed) {
@@ -39,12 +30,11 @@ export async function POST(request: Request) {
         ok: false,
         reason: "test_billing_disabled",
         error: "test_billing_disabled",
-        hint:
-          "Brak konfiguracji Stripe dla okresu próbnego. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
         message:
-          "Brak konfiguracji Stripe dla okresu próbnego. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
+          "Brak konfiguracji Stripe. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
+        hint:
+          "Brak konfiguracji Stripe. Ustaw STRIPE_SECRET_KEY i STRIPE_PRICE_ID albo włącz ENABLE_TEST_BILLING.",
         debug: {
-          enableTestBilling: false,
           hasStripePriceId: Boolean(process.env.STRIPE_PRICE_ID?.trim()),
         },
       },
@@ -63,10 +53,6 @@ export async function POST(request: Request) {
         message: configHint,
         hint: configHint,
         details: configErrors,
-        debug: {
-          enableTestBilling: true,
-          hasStripePriceId: Boolean(process.env.STRIPE_PRICE_ID?.trim()),
-        },
       },
       { status: 400 }
     )
@@ -84,14 +70,11 @@ export async function POST(request: Request) {
         error: "stripe_config_invalid",
         message: hint,
         hint,
-        debug: {
-          enableTestBilling: true,
-          hasStripePriceId: Boolean(priceId),
-        },
       },
       { status: 500 }
     )
   }
+
   const base = siteBaseRaw.replace(/\/$/, "")
   const resolution = await resolveAdminBusinessForUser()
   if (!resolution.ok) {
@@ -110,10 +93,6 @@ export async function POST(request: Request) {
         error: resolution.error,
         message: resolutionMessage,
         hint: resolutionMessage,
-        debug: {
-          enableTestBilling: true,
-          hasStripePriceId: Boolean(priceId),
-        },
       },
       { status: resolution.status }
     )
@@ -134,42 +113,6 @@ export async function POST(request: Request) {
       : null
   const hasStripeSubscriptionId =
     typeof bp.stripe_subscription_id === "string" && bp.stripe_subscription_id.trim().length > 0
-  const trialAlreadyUsedOnThisRow = Boolean(bp.trial_used_at) || Boolean(bp.trial_started_at)
-
-  const admin = getServiceRoleClient()
-
-  const trialBlockPayload = (msg: string, context: TrialBlockContext, bpRow: (typeof bp)) => ({
-    ok: false,
-    reason: "trial_already_used" as const,
-    error: "trial_already_used" as const,
-    message: msg,
-    hint: msg,
-    trialBlockContext: context,
-    accountType:
-      bpRow.account_type?.trim() === ACCOUNT_TYPE_REGISTERED ||
-      bpRow.account_type?.trim() === ACCOUNT_TYPE_UNREGISTERED
-        ? bpRow.account_type.trim()
-        : null,
-    debug: {
-      enableTestBilling: true,
-      hasStripePriceId: true,
-      subscriptionStatus: status,
-      stripeSubscriptionStatus: stripeStatus,
-      hasStripeSubscriptionId,
-      businessId: res.businessId,
-      trialStartedAt: bpRow?.trial_started_at ?? null,
-      trialUsedAt: bpRow?.trial_used_at ?? null,
-    },
-  })
-
-  if (trialAlreadyUsedOnThisRow) {
-    const at = bp.account_type?.trim()
-    const msg =
-      at === ACCOUNT_TYPE_UNREGISTERED
-        ? "Darmowy okres próbny został już wykorzystany dla tej osoby."
-        : "Darmowy okres próbny został już wykorzystany dla tej firmy."
-    return NextResponse.json(trialBlockPayload(msg, "own_profile", bp), { status: 409 })
-  }
 
   if (
     hasBlockedSubscriptionStatus(status) ||
@@ -179,13 +122,11 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         ok: false,
-        reason: "subscription_already_exists",
-        error: "subscription_already_exists",
-        message: "Ta firma ma już aktywną lub istniejącą subskrypcję.",
-        hint: "Ta firma ma już aktywną lub istniejącą subskrypcję.",
+        reason: "subscription_already_active",
+        error: "subscription_already_active",
+        message: "Subskrypcja jest już aktywna.",
+        hint: "Subskrypcja jest już aktywna.",
         debug: {
-          enableTestBilling: true,
-          hasStripePriceId: true,
           subscriptionStatus: status,
           stripeSubscriptionStatus: stripeStatus,
           hasStripeSubscriptionId,
@@ -218,41 +159,6 @@ export async function POST(request: Request) {
     typeof bp.contact_phone_normalized === "string" ? bp.contact_phone_normalized : null
   )
 
-  if (admin) {
-    const identityBlock = await trialBlockedByIdentityElsewhere(admin, bp, bp.id, accountType)
-    if (identityBlock === "nip_taken") {
-      return NextResponse.json(
-        trialBlockPayload(
-          "Darmowy okres próbny został już wykorzystany dla tej firmy.",
-          "nip_taken",
-          bp
-        ),
-        { status: 409 }
-      )
-    }
-    if (identityBlock === "phone_taken") {
-      return NextResponse.json(
-        trialBlockPayload(
-          "Darmowy okres próbny został już wykorzystany dla tej osoby.",
-          "phone_taken",
-          bp
-        ),
-        { status: 409 }
-      )
-    }
-  }
-
-  let source = "wizytaok_test_billing"
-  try {
-    const payload = (await request.json()) as { source?: unknown } | undefined
-    const candidate = typeof payload?.source === "string" ? payload.source.trim() : ""
-    if (candidate && ALLOWED_SOURCES.has(candidate)) {
-      source = candidate
-    }
-  } catch {
-    // body is optional
-  }
-
   const stripe = new Stripe(secret)
 
   const meta = buildSubscriptionMetadata(
@@ -260,18 +166,17 @@ export async function POST(request: Request) {
     accountType,
     companyTaxIdNormalized,
     contactPhoneNormalized,
-    source
+    PAID_SOURCE
   )
 
   const sessionParams: Stripe.Checkout.SessionCreateParams = {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
-      trial_period_days: 30,
       metadata: meta,
     },
-    success_url: `${base}/settings?stripe_test=success`,
-    cancel_url: `${base}/settings?stripe_test=cancel`,
+    success_url: `${base}/settings?stripe_paid=success`,
+    cancel_url: `${base}/start-trial?stripe_paid=cancel`,
     client_reference_id: res.businessId,
     metadata: meta,
   }
@@ -282,19 +187,12 @@ export async function POST(request: Request) {
     const session = await stripe.checkout.sessions.create(sessionParams)
 
     if (!session.url) {
-      const msg = "Stripe nie zwrócił adresu płatności."
       return NextResponse.json(
         {
           ok: false,
           reason: "checkout_url_missing",
           error: "checkout_url_missing",
-          message: msg,
-          hint: msg,
-          debug: {
-            enableTestBilling: true,
-            hasStripePriceId: true,
-            businessId: res.businessId,
-          },
+          message: "Stripe nie zwrócił adresu płatności.",
         },
         { status: 500 }
       )
@@ -304,11 +202,6 @@ export async function POST(request: Request) {
       ok: true,
       reason: "checkout_created",
       url: session.url,
-      debug: {
-        enableTestBilling: true,
-        hasStripePriceId: true,
-        businessId: res.businessId,
-      },
     })
   } catch (err) {
     const stripeMsg = err instanceof Stripe.errors.StripeError ? err.message : null
@@ -323,11 +216,6 @@ export async function POST(request: Request) {
         error: "stripe_checkout_failed",
         message: msg,
         hint: msg,
-        debug: {
-          enableTestBilling: true,
-          hasStripePriceId: true,
-          businessId: res.businessId,
-        },
       },
       { status: 502 }
     )

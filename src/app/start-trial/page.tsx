@@ -6,14 +6,15 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { subscriptionStatusBlocksNewCheckout } from "@/lib/billing/subscription-status"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
-type StartTrialState = "loading" | "error" | "active"
-
-function isActiveSubscriptionStatus(status: string | null | undefined): boolean {
-  const normalized = String(status ?? "").trim().toLowerCase()
-  return normalized === "trialing" || normalized === "active"
-}
+type StartTrialState =
+  | "loading"
+  | "error"
+  | "nip_exists"
+  | "subscription_active"
+  | "trial_used"
 
 type PrepareBusinessProfileResponse = {
   ok?: boolean
@@ -28,6 +29,7 @@ type PrepareErrorCode =
   | "missing_contact_phone"
   | "missing_slug_or_business_name"
   | "missing_service_role_key"
+  | "nip_company_already_exists"
   | "business_profile_insert_failed"
   | "business_profile_update_failed"
   | "membership_insert_failed"
@@ -87,9 +89,59 @@ function StartTrialContent() {
   const searchParams = useSearchParams()
   const [state, setState] = React.useState<StartTrialState>("loading")
   const [error, setError] = React.useState<string | null>(null)
+  const [trialHeadline, setTrialHeadline] = React.useState<string | null>(null)
+  const [loadingKind, setLoadingKind] = React.useState<"trial" | "paid">("trial")
+
+  const beginPaidCheckout = React.useCallback(async () => {
+    setError(null)
+    setLoadingKind("paid")
+    setState("loading")
+
+    const checkoutRes = await fetch("/api/billing/checkout-paid", {
+      method: "POST",
+      credentials: "same-origin",
+    })
+
+    const rawBody = await checkoutRes.text()
+    type PaidCheckoutJson = {
+      url?: string
+      reason?: string
+      error?: string
+      message?: string
+    }
+    let payload: PaidCheckoutJson | null = null
+    if (rawBody.trim().length > 0) {
+      try {
+        payload = JSON.parse(rawBody) as PaidCheckoutJson
+      } catch {
+        payload = null
+      }
+    }
+
+    const reason = payload?.reason?.trim() ?? ""
+
+    if (!checkoutRes.ok || !payload?.url) {
+      if (reason === "subscription_already_active") {
+        setState("subscription_active")
+        setTrialHeadline(null)
+        return
+      }
+      setState("trial_used")
+      const msg =
+        payload?.message?.trim() ||
+        payload?.error?.trim() ||
+        "Nie udało się uruchomić płatnej subskrypcji. Spróbuj ponownie."
+      setError(msg)
+      return
+    }
+
+    window.location.href = payload.url
+  }, [])
 
   const beginCheckout = React.useCallback(async () => {
     setError(null)
+    setTrialHeadline(null)
+    setLoadingKind("trial")
     setState("loading")
 
     if (!isSupabaseConfigured()) {
@@ -163,16 +215,21 @@ function StartTrialContent() {
           supabaseMessage: prepareJson?.supabaseMessage,
         })
       }
+      if (code === "nip_company_already_exists") {
+        setState("nip_exists")
+        setError(null)
+        return
+      }
       setState("error")
       setError(`${base}${devSuffix}`)
       return
     }
 
-    if (isActiveSubscriptionStatus(prepareJson.subscriptionStatus)) {
+    if (subscriptionStatusBlocksNewCheckout(prepareJson.subscriptionStatus)) {
       if (process.env.NODE_ENV === "development") {
         console.info("[start-trial]", { reason: "subscription_already_active" })
       }
-      setState("active")
+      setState("subscription_active")
       return
     }
 
@@ -223,45 +280,60 @@ function StartTrialContent() {
           rawBodyPreview: rawBody.slice(0, 500),
         })
       }
-      setState("error")
-      if (reason === "trial_already_used") {
-        setError("Darmowy okres próbny został już wykorzystany dla tej firmy lub osoby.")
-      } else if (reason === "subscription_already_exists" || reason === "subscription_already_active") {
-        setError("Twój okres próbny jest aktywny.")
-      } else {
-        const rawErr = typeof payload?.error === "string" ? payload.error.trim() : ""
-        const detailsJoined =
-          Array.isArray(payload?.details) && payload.details.length > 0
-            ? payload.details.filter((s) => typeof s === "string" && s.trim().length > 0).join(" ")
-            : ""
-        const backendMessage =
-          payload?.message?.trim() ||
-          payload?.hint?.trim() ||
-          detailsJoined ||
-          (rawErr === "unauthorized"
-            ? "Sesja wygasła lub nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie."
-            : rawErr === "no_business"
-              ? "Nie znaleziono profilu firmy powiązanego z kontem."
-              : rawErr === "test_billing_disabled"
-                ? "Brak konfiguracji Stripe dla okresu próbnego (sprawdź zmienne na serwerze)."
-                : rawErr.length > 0
-                  ? rawErr
-                  : !payload && rawBody.trim().length > 0
-                    ? `Odpowiedź serwera (${checkoutRes.status}): ${rawBody.slice(0, 280)}${rawBody.length > 280 ? "…" : ""}`
-                    : "")
-        const isDev = process.env.NODE_ENV !== "production"
-        const devCheckout =
-          isDev && (payload?.reason || payload?.error)
-            ? `\n(dev: ${payload?.reason ?? payload?.error ?? reason})`
-            : ""
-        setError(
-          (backendMessage.length > 0
-            ? backendMessage
-            : checkoutRes.status >= 500
-              ? `Błąd serwera (${checkoutRes.status}). Spróbuj za chwilę lub skontaktuj się z pomocą.`
-              : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.") + devCheckout
-        )
+
+      if (
+        reason === "subscription_already_exists" ||
+        reason === "subscription_already_active"
+      ) {
+        setState("subscription_active")
+        setError(null)
+        return
       }
+
+      if (reason === "trial_already_used") {
+        const headline =
+          typeof payload?.message === "string" && payload.message.trim().length > 0
+            ? payload.message.trim()
+            : "Darmowy okres próbny został już wykorzystany dla tej firmy."
+        setTrialHeadline(headline)
+        setState("trial_used")
+        setError(null)
+        return
+      }
+
+      setState("error")
+      const rawErr = typeof payload?.error === "string" ? payload.error.trim() : ""
+      const detailsJoined =
+        Array.isArray(payload?.details) && payload.details.length > 0
+          ? payload.details.filter((s) => typeof s === "string" && s.trim().length > 0).join(" ")
+          : ""
+      const backendMessage =
+        payload?.message?.trim() ||
+        payload?.hint?.trim() ||
+        detailsJoined ||
+        (rawErr === "unauthorized"
+          ? "Sesja wygasła lub nie jesteś zalogowany. Odśwież stronę i zaloguj się ponownie."
+          : rawErr === "no_business"
+            ? "Nie znaleziono profilu firmy powiązanego z kontem."
+            : rawErr === "test_billing_disabled"
+              ? "Brak konfiguracji Stripe dla okresu próbnego (sprawdź zmienne na serwerze)."
+              : rawErr.length > 0
+                ? rawErr
+                : !payload && rawBody.trim().length > 0
+                  ? `Odpowiedź serwera (${checkoutRes.status}): ${rawBody.slice(0, 280)}${rawBody.length > 280 ? "…" : ""}`
+                  : "")
+      const isDev = process.env.NODE_ENV !== "production"
+      const devCheckout =
+        isDev && (payload?.reason || payload?.error)
+          ? `\n(dev: ${payload?.reason ?? payload?.error ?? reason})`
+          : ""
+      setError(
+        (backendMessage.length > 0
+          ? backendMessage
+          : checkoutRes.status >= 500
+            ? `Błąd serwera (${checkoutRes.status}). Spróbuj za chwilę lub skontaktuj się z pomocą.`
+            : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.") + devCheckout
+      )
       return
     }
 
@@ -274,42 +346,81 @@ function StartTrialContent() {
     })
   }, [beginCheckout])
 
+  const paidCtaDescription =
+    "Możesz kontynuować korzystanie z WizytaOK w ramach abonamentu 149 zł / miesiąc."
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
           <CardTitle>
             {state === "loading"
-              ? "Przygotowujemy Twój 30-dniowy okres próbny..."
-              : state === "active"
-                ? "Twój okres próbny jest aktywny."
-                : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."}
+              ? loadingKind === "paid"
+                ? "Przekierowujemy do bezpiecznej płatności Stripe..."
+                : "Przygotowujemy Twój 30-dniowy okres próbny..."
+              : state === "nip_exists"
+                ? "Firma z tym NIP już istnieje w WizytaOK."
+                : state === "subscription_active"
+                  ? "Subskrypcja jest już aktywna."
+                  : state === "trial_used"
+                    ? trialHeadline ?? "Darmowy okres próbny został już wykorzystany dla tej firmy."
+                    : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."}
           </CardTitle>
           <CardDescription>
             {state === "loading"
-              ? "Sprawdzamy konto i przekierowujemy do bezpiecznego checkoutu Stripe."
-              : state === "active"
-                ? "Możesz przejść do panelu i kontynuować pracę."
-                : "Możesz spróbować ponownie albo przejść do panelu."}
+              ? loadingKind === "paid"
+                ? "Otwieramy stronę Stripe z subskrypcją miesięczną (bez okresu próbnego)."
+                : "Sprawdzamy konto i przekierowujemy do bezpiecznego checkoutu Stripe."
+              : state === "nip_exists"
+                ? "Zaloguj się na konto właściciela lub poproś o dostęp do tej firmy."
+                : state === "subscription_active"
+                  ? "Możesz przejść do panelu i kontynuować pracę."
+                  : state === "trial_used"
+                    ? paidCtaDescription
+                    : "Możesz spróbować ponownie albo przejść do panelu."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {state === "error" ? (
             <p className="whitespace-pre-wrap text-sm text-destructive">{error}</p>
           ) : null}
-          {state === "error" || state === "active" ? (
+          {state === "error" ? (
             <div className="flex flex-wrap gap-2">
-              {state === "error" ? (
-                <Button type="button" onClick={() => void beginCheckout()}>
-                  Spróbuj ponownie
+              <Button type="button" onClick={() => void beginCheckout()}>
+                Spróbuj ponownie
+              </Button>
+              <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
+                Przejdź do panelu
+              </Button>
+            </div>
+          ) : null}
+          {state === "trial_used" ? (
+            <>
+              {error ? <p className="whitespace-pre-wrap text-sm text-destructive">{error}</p> : null}
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" onClick={() => void beginPaidCheckout()}>
+                  Wykup subskrypcję
                 </Button>
-              ) : null}
-              <Button
-                type="button"
-                variant={state === "error" ? "outline" : "default"}
-                onClick={() => router.push("/settings")}
-              >
-                {error?.includes("wykorzystany") ? "Przejdź do subskrypcji" : "Przejdź do panelu"}
+                <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
+                  Przejdź do panelu
+                </Button>
+              </div>
+            </>
+          ) : null}
+          {state === "subscription_active" ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => router.push("/dashboard")}>
+                Przejdź do panelu
+              </Button>
+            </div>
+          ) : null}
+          {state === "nip_exists" ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" onClick={() => router.push("/login?next=%2Fdashboard")}>
+                Zaloguj się
+              </Button>
+              <Button type="button" variant="outline" onClick={() => router.push("/support")}>
+                Poproś o dostęp
               </Button>
             </div>
           ) : null}

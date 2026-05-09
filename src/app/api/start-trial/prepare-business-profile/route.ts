@@ -12,6 +12,7 @@ export const runtime = "nodejs"
 function httpStatusForPrepareError(e: PrepareBusinessProfileError): number {
   if (e === "unauthorized") return 401
   if (e === "no_server" || e === "missing_service_role_key") return 503
+  if (e === "nip_company_already_exists") return 409
   return 422
 }
 

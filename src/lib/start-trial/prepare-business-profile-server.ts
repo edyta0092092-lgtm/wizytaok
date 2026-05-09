@@ -1,5 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
+import { resolveRegisteredBusinessNipCollision } from "@/lib/business/registered-nip-collision-server"
 import {
   insertBusinessProfileFromPlan,
   planBusinessProfileInsertFromUser,
@@ -20,6 +21,7 @@ export type PrepareBusinessProfileError =
   | "missing_contact_phone"
   | "missing_slug_or_business_name"
   | "missing_service_role_key"
+  | "nip_company_already_exists"
   | "business_profile_insert_failed"
   | "business_profile_update_failed"
   | "membership_insert_failed"
@@ -409,6 +411,42 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
       subscriptionStatus: finalRow.subscription_status ?? null,
       created: false,
       updated,
+    }
+  }
+
+  if (accountType === REGISTERED && taxNorm.length === 10) {
+    const nipCollision = await resolveRegisteredBusinessNipCollision(admin, user.id, taxNorm)
+    if (nipCollision.outcome === "blocked_foreign_nip") {
+      return { ok: false, error: "nip_company_already_exists" }
+    }
+    if (nipCollision.outcome === "member_of_existing_company") {
+      const { data: reusedRow, error: reuseSelErr } = await admin
+        .from("business_profiles")
+        .select("id, subscription_status, account_type, company_tax_id_normalized, contact_phone_normalized")
+        .eq("id", nipCollision.businessId)
+        .maybeSingle()
+      if (reuseSelErr) {
+        logPrepareBusinessProfileError("select business_profiles nip member reuse", reuseSelErr)
+        return {
+          ok: false,
+          error: classifyBusinessProfileWriteError(reuseSelErr.message, reuseSelErr.code),
+          supabaseMessage: reuseSelErr.message,
+        }
+      }
+      if (!reusedRow?.id) {
+        return { ok: false, error: "business_profile_insert_failed" }
+      }
+      const vReuse = validateRowForCheckout(reusedRow)
+      if (!vReuse.ok) {
+        return { ok: false, error: vReuse.error }
+      }
+      return {
+        ok: true,
+        businessId: reusedRow.id,
+        subscriptionStatus: reusedRow.subscription_status ?? null,
+        created: false,
+        updated: false,
+      }
     }
   }
 
