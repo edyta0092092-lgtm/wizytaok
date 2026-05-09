@@ -912,8 +912,11 @@ export interface Database {
           role: string
           display_name: string | null
           email: string | null
+          phone: string | null
           is_active: boolean
           invited_by: string | null
+          invited_at: string | null
+          joined_at: string | null
           staff_member_id: string | null
           created_at: string
           updated_at: string
@@ -925,8 +928,11 @@ export interface Database {
           role?: string
           display_name?: string | null
           email?: string | null
+          phone?: string | null
           is_active?: boolean
           invited_by?: string | null
+          invited_at?: string | null
+          joined_at?: string | null
           staff_member_id?: string | null
           created_at?: string
           updated_at?: string
@@ -938,8 +944,11 @@ export interface Database {
           role?: string
           display_name?: string | null
           email?: string | null
+          phone?: string | null
           is_active?: boolean
           invited_by?: string | null
+          invited_at?: string | null
+          joined_at?: string | null
           staff_member_id?: string | null
           created_at?: string
           updated_at?: string
