@@ -51,7 +51,7 @@ export function mapBusinessProfileRow(row: Tables<"business_profiles">): Busines
     businessName: row.business_name,
     slug: row.slug,
     ownerName: row.owner_name,
-    ownerLastName: row.owner_last_name,
+    ownerLastName: row.owner_last_name ?? null,
     email: row.email,
     phone: row.phone,
     taxId: row.tax_id ?? null,

@@ -71,16 +71,17 @@ export function logPrepareBusinessProfileError(context: string, err: unknown): v
   console.error(`[prepare-business-profile] ${context}`, msg)
 }
 
-function buildOwnerDisplayForMembership(row: {
-  business_name: string
-  owner_name: string | null
-  owner_last_name: string | null
-}): string {
-  const parts = [row.owner_name, row.owner_last_name]
-    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
-    .map((s) => s.trim())
-  if (parts.length > 0) return parts.join(" ")
+function buildOwnerDisplayForMembership(row: { business_name: string; owner_name: string | null }): string {
+  const n = typeof row.owner_name === "string" ? row.owner_name.trim() : ""
+  if (n.length > 0) return n
   return row.business_name
+}
+
+function ownerDisplayFromSignupMeta(meta: Record<string, unknown>): string {
+  const first = typeof meta.owner_name === "string" ? meta.owner_name.trim() : ""
+  const last = typeof meta.owner_last_name === "string" ? meta.owner_last_name.trim() : ""
+  const combined = [first, last].filter((p) => p.length > 0).join(" ").trim()
+  return combined
 }
 
 /**
@@ -90,17 +91,36 @@ async function upsertOwnerMembershipAdmin(
   admin: SupabaseClient<Database>,
   p: { businessId: string; userId: string; userEmail: string | null; displayName: string }
 ): Promise<{ ok: true } | { ok: false; message: string; code?: string }> {
-  const { error } = await admin.from("business_members").upsert(
+  let { error } = await admin.from("business_members").upsert(
     {
       business_id: p.businessId,
       user_id: p.userId,
       role: "admin",
       display_name: p.displayName,
       email: p.userEmail?.trim() ?? null,
-      is_active: true,
     },
     { onConflict: "business_id,user_id" }
   )
+  if (
+    error &&
+    error.message.toLowerCase().includes("is_active") &&
+    (error.message.toLowerCase().includes("null value") ||
+      error.message.toLowerCase().includes("not-null") ||
+      error.message.toLowerCase().includes("violates not-null constraint"))
+  ) {
+    const retry = await admin.from("business_members").upsert(
+      {
+        business_id: p.businessId,
+        user_id: p.userId,
+        role: "admin",
+        display_name: p.displayName,
+        email: p.userEmail?.trim() ?? null,
+        is_active: true,
+      },
+      { onConflict: "business_id,user_id" }
+    )
+    error = retry.error
+  }
   if (error) {
     return { ok: false, message: error.message ?? "upsert failed", code: error.code }
   }
@@ -297,33 +317,13 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
       patch.email = user.email
     }
 
-    const ownerFirst =
-      typeof meta.owner_name === "string" ? meta.owner_name.trim() : existing.owner_name ?? ""
-    const ownerLast =
-      typeof meta.owner_last_name === "string"
-        ? meta.owner_last_name.trim()
-        : existing.owner_last_name ?? ""
-    if (ownerFirst && existing.owner_name !== ownerFirst) {
-      patch.owner_name = ownerFirst
-    }
-    if (ownerLast && existing.owner_last_name !== ownerLast) {
-      patch.owner_last_name = ownerLast
+    const combinedOwner = ownerDisplayFromSignupMeta(meta)
+    if (combinedOwner.length > 0 && (existing.owner_name ?? "").trim() !== combinedOwner) {
+      patch.owner_name = combinedOwner
     }
 
     if (Object.keys(patch).length > 0) {
       let upErr = (await admin.from("business_profiles").update(patch).eq("id", existing.id)).error
-      if (upErr && classifyBusinessProfileWriteError(upErr.message, upErr.code) === "missing_required_column") {
-        // Nie usuwaj account_type / NIP / telefon — i tak dogrywamy je w syncBusinessProfileIdentityForTrial.
-        const stripKeys = ["owner_last_name"] as const
-        const rest = { ...patch } as Record<string, unknown>
-        for (const k of stripKeys) {
-          delete rest[k]
-        }
-        const slim = rest as Database["public"]["Tables"]["business_profiles"]["Update"]
-        if (Object.keys(slim).length > 0) {
-          upErr = (await admin.from("business_profiles").update(slim).eq("id", existing.id)).error
-        }
-      }
       if (upErr && classifyBusinessProfileWriteError(upErr.message, upErr.code) === "missing_required_column") {
         const minimal: Database["public"]["Tables"]["business_profiles"]["Update"] = {}
         if (patch.owner_name != null) minimal.owner_name = patch.owner_name
@@ -346,7 +346,7 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
 
     const { data: bpForMember, error: bmLoadErr } = await admin
       .from("business_profiles")
-      .select("id, owner_name, owner_last_name, business_name, email")
+      .select("id, owner_name, business_name, email")
       .eq("id", existing.id)
       .maybeSingle()
     if (bmLoadErr || !bpForMember?.id) {
@@ -425,7 +425,7 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
 
   const { data: bpForMember, error: bmLoadErr } = await admin
     .from("business_profiles")
-    .select("id, owner_name, owner_last_name, business_name, email")
+    .select("id, owner_name, business_name, email")
     .eq("owner_id", user.id)
     .maybeSingle()
   if (bmLoadErr || !bpForMember?.id) {

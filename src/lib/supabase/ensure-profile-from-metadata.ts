@@ -68,6 +68,8 @@ export function planBusinessProfileInsertFromUser(
     typeof meta.owner_last_name === "string" ? meta.owner_last_name.trim() : ""
   const ownerFirst = ownerFirstRaw.length > 0 ? ownerFirstRaw : null
   const ownerLast = ownerLastRaw.length > 0 ? ownerLastRaw : null
+  const ownerNameCombined =
+    [ownerFirst, ownerLast].filter((s): s is string => s != null && s.length > 0).join(" ").trim() || null
   const accountTypeRaw = typeof meta.account_type === "string" ? meta.account_type.trim() : ""
   const accountType =
     accountTypeRaw === "registered_business" || accountTypeRaw === "unregistered_activity"
@@ -85,7 +87,8 @@ export function planBusinessProfileInsertFromUser(
     business_name: businessName,
     slug,
     email: user.email ?? null,
-    owner_name: ownerFirst,
+    owner_name: ownerNameCombined,
+    owner_first_name: ownerFirst,
     owner_last_name: ownerLast,
     tax_id: companyTaxIdRaw || null,
     account_type: accountType,
@@ -95,8 +98,7 @@ export function planBusinessProfileInsertFromUser(
     contact_phone_normalized: contactPhoneNormalized,
   }
 
-  const ownerNameLegacyFallback =
-    [ownerFirst, ownerLast].filter((s): s is string => s != null && s.length > 0).join(" ") || null
+  const ownerNameLegacyFallback = ownerNameCombined
 
   return {
     fullInsert,

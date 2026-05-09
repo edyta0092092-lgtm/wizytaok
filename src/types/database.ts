@@ -113,6 +113,7 @@ export interface Database {
           business_name: string
           slug: string
           owner_name: string | null
+          owner_first_name: string | null
           owner_last_name: string | null
           email: string | null
           phone: string | null
@@ -150,6 +151,7 @@ export interface Database {
           business_name: string
           slug: string
           owner_name?: string | null
+          owner_first_name?: string | null
           owner_last_name?: string | null
           email?: string | null
           phone?: string | null
@@ -187,6 +189,7 @@ export interface Database {
           business_name?: string
           slug?: string
           owner_name?: string | null
+          owner_first_name?: string | null
           owner_last_name?: string | null
           email?: string | null
           phone?: string | null
