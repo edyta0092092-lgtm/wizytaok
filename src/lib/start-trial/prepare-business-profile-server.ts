@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js"
+import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 import {
   insertBusinessProfileFromPlan,
@@ -69,6 +69,42 @@ export function classifyBusinessProfileWriteError(
 export function logPrepareBusinessProfileError(context: string, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err)
   console.error(`[prepare-business-profile] ${context}`, msg)
+}
+
+function buildOwnerDisplayForMembership(row: {
+  business_name: string
+  owner_name: string | null
+  owner_last_name: string | null
+}): string {
+  const parts = [row.owner_name, row.owner_last_name]
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    .map((s) => s.trim())
+  if (parts.length > 0) return parts.join(" ")
+  return row.business_name
+}
+
+/**
+ * Właściciel jako admin w business_members — service role (nie polega na auth.uid() w RPC).
+ */
+async function upsertOwnerMembershipAdmin(
+  admin: SupabaseClient<Database>,
+  p: { businessId: string; userId: string; userEmail: string | null; displayName: string }
+): Promise<{ ok: true } | { ok: false; message: string; code?: string }> {
+  const { error } = await admin.from("business_members").upsert(
+    {
+      business_id: p.businessId,
+      user_id: p.userId,
+      role: "admin",
+      display_name: p.displayName,
+      email: p.userEmail?.trim() ?? null,
+      is_active: true,
+    },
+    { onConflict: "business_id,user_id" }
+  )
+  if (error) {
+    return { ok: false, message: error.message ?? "upsert failed", code: error.code }
+  }
+  return { ok: true }
 }
 
 type CheckoutIdentityRow = {
@@ -291,10 +327,28 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
       updated = true
     }
 
-    const { error: rpcErr } = await userSb.rpc("ensure_owner_membership")
-    if (rpcErr) {
-      logPrepareBusinessProfileError("ensure_owner_membership", rpcErr)
-      return { ok: false, error: "membership_insert_failed", supabaseMessage: rpcErr.message }
+    const { data: bpForMember, error: bmLoadErr } = await admin
+      .from("business_profiles")
+      .select("id, owner_name, owner_last_name, business_name, email")
+      .eq("id", existing.id)
+      .maybeSingle()
+    if (bmLoadErr || !bpForMember?.id) {
+      logPrepareBusinessProfileError("load business_profiles for membership", bmLoadErr)
+      return {
+        ok: false,
+        error: "membership_insert_failed",
+        supabaseMessage: bmLoadErr?.message ?? "business profile row missing",
+      }
+    }
+    const memRes = await upsertOwnerMembershipAdmin(admin, {
+      businessId: bpForMember.id,
+      userId: user.id,
+      userEmail: user.email ?? bpForMember.email,
+      displayName: buildOwnerDisplayForMembership(bpForMember),
+    })
+    if (!memRes.ok) {
+      logPrepareBusinessProfileError("upsert business_members (owner)", memRes.message)
+      return { ok: false, error: "membership_insert_failed", supabaseMessage: memRes.message }
     }
 
     const { data: finalRow, error: frErr } = await admin
@@ -340,10 +394,28 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
   }
   created = true
 
-  const { error: rpcErr } = await userSb.rpc("ensure_owner_membership")
-  if (rpcErr) {
-    logPrepareBusinessProfileError("ensure_owner_membership", rpcErr)
-    return { ok: false, error: "membership_insert_failed", supabaseMessage: rpcErr.message }
+  const { data: bpForMember, error: bmLoadErr } = await admin
+    .from("business_profiles")
+    .select("id, owner_name, owner_last_name, business_name, email")
+    .eq("owner_id", user.id)
+    .maybeSingle()
+  if (bmLoadErr || !bpForMember?.id) {
+    logPrepareBusinessProfileError("load business_profiles after insert for membership", bmLoadErr)
+    return {
+      ok: false,
+      error: "membership_insert_failed",
+      supabaseMessage: bmLoadErr?.message ?? "business profile row missing",
+    }
+  }
+  const memRes = await upsertOwnerMembershipAdmin(admin, {
+    businessId: bpForMember.id,
+    userId: user.id,
+    userEmail: user.email ?? bpForMember.email,
+    displayName: buildOwnerDisplayForMembership(bpForMember),
+  })
+  if (!memRes.ok) {
+    logPrepareBusinessProfileError("upsert business_members (owner) after insert", memRes.message)
+    return { ok: false, error: "membership_insert_failed", supabaseMessage: memRes.message }
   }
 
   const { data: insertedRow, error: insSelErr } = await admin
