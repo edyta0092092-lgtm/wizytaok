@@ -56,7 +56,13 @@ function polishMessageForPrepareError(code: string): string {
     case "membership_insert_failed":
       return "Nie udało się utworzyć członkostwa właściciela (membership_insert_failed)."
     case "missing_required_column":
-      return "Baza jest niezsynchronizowana ze schematem (brak kolumny). Uruchom migracje Supabase."
+      return [
+        "Baza w Supabase nie ma wymaganych kolumn (np. account_type, contact_phone_normalized).",
+        "Naprawa: Supabase Dashboard → SQL Editor → wklej i uruchom plik migracji z repozytorium:",
+        "supabase/migrations/048_business_profiles_trial_identity_guards.sql",
+        "oraz supabase/migrations/050_business_profiles_identity_columns_idempotent.sql",
+        "(albo: supabase db push / link migracji z GitHuba do surowego SQL).",
+      ].join("\n")
     case "rls_blocked":
       return "Zapis profilu zablokowany przez RLS (rls_blocked). Sprawdź polityki lub użyj service role na serwerze."
     case "no_server":
@@ -137,10 +143,19 @@ function StartTrialContent() {
       const code = (prepareJson?.error ?? "").trim() as PrepareErrorCode | string
       const base = polishMessageForPrepareError(code || "unknown")
       const isDev = process.env.NODE_ENV !== "production"
+      const showDbDetail =
+        Boolean(prepareJson?.supabaseMessage) &&
+        (isDev ||
+          code === "missing_required_column" ||
+          code === "business_profile_insert_failed" ||
+          code === "business_profile_update_failed" ||
+          code === "membership_insert_failed")
       const devSuffix =
         isDev && code
           ? `\n(dev: ${code}${prepareJson?.supabaseMessage ? ` — ${prepareJson.supabaseMessage}` : ""})`
-          : ""
+          : showDbDetail && !isDev && prepareJson?.supabaseMessage
+            ? `\n\nSzczegół: ${prepareJson.supabaseMessage}`
+            : ""
       if (process.env.NODE_ENV === "development") {
         console.info("[start-trial] prepare-business-profile failed", {
           status: prepareRes.status,

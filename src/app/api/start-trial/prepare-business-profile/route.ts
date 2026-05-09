@@ -26,7 +26,12 @@ export async function POST() {
   const r = await prepareBusinessProfileForStartTrial()
 
   if (!r.ok) {
-    const showDetails = process.env.NODE_ENV !== "production"
+    const alwaysShowMessage =
+      r.error === "missing_required_column" ||
+      r.error === "business_profile_insert_failed" ||
+      r.error === "business_profile_update_failed" ||
+      r.error === "membership_insert_failed"
+    const showDetails = process.env.NODE_ENV !== "production" || alwaysShowMessage
     return NextResponse.json(
       {
         ok: false,

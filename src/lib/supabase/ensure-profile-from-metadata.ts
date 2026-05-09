@@ -133,6 +133,17 @@ export async function insertBusinessProfileFromPlan(
     insertError = fallbackError ?? null
   }
 
+  if (insertError && isMissingColumnError(insertError.message)) {
+    const { error: legacyError } = await supabase.from("business_profiles").insert({
+      owner_id: userId,
+      business_name: fullInsert.business_name,
+      slug: insertSlug,
+      email: fullInsert.email ?? null,
+      owner_name: ownerNameLegacyFallback,
+    })
+    insertError = legacyError ?? null
+  }
+
   if (insertError && allowFallbackProfile && isUniqueViolation(insertError.message)) {
     insertSlug = buildFallbackSlug(userId)
     const retryPayload = { ...fullInsert, slug: insertSlug }
@@ -148,6 +159,16 @@ export async function insertBusinessProfileFromPlan(
         tax_id: companyTaxIdRaw || null,
       })
       insertError = fallbackError ?? null
+    }
+    if (insertError && isMissingColumnError(insertError.message)) {
+      const { error: legacyError } = await supabase.from("business_profiles").insert({
+        owner_id: userId,
+        business_name: fullInsert.business_name,
+        slug: insertSlug,
+        email: fullInsert.email ?? null,
+        owner_name: ownerNameLegacyFallback,
+      })
+      insertError = legacyError ?? null
     }
   }
 

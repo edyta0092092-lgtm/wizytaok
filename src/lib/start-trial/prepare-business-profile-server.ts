@@ -252,7 +252,33 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
     }
 
     if (Object.keys(patch).length > 0) {
-      const { error: upErr } = await admin.from("business_profiles").update(patch).eq("id", existing.id)
+      let upErr = (await admin.from("business_profiles").update(patch).eq("id", existing.id)).error
+      if (upErr && classifyBusinessProfileWriteError(upErr.message, upErr.code) === "missing_required_column") {
+        const stripKeys = [
+          "owner_last_name",
+          "account_type",
+          "company_tax_id",
+          "company_tax_id_normalized",
+          "contact_phone",
+          "contact_phone_normalized",
+        ] as const
+        const rest = { ...patch } as Record<string, unknown>
+        for (const k of stripKeys) {
+          delete rest[k]
+        }
+        const slim = rest as Database["public"]["Tables"]["business_profiles"]["Update"]
+        if (Object.keys(slim).length > 0) {
+          upErr = (await admin.from("business_profiles").update(slim).eq("id", existing.id)).error
+        }
+      }
+      if (upErr && classifyBusinessProfileWriteError(upErr.message, upErr.code) === "missing_required_column") {
+        const minimal: Database["public"]["Tables"]["business_profiles"]["Update"] = {}
+        if (patch.owner_name != null) minimal.owner_name = patch.owner_name
+        if (patch.email != null) minimal.email = patch.email
+        if (Object.keys(minimal).length > 0) {
+          upErr = (await admin.from("business_profiles").update(minimal).eq("id", existing.id)).error
+        }
+      }
       if (upErr) {
         logPrepareBusinessProfileError("update business_profiles", upErr)
         const kind = classifyBusinessProfileWriteError(upErr.message, upErr.code)
@@ -277,8 +303,15 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
       .eq("id", existing.id)
       .maybeSingle()
 
-    if (frErr || !finalRow?.id) {
+    if (frErr) {
       logPrepareBusinessProfileError("select business_profiles after update", frErr)
+      const kind = classifyBusinessProfileWriteError(frErr.message, frErr.code)
+      if (kind === "missing_required_column") {
+        return { ok: false, error: "missing_required_column", supabaseMessage: frErr.message }
+      }
+      return { ok: false, error: "business_profile_insert_failed", supabaseMessage: frErr.message }
+    }
+    if (!finalRow?.id) {
       return { ok: false, error: "business_profile_insert_failed" }
     }
 
@@ -319,8 +352,15 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
     .eq("owner_id", user.id)
     .maybeSingle()
 
-  if (insSelErr || !insertedRow?.id) {
+  if (insSelErr) {
     logPrepareBusinessProfileError("select business_profiles after insert", insSelErr)
+    const kind = classifyBusinessProfileWriteError(insSelErr.message, insSelErr.code)
+    if (kind === "missing_required_column") {
+      return { ok: false, error: "missing_required_column", supabaseMessage: insSelErr.message }
+    }
+    return { ok: false, error: "business_profile_insert_failed", supabaseMessage: insSelErr.message }
+  }
+  if (!insertedRow?.id) {
     return { ok: false, error: "business_profile_insert_failed" }
   }
 
