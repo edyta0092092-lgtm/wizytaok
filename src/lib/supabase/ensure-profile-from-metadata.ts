@@ -105,6 +105,10 @@ export function planBusinessProfileInsertFromUser(
   }
 }
 
+export type InsertBusinessProfileFromPlanResult =
+  | { ok: true }
+  | { ok: false; message: string; code?: string }
+
 /**
  * Jedna próba utworzenia wiersza (insert + fallback przy braku kolumn / kolizji sluga).
  */
@@ -113,7 +117,7 @@ export async function insertBusinessProfileFromPlan(
   userId: string,
   plan: BusinessProfileInsertPlan,
   allowFallbackProfile: boolean
-): Promise<boolean> {
+): Promise<InsertBusinessProfileFromPlanResult> {
   const { fullInsert, ownerNameLegacyFallback, companyTaxIdRaw } = plan
   let insertSlug = fullInsert.slug
   let { error: insertError } = await supabase.from("business_profiles").insert(fullInsert)
@@ -147,7 +151,14 @@ export async function insertBusinessProfileFromPlan(
     }
   }
 
-  return !insertError
+  if (!insertError) {
+    return { ok: true }
+  }
+  return {
+    ok: false,
+    message: insertError.message ?? "insert failed",
+    code: insertError.code,
+  }
 }
 
 /**
@@ -183,8 +194,10 @@ export async function ensureBusinessProfileFromUserMetadata(
   }
 
   const inserted = await insertBusinessProfileFromPlan(supabase, user.id, plan, allowFallbackProfile)
-  if (inserted) {
+  if (inserted.ok) {
     businessProfileCreated = true
+  } else {
+    console.error("[ensureBusinessProfileFromUserMetadata] insert failed", inserted.message)
   }
 
   await supabase.rpc("ensure_owner_membership")

@@ -21,6 +21,44 @@ const ACCOUNT_TYPE_UNREGISTERED = "unregistered_activity"
 
 type BusinessProfileRow = Database["public"]["Tables"]["business_profiles"]["Row"]
 
+function assertBusinessProfileIdentityForCheckout(
+  bp: BusinessProfileRow
+):
+  | { ok: true; accountType: typeof ACCOUNT_TYPE_REGISTERED | typeof ACCOUNT_TYPE_UNREGISTERED }
+  | { ok: false; error: string; message: string } {
+  const raw = bp.account_type?.trim()
+  if (raw !== ACCOUNT_TYPE_REGISTERED && raw !== ACCOUNT_TYPE_UNREGISTERED) {
+    return {
+      ok: false,
+      error: "missing_account_type",
+      message:
+        "Profil firmy nie ma typu działalności. Uzupełnij dane konta lub skontaktuj się z pomocą.",
+    }
+  }
+  if (raw === ACCOUNT_TYPE_REGISTERED) {
+    const d = normalizeDigits(bp.company_tax_id_normalized)
+    if (!d || d.length !== 10) {
+      return {
+        ok: false,
+        error: "missing_company_tax_id",
+        message:
+          "Brak poprawnego NIP w profilu firmy. Zarejestruj konto ponownie lub skontaktuj się z pomocą.",
+      }
+    }
+  } else {
+    const d = normalizeDigits(bp.contact_phone_normalized)
+    if (!d || d.length < 9) {
+      return {
+        ok: false,
+        error: "missing_contact_phone",
+        message:
+          "Brak numeru telefonu w profilu firmy. Zarejestruj konto ponownie lub skontaktuj się z pomocą.",
+      }
+    }
+  }
+  return { ok: true, accountType: raw }
+}
+
 function normalizeDigits(raw: string | null | undefined): string | null {
   if (!raw) return null
   const normalized = raw.replace(/\D/g, "")
@@ -276,11 +314,21 @@ export async function POST(request: Request) {
     )
   }
 
-  const accountType =
-    (bp.account_type === ACCOUNT_TYPE_REGISTERED || bp.account_type === ACCOUNT_TYPE_UNREGISTERED
-      ? bp.account_type
-      : null
-    ) as string | null
+  const identity = assertBusinessProfileIdentityForCheckout(bp)
+  if (!identity.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "business_profile_incomplete",
+        error: identity.error,
+        message: identity.message,
+        hint: identity.message,
+      },
+      { status: 422 }
+    )
+  }
+
+  const accountType = identity.accountType
   const companyTaxIdNormalized = normalizeDigits(
     typeof bp.company_tax_id_normalized === "string" ? bp.company_tax_id_normalized : null
   )

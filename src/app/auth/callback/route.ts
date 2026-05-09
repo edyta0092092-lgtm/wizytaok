@@ -4,7 +4,7 @@ import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { safeInternalRedirectOrDashboard } from "@/lib/auth/safe-internal-redirect"
-import { ensureBusinessProfileFromUserMetadata } from "@/lib/supabase/ensure-profile-from-metadata"
+import { prepareBusinessProfileForStartTrial } from "@/lib/start-trial/prepare-business-profile-server"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 import { normalizeSupabaseUrl } from "@/lib/supabase/url"
 import type { Database } from "@/types/database"
@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
   if (code) {
     await supabase.auth.exchangeCodeForSession(code)
-    await ensureBusinessProfileFromUserMetadata(supabase, { allowFallbackProfile: true })
+    await prepareBusinessProfileForStartTrial()
   }
 
   let next = requestedNext

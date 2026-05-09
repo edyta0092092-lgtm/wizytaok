@@ -6,7 +6,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ensureBusinessProfileFromUserMetadata } from "@/lib/supabase/ensure-profile-from-metadata"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 type StartTrialState = "loading" | "error" | "active"
@@ -14,6 +13,59 @@ type StartTrialState = "loading" | "error" | "active"
 function isActiveSubscriptionStatus(status: string | null | undefined): boolean {
   const normalized = String(status ?? "").trim().toLowerCase()
   return normalized === "trialing" || normalized === "active"
+}
+
+type PrepareBusinessProfileResponse = {
+  ok?: boolean
+  error?: string
+  supabaseMessage?: string
+  subscriptionStatus?: string | null
+}
+
+type PrepareErrorCode =
+  | "missing_account_type"
+  | "missing_company_tax_id"
+  | "missing_contact_phone"
+  | "missing_slug_or_business_name"
+  | "missing_service_role_key"
+  | "business_profile_insert_failed"
+  | "business_profile_update_failed"
+  | "membership_insert_failed"
+  | "missing_required_column"
+  | "rls_blocked"
+  | "unauthorized"
+  | "no_server"
+  | "supabase_unconfigured"
+
+function polishMessageForPrepareError(code: string): string {
+  switch (code) {
+    case "missing_account_type":
+      return "Brak typu działalności w koncie (account_type). Zarejestruj się ponownie lub skontaktuj się z pomocą."
+    case "missing_company_tax_id":
+      return "Brak NIP w danych konta. Zarejestruj firmę z NIP lub skontaktuj się z pomocą."
+    case "missing_contact_phone":
+      return "Brak numeru telefonu w danych konta. Zarejestruj się z poprawnym telefonem lub skontaktuj się z pomocą."
+    case "missing_slug_or_business_name":
+      return "Brak nazwy firmy lub identyfikatora (slug) w koncie. Zarejestruj się ponownie."
+    case "missing_service_role_key":
+      return "Błąd konfiguracji serwera: brak SUPABASE_SERVICE_ROLE_KEY. Dodaj klucz w Vercel i wdróż ponownie."
+    case "business_profile_insert_failed":
+      return "Nie udało się utworzyć profilu firmy w bazie (business_profile_insert_failed)."
+    case "business_profile_update_failed":
+      return "Nie udało się zaktualizować profilu firmy (business_profile_update_failed)."
+    case "membership_insert_failed":
+      return "Nie udało się utworzyć członkostwa właściciela (membership_insert_failed)."
+    case "missing_required_column":
+      return "Baza jest niezsynchronizowana ze schematem (brak kolumny). Uruchom migracje Supabase."
+    case "rls_blocked":
+      return "Zapis profilu zablokowany przez RLS (rls_blocked). Sprawdź polityki lub użyj service role na serwerze."
+    case "no_server":
+      return "Brak konfiguracji Supabase po stronie serwera."
+    case "supabase_unconfigured":
+      return "Aplikacja nie ma skonfigurowanego Supabase."
+    default:
+      return "Nie udało się przygotować profilu firmy przed płatnością."
+  }
 }
 
 export default function StartTrialPage() {
@@ -39,7 +91,7 @@ function StartTrialContent() {
         console.info("[start-trial]", { reason: "supabase_not_configured" })
       }
       setState("error")
-      setError("Konfiguracja aplikacji jest niepelna. Sprobuj ponownie za chwile.")
+      setError(polishMessageForPrepareError("supabase_unconfigured"))
       return
     }
 
@@ -65,91 +117,43 @@ function StartTrialContent() {
       return
     }
 
-    const loadProfile = async () =>
-      client
-        .from("business_profiles")
-        .select("id, subscription_status, stripe_customer_id, stripe_subscription_id")
-        .eq("owner_id", user.id)
-        .maybeSingle()
+    const prepareRes = await fetch("/api/start-trial/prepare-business-profile", {
+      method: "POST",
+      credentials: "same-origin",
+    })
 
-    let { data: profile } = await loadProfile()
-
-    let businessProfileCreated = false
-    let membershipCreated = false
-    if (!profile?.id) {
-      try {
-        const ensureResult = await ensureBusinessProfileFromUserMetadata(client, {
-          allowFallbackProfile: true,
-        })
-        businessProfileCreated = ensureResult.businessProfileCreated
-        membershipCreated = ensureResult.membershipCreated
-      } catch {
-        // best effort fallback for flows that skipped auth/callback profile creation
-      }
-      let retry = await loadProfile()
-      profile = retry.data ?? null
+    let prepareJson: PrepareBusinessProfileResponse | null = null
+    try {
+      prepareJson = (await prepareRes.json()) as PrepareBusinessProfileResponse
+    } catch {
+      prepareJson = null
     }
 
-    if (!profile?.id) {
-      const serverEnsure = await fetch("/api/auth/ensure-business-profile", {
-        method: "POST",
-        credentials: "same-origin",
-      })
-      let serverPayload: { ok?: boolean; error?: string } | null = null
-      try {
-        serverPayload = (await serverEnsure.json()) as { ok?: boolean; error?: string }
-      } catch {
-        serverPayload = null
-      }
-      if (serverEnsure.ok && serverPayload?.ok === true) {
-        const afterServer = await loadProfile()
-        profile = afterServer.data ?? null
-      } else {
-        if (serverEnsure.status === 401) {
-          router.replace("/login?next=%2Fstart-trial")
-          return
-        }
-        const code = typeof serverPayload?.error === "string" ? serverPayload.error.trim() : ""
-        if (process.env.NODE_ENV === "development") {
-          console.info("[start-trial]", {
-            reason: "business_profile_missing_after_retry",
-            businessProfileCreated,
-            membershipCreated,
-            serverEnsure: serverEnsure.status,
-            serverError: code,
-          })
-        }
-        setState("error")
-        if (code === "service_role_required") {
-          setError(
-            "Serwer nie może utworzyć profilu firmy. Dodaj zmienną SUPABASE_SERVICE_ROLE_KEY w ustawieniach Vercel (Project → Settings → Environment Variables) i wdróż ponownie."
-          )
-        } else if (code === "incomplete_user_metadata") {
-          setError(
-            "Konto nie ma danych rejestracji (slug / nazwa firmy). Zarejestruj się ponownie lub skontaktuj się z pomocą."
-          )
-        } else if (code === "profile_insert_failed") {
-          setError(
-            "Nie udało się zapisać profilu firmy w bazie. Spróbuj ponownie za chwilę lub skontaktuj się z pomocą."
-          )
-        } else {
-          setError(
-            "Nie znaleziono profilu firmy po zalogowaniu. Spróbuj wylogować się i zalogować ponownie albo skontaktuj się z pomocą."
-          )
-        }
+    if (!prepareRes.ok || prepareJson?.ok !== true) {
+      if (prepareRes.status === 401) {
+        router.replace("/login?next=%2Fstart-trial")
         return
       }
-    }
-
-    if (!profile?.id) {
+      const code = (prepareJson?.error ?? "").trim() as PrepareErrorCode | string
+      const base = polishMessageForPrepareError(code || "unknown")
+      const isDev = process.env.NODE_ENV !== "production"
+      const devSuffix =
+        isDev && code
+          ? `\n(dev: ${code}${prepareJson?.supabaseMessage ? ` — ${prepareJson.supabaseMessage}` : ""})`
+          : ""
+      if (process.env.NODE_ENV === "development") {
+        console.info("[start-trial] prepare-business-profile failed", {
+          status: prepareRes.status,
+          code,
+          supabaseMessage: prepareJson?.supabaseMessage,
+        })
+      }
       setState("error")
-      setError(
-        "Nie znaleziono profilu firmy po zalogowaniu. Spróbuj wylogować się i zalogować ponownie albo skontaktuj się z pomocą."
-      )
+      setError(`${base}${devSuffix}`)
       return
     }
 
-    if (isActiveSubscriptionStatus(profile.subscription_status)) {
+    if (isActiveSubscriptionStatus(prepareJson.subscriptionStatus)) {
       if (process.env.NODE_ENV === "development") {
         console.info("[start-trial]", { reason: "subscription_already_active" })
       }
@@ -230,12 +234,17 @@ function StartTrialContent() {
                   : !payload && rawBody.trim().length > 0
                     ? `Odpowiedź serwera (${checkoutRes.status}): ${rawBody.slice(0, 280)}${rawBody.length > 280 ? "…" : ""}`
                     : "")
+        const isDev = process.env.NODE_ENV !== "production"
+        const devCheckout =
+          isDev && (payload?.reason || payload?.error)
+            ? `\n(dev: ${payload?.reason ?? payload?.error ?? reason})`
+            : ""
         setError(
-          backendMessage.length > 0
+          (backendMessage.length > 0
             ? backendMessage
             : checkoutRes.status >= 500
               ? `Błąd serwera (${checkoutRes.status}). Spróbuj za chwilę lub skontaktuj się z pomocą.`
-              : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."
+              : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie.") + devCheckout
         )
       }
       return
@@ -270,7 +279,9 @@ function StartTrialContent() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {state === "error" ? <p className="text-sm text-destructive">{error}</p> : null}
+          {state === "error" ? (
+            <p className="whitespace-pre-wrap text-sm text-destructive">{error}</p>
+          ) : null}
           {state === "error" || state === "active" ? (
             <div className="flex flex-wrap gap-2">
               {state === "error" ? (
@@ -305,4 +316,3 @@ function StartTrialFallback() {
     </main>
   )
 }
-

@@ -1,10 +1,7 @@
 import {
-  ensureBusinessProfileFromUserMetadata,
-  insertBusinessProfileFromPlan,
-  planBusinessProfileInsertFromUser,
-} from "@/lib/supabase/ensure-profile-from-metadata"
-import { getServerClient } from "@/lib/supabase/server"
-import { getServiceRoleClient } from "@/lib/supabase/service-role"
+  prepareBusinessProfileForStartTrial,
+  type PrepareBusinessProfileError,
+} from "@/lib/start-trial/prepare-business-profile-server"
 
 export type EnsureProfileSessionResult =
   | { ok: true; hadProfile: boolean; created: boolean }
@@ -18,71 +15,35 @@ export type EnsureProfileSessionResult =
         | "profile_insert_failed"
     }
 
+function mapPrepareFailure(error: PrepareBusinessProfileError): EnsureProfileSessionResult {
+  switch (error) {
+    case "unauthorized":
+      return { ok: false, error: "unauthorized" }
+    case "no_server":
+      return { ok: false, error: "no_server" }
+    case "missing_service_role_key":
+      return { ok: false, error: "service_role_required" }
+    case "missing_account_type":
+    case "missing_slug_or_business_name":
+    case "missing_company_tax_id":
+    case "missing_contact_phone":
+      return { ok: false, error: "incomplete_user_metadata" }
+    default:
+      return { ok: false, error: "profile_insert_failed" }
+  }
+}
+
 /**
- * Gwarantuje `business_profiles` dla zalogowanego użytkownika (cookie session).
- * Najpierw zwykły klient (RLS), potem — gdy nadal brak wiersza — service role (Vercel).
+ * @deprecated Prefer prepareBusinessProfileForStartTrial — ta funkcja zachowana dla POST /api/auth/ensure-business-profile.
  */
 export async function ensureBusinessProfileForSessionUser(): Promise<EnsureProfileSessionResult> {
-  const supabase = await getServerClient()
-  if (!supabase) {
-    return { ok: false, error: "no_server" }
+  const r = await prepareBusinessProfileForStartTrial()
+  if (r.ok) {
+    return {
+      ok: true,
+      hadProfile: !r.created,
+      created: r.created || r.updated,
+    }
   }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return { ok: false, error: "unauthorized" }
-  }
-
-  const { data: existingBefore } = await supabase
-    .from("business_profiles")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle()
-
-  if (existingBefore?.id) {
-    await supabase.rpc("ensure_owner_membership")
-    return { ok: true, hadProfile: true, created: false }
-  }
-
-  await ensureBusinessProfileFromUserMetadata(supabase, { allowFallbackProfile: true })
-
-  const { data: existingAfter } = await supabase
-    .from("business_profiles")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle()
-
-  if (existingAfter?.id) {
-    return { ok: true, hadProfile: false, created: true }
-  }
-
-  const plan = planBusinessProfileInsertFromUser(user, true)
-  if (!plan) {
-    return { ok: false, error: "incomplete_user_metadata" }
-  }
-
-  const admin = getServiceRoleClient()
-  if (!admin) {
-    return { ok: false, error: "service_role_required" }
-  }
-
-  const { data: raceRow } = await admin
-    .from("business_profiles")
-    .select("id")
-    .eq("owner_id", user.id)
-    .maybeSingle()
-  if (raceRow?.id) {
-    await supabase.rpc("ensure_owner_membership")
-    return { ok: true, hadProfile: true, created: false }
-  }
-
-  const inserted = await insertBusinessProfileFromPlan(admin, user.id, plan, true)
-  if (inserted) {
-    await supabase.rpc("ensure_owner_membership")
-    return { ok: true, hadProfile: false, created: true }
-  }
-
-  return { ok: false, error: "profile_insert_failed" }
+  return mapPrepareFailure(r.error)
 }
