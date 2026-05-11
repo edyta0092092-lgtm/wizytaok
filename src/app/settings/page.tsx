@@ -203,9 +203,19 @@ export default function SettingsPage() {
             typeof data.default_reminder_hours === "number" && Number.isFinite(data.default_reminder_hours)
               ? data.default_reminder_hours
               : 24
-          const phoneParts = splitStoredPhoneIntoParts(
-            typeof data.phone === "string" ? data.phone : "",
-          )
+          // Konta utworzone przez signup / start-trial mogą mieć NIP zapisany
+          // tylko w `company_tax_id` (kanonicznej kolumnie), a telefon tylko w
+          // `contact_phone` — bez kopii w legacy `tax_id`/`phone`. Czytamy obie
+          // kolumny i bierzemy pierwszą niepustą wartość.
+          const pickString = (...vals: unknown[]) => {
+            for (const v of vals) {
+              if (typeof v === "string" && v.trim().length > 0) return v
+            }
+            return ""
+          }
+          const taxIdFromDb = pickString(data.tax_id, data.company_tax_id)
+          const phoneFromDb = pickString(data.phone, data.contact_phone)
+          const phoneParts = splitStoredPhoneIntoParts(phoneFromDb)
           setForm((f) => ({
             ...f,
             businessName: data.business_name,
@@ -213,11 +223,8 @@ export default function SettingsPage() {
             email: data.email ?? user.email ?? f.email,
             phoneDialCode: phoneParts.dialCode,
             phoneNational: phoneParts.nationalDigits,
-            taxId: typeof data.tax_id === "string" ? data.tax_id : "",
-            taxIdEntryEnabled: (() => {
-              const raw = typeof data.tax_id === "string" ? data.tax_id : ""
-              return raw.replace(/[\s-]/g, "").trim().length > 0
-            })(),
+            taxId: taxIdFromDb,
+            taxIdEntryEnabled: taxIdFromDb.replace(/[\s-]/g, "").trim().length > 0,
             reminderLead: hoursToReminderLead(hours),
             secondReminderLead: minutesToSecondReminder(
               typeof data.second_reminder_minutes === "number" && Number.isFinite(data.second_reminder_minutes)
