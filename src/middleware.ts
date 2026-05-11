@@ -13,6 +13,7 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/terms") return true
   if (pathname === "/privacy") return true
   if (pathname === "/developer-contact") return true
+  if (pathname.startsWith("/rezerwacje/")) return true
   if (pathname.startsWith("/book/")) return true
   if (pathname.startsWith("/confirm/")) return true
   if (pathname.startsWith("/auth/")) return true

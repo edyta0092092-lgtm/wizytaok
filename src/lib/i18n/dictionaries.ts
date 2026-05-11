@@ -1894,9 +1894,9 @@ Pozdrawiamy,
       modBusinessLead:
         "W ustawieniach uzupełniasz nazwę firmy, dane kontaktowe, opcjonalny NIP oraz adres strony rezerwacji.",
       modBusinessBullets:
-        "- nazwa firmy\n- opcjonalnie NIP firmy\n- e-mail\n- telefon\n- adres strony rezerwacji (końcówka linku pod /book/...)\n- link, który wklejasz klientom",
+        "- nazwa firmy\n- opcjonalnie NIP firmy\n- e-mail\n- telefon\n- link, który wklejasz klientom (zawsze pod /rezerwacje/...)",
       modBusinessSteps:
-        "1. Wejdź w Ustawienia.\n2. Uzupełnij dane firmy.\n3. Sprawdź adres strony rezerwacji.\n4. Kliknij Zapisz zmiany.\n5. Otwórz adres /book/[twója-końcówka] i sprawdź stronę klienta.",
+        "1. Wejdź w Ustawienia.\n2. Uzupełnij dane firmy.\n3. Kliknij Zapisz zmiany.\n4. Otwórz adres /rezerwacje/[twoja-końcówka] i sprawdź stronę klienta.",
       modBusinessTip:
         "Adres strony rezerwacji to końcówka linku, pod którym klienci mogą umawiać wizyty.",
       modServicesTitle: "Usługi",
@@ -3957,7 +3957,7 @@ Regards,
       modBusinessBullets:
         "- business name\n- optional company tax ID\n- email\n- phone\n- booking page address (end of the public link)\n- the link you share with clients",
       modBusinessSteps:
-        "1. Open Settings.\n2. Fill in business details.\n3. Confirm the booking page address.\n4. Click Save changes.\n5. Open your /book/ page as a guest to verify.",
+        "1. Open Settings.\n2. Fill in business details.\n3. Click Save changes.\n4. Open your /rezerwacje/ page as a guest to verify.",
       modBusinessTip:
         "Booking page address is the end of the link clients use to book appointments.",
       modServicesTitle: "Services",

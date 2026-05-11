@@ -516,7 +516,7 @@ export default function DashboardPage() {
       const siteBase =
         (process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
           (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "")
-      const bookingUrl = slug && siteBase ? `${siteBase}/book/${encodeURIComponent(slug)}` : null
+      const bookingUrl = slug && siteBase ? `${siteBase}/rezerwacje/${encodeURIComponent(slug)}` : null
 
       if (!cancelled) {
         setOnboarding({

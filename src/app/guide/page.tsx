@@ -115,7 +115,7 @@ export default function GuidePage() {
     }
   }, [])
 
-  const bookingPath = bookingSlug ? `/book/${bookingSlug}` : "/settings"
+  const bookingPath = bookingSlug ? `/rezerwacje/${bookingSlug}` : "/settings"
 
   const quickRowsResolved = React.useMemo(() => {
     return quickRows.map((row) => {

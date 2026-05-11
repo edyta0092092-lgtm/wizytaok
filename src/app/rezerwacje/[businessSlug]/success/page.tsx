@@ -267,7 +267,7 @@ export default function PublicBookingSuccessPage() {
 
   const handleBackToBooking = React.useCallback(async () => {
     if (returningToBooking) return
-    const targetHref = `/book/${encodeURIComponent(String(businessSlug))}`
+    const targetHref = `/rezerwacje/${encodeURIComponent(String(businessSlug))}`
     setReturningToBooking(true)
     try {
       await cancelIfNeeded()
@@ -296,7 +296,7 @@ export default function PublicBookingSuccessPage() {
         try {
           await cancelIfNeeded()
         } finally {
-          router.replace(`/book/${encodeURIComponent(String(businessSlug))}`)
+          router.replace(`/rezerwacje/${encodeURIComponent(String(businessSlug))}`)
         }
       })()
     }

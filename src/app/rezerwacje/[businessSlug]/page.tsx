@@ -842,7 +842,7 @@ export default function PublicBookingPage() {
             // noop for MVP
           }
           router.push(
-            `/book/${encodeURIComponent(String(businessSlug))}/success?token=${encodeURIComponent(res.confirmationToken)}`
+            `/rezerwacje/${encodeURIComponent(String(businessSlug))}/success?token=${encodeURIComponent(res.confirmationToken)}`
           )
         } finally {
           setIsSubmitting(false)
@@ -896,7 +896,7 @@ export default function PublicBookingPage() {
         // noop for MVP
       }
 
-      router.push(`/book/${encodeURIComponent(String(businessSlug))}/success`)
+      router.push(`/rezerwacje/${encodeURIComponent(String(businessSlug))}/success`)
     })()
   }
 

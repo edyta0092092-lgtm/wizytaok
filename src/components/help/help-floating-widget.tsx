@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
-const HIDE_PREFIXES = ["/book/", "/confirm/"]
+const HIDE_PREFIXES = ["/rezerwacje/", "/book/", "/confirm/"]
 const PANEL_PREFIXES = [
   "/dashboard",
   "/appointments",

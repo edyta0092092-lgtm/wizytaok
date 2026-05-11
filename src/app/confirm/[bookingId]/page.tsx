@@ -215,7 +215,7 @@ export default function PublicConfirmAppointmentPage() {
     booking.status === "pending" ||
     booking.status === "confirmed"
   const bookingBackHref = booking.businessSlug?.trim()
-    ? `/book/${encodeURIComponent(booking.businessSlug.trim())}`
+    ? `/rezerwacje/${encodeURIComponent(booking.businessSlug.trim())}`
     : "/"
 
   const runConfirmRpcWithFallback = async (

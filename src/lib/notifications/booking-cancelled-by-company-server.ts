@@ -134,7 +134,7 @@ export async function notifyBookingCancelledByCompany(args: {
   const { booking, business, language } = args
   const appUrl = getPublicAppOrigin()
   const slug = typeof business.slug === "string" && business.slug.trim().length > 0 ? business.slug.trim() : ""
-  const linkRezerwacji = slug ? `${appUrl}/book/${encodeURIComponent(slug)}` : appUrl
+  const linkRezerwacji = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
   const phoneRaw = typeof business.phone === "string" ? business.phone.trim() : ""
   const phoneForTemplate = phoneRaw.length > 0 ? phoneRaw : ""
   const nazwa =

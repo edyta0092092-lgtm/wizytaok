@@ -42,7 +42,7 @@ export async function notifyBookingCancelledByClient(args: {
   const template = await getTemplateRuntime(admin, booking.business_id, "booking_cancelled_by_client")
   const appUrl = getPublicAppOrigin()
   const slug = args.business.slug?.trim() || ""
-  const linkBooking = slug ? `${appUrl}/book/${encodeURIComponent(slug)}` : appUrl
+  const linkBooking = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
   const confirmUrl = `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`
   const staffId =
     typeof (booking as { staff_id?: string | null }).staff_id === "string"
