@@ -61,12 +61,14 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
-  /** Blokada przed signUp: NIP lub telefon już w business_profiles (preflight API). */
-  const [identityBlock, setIdentityBlock] = React.useState<"tax_id" | "phone" | null>(null)
+  /** Blokada przed signUp: NIP, telefon lub e-mail już w business_profiles (preflight API). */
+  const [identityBlock, setIdentityBlock] = React.useState<"tax_id" | "phone" | "email" | null>(null)
   /** Live‑check NIP w trakcie wpisywania (debounce). */
   const [nipChecking, setNipChecking] = React.useState(false)
   /** Live‑check telefonu w trakcie wpisywania (debounce). */
   const [phoneChecking, setPhoneChecking] = React.useState(false)
+  /** Live‑check adresu e-mail w trakcie wpisywania (debounce). */
+  const [emailChecking, setEmailChecking] = React.useState(false)
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -239,6 +241,51 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setPhoneChecking(false)
     }
   }, [phoneDialCode, phoneNational])
+
+  // Live‑check: czy podany e-mail został już użyty do założenia konta.
+  React.useEffect(() => {
+    const trimmed = email.trim()
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
+    if (!valid) {
+      setEmailChecking(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setEmailChecking(true)
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/signup/check-email", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: trimmed }),
+            signal: controller.signal,
+          })
+          if (controller.signal.aborted) return
+          if (!res.ok) return
+          const json = (await res.json().catch(() => null)) as {
+            exists?: boolean
+            reason?: string
+          } | null
+          if (controller.signal.aborted) return
+          if (json?.exists === true && json.reason === "email_already_registered") {
+            setIdentityBlock("email")
+          }
+        } catch {
+          // brak sieci / przerwany request — submit i tak zwróci błąd Supabase
+        } finally {
+          if (!controller.signal.aborted) setEmailChecking(false)
+        }
+      })()
+    }, 400)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+      setEmailChecking(false)
+    }
+  }, [email])
 
   function setAccountKindChoice(next: SignupAccountKind) {
     setIdentityBlock(null)
@@ -625,10 +672,29 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 rounded-xl"
+                  onChange={(e) => {
+                    if (identityBlock === "email") setIdentityBlock(null)
+                    setEmail(e.target.value)
+                  }}
+                  aria-invalid={identityBlock === "email"}
+                  className={cn(
+                    "h-11 rounded-xl",
+                    identityBlock === "email"
+                      ? "border-destructive focus-visible:ring-destructive/30"
+                      : null,
+                  )}
                   required
                 />
+                {identityBlock === "email" ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    Ten adres e-mail został już użyty do założenia konta w WizytaOK.
+                  </p>
+                ) : null}
+                {identityBlock !== "email" && emailChecking ? (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    Sprawdzanie adresu e-mail…
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">{t("auth.password")}</Label>
@@ -682,6 +748,23 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     </Button>
                     <Button variant="outline" className="h-9 rounded-lg" asChild>
                       <Link href="/help">Poproś o dostęp</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {identityBlock === "email" ? (
+                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
+                  <p className="font-medium text-foreground">Ten adres e-mail jest już zarejestrowany w WizytaOK.</p>
+                  <p className="text-muted-foreground">
+                    Zaloguj się na istniejące konto lub odzyskaj hasło — nie można utworzyć drugiego profilu na ten
+                    sam adres.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button className="h-9 rounded-lg" asChild>
+                      <Link href={loginHrefDup}>Zaloguj się</Link>
+                    </Button>
+                    <Button variant="outline" className="h-9 rounded-lg" asChild>
+                      <Link href="/reset-password">Nie pamiętam hasła</Link>
                     </Button>
                   </div>
                 </div>
