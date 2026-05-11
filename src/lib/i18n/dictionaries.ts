@@ -1042,7 +1042,12 @@ export const dictionaries = {
         "Jeśli chcesz dokonać zmian, anuluj rezerwację i wróć do strony rezerwacji.",
       backToOnlineBookingSystem: "Powrót do systemu rezerwacji online",
       successReschedule: "Prośba o zmianę została wysłana.",
-      successCancelled: "Rezerwacja została anulowana.",
+      // Komunikat sukcesu po odwołaniu wizyty — wariant zależy od statusu PRZED anulowaniem:
+      //   • `successCancelled` — wizyta nie była jeszcze potwierdzona (booked / pending)
+      //   • `successCancelledConfirmed` — wizyta była już potwierdzona (confirmed)
+      // Wybór wariantu odbywa się w `src/app/confirm/[bookingId]/page.tsx`.
+      successCancelled: "Rezerwacja odwołana",
+      successCancelledConfirmed: "Wizyta odwołana",
       notFoundTitle: "Nie znaleziono rezerwacji",
       notFoundBody:
         "Link może być nieaktualny albo rezerwacja została usunięta.",
@@ -3121,7 +3126,10 @@ Pozdrawiamy,
         "If you want to make changes, cancel the booking and return to the booking page.",
       backToOnlineBookingSystem: "Back to online booking system",
       successReschedule: "Your request has been sent.",
-      successCancelled: "Booking cancelled.",
+      // See PL dictionary above for the same key — variant depends on the booking
+      // status BEFORE cancellation (booked/pending vs confirmed).
+      successCancelled: "Booking cancelled",
+      successCancelledConfirmed: "Appointment cancelled",
       notFoundTitle: "Booking not found",
       notFoundBody:
         "The link may be expired or the booking may have been removed.",

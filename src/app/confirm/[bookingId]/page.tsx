@@ -279,6 +279,17 @@ export default function PublicConfirmAppointmentPage() {
 
   const cancelAppointment = () => {
     void (async () => {
+      // Dobór tekstu sukcesu PRZED zmianą statusu — patrzymy na status, który
+      // wizyta miała w momencie, gdy klient kliknął „Tak, odwołaj":
+      //   • confirmed   → „Wizyta odwołana"      (successCancelledConfirmed)
+      //   • inny status → „Rezerwacja odwołana"  (successCancelled)
+      // Klient po anulowaniu nadal trafia do tabeli klientów — nic nie usuwamy.
+      // Status w bazie ustawiamy przez UPDATE (RPC + /api/public/cancel-booking),
+      // nigdy przez DELETE.
+      const wasConfirmed = booking?.status === "confirmed"
+      const cancelledMessage = wasConfirmed
+        ? t("confirmPublic.successCancelledConfirmed")
+        : t("confirmPublic.successCancelled")
       if (dataSource === "supabase") {
         const client = getBrowserClient()
         if (!client) return
@@ -291,13 +302,13 @@ export default function PublicConfirmAppointmentPage() {
         }).catch(() => undefined)
         await refreshSupabaseBooking()
         setScreen("main")
-        setSuccessMessage(t("confirmPublic.successCancelled"))
+        setSuccessMessage(cancelledMessage)
         setShowConfirmedReminderBadge(false)
         return
       }
       applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
       setScreen("main")
-      setSuccessMessage(t("confirmPublic.successCancelled"))
+      setSuccessMessage(cancelledMessage)
       setShowConfirmedReminderBadge(false)
     })()
   }
