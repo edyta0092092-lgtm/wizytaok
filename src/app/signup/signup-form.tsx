@@ -61,6 +61,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
+  /** Blokada przed signUp: NIP lub telefon już w business_profiles (preflight API). */
+  const [identityBlock, setIdentityBlock] = React.useState<"tax_id" | "phone" | null>(null)
+  /** Live‑check NIP w trakcie wpisywania (debounce). */
+  const [nipChecking, setNipChecking] = React.useState(false)
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -112,7 +116,62 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const nipEmptyBlocksSubmit = nipRelevant && normalizeDigits(companyTaxId).length === 0
   const nipBlocksSubmit = Boolean(nipFieldHint) || nipEmptyBlocksSubmit
 
+  // Live‑check: po wpisaniu poprawnego NIP odpytaj API i ustaw identityBlock,
+  // jeśli na ten NIP istnieje już profil firmowy. Debounce, aby nie spamować
+  // requestami przy każdym znaku.
+  React.useEffect(() => {
+    if (!nipRelevant) {
+      setNipChecking(false)
+      return
+    }
+    const digits = normalizeDigits(companyTaxId)
+    if (digits.length !== 10 || !isPolishNip10Valid(digits)) {
+      setNipChecking(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setNipChecking(true)
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/signup/check-business-identity", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              account_type: "registered_business",
+              company_tax_id: digits,
+              contact_phone: "",
+            }),
+            signal: controller.signal,
+          })
+          if (controller.signal.aborted) return
+          if (!res.ok) return
+          const json = (await res.json().catch(() => null)) as {
+            exists?: boolean
+            reason?: string
+          } | null
+          if (controller.signal.aborted) return
+          if (json?.exists === true && json.reason === "tax_id_already_registered") {
+            setIdentityBlock("tax_id")
+          }
+        } catch {
+          // brak sieci / przerwany request — submit zrobi pełną weryfikację
+        } finally {
+          if (!controller.signal.aborted) setNipChecking(false)
+        }
+      })()
+    }, 400)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+      setNipChecking(false)
+    }
+  }, [nipRelevant, companyTaxId])
+
   function setAccountKindChoice(next: SignupAccountKind) {
+    setIdentityBlock(null)
     setAccountKind(next)
     if (next === "unregistered_activity") setCompanyTaxId("")
   }
@@ -194,11 +253,64 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       return
     }
 
+    setLoading(true)
+    setIdentityBlock(null)
+    try {
+      const checkPayload = {
+        account_type: accountKind,
+        company_tax_id: accountKind === "registered_business" ? companyTaxId.trim() : "",
+        contact_phone: contactPhoneStored,
+      }
+      const identityRes = await fetch("/api/signup/check-business-identity", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(checkPayload),
+      })
+
+      const identityJson = (await identityRes.json().catch(() => null)) as {
+        ok?: boolean
+        exists?: boolean
+        reason?: string
+        error?: string
+      } | null
+
+      if (!identityRes.ok) {
+        if (identityRes.status === 503) {
+          setError(
+            "Sprawdzanie konta jest chwilowo niedostępne. Spróbuj ponownie lub skontaktuj się z pomocą."
+          )
+        } else if (identityJson?.error === "lookup_failed") {
+          setError("Nie udało się sprawdzić NIP/telefonu. Spróbuj ponownie za chwilę.")
+        } else {
+          setError("Nie udało się zweryfikować danych. Sprawdź NIP lub telefon i spróbuj ponownie.")
+        }
+        setLoading(false)
+        return
+      }
+
+      if (identityJson?.exists === true) {
+        if (identityJson.reason === "phone_already_registered") {
+          setIdentityBlock("phone")
+        } else {
+          setIdentityBlock("tax_id")
+        }
+        setError(null)
+        setInfo(null)
+        setLoading(false)
+        return
+      }
+    } catch {
+      setError("Brak połączenia z serwerem. Sprawdź sieć i spróbuj ponownie.")
+      setLoading(false)
+      return
+    }
+
     const slugPick = await allocateSignupBookingSlug(client, businessName.trim())
     if (!slugPick.ok) {
       setError(
         slugPick.code === "check_failed" ? t("auth.slugCheckError") : t("auth.signupSlugReserveFailed"),
       )
+      setLoading(false)
       return
     }
     const normalized = slugPick.slug
@@ -211,7 +323,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       })
     }
 
-    setLoading(true)
     try {
       if (startTrial && typeof document !== "undefined") {
         document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
@@ -274,6 +385,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setLoading(false)
     }
   }
+
+  const loginHrefDup = startTrial ? "/login?next=%2Fdashboard" : "/login"
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -367,7 +480,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                       id="signup-tax-id"
                       autoComplete="off"
                       value={companyTaxId}
-                      onChange={(e) => setCompanyTaxId(e.target.value)}
+                      onChange={(e) => {
+                        setIdentityBlock(null)
+                        setCompanyTaxId(e.target.value)
+                      }}
                       placeholder={t("settings.taxIdPlaceholder")}
                       aria-invalid={Boolean(nipFieldHint)}
                       required
@@ -381,6 +497,16 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                         {nipFieldHint}
                       </p>
                     ) : null}
+                    {!nipFieldHint && identityBlock === "tax_id" ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        Ten NIP został już użyty do założenia konta w WizytaOK.
+                      </p>
+                    ) : null}
+                    {!nipFieldHint && identityBlock !== "tax_id" && nipChecking ? (
+                      <p className="text-xs text-muted-foreground" aria-live="polite">
+                        Sprawdzanie NIP-u…
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
                 {startTrial && accountKind === "registered_business" ? (
@@ -392,8 +518,14 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 label={t("settings.phoneLabel")}
                 dialCode={phoneDialCode}
                 nationalDigits={phoneNational}
-                onDialCodeChange={setPhoneDialCode}
-                onNationalChange={setPhoneNational}
+                onDialCodeChange={(v) => {
+                  setIdentityBlock(null)
+                  setPhoneDialCode(v)
+                }}
+                onNationalChange={(v) => {
+                  setIdentityBlock(null)
+                  setPhoneNational(v)
+                }}
                 dialSelectId="signup-phone-dial"
                 nationalInputId="signup-phone-national"
                 showInlineError={false}
@@ -434,6 +566,39 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   </p>
                 ) : null}
               </div>
+              {identityBlock === "tax_id" ? (
+                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
+                  <p className="font-medium text-foreground">Firma z tym NIP już istnieje w WizytaOK.</p>
+                  <p className="text-muted-foreground">
+                    Zaloguj się na konto właściciela lub poproś o dostęp do tej firmy.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button className="h-9 rounded-lg" asChild>
+                      <Link href={loginHrefDup}>Zaloguj się</Link>
+                    </Button>
+                    <Button variant="outline" className="h-9 rounded-lg" asChild>
+                      <Link href="/help">Poproś o dostęp</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {identityBlock === "phone" ? (
+                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
+                  <p className="font-medium text-foreground">Ten numer telefonu jest już zarejestrowany w WizytaOK.</p>
+                  <p className="text-muted-foreground">
+                    Zaloguj się na istniejące konto lub poproś o dostęp — nie można utworzyć drugiego profilu z tym
+                    samym numerem.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button className="h-9 rounded-lg" asChild>
+                      <Link href={loginHrefDup}>Zaloguj się</Link>
+                    </Button>
+                    <Button variant="outline" className="h-9 rounded-lg" asChild>
+                      <Link href="/help">Poproś o dostęp</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {error ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {error}
@@ -458,7 +623,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <Button
                 type="submit"
                 className="h-11 w-full rounded-xl"
-                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit}
+                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit || identityBlock !== null}
               >
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>
