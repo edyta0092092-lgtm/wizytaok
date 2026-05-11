@@ -761,6 +761,17 @@ export default function SettingsPage() {
                   className="h-11 rounded-xl"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <Button type="button" variant="outline" size="sm" asChild>
+                  <Link
+                    href={`/rezerwacje/${form.publicSlug || "rezerwacje"}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {t("settings.openBookingPage")}
+                  </Link>
+                </Button>
+              </div>
               <InternationalPhoneFieldGroup
                 className="sm:col-span-2"
                 label={t("settings.phoneLabel")}
