@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +28,14 @@ type Screen = "main" | "cancel"
 export default function PublicConfirmAppointmentPage() {
   const { t, language } = useTranslations()
   const params = useParams<{ bookingId: string }>()
+  const searchParams = useSearchParams()
   const bookingId = typeof params.bookingId === "string" ? params.bookingId : ""
+  // Strona zarządzania wizytą jest współdzielona z ekranem sukcesu po rezerwacji.
+  // Gdy klient wchodzi tu z linka w przypomnieniu (e-mail / w przyszłości SMS),
+  // doklejamy `?source=reminder`, żeby ukryć przycisk „Wróć do strony rezerwacji".
+  // Reszta flow pozostaje bez zmian (potwierdzanie / anulowanie wymaga osobnego
+  // kliknięcia na tej stronie — nigdy z poziomu maila).
+  const fromReminderLink = (searchParams?.get("source") ?? "").trim() === "reminder"
   const [booking, setBooking] = React.useState<PublicBooking | null>(null)
   const [ready, setReady] = React.useState(false)
   const [screen, setScreen] = React.useState<Screen>("main")
@@ -404,9 +411,11 @@ export default function PublicConfirmAppointmentPage() {
               <Button variant="outline" className="w-full" onClick={() => setScreen("cancel")}>
                 {isBooked ? t("confirmPublic.wantCancel") : t("confirmPublic.actionCancel")}
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>
-              </Button>
+              {!fromReminderLink ? (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}
@@ -428,7 +437,7 @@ export default function PublicConfirmAppointmentPage() {
           </Card>
         ) : null}
 
-        {!canAct ? (
+        {!canAct && !fromReminderLink ? (
           <div className="flex justify-center">
             <Button asChild variant="outline" className="w-full max-w-md">
               <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>

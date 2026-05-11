@@ -85,6 +85,14 @@ export type AppointmentReminderEmailInput = {
   serviceName: string | null
   staffName: string | null
   clientName: string | null
+  /**
+   * Absolutny URL do istniejącej strony zarządzania wizytą (token-based),
+   * np. `https://wizytaok.example/confirm/{confirmation_token}?source=reminder`.
+   * Jeżeli null/pusty, sekcja z przyciskiem nie jest renderowana.
+   * NIE jest to link do bezpośredniego anulowania — klient musi kliknąć
+   * na stronie zarządzania, żeby potwierdzić obecność lub odwołać wizytę.
+   */
+  manageUrl?: string | null
   /** Adres kontaktowy firmy — używany jako reply_to, jeśli podany. */
   replyTo?: string | null
 }
@@ -139,6 +147,14 @@ export async function sendAppointmentReminderEmail(
     detailRows.push({ label: "Osoba", value: trimmedStaff })
   }
 
+  // Link do istniejącej strony zarządzania wizytą (`/confirm/{token}`).
+  // Nie tworzymy nowego flow — to ten sam adres, który klient dostaje przy
+  // potwierdzeniu rezerwacji. Anulowanie wymaga dodatkowego kliknięcia na
+  // stronie zarządzania (nie z poziomu maila), żeby uniknąć przypadkowych
+  // anulowań przez skanery linków w klientach pocztowych.
+  const trimmedManageUrl = input.manageUrl?.trim() || ""
+  const hasManageButton = trimmedManageUrl.length > 0
+
   const text = [
     "Przypomnienie o wizycie",
     "",
@@ -147,6 +163,14 @@ export async function sendAppointmentReminderEmail(
     "",
     "Szczegóły wizyty:",
     ...detailRows.map((row) => `${row.label}: ${row.value}`),
+    ...(hasManageButton
+      ? [
+          "",
+          "Zarządzaj wizytą:",
+          trimmedManageUrl,
+          "Możesz sprawdzić szczegóły wizyty albo ją odwołać.",
+        ]
+      : []),
     "",
     "Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.",
     "",
@@ -211,7 +235,23 @@ export async function sendAppointmentReminderEmail(
                   </table>
                 </td>
               </tr>
+            </table>${
+              hasManageButton
+                ? `
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
+              <tr>
+                <td align="center" style="background-color:#1f6b5d; border-radius:10px;">
+                  <a href="${escapeHtml(trimmedManageUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:13px 26px; font-family:${fontStack}; font-size:15px; line-height:1.2; color:#ffffff; text-decoration:none; font-weight:600;">
+                    Zarządzaj wizytą
+                  </a>
+                </td>
+              </tr>
             </table>
+            <p style="margin:10px 0 0 0; font-family:${fontStack}; font-size:13px; line-height:1.5; color:#5b6d6a;">
+              Możesz sprawdzić szczegóły wizyty albo ją odwołać.
+            </p>`
+                : ""
+            }
             <p style="margin:24px 0 0 0; font-family:${fontStack}; font-size:14px; line-height:1.55; color:#4a5b58;">
               Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.
             </p>

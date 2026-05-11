@@ -58,6 +58,20 @@ type BookingRow = {
   staff_name: string | null
   appointment_date: string
   appointment_time: string
+  confirmation_token: string | null
+}
+
+/**
+ * Bazowy origin aplikacji do budowy absolutnych linków w mailach.
+ * Spójnie z `booking-confirmed-server.ts` / `reminders.ts`.
+ */
+function getPublicAppOrigin(): string {
+  const explicit =
+    process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (explicit) return explicit.replace(/\/$/, "")
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
+  return "http://localhost:3000"
 }
 
 type BusinessRow = {
@@ -175,7 +189,7 @@ async function processSingleReminder(
     const { data: bookingRaw, error: bookingError } = await admin
       .from("bookings")
       .select(
-        "id, business_id, status, client_email, client_name, service_name, staff_name, appointment_date, appointment_time"
+        "id, business_id, status, client_email, client_name, service_name, staff_name, appointment_date, appointment_time, confirmation_token"
       )
       .eq("id", item.appointment_id)
       .maybeSingle()
@@ -211,6 +225,17 @@ async function processSingleReminder(
     const replyTo =
       business?.email && business.email.trim().length > 0 ? business.email.trim() : null
 
+    // Token z bookings → URL istniejącej strony zarządzania wizytą `/confirm/{token}`.
+    // Brak tworzenia nowego flow ani nowych endpointów. Anulowanie nadal idzie
+    // przez UPDATE statusu booking (cancel-booking API), nie DELETE.
+    // `?source=reminder` służy wyłącznie do ukrycia przycisku „Wróć do strony
+    // rezerwacji" w UI tej konkretnej ścieżki — nie zmienia logiki API.
+    const tokenTrimmed = (booking.confirmation_token ?? "").trim()
+    const manageUrl =
+      tokenTrimmed.length > 0
+        ? `${getPublicAppOrigin()}/confirm/${encodeURIComponent(tokenTrimmed)}?source=reminder`
+        : null
+
     const emailResult: AppointmentReminderEmailResult = await sendAppointmentReminderEmail({
       to: recipient,
       businessName,
@@ -219,6 +244,7 @@ async function processSingleReminder(
       serviceName: booking.service_name,
       staffName: booking.staff_name,
       clientName: booking.client_name,
+      manageUrl,
       replyTo,
     })
 
