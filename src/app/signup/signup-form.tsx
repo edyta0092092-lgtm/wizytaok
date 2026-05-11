@@ -65,6 +65,8 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [identityBlock, setIdentityBlock] = React.useState<"tax_id" | "phone" | null>(null)
   /** Live‑check NIP w trakcie wpisywania (debounce). */
   const [nipChecking, setNipChecking] = React.useState(false)
+  /** Live‑check telefonu w trakcie wpisywania (debounce). */
+  const [phoneChecking, setPhoneChecking] = React.useState(false)
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -169,6 +171,74 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setNipChecking(false)
     }
   }, [nipRelevant, companyTaxId])
+
+  /** Inline hint długości krajowego numeru telefonu (np. PL → wymagane 9 cyfr). */
+  const phoneLengthHint = React.useMemo(() => {
+    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
+    if (v.ok) return null
+    if (phoneNational.replace(/\D/g, "").length === 0) return null
+    if (v.min === v.max) {
+      return t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(v.min))
+    }
+    return t("settings.phoneInvalidNationalLength")
+      .replace("{min}", String(v.min))
+      .replace("{max}", String(v.max))
+  }, [phoneDialCode, phoneNational, t])
+
+  // Live‑check: po wpisaniu poprawnego (długością) numeru telefonu odpytaj API
+  // i ustaw identityBlock="phone", jeśli numer jest już użyty w istniejącym profilu.
+  React.useEffect(() => {
+    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
+    if (!v.ok || phoneNational.replace(/\D/g, "").length === 0) {
+      setPhoneChecking(false)
+      return
+    }
+    const stored = buildStoredInternationalPhone(phoneDialCode, phoneNational)
+    if (!stored) {
+      setPhoneChecking(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setPhoneChecking(true)
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/signup/check-business-identity", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              // wymuszamy gałąź telefonu w API niezależnie od wybranego typu konta
+              account_type: "unregistered_activity",
+              company_tax_id: "",
+              contact_phone: stored,
+            }),
+            signal: controller.signal,
+          })
+          if (controller.signal.aborted) return
+          if (!res.ok) return
+          const json = (await res.json().catch(() => null)) as {
+            exists?: boolean
+            reason?: string
+          } | null
+          if (controller.signal.aborted) return
+          if (json?.exists === true && json.reason === "phone_already_registered") {
+            setIdentityBlock("phone")
+          }
+        } catch {
+          // brak sieci / przerwany request — submit zrobi pełną weryfikację
+        } finally {
+          if (!controller.signal.aborted) setPhoneChecking(false)
+        }
+      })()
+    }, 400)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+      setPhoneChecking(false)
+    }
+  }, [phoneDialCode, phoneNational])
 
   function setAccountKindChoice(next: SignupAccountKind) {
     setIdentityBlock(null)
@@ -514,22 +584,39 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 ) : null}
               </fieldset>
 
-              <InternationalPhoneFieldGroup
-                label={t("settings.phoneLabel")}
-                dialCode={phoneDialCode}
-                nationalDigits={phoneNational}
-                onDialCodeChange={(v) => {
-                  setIdentityBlock(null)
-                  setPhoneDialCode(v)
-                }}
-                onNationalChange={(v) => {
-                  setIdentityBlock(null)
-                  setPhoneNational(v)
-                }}
-                dialSelectId="signup-phone-dial"
-                nationalInputId="signup-phone-national"
-                showInlineError={false}
-              />
+              <div className="space-y-1.5">
+                <InternationalPhoneFieldGroup
+                  label={t("settings.phoneLabel")}
+                  dialCode={phoneDialCode}
+                  nationalDigits={phoneNational}
+                  onDialCodeChange={(v) => {
+                    setIdentityBlock(null)
+                    setPhoneDialCode(v)
+                  }}
+                  onNationalChange={(v) => {
+                    setIdentityBlock(null)
+                    setPhoneNational(v)
+                  }}
+                  dialSelectId="signup-phone-dial"
+                  nationalInputId="signup-phone-national"
+                  showInlineError={false}
+                />
+                {phoneLengthHint ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {phoneLengthHint}
+                  </p>
+                ) : null}
+                {!phoneLengthHint && identityBlock === "phone" ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    Ten numer telefonu został już użyty do założenia konta w WizytaOK.
+                  </p>
+                ) : null}
+                {!phoneLengthHint && identityBlock !== "phone" && phoneChecking ? (
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    Sprawdzanie numeru telefonu…
+                  </p>
+                ) : null}
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
@@ -623,7 +710,13 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <Button
                 type="submit"
                 className="h-11 w-full rounded-xl"
-                disabled={loading || nipBlocksSubmit || passwordBlocksSubmit || identityBlock !== null}
+                disabled={
+                  loading ||
+                  nipBlocksSubmit ||
+                  passwordBlocksSubmit ||
+                  Boolean(phoneLengthHint) ||
+                  identityBlock !== null
+                }
               >
                 {loading ? "…" : t("auth.signupSubmit")}
               </Button>
