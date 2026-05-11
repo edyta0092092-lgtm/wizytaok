@@ -13,12 +13,22 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/terms") return true
   if (pathname === "/privacy") return true
   if (pathname === "/developer-contact") return true
+  if (pathname === "/rezerwacje") return true
   if (pathname.startsWith("/rezerwacje/")) return true
   if (pathname.startsWith("/book/")) return true
   if (pathname.startsWith("/confirm/")) return true
   if (pathname.startsWith("/auth/")) return true
   if (pathname.startsWith("/accept-invite/")) return true
   return false
+}
+
+function normalizeSlugForRewrite(raw: string | null | undefined): string | null {
+  if (typeof raw !== "string") return null
+  const trimmed = raw.trim()
+  if (trimmed.length === 0) return null
+  // dopuszczamy tylko bezpieczne znaki na slug, by uniknąć directory traversal
+  if (!/^[a-z0-9-]+$/i.test(trimmed)) return null
+  return trimmed.toLowerCase()
 }
 
 function isProtectedPath(pathname: string): boolean {
@@ -45,8 +55,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next({ request })
   }
 
-  const { response, user } = await updateSession(request)
+  const { response, user, supabase } = await updateSession(request)
   const pathname = request.nextUrl.pathname
+
+  // Czysty URL /rezerwacje — wewnętrznie wybieramy slug i renderujemy
+  // /rezerwacje/[businessSlug] przez `rewrite` (URL w pasku pozostaje /rezerwacje).
+  // Priorytety: query ?firma=…  →  slug zalogowanego właściciela.
+  if (pathname === "/rezerwacje") {
+    const querySlug = normalizeSlugForRewrite(request.nextUrl.searchParams.get("firma"))
+    let target: string | null = querySlug
+    if (!target && user) {
+      try {
+        const { data } = await supabase
+          .from("business_profiles")
+          .select("slug")
+          .eq("owner_id", user.id)
+          .maybeSingle()
+        target = normalizeSlugForRewrite(data?.slug ?? null)
+      } catch {
+        target = null
+      }
+    }
+    if (target) {
+      const rewriteUrl = request.nextUrl.clone()
+      rewriteUrl.pathname = `/rezerwacje/${target}`
+      return NextResponse.rewrite(rewriteUrl)
+    }
+    // Brak rozpoznanej firmy — pozwalamy fallback page'owi /rezerwacje obsłużyć błąd.
+    return response
+  }
 
   if (isPublicPath(pathname)) {
     if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/signup-staff")) {

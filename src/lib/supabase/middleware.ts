@@ -8,10 +8,13 @@ import { normalizeSupabaseUrl } from "@/lib/supabase/url"
 
 /**
  * Odświeża ciasteczka sesji Supabase (wzorzec @supabase/ssr + Next.js middleware).
+ * Zwraca też klienta supabase, by middleware mógł doczytywać dane (np. slug firmy)
+ * bez tworzenia drugiej instancji.
  */
 export async function updateSession(request: NextRequest): Promise<{
   response: NextResponse
   user: User | null
+  supabase: SupabaseClient<Database>
 }> {
   let supabaseResponse = NextResponse.next({
     request: { headers: request.headers },
@@ -46,5 +49,5 @@ export async function updateSession(request: NextRequest): Promise<{
     data: { user },
   } = await supabase.auth.getUser()
 
-  return { response: supabaseResponse, user }
+  return { response: supabaseResponse, user, supabase }
 }

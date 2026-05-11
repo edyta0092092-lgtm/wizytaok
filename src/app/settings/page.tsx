@@ -783,7 +783,11 @@ export default function SettingsPage() {
               <div className="sm:col-span-2">
                 <Button type="button" variant="outline" size="sm" asChild>
                   <Link
-                    href={`/rezerwacje/${form.publicSlug || "rezerwacje"}`}
+                    href={
+                      form.publicSlug
+                        ? `/rezerwacje?firma=${encodeURIComponent(form.publicSlug)}`
+                        : "/rezerwacje"
+                    }
                     target="_blank"
                     rel="noreferrer"
                   >
