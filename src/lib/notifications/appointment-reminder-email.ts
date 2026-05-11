@@ -50,6 +50,33 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;")
 }
 
+/**
+ * Wyciąga TYLKO pierwsze imię klienta — do użycia w powitaniach maila / SMS.
+ *
+ * Zasada projektowa (etap 1 e-mail i przyszły etap 2 SMS):
+ *   - W powitaniach NIE używamy nazwiska klienta (UX / RODO),
+ *     tylko pierwsze imię (a jeśli nie da się ustalić — bezosobowe „Dzień dobry,").
+ *   - "Anna Kowalska"        → "Anna"
+ *   - " Anna Kowalska "      → "Anna"
+ *   - "Anna Maria Kowalska"  → "Anna"
+ *   - "Kowalski"             → "Kowalski"   (jednoczłonowy zostaje, bo nie wiemy czy to imię)
+ *   - ""                     → null
+ *   - null / undefined       → null
+ *
+ * UWAGA dla przyszłej integracji SMS / SMSAPI:
+ *   W treści SMS-a używaj WYŁĄCZNIE wartości zwróconej przez `getClientFirstName(...)`.
+ *   Jeśli zwróci `null` — pomiń powitanie zupełnie, NIE wstawiaj nazwiska.
+ */
+export function getClientFirstName(
+  fullName: string | null | undefined
+): string | null {
+  if (typeof fullName !== "string") return null
+  const trimmed = fullName.trim()
+  if (trimmed.length === 0) return null
+  const first = trimmed.split(/\s+/)[0]
+  return first && first.length > 0 ? first : null
+}
+
 export type AppointmentReminderEmailInput = {
   to: string
   businessName: string
@@ -84,60 +111,123 @@ export async function sendAppointmentReminderEmail(
     process.env.RESEND_FROM?.trim() ||
     DEFAULT_FROM
 
-  const { dateLabel, timeLabel } = formatPolishAppointmentLabel(
+  const { dateLabel, timeLabel, longLabel } = formatPolishAppointmentLabel(
     input.appointmentDate,
     input.appointmentTime
   )
 
-  const subject = `Przypomnienie o wizycie — ${input.businessName}`
-  const greetingName = (input.clientName ?? "").trim()
-  const greetingLine = greetingName ? `Dzień dobry, ${greetingName}!` : "Dzień dobry!"
+  const businessNameRaw = input.businessName?.trim()
+  const businessName = businessNameRaw && businessNameRaw.length > 0 ? businessNameRaw : "WizytaOK"
+  const subject = `Przypomnienie o wizycie — ${businessName}`
 
-  const detailLines: string[] = [
-    `Firma: ${input.businessName}`,
-    `Data: ${dateLabel}`,
-    `Godzina: ${timeLabel}`,
+  // Powitanie: tylko pierwsze imię klienta (bez nazwiska). Jeżeli nie da się
+  // ustalić — degradujemy do bezosobowego „Dzień dobry,". Patrz `getClientFirstName`.
+  const clientFirstName = getClientFirstName(input.clientName)
+  const greetingLine = clientFirstName
+    ? `Dzień dobry ${clientFirstName},`
+    : "Dzień dobry,"
+
+  const detailRows: Array<{ label: string; value: string }> = [
+    { label: "Data i godzina", value: `${dateLabel}, ${timeLabel}` },
   ]
-  if (input.serviceName && input.serviceName.trim().length > 0) {
-    detailLines.push(`Usługa: ${input.serviceName.trim()}`)
+  const trimmedService = input.serviceName?.trim()
+  if (trimmedService && trimmedService.length > 0) {
+    detailRows.push({ label: "Usługa", value: trimmedService })
   }
-  if (input.staffName && input.staffName.trim().length > 0) {
-    detailLines.push(`Specjalista: ${input.staffName.trim()}`)
+  const trimmedStaff = input.staffName?.trim()
+  if (trimmedStaff && trimmedStaff.length > 0) {
+    detailRows.push({ label: "Osoba", value: trimmedStaff })
   }
 
   const text = [
+    "Przypomnienie o wizycie",
+    "",
     greetingLine,
+    "przypominamy o nadchodzącej wizycie.",
     "",
-    "Przypominamy o nadchodzącej wizycie.",
+    "Szczegóły wizyty:",
+    ...detailRows.map((row) => `${row.label}: ${row.value}`),
     "",
-    ...detailLines,
+    "Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.",
     "",
-    "Do zobaczenia!",
-    "",
-    "—",
     "Ta wiadomość została wysłana automatycznie przez WizytaOK.",
   ].join("\n")
 
-  const detailHtmlRows = detailLines
-    .map((row) => {
-      const colonIdx = row.indexOf(":")
-      if (colonIdx === -1) return `<li>${escapeHtml(row)}</li>`
-      const label = row.slice(0, colonIdx).trim()
-      const value = row.slice(colonIdx + 1).trim()
-      return `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</li>`
+  const preheader = `Przypominamy o nadchodzącej wizycie w ${businessName} — ${longLabel}.`
+
+  const fontStack =
+    "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+
+  const detailRowsHtml = detailRows
+    .map((row, idx) => {
+      const topPadding = idx === 0 ? 0 : 18
+      return `
+                      <tr>
+                        <td style="padding:${topPadding}px 0 0 0;">
+                          <div style="font-family:${fontStack}; font-size:12px; line-height:1.4; color:#5b6d6a; text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">${escapeHtml(row.label)}</div>
+                          <div style="font-family:${fontStack}; font-size:16px; line-height:1.45; color:#0f1f1c; font-weight:600; margin-top:4px;">${escapeHtml(row.value)}</div>
+                        </td>
+                      </tr>`
     })
     .join("")
 
-  const html = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; line-height: 1.5; color: #111; max-width: 560px;">
-  <p>${escapeHtml(greetingLine)}</p>
-  <p>Przypominamy o nadchodzącej wizycie.</p>
-  <ul style="padding-left: 18px; margin: 12px 0;">${detailHtmlRows}</ul>
-  <p>Do zobaczenia!</p>
-  <hr style="border: none; border-top: 1px solid #eee; margin: 18px 0;" />
-  <p style="font-size: 12px; color: #666;">Ta wiadomość została wysłana automatycznie przez WizytaOK.</p>
-</div>
-  `.trim()
+  const html = `<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="x-apple-disable-message-reformatting" />
+<meta name="color-scheme" content="light only" />
+<meta name="supported-color-schemes" content="light" />
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F6FAF9; width:100%;">
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; visibility:hidden; opacity:0; color:transparent; height:0; width:0;">${escapeHtml(preheader)}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;">
+        <tr>
+          <td style="padding:0 4px 18px 4px; font-family:${fontStack}; font-size:13px; line-height:1.3; color:#1f6b5d; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;">
+            WizytaOK
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#ffffff; border:1px solid #DDEDEA; border-radius:16px; padding:36px 32px;">
+            <h1 style="margin:0 0 12px 0; font-family:${fontStack}; font-size:24px; line-height:1.3; color:#0f1f1c; font-weight:700;">
+              Przypomnienie o wizycie
+            </h1>
+            <p style="margin:0 0 22px 0; font-family:${fontStack}; font-size:15px; line-height:1.6; color:#0f1f1c;">
+              ${escapeHtml(greetingLine)}<br />
+              przypominamy o nadchodzącej wizycie.
+            </p>
+            <p style="margin:0 0 10px 0; font-family:${fontStack}; font-size:14px; line-height:1.4; color:#0f1f1c; font-weight:700;">
+              Szczegóły wizyty:
+            </p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9; border:1px solid #DDEDEA; border-radius:12px;">
+              <tr>
+                <td style="padding:22px 24px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${detailRowsHtml}
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:24px 0 0 0; font-family:${fontStack}; font-size:14px; line-height:1.55; color:#4a5b58;">
+              Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:20px 4px 0 4px; font-family:${fontStack}; font-size:12px; line-height:1.5; color:#7a8a87;">
+            Ta wiadomość została wysłana automatycznie przez WizytaOK.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`
 
   const replyTo = input.replyTo?.trim() || undefined
 
