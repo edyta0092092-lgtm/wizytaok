@@ -12,6 +12,7 @@ import {
   updateBusinessProfileByOwnerId,
 } from "@/lib/supabase/repositories/business-profile.repository"
 import { getServerClient } from "@/lib/supabase/server"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export type SaveBusinessProfileInput = {
   businessName: string
@@ -29,9 +30,64 @@ export type SaveBusinessProfileResult =
   | { ok: true }
   | {
       ok: false
-      code: "unauthorized" | "slug_invalid" | "slug_taken" | "tax_id_invalid" | "unknown"
+      code:
+        | "unauthorized"
+        | "slug_invalid"
+        | "slug_taken"
+        | "tax_id_invalid"
+        | "tax_id_taken"
+        | "phone_taken"
+        | "email_taken"
+        | "unknown"
       details?: string
     }
+
+/**
+ * Wyszukuje, czy jakaś inna firma (nie należąca do `ownerId`) używa już tych samych
+ * danych identyfikacyjnych. Zwraca pierwszy znaleziony konflikt, lub null.
+ * Używa service role, bo RLS by ograniczyło widok do własnego profilu.
+ */
+async function findIdentityConflict(
+  ownerId: string,
+  taxIdNormalized: string | null,
+  contactPhoneNormalized: string | null,
+  email: string | null
+): Promise<"tax_id_taken" | "phone_taken" | "email_taken" | null> {
+  const admin = getServiceRoleClient()
+  if (!admin) return null
+
+  if (taxIdNormalized && taxIdNormalized.length > 0) {
+    const { data, error } = await admin
+      .from("business_profiles")
+      .select("owner_id")
+      .eq("company_tax_id_normalized", taxIdNormalized)
+      .neq("owner_id", ownerId)
+      .limit(1)
+    if (!error && data && data.length > 0) return "tax_id_taken"
+  }
+
+  if (contactPhoneNormalized && contactPhoneNormalized.length > 0) {
+    const { data, error } = await admin
+      .from("business_profiles")
+      .select("owner_id")
+      .eq("contact_phone_normalized", contactPhoneNormalized)
+      .neq("owner_id", ownerId)
+      .limit(1)
+    if (!error && data && data.length > 0) return "phone_taken"
+  }
+
+  if (email && email.length > 0) {
+    const { data, error } = await admin
+      .from("business_profiles")
+      .select("owner_id")
+      .ilike("email", email)
+      .neq("owner_id", ownerId)
+      .limit(1)
+    if (!error && data && data.length > 0) return "email_taken"
+  }
+
+  return null
+}
 
 function getMissingBusinessProfilesColumnFromError(message: string | undefined): string | null {
   const normalized = String(message ?? "")
@@ -113,12 +169,31 @@ export async function saveBusinessProfileAction(
     return { ok: false, code: "tax_id_invalid" }
   }
 
+  const phoneTrimmed = input.phone.trim()
+  const phoneNormalized = phoneTrimmed ? phoneTrimmed.replace(/\D/g, "") : null
+  const emailTrimmed = input.email.trim() || null
+
+  const conflict = await findIdentityConflict(
+    user.id,
+    taxNormalized,
+    phoneNormalized,
+    emailTrimmed
+  )
+  if (conflict) return { ok: false, code: conflict }
+
   const patch = {
     business_name: input.businessName.trim(),
     slug,
-    email: input.email.trim() || null,
-    phone: input.phone.trim() || null,
+    email: emailTrimmed,
+    phone: phoneTrimmed || null,
     tax_id: taxNormalized,
+    // Kanoniczne kolumny używane przez signup-side duplicate-check.
+    // Brakujące kolumny w starych instancjach DB zostaną automatycznie zdjęte
+    // przez tryUpdateWithSchemaFallback / tryInsertWithSchemaFallback.
+    company_tax_id: taxNormalized,
+    company_tax_id_normalized: taxNormalized,
+    contact_phone: phoneTrimmed || null,
+    contact_phone_normalized: phoneNormalized,
     default_reminder_hours: input.defaultReminderHours,
     second_reminder_minutes: input.secondReminderMinutes,
     reminder_channel: input.reminderChannel,
@@ -137,6 +212,10 @@ export async function saveBusinessProfileAction(
       email: patch.email,
       phone: patch.phone,
       tax_id: patch.tax_id,
+      company_tax_id: patch.company_tax_id,
+      company_tax_id_normalized: patch.company_tax_id_normalized,
+      contact_phone: patch.contact_phone,
+      contact_phone_normalized: patch.contact_phone_normalized,
       default_reminder_hours: patch.default_reminder_hours,
       second_reminder_minutes: patch.second_reminder_minutes,
       reminder_channel: patch.reminder_channel,

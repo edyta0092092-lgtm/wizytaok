@@ -399,6 +399,18 @@ export default function SettingsPage() {
             setSaveError(t("settings.taxIdInvalidChecksum"))
             return
           }
+          if (result.code === "tax_id_taken") {
+            setSaveError(t("auth.taxIdTaken"))
+            return
+          }
+          if (result.code === "phone_taken") {
+            setSaveError(t("auth.phoneTaken"))
+            return
+          }
+          if (result.code === "email_taken") {
+            setSaveError(t("auth.emailTaken"))
+            return
+          }
           const fallbackError =
             process.env.NODE_ENV === "development" && result.details
               ? `${t("common.saveError")} ${t("help.errorDetailsPrefix")} ${result.details}`
