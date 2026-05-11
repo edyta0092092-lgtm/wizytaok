@@ -691,6 +691,66 @@ export interface Database {
         }
         Relationships: []
       }
+      appointment_reminders: {
+        Row: {
+          id: string
+          business_id: string
+          appointment_id: string
+          channel: string
+          reminder_kind: string
+          scheduled_for: string
+          status: string
+          attempts: number
+          locked_at: string | null
+          sent_at: string | null
+          failed_at: string | null
+          skipped_at: string | null
+          provider: string | null
+          provider_message_id: string | null
+          last_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          business_id: string
+          appointment_id: string
+          channel: string
+          reminder_kind: string
+          scheduled_for: string
+          status?: string
+          attempts?: number
+          locked_at?: string | null
+          sent_at?: string | null
+          failed_at?: string | null
+          skipped_at?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          business_id?: string
+          appointment_id?: string
+          channel?: string
+          reminder_kind?: string
+          scheduled_for?: string
+          status?: string
+          attempts?: number
+          locked_at?: string | null
+          sent_at?: string | null
+          failed_at?: string | null
+          skipped_at?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notification_logs: {
         Row: {
           id: string
