@@ -62,15 +62,28 @@ type BookingRow = {
 }
 
 /**
- * Bazowy origin aplikacji do budowy absolutnych linków w mailach.
- * Spójnie z `booking-confirmed-server.ts` / `reminders.ts`.
+ * Bazowy origin aplikacji do budowy absolutnych linków w mailach reminderowych.
+ *
+ * UWAGA: NIE używamy `VERCEL_URL`, bo na produkcji jest to techniczny
+ * deployment URL (np. `wizytaok-92nw2diq7-...vercel.app`), który Vercel
+ * chroni stroną logowania — klient po kliknięciu w link w mailu trafiłby na
+ * `vercel.com/login`. Linki w mailach muszą prowadzić tylko na stabilną,
+ * publiczną domenę (`APP_ORIGIN` / `NEXT_PUBLIC_APP_URL`, a w ostateczności
+ * twardy fallback produkcyjny).
+ *
+ * Kolejność rozstrzygania:
+ *   1. APP_ORIGIN              (preferowane, ustawiane w Vercel)
+ *   2. NEXT_PUBLIC_APP_URL     (fallback, też z env)
+ *   3. NODE_ENV === "production" → https://wizytaok.vercel.app (twardy fallback)
+ *   4. dev/test               → http://localhost:3000
  */
 function getPublicAppOrigin(): string {
   const explicit =
     process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
   if (explicit) return explicit.replace(/\/$/, "")
-  const vercel = process.env.VERCEL_URL?.trim()
-  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
+  if (process.env.NODE_ENV === "production") {
+    return "https://wizytaok.vercel.app"
+  }
   return "http://localhost:3000"
 }
 
