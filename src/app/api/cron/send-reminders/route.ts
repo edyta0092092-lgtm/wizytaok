@@ -5,6 +5,7 @@ import {
   type AppointmentReminderEmailResult,
 } from "@/lib/notifications/appointment-reminder-email"
 import {
+  getActiveSmsReminderProvider,
   sendAppointmentReminderSms,
   type AppointmentReminderSmsResult,
 } from "@/lib/notifications/appointment-reminder-sms"
@@ -32,10 +33,11 @@ const DEFAULT_SMS_MONTHLY_LIMIT = 100
  *     pozostają `pending` (nigdy nie lockowane), e‑mail bez zmian. MVP produkcyjne.
  *   - SMS_REMINDERS_ALLOWED_BUSINESS_IDS — opcjonalnie, gdy SMS włączone: lista
  *     `uuid,uuid,...`; tylko te firmy mają SMS w paczce crona. Puste / nieustawione =
- *     wszystkie firmy. SMS spoza listy zostaje `pending` (bez locka, bez SMSAPI).
- *   - SMSAPI_TOKEN                 — OAuth API token SMSAPI (jeśli brak, SMS-y
- *     są odkładane jako pending bez zwiększania attempts, analogicznie do e-maila).
- *   - SMSAPI_FROM (opcjonalnie)    — fallback "WizytaOK" w helperze.
+ *     wszystkie firmy. SMS spoza listy zostaje `pending` (bez locka, bez wysyłki).
+ *   - SMS_PROVIDER                 — `smsapi` (domyślnie) albo `szybkisms`.
+ *   - SMSAPI_TOKEN, SMSAPI_FROM    — gdy dostawca SMSAPI.
+ *   - SZYBKISMS_TOKEN, SZYBKISMS_FROM — gdy dostawca SzybkiSMS; opcjonalnie
+ *     SZYBKISMS_API_BASE_URL (domyślnie https://api.szybkisms.pl/rest).
  *   - SMS_MONTHLY_INCLUDED_LIMIT   — limit faktycznie wysłanych SMS-ów (status='sent')
  *     per firma per kalendarzowy miesiąc (Europe/Warsaw). Fallback: 100.
  *
@@ -538,7 +540,7 @@ async function processSmsReminder(
       // To NIE jest błąd techniczny — to decyzja biznesowa, więc:
       //   • status = 'skipped',
       //   • last_error = 'sms_monthly_limit_reached',
-      //   • provider = 'smsapi' (źródłem decyzji jest pipeline SMSAPI),
+      //   • provider = aktywny SMS (smsapi | szybkisms),
       //   • NIE zwiększamy attempts — kolejne uruchomienia crona i tak nie
       //     spojrzą na ten rekord (status='skipped' jest poza WHERE w SELECT).
       const { error: limitErr } = await admin
@@ -548,7 +550,7 @@ async function processSmsReminder(
           skipped_at: new Date().toISOString(),
           locked_at: null,
           last_error: "sms_monthly_limit_reached",
-          provider: "smsapi",
+          provider: getActiveSmsReminderProvider(),
         })
         .eq("id", item.id)
       if (limitErr) {
