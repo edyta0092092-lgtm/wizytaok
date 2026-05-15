@@ -27,8 +27,11 @@ const ALLOWED_SOURCES = new Set([
   "landing_trial_existing_user",
 ])
 
+/** Okres próbny dla nowych subskrypcji Stripe Checkout (nie dotyczy istniejących subskrypcji). */
+const TRIAL_PERIOD_DAYS = 14
+
 /**
- * Stripe Checkout — subskrypcja z okresem próbnym (30 dni); klucze sk_test_ lub sk_live_ + price_.
+ * Stripe Checkout — subskrypcja z okresem próbnym (14 dni); klucze sk_test_ lub sk_live_ + price_.
  */
 export async function POST(request: Request) {
   const flags = readTestIntegrationFlags()
@@ -267,7 +270,7 @@ export async function POST(request: Request) {
     mode: "subscription",
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
-      trial_period_days: 30,
+      trial_period_days: TRIAL_PERIOD_DAYS,
       metadata: meta,
     },
     success_url: `${base}/settings?stripe_test=success`,

@@ -16,7 +16,7 @@ Integracje testowe są **wyłącznie opcjonalne** i sterowane zmiennymi środowi
 
 ## `ENABLE_TEST_BILLING`
 
-- **Co robi:** po ustawieniu na `true` pokazuje w **Ustawieniach** kartę **testowej subskrypcji** Stripe (plan 149 zł / miesiąc, trial 30 dni) **tylko dla administratora / właściciela**.
+- **Co robi:** po ustawieniu na `true` pokazuje w **Ustawieniach** kartę **testowej subskrypcji** Stripe (plan 149 zł / miesiąc, trial 14 dni) **tylko dla administratora / właściciela**.
 - **Backend:** `POST /api/test-billing/checkout` — `mode: subscription`, wymaga **`STRIPE_PRICE_ID`** (`price_…`, cena miesięczna skonfigurowana w Stripe), **`STRIPE_SECRET_KEY`** (`sk_test_`), opcjonalnie **`NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`** (jeśli ustawione — musi być `pk_test_`). Powrót z Checkout: **`NEXT_PUBLIC_SITE_URL`** (fallback: `APP_ORIGIN` / `NEXT_PUBLIC_APP_URL` / `VERCEL_URL`).
 - **Webhook:** `POST /api/stripe/webhook` — wymaga **`STRIPE_WEBHOOK_SECRET`** (`whsec_…`, tryb testowy w Stripe). Zdarzenia aktualizują pola `stripe_*` w `business_profiles` (status jest **tylko informacyjny** — brak blokady panelu).
 - **Produkcja:** domyślnie zostaw **`false`**, dopóki nie chcesz tego świadomie udostępnić.

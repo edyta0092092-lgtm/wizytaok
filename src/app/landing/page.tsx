@@ -99,14 +99,17 @@ export default function WizytaOKLandingPage() {
             </p>
             <div className="mt-9 flex flex-col gap-4 sm:flex-row">
               <a href={marketingSignupHref()} className="inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
-                Testuj za darmo przez 30 dni
+                Testuj za darmo przez 14 dni
                 <ArrowRight className="ml-2 h-5 w-5" />
               </a>
               <a href="#funkcje" className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/5 px-6 py-4 text-base font-bold text-white transition hover:bg-white/10">
                 Zobacz funkcje
               </a>
             </div>
-            <p className="mt-4 text-sm text-slate-400">Wymagana karta. Nie pobieramy oplaty przez 30 dni.</p>
+            <p className="mt-4 text-sm text-slate-400">
+              Wymagana karta. Nie pobieramy opłaty przez 14 dni. Po trialu 149 zł / miesiąc, 100 SMS miesięcznie w
+              pakiecie.
+            </p>
           </div>
 
           <div className="rounded-[2rem] border border-white/10 bg-slate-950/60 p-4 shadow-2xl shadow-teal-950/40 backdrop-blur">
@@ -238,8 +241,8 @@ export default function WizytaOKLandingPage() {
         <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
           <div className="grid gap-10 lg:grid-cols-[1fr_0.8fr] lg:items-center">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.25em] text-teal-300">30 dni za darmo</p>
-              <h2 className="mt-4 text-3xl font-black sm:text-4xl">Przetestuj WizytaOK przez 30 dni za darmo</h2>
+              <p className="text-sm font-bold uppercase tracking-[0.25em] text-teal-300">14 dni za darmo</p>
+              <h2 className="mt-4 text-3xl font-black sm:text-4xl">Przetestuj WizytaOK przez 14 dni za darmo</h2>
               <p className="mt-5 text-lg leading-8 text-slate-300">
                 Sprawdź, czy system pasuje do Twojej firmy. Skonfiguruj usługi, dostępność, zespół i publiczny link rezerwacji bez zobowiązań.
               </p>
@@ -257,9 +260,12 @@ export default function WizytaOKLandingPage() {
                 </div>
               ))}
               <a href={marketingSignupHref()} className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
-                Testuj za darmo przez 30 dni
+                Testuj za darmo przez 14 dni
               </a>
-              <p className="mt-3 text-center text-sm text-slate-400">Wymagana karta. Nie pobieramy oplaty przez 30 dni.</p>
+              <p className="mt-3 text-center text-sm text-slate-400">
+                Wymagana karta. Nie pobieramy opłaty przez 14 dni. Po trialu 149 zł / miesiąc, 100 SMS miesięcznie w
+                pakiecie.
+              </p>
             </div>
           </div>
         </div>
@@ -292,7 +298,7 @@ export default function WizytaOKLandingPage() {
             Ustaw usługi, dodaj dostępność i sprawdź, jak WizytaOK pomaga uporządkować rezerwacje.
           </p>
           <a href={marketingSignupHref()} className="mt-8 inline-flex items-center justify-center rounded-2xl bg-teal-400 px-6 py-4 text-base font-bold text-slate-950 shadow-lg shadow-teal-500/20 transition hover:bg-teal-300">
-            Testuj za darmo przez 30 dni
+            Testuj za darmo przez 14 dni
             <ArrowRight className="ml-2 h-5 w-5" />
           </a>
         </div>

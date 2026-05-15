@@ -357,7 +357,7 @@ function StartTrialContent() {
             {state === "loading"
               ? loadingKind === "paid"
                 ? "Przekierowujemy do bezpiecznej płatności Stripe..."
-                : "Przygotowujemy Twój 30-dniowy okres próbny..."
+                : "Przygotowujemy Twój 14-dniowy okres próbny..."
               : state === "nip_exists"
                 ? "Firma z tym NIP już istnieje w WizytaOK."
                 : state === "subscription_active"
