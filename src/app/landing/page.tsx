@@ -107,8 +107,10 @@ export default function WizytaOKLandingPage() {
               </a>
             </div>
             <p className="mt-4 text-sm text-slate-400">
-              Wymagana karta. Nie pobieramy opłaty przez 14 dni. Po trialu 149 zł / miesiąc, 100 SMS miesięcznie w
-              pakiecie.
+              Karta wymagana. Skonfiguruj system i sprawdź, czy pasuje do Twojej firmy.
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              Po trialu 149 zł / miesiąc. 100 SMS miesięcznie w pakiecie.
             </p>
           </div>
 

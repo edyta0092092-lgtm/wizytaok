@@ -39,7 +39,9 @@ export const dictionaries = {
       heroAudience: "Dla biznesów pracujących na wizytach",
       freeDaysBadge: "14 dni za darmo",
       ctaHelper:
-        "Bez zobowiązań. Skonfiguruj system i sprawdź, czy pasuje do Twojej firmy.",
+        "Karta wymagana. Skonfiguruj system i sprawdź, czy pasuje do Twojej firmy.",
+      ctaPricingNote:
+        "Po trialu 149 zł / miesiąc. 100 SMS miesięcznie w pakiecie.",
       previewCardTitle: "Plan dnia",
       previewCardSubtitle: "Kto potwierdził, kto nie odpowiedział.",
       previewToday: "Dzisiaj",
@@ -145,7 +147,7 @@ export const dictionaries = {
       ctaPrimary: "Testuj za darmo przez 14 dni",
       ctaSecondary: "Zobacz funkcje",
       trustLine:
-        "Bez zobowiązań. Skonfiguruj system i sprawdź, czy pasuje do Twojej firmy.",
+        "Karta wymagana. Skonfiguruj system i sprawdź, czy pasuje do Twojej firmy.",
       mockNavDay: "Plan dnia",
       mockNavAppts: "Wizyty",
       mockStatTodo: "Do potwierdzenia",
@@ -2132,7 +2134,9 @@ Pozdrawiamy,
       heroAudience: "Built for businesses that run on appointments",
       freeDaysBadge: "14 days free",
       ctaHelper:
-        "No commitment. Set up the system and see if it fits your business.",
+        "Card required. Set up the system and see if it fits your business.",
+      ctaPricingNote:
+        "After trial 149 PLN / month. 100 SMS per month included.",
       previewCardTitle: "Day plan",
       previewCardSubtitle: "Who confirmed and who has not replied yet.",
       previewToday: "Today",
@@ -2239,7 +2243,7 @@ Pozdrawiamy,
       ctaPrimary: "Try free for 14 days",
       ctaSecondary: "See features",
       trustLine:
-        "No commitment. Set up the system and see if it fits your business.",
+        "Card required. Set up the system and see if it fits your business.",
       mockNavDay: "Day plan",
       mockNavAppts: "Appointments",
       mockStatTodo: "To confirm",

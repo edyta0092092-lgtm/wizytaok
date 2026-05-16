@@ -75,6 +75,7 @@ export default function HomePage() {
               </Link>
             </div>
             <p className="max-w-xl text-sm text-muted-foreground">{t("marketing.ctaHelper")}</p>
+            <p className="max-w-xl text-sm text-muted-foreground">{t("marketing.ctaPricingNote")}</p>
           </div>
         </div>
 
