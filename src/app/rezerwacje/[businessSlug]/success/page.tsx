@@ -117,7 +117,15 @@ export default function PublicBookingSuccessPage() {
   const [actionError, setActionError] = React.useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
   const [returningToBooking, setReturningToBooking] = React.useState(false)
+  const [confirming, setConfirming] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
   const popstateHandlingRef = React.useRef(false)
+  const popstateReadyRef = React.useRef(false)
+
+  const actionToken = React.useMemo(
+    () => (publicBooking?.confirmationToken ?? tokenFromQuery).trim(),
+    [publicBooking?.confirmationToken, tokenFromQuery],
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -183,6 +191,7 @@ export default function PublicBookingSuccessPage() {
         email: b.customerEmail?.trim() || undefined,
       })
       setPublicBooking(b)
+      setActionError(null)
       setLoading(false)
     }
     void run()
@@ -236,14 +245,28 @@ export default function PublicBookingSuccessPage() {
   const runActionWithFallback = React.useCallback(
     async (action: "confirm" | "cancel") => {
       const client = getBrowserClient()
-      if (!client || !tokenFromQuery) return { ok: false as const }
-      const first = await updateBookingByConfirmationToken(client, tokenFromQuery, action, {})
+      const token = actionToken
+      if (!client || !token) return { ok: false as const }
+      const first = await updateBookingByConfirmationToken(client, token, action, {})
       if (first.ok) return first
       const fallbackToken = publicBooking?.id?.trim() ?? ""
-      if (!fallbackToken || fallbackToken === tokenFromQuery) return first
+      if (!fallbackToken || fallbackToken === token) return first
       return updateBookingByConfirmationToken(client, fallbackToken, action, {})
     },
-    [publicBooking?.id, tokenFromQuery]
+    [actionToken, publicBooking?.id],
+  )
+
+  const confirmViaApi = React.useCallback(
+    async (token: string) => {
+      const res = await fetch("/api/public/confirm-attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, language }),
+      })
+      const json = (await res.json().catch(() => ({}))) as { ok?: boolean }
+      return res.ok && json.ok === true
+    },
+    [language],
   )
 
   const refreshBooking = React.useCallback(async () => {
@@ -265,54 +288,72 @@ export default function PublicBookingSuccessPage() {
   }, [tokenFromQuery])
 
   const handleConfirm = React.useCallback(async () => {
+    if (confirming) return
+    const reminderToken = actionToken
+    if (!reminderToken) {
+      setActionError(t("confirmPublic.confirmActionFailed"))
+      return
+    }
+    setConfirming(true)
     setActionError(null)
     setActionSuccess(null)
-    const reminderToken = (publicBooking?.confirmationToken ?? tokenFromQuery).trim()
-
     let pending: boolean | null = null
     try {
-      if (reminderToken.length > 0) {
-        pending = await resolveConfirmationReminderPending(reminderToken, async () => {
-          const r = await runActionWithFallback("confirm")
-          if (!r.ok) {
-            throw new Error("confirm_failed")
-          }
-          await refreshBooking()
-        })
-      } else {
+      const runConfirm = async () => {
         const r = await runActionWithFallback("confirm")
         if (!r.ok) {
-          setActionError(t("bookings.createFailed"))
-          return
+          const apiOk = await confirmViaApi(reminderToken)
+          if (!apiOk) {
+            throw new Error("confirm_failed")
+          }
+        } else {
+          void confirmViaApi(reminderToken)
         }
         await refreshBooking()
       }
+      if (reminderToken.length > 0) {
+        pending = await resolveConfirmationReminderPending(reminderToken, runConfirm)
+      } else {
+        await runConfirm()
+      }
     } catch {
-      setActionError(t("bookings.createFailed"))
+      setActionError(t("confirmPublic.confirmActionFailed"))
       return
+    } finally {
+      setConfirming(false)
     }
 
     setActionSuccess(t(confirmedReminderCopyKey(pending)))
-  }, [publicBooking?.confirmationToken, refreshBooking, runActionWithFallback, t, tokenFromQuery])
+  }, [actionToken, confirmViaApi, confirming, refreshBooking, runActionWithFallback, t])
 
   const cancelViaSupabase = React.useCallback(async () => {
-    const token = (publicBooking?.confirmationToken ?? tokenFromQuery).trim()
-    if (!token) return false
-    const res = await cancelPublicBookingViaApi(token, language)
+    if (!actionToken) return false
+    const res = await cancelPublicBookingViaApi(actionToken, language)
     return res.ok
-  }, [language, publicBooking?.confirmationToken, tokenFromQuery])
+  }, [actionToken, language])
 
   const handleCancel = React.useCallback(async () => {
+    if (cancelling) return
+    setCancelling(true)
     setActionError(null)
     setActionSuccess(null)
-    const ok = await cancelViaSupabase()
-    if (!ok) {
-      setActionError(t("bookings.createFailed"))
-      return
+    try {
+      const ok = await cancelViaSupabase()
+      if (!ok) {
+        setActionError(t("confirmPublic.cancelActionFailed"))
+        return
+      }
+      await refreshBooking()
+      const wasConfirmed = publicBooking?.status === "confirmed"
+      setActionSuccess(
+        wasConfirmed
+          ? t("confirmPublic.successCancelledConfirmed")
+          : t("confirmPublic.successCancelled"),
+      )
+    } finally {
+      setCancelling(false)
     }
-    await refreshBooking()
-    setActionSuccess(t("confirmPublic.successCancelled"))
-  }, [cancelViaSupabase, refreshBooking, t])
+  }, [cancelViaSupabase, cancelling, publicBooking?.status, refreshBooking, t])
 
   const cancelIfNeeded = React.useCallback(async () => {
     if (!tokenFromQuery || !publicBooking || publicBooking.status === "cancelled") return
@@ -340,14 +381,18 @@ export default function PublicBookingSuccessPage() {
 
   React.useEffect(() => {
     if (!tokenFromQuery || !summary?.id) return
+    popstateReadyRef.current = false
     const backGuardState = { bookingSuccessGuard: true }
     try {
       window.history.pushState(backGuardState, "", window.location.href)
     } catch {
       // ignore
     }
+    const readyTimer = window.setTimeout(() => {
+      popstateReadyRef.current = true
+    }, 0)
     const onPopState = () => {
-      if (popstateHandlingRef.current) return
+      if (!popstateReadyRef.current || popstateHandlingRef.current) return
       popstateHandlingRef.current = true
       void (async () => {
         try {
@@ -359,6 +404,7 @@ export default function PublicBookingSuccessPage() {
     }
     window.addEventListener("popstate", onPopState)
     return () => {
+      window.clearTimeout(readyTimer)
       window.removeEventListener("popstate", onPopState)
     }
   }, [tokenFromQuery, summary?.id, cancelIfNeeded, router, businessSlug])
@@ -465,17 +511,26 @@ export default function PublicBookingSuccessPage() {
                   ) : null}
                   <div className="mt-3 flex flex-col gap-2">
                     {publicBooking.status !== "confirmed" && publicBooking.status !== "cancelled" ? (
-                      <Button className="w-full" onClick={() => void handleConfirm()}>
-                        {t("confirmPublic.confirmAttendanceAction")}
+                      <Button
+                        className="w-full"
+                        disabled={confirming || cancelling}
+                        onClick={() => void handleConfirm()}
+                      >
+                        {confirming
+                          ? t("bookings.loading")
+                          : t("confirmPublic.confirmAttendanceAction")}
                       </Button>
                     ) : null}
                     {publicBooking.status !== "cancelled" ? (
                       <Button
                         variant="outline"
                         className="w-full"
+                        disabled={confirming || cancelling}
                         onClick={() => void handleCancel()}
                       >
-                        {t("confirmPublic.cancelAppointmentAction")}
+                        {cancelling
+                          ? t("bookings.loading")
+                          : t("confirmPublic.cancelAppointmentAction")}
                       </Button>
                     ) : null}
                   </div>

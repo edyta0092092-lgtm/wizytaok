@@ -283,7 +283,7 @@ export default function PublicConfirmAppointmentPage() {
             }
           })
         } catch {
-          setSlotFlowError(t("bookings.createFailed"))
+          setSlotFlowError(t("confirmPublic.confirmActionFailed"))
           return
         }
         setConfirmedReminderPending(pending)
@@ -324,12 +324,12 @@ export default function PublicConfirmAppointmentPage() {
       try {
         if (dataSource === "supabase") {
           if (!cancelToken) {
-            setSlotFlowError(t("bookings.createFailed"))
+            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
             return
           }
           const apiRes = await cancelPublicBookingViaApi(cancelToken, language)
           if (!apiRes.ok) {
-            setSlotFlowError(t("bookings.createFailed"))
+            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
             return
           }
           await refreshSupabaseBooking()

@@ -1074,6 +1074,8 @@ export const dictionaries = {
       // Wybór wariantu odbywa się w `src/app/confirm/[bookingId]/page.tsx`.
       successCancelled: "Rezerwacja odwołana",
       successCancelledConfirmed: "Wizyta odwołana",
+      confirmActionFailed: "Nie udało się potwierdzić obecności. Spróbuj ponownie.",
+      cancelActionFailed: "Nie udało się anulować wizyty. Spróbuj ponownie.",
       notFoundTitle: "Nie znaleziono rezerwacji",
       notFoundBody:
         "Link może być nieaktualny albo rezerwacja została usunięta.",
@@ -3178,6 +3180,8 @@ Pozdrawiamy,
       // status BEFORE cancellation (booked/pending vs confirmed).
       successCancelled: "Booking cancelled",
       successCancelledConfirmed: "Appointment cancelled",
+      confirmActionFailed: "Could not confirm attendance. Please try again.",
+      cancelActionFailed: "Could not cancel the appointment. Please try again.",
       notFoundTitle: "Booking not found",
       notFoundBody:
         "The link may be expired or the booking may have been removed.",

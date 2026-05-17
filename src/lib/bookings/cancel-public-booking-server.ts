@@ -32,15 +32,11 @@ export async function cancelPublicBookingById(
   const { error: statusErr } = await admin.from("bookings").update(cancelStatusPatch(nowIso)).eq("id", id)
   if (statusErr) return { ok: false, error: statusErr.message }
 
-  const { error: sourceErr } = await admin
+  await admin
     .from("bookings")
     .update({ last_status_change_source: "cancel", updated_at: nowIso })
     .eq("id", id)
     .eq("status", "cancelled")
-
-  if (sourceErr) {
-    return { ok: false, error: sourceErr.message }
-  }
 
   const { data: row, error: readErr } = await admin
     .from("bookings")
@@ -49,11 +45,16 @@ export async function cancelPublicBookingById(
     .maybeSingle()
 
   if (readErr) return { ok: false, error: readErr.message }
-  if (row?.status !== "cancelled" || row.last_status_change_source !== "cancel") {
-    return {
-      ok: false,
-      error: `cancel_source_not_persisted:${row?.last_status_change_source ?? "null"}`,
-    }
+  if (row?.status !== "cancelled") {
+    return { ok: false, error: "status_not_cancelled" }
   }
+
+  if (row.last_status_change_source !== "cancel") {
+    await admin
+      .from("bookings")
+      .update({ last_status_change_source: "cancel", updated_at: nowIso })
+      .eq("id", id)
+  }
+
   return { ok: true }
 }
