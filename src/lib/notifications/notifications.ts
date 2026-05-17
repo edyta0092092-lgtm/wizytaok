@@ -160,8 +160,7 @@ export function createBookingCreatedMessages(
       recipientPhone: booking.customerPhone,
       body: smsBody,
       confirmationLink,
-      status: "sent",
-      sentAt: createdAt,
+      status: "scheduled",
       createdAt,
     },
     {
@@ -175,8 +174,7 @@ export function createBookingCreatedMessages(
       subject: emailSubject,
       body: emailBody,
       confirmationLink,
-      status: "sent",
-      sentAt: createdAt,
+      status: "scheduled",
       createdAt,
     },
   ]

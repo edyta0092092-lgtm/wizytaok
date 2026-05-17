@@ -963,22 +963,33 @@ export const dictionaries = {
       optionalNote: "Notatka opcjonalnie",
       bookingSavedTitle: "Rezerwacja zapisana",
       bookingSavedDescription:
-        "Twoja wizyta została zapisana. Wysłaliśmy SMS i e-mail z linkiem do zarządzania rezerwacją.",
+        "Rezerwacja została zapisana. Jeśli podałeś poprawny adres e-mail, otrzymasz wiadomość z linkiem do zarządzania rezerwacją.",
+      bookingSavedDescriptionNoEmail:
+        "Rezerwacja została zapisana.",
       panelHintBusiness:
         "Rezerwacja pojawi się w panelu firmy jako nowa wizyta do potwierdzenia.",
       manageBooking: "Zarządzaj rezerwacją",
       whatNextTitle: "Co dalej?",
-      whatNextSent: "SMS i e-mail z linkiem zostały wysłane.",
-      whatNextReminder: "Przypomnienia są wysyłane automatycznie 24h przed wizytą.",
+      whatNextEmailNote:
+        "Na podany adres e-mail możesz otrzymać link do zarządzania rezerwacją (gdy wysyłka jest skonfigurowana).",
+      whatNextReminderBoth:
+        "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (SMS i e-mail, zgodnie z ustawieniami firmy).",
+      whatNextReminderEmail:
+        "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (e-mail, zgodnie z ustawieniami firmy).",
+      whatNextReminderSms:
+        "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (SMS, zgodnie z ustawieniami firmy).",
       whatNextConfirm: "W linku z przypomnienia potwierdzisz obecność.",
       whatNextChange: "Jeśli coś się zmieni, możesz poprosić o inny termin albo anulować wizytę.",
       whatNextManageFull: "W linku możesz potwierdzić obecność, zmienić termin, zmienić usługę albo anulować wizytę.",
-      messageStatusTitle: "Status wiadomości",
-      messageStatusSms: "SMS",
-      messageStatusEmail: "E-mail",
-      messageStatusReminder: "Przypomnienie 24h",
-      messageStatusReminderAutomatic:
-        "Automatyczne przypomnienie 24h: SMS i e-mail wg ustawień firmy (wymaga crona i dostawców).",
+      messageStatusTitle: "Powiadomienia",
+      messageStatusEmailInfo:
+        "E-mail z linkiem do rezerwacji nie jest wysyłany automatycznie w tym kroku — skontaktuj się z gabinetem, jeśli go nie otrzymasz.",
+      messageStatusReminderBoth:
+        "Przypomnienie 24h przed wizytą: SMS i e-mail (wg ustawień firmy).",
+      messageStatusReminderEmail:
+        "Przypomnienie 24h przed wizytą: e-mail (wg ustawień firmy).",
+      messageStatusReminderSms:
+        "Przypomnienie 24h przed wizytą: SMS (wg ustawień firmy).",
       backToBooking: "Wróć do strony rezerwacji",
       today: "Dzisiaj",
       tomorrow: "Jutro",
@@ -3064,22 +3075,29 @@ Pozdrawiamy,
       optionalNote: "Optional note",
       bookingSavedTitle: "Booking saved",
       bookingSavedDescription:
-        "Your appointment has been saved. We sent an SMS and email with a link to manage your booking.",
+        "Your booking has been saved. If you provided a valid email address, you will receive a message with a link to manage your booking.",
+      bookingSavedDescriptionNoEmail: "Your booking has been saved.",
       panelHintBusiness:
         "The booking will appear in the business panel as a new appointment to confirm.",
       manageBooking: "Manage booking",
       whatNextTitle: "What happens next?",
-      whatNextSent: "SMS and email with the link have been sent.",
-      whatNextReminder: "Reminders are sent automatically 24h before the appointment.",
+      whatNextEmailNote:
+        "If you provided an email address, you may receive a link to manage your booking (when outbound email is configured).",
+      whatNextReminderBoth:
+        "Reminders are sent automatically about 24h before the appointment (SMS and email, per business settings).",
+      whatNextReminderEmail:
+        "Reminders are sent automatically about 24h before the appointment (email, per business settings).",
+      whatNextReminderSms:
+        "Reminders are sent automatically about 24h before the appointment (SMS, per business settings).",
       whatNextConfirm: "In the reminder link, you can confirm attendance.",
       whatNextChange: "If anything changes, you can request another time or cancel.",
       whatNextManageFull: "In the link, you can confirm attendance, change the time, change the service or cancel.",
-      messageStatusTitle: "Message status",
-      messageStatusSms: "SMS",
-      messageStatusEmail: "Email",
-      messageStatusReminder: "24h reminder",
-      messageStatusReminderAutomatic:
-        "Automatic 24h reminder: SMS and email per business settings (requires cron and providers).",
+      messageStatusTitle: "Notifications",
+      messageStatusEmailInfo:
+        "A booking link email is not sent automatically in this step — contact the business if you need the link.",
+      messageStatusReminderBoth: "24h reminder: SMS and email (per business settings).",
+      messageStatusReminderEmail: "24h reminder: email (per business settings).",
+      messageStatusReminderSms: "24h reminder: SMS (per business settings).",
       backToBooking: "Back to booking page",
       today: "Today",
       tomorrow: "Tomorrow",

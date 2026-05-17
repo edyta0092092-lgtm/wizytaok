@@ -13,11 +13,20 @@ import {
 } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import { getMessagesForBooking } from "@/lib/notifications/notifications"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import type { NotificationMessage } from "@/types/domain"
+import type { BusinessReminderChannelPersisted } from "@/types/domain"
 import type { PublicBooking } from "@/lib/bookings/public-bookings"
+
+function reminderCopyKey(
+  channel: BusinessReminderChannelPersisted | null,
+  prefix: "whatNextReminder" | "messageStatusReminder"
+): `bookingPublic.${typeof prefix}Both` | `bookingPublic.${typeof prefix}Email` | `bookingPublic.${typeof prefix}Sms` {
+  const ch = channel ?? "both"
+  if (ch === "email") return `bookingPublic.${prefix}Email`
+  if (ch === "sms") return `bookingPublic.${prefix}Sms`
+  return `bookingPublic.${prefix}Both`
+}
 
 type StoredBookingLegacy = {
   id: string
@@ -48,6 +57,7 @@ type DisplaySummary = {
   time: string
   fullName: string
   phone: string
+  email?: string
 }
 
 function pickLatestBooking(
@@ -96,8 +106,9 @@ export default function PublicBookingSuccessPage() {
   const [summary, setSummary] = React.useState<DisplaySummary | null>(null)
   const [loadError, setLoadError] = React.useState(false)
   const [loading, setLoading] = React.useState(Boolean(tokenFromQuery))
-  const [messages, setMessages] = React.useState<NotificationMessage[]>([])
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
+  const [reminderChannel, setReminderChannel] =
+    React.useState<BusinessReminderChannelPersisted | null>(null)
   const [actionError, setActionError] = React.useState<string | null>(null)
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
   const [returningToBooking, setReturningToBooking] = React.useState(false)
@@ -130,6 +141,7 @@ export default function PublicBookingSuccessPage() {
               time: picked.time ?? "",
               fullName: picked.fullName ?? "",
               phone: picked.phone ?? "",
+              email: typeof picked.email === "string" ? picked.email.trim() || undefined : undefined,
             })
           } catch {
             setSummary(null)
@@ -163,6 +175,7 @@ export default function PublicBookingSuccessPage() {
         time: b.time,
         fullName: b.customerName,
         phone: b.customerPhone,
+        email: b.customerEmail?.trim() || undefined,
       })
       setPublicBooking(b)
       setLoading(false)
@@ -174,14 +187,26 @@ export default function PublicBookingSuccessPage() {
   }, [normalizedSlug, tokenFromQuery])
 
   React.useEffect(() => {
-    queueMicrotask(() => {
-      if (!summary?.id) {
-        setMessages([])
-        return
+    if (!normalizedSlug) return
+    const client = getBrowserClient()
+    if (!isSupabaseConfigured() || !client) return
+    let cancelled = false
+    void (async () => {
+      const { data } = await client
+        .from("business_profiles")
+        .select("reminder_channel")
+        .eq("slug", normalizedSlug)
+        .maybeSingle()
+      if (cancelled || !data?.reminder_channel) return
+      const ch = data.reminder_channel
+      if (ch === "sms" || ch === "email" || ch === "both") {
+        setReminderChannel(ch)
       }
-      setMessages(getMessagesForBooking(summary.id))
-    })
-  }, [summary?.id])
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [normalizedSlug])
 
   const fmtDay = React.useMemo(
     () =>
@@ -194,8 +219,8 @@ export default function PublicBookingSuccessPage() {
   )
 
   const dayIso = summary?.day ?? ""
-  const sentSms = messages.some((m) => m.type === "booking_created" && m.channel === "sms" && m.status === "sent")
-  const sentEmail = messages.some((m) => m.type === "booking_created" && m.channel === "email" && m.status === "sent")
+  const customerEmail = (publicBooking?.customerEmail ?? summary?.email ?? "").trim()
+  const hasEmail = customerEmail.length > 0
   const statusLabel = React.useMemo(() => {
     if (!publicBooking) return t("confirmPublic.labelStatusPending")
     if (publicBooking.status === "confirmed") return t("confirmPublic.labelStatusConfirmed")
@@ -230,6 +255,7 @@ export default function PublicBookingSuccessPage() {
       time: b.time,
       fullName: b.customerName,
       phone: b.customerPhone,
+      email: b.customerEmail?.trim() || undefined,
     })
   }, [tokenFromQuery])
 
@@ -345,7 +371,9 @@ export default function PublicBookingSuccessPage() {
               {t("bookingPublic.bookingSavedTitle")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {t("bookingPublic.bookingSavedDescription")}
+              {hasEmail
+                ? t("bookingPublic.bookingSavedDescription")
+                : t("bookingPublic.bookingSavedDescriptionNoEmail")}
             </p>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -374,23 +402,16 @@ export default function PublicBookingSuccessPage() {
             <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
               <p className="text-sm font-semibold text-foreground">{t("bookingPublic.whatNextTitle")}</p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <li>- {t("bookingPublic.whatNextSent")}</li>
-                <li>- {t("bookingPublic.whatNextReminder")}</li>
+                {hasEmail ? <li>- {t("bookingPublic.whatNextEmailNote")}</li> : null}
+                <li>- {t(reminderCopyKey(reminderChannel, "whatNextReminder"))}</li>
                 <li>- {t("confirmPublic.changeOptionsRemovedInfo")}</li>
               </ul>
             </div>
             <div className="rounded-xl border border-border bg-muted/20 p-3">
               <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                <li>
-                  - {t("bookingPublic.messageStatusSms")}:{" "}
-                  {sentSms ? t("notifications.sent") : t("notifications.failed")}
-                </li>
-                <li>
-                  - {t("bookingPublic.messageStatusEmail")}:{" "}
-                  {sentEmail ? t("notifications.sent") : t("notifications.failed")}
-                </li>
-                <li>- {t("bookingPublic.messageStatusReminderAutomatic")}</li>
+                {hasEmail ? <li>- {t("bookingPublic.messageStatusEmailInfo")}</li> : null}
+                <li>- {t(reminderCopyKey(reminderChannel, "messageStatusReminder"))}</li>
               </ul>
             </div>
 
