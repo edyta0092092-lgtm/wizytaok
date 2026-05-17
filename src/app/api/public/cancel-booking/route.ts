@@ -37,10 +37,13 @@ export async function POST(req: Request) {
     cancelled_at: new Date().toISOString(),
     status: "cancelled",
     last_updated_by: "customer",
-    last_status_change_source: "confirm",
+    last_status_change_source: "cancel",
     updated_at: new Date().toISOString(),
   }
-  await admin.from("bookings").update(patch).eq("id", bookingId)
+  const { error: updateError } = await admin.from("bookings").update(patch).eq("id", bookingId)
+  if (updateError) {
+    return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 })
+  }
 
   const { data: business } = await admin
     .from("business_profiles")

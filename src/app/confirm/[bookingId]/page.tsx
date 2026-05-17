@@ -14,6 +14,7 @@ import {
   publicBookingSyncSignature,
   type PublicBooking,
 } from "@/lib/bookings/public-bookings"
+import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
 import {
   getBookingByConfirmationToken,
   updateBookingByConfirmationToken,
@@ -319,13 +320,11 @@ export default function PublicConfirmAppointmentPage() {
       if (dataSource === "supabase") {
         const client = getBrowserClient()
         if (!client) return
-        const r = await runConfirmRpcWithFallback("cancel", {})
-        if (!r.ok) return
-        void fetch("/api/public/cancel-booking", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: confirmToken, language }),
-        }).catch(() => undefined)
+        const apiOk = await cancelPublicBookingViaApi(confirmToken, language)
+        if (!apiOk) {
+          const r = await runConfirmRpcWithFallback("cancel", {})
+          if (!r.ok) return
+        }
         await refreshSupabaseBooking()
         setScreen("main")
         setSuccessMessage(cancelledMessage)

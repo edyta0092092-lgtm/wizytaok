@@ -7,6 +7,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { PUBLIC_BOOKINGS_STORAGE_KEY } from "@/lib/bookings/public-bookings"
+import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
 import {
   getBookingByConfirmationToken,
   updateBookingByConfirmationToken,
@@ -294,25 +295,33 @@ export default function PublicBookingSuccessPage() {
     setActionSuccess(t(confirmedReminderCopyKey(pending)))
   }, [publicBooking?.confirmationToken, refreshBooking, runActionWithFallback, t, tokenFromQuery])
 
+  const cancelViaSupabase = React.useCallback(async () => {
+    if (!tokenFromQuery) return false
+    const apiOk = await cancelPublicBookingViaApi(tokenFromQuery, language)
+    if (apiOk) return true
+    const r = await runActionWithFallback("cancel")
+    return r.ok
+  }, [language, runActionWithFallback, tokenFromQuery])
+
   const handleCancel = React.useCallback(async () => {
     setActionError(null)
     setActionSuccess(null)
-    const r = await runActionWithFallback("cancel")
-    if (!r.ok) {
+    const ok = await cancelViaSupabase()
+    if (!ok) {
       setActionError(t("bookings.createFailed"))
       return
     }
     await refreshBooking()
     setActionSuccess(t("confirmPublic.successCancelled"))
-  }, [refreshBooking, runActionWithFallback, t])
+  }, [cancelViaSupabase, refreshBooking, t])
 
   const cancelIfNeeded = React.useCallback(async () => {
     if (!tokenFromQuery || !publicBooking || publicBooking.status === "cancelled") return
-    const r = await runActionWithFallback("cancel")
-    if (r.ok) {
+    const ok = await cancelViaSupabase()
+    if (ok) {
       await refreshBooking()
     }
-  }, [tokenFromQuery, publicBooking, runActionWithFallback, refreshBooking])
+  }, [cancelViaSupabase, publicBooking, refreshBooking, tokenFromQuery])
 
   const handleBackToBooking = React.useCallback(async () => {
     if (returningToBooking) return

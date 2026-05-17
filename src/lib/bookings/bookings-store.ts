@@ -158,6 +158,7 @@ export function mapBookingRowToPublicBooking(row: Tables<"bookings">, businessSl
     lastStatusChangeSource:
       row.last_status_change_source === "manual" ||
       row.last_status_change_source === "confirm" ||
+      row.last_status_change_source === "cancel" ||
       row.last_status_change_source === "system" ||
       row.last_status_change_source === "auto_reminder_24h" ||
       row.last_status_change_source === "automatic_24h_reminder"
@@ -655,7 +656,13 @@ export async function updateBooking(
 
 type UpdateBookingStatusOpts = {
   lastUpdatedBy?: "customer" | "business" | "system"
-  lastStatusChangeSource?: "manual" | "confirm" | "system" | "auto_reminder_24h" | "automatic_24h_reminder"
+  lastStatusChangeSource?:
+    | "manual"
+    | "confirm"
+    | "cancel"
+    | "system"
+    | "auto_reminder_24h"
+    | "automatic_24h_reminder"
   lastChangeType?: PublicBooking["lastChangeType"]
   reminderSentAtIso?: string | null
   reminderStatus?: string | null

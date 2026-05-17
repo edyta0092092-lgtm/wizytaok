@@ -50,7 +50,13 @@ export type Appointment = {
   secondReminderError?: string | null
   lastUpdatedBy?: "customer" | "business" | "system"
   lastStatusChangeAt?: string
-  lastStatusChangeSource?: "manual" | "confirm" | "system" | "auto_reminder_24h" | "automatic_24h_reminder"
+  lastStatusChangeSource?:
+    | "manual"
+    | "confirm"
+    | "cancel"
+    | "system"
+    | "auto_reminder_24h"
+    | "automatic_24h_reminder"
   statusBeforeRequest?: "booked" | "confirmed"
   /** Termin przed propozycją firmy (MVP localStorage). */
   previousDate?: string

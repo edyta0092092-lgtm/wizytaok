@@ -59,7 +59,13 @@ export type PublicBooking = {
   lastUpdatedBy?: "customer" | "business" | "system"
   updatedAt?: string
   lastStatusChangeAt?: string
-  lastStatusChangeSource?: "manual" | "confirm" | "system" | "auto_reminder_24h" | "automatic_24h_reminder"
+  lastStatusChangeSource?:
+    | "manual"
+    | "confirm"
+    | "cancel"
+    | "system"
+    | "auto_reminder_24h"
+    | "automatic_24h_reminder"
   /** Termin zapisany w momencie propozycji firmy - przed zmianą na proposed*. */
   previousDate?: string
   previousTime?: string
