@@ -25,6 +25,8 @@ export type AppointmentListRowProps = {
   dateLabel: string
   timeLabel: string
   reminderSections: AppointmentReminderSection[]
+  remindersAutomatedPolicy: string
+  reminderNoRowsMessage: string
   showNeedsActionReason: boolean
   language: "pl" | "en"
   staffByService: Record<string, StaffMember[]>
@@ -67,6 +69,8 @@ export function AppointmentListRow({
   dateLabel,
   timeLabel,
   reminderSections,
+  remindersAutomatedPolicy,
+  reminderNoRowsMessage,
   showNeedsActionReason,
   language,
   staffByService,
@@ -170,7 +174,7 @@ export function AppointmentListRow({
           ) : null}
           {row.id.startsWith("sb-") ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              {t("appointments.remindersAutomatedPolicy")}
+              {remindersAutomatedPolicy}
             </p>
           ) : null}
           {row.id.startsWith("sb-") && reminderSections.length > 0
@@ -190,6 +194,9 @@ export function AppointmentListRow({
                 </div>
               ))
             : null}
+          {row.id.startsWith("sb-") && reminderSections.length === 0 && reminderNoRowsMessage ? (
+            <p className="mt-1 text-xs text-muted-foreground">{reminderNoRowsMessage}</p>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 md:max-w-full md:items-end">

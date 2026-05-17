@@ -96,11 +96,19 @@ export function AppointmentsListWithRows({
   const [reminderSectionsByBookingId, setReminderSectionsByBookingId] = React.useState<
     Record<string, AppointmentReminderSection[]>
   >({})
+  const [reminderRowsLoaded, setReminderRowsLoaded] = React.useState(false)
 
   React.useEffect(() => {
     let cancelled = false
+    setReminderRowsLoaded(false)
     void (async () => {
-      if (!isSupabaseConfigured()) return
+      if (!isSupabaseConfigured()) {
+        if (!cancelled) {
+          setReminderSectionsByBookingId({})
+          setReminderRowsLoaded(true)
+        }
+        return
+      }
       const client = getBrowserClient()
       if (!client) return
       const bookingIds = Object.values(grouped)
@@ -108,7 +116,10 @@ export function AppointmentsListWithRows({
         .filter((row) => row.id.startsWith("sb-"))
         .map((row) => row.id.slice(3))
       if (bookingIds.length === 0) {
-        if (!cancelled) setReminderSectionsByBookingId({})
+        if (!cancelled) {
+          setReminderSectionsByBookingId({})
+          setReminderRowsLoaded(true)
+        }
         return
       }
       const businessId = await getCurrentBusinessProfileIdForClient(client)
@@ -118,8 +129,12 @@ export function AppointmentsListWithRows({
         .select("appointment_id,channel,reminder_kind,status")
         .eq("business_id", businessId)
         .in("appointment_id", bookingIds)
-      if (error) return
       if (cancelled) return
+      if (error) {
+        setReminderSectionsByBookingId({})
+        setReminderRowsLoaded(true)
+        return
+      }
       const rows = (data ?? []) as AppointmentReminderQueueRow[]
       const groupedRows = groupAppointmentReminderRowsByBookingId(rows)
       const sectionsByBooking: Record<string, AppointmentReminderSection[]> = {}
@@ -133,6 +148,7 @@ export function AppointmentsListWithRows({
         }
       }
       setReminderSectionsByBookingId(sectionsByBooking)
+      setReminderRowsLoaded(true)
     })()
     return () => {
       cancelled = true
@@ -203,6 +219,10 @@ export function AppointmentsListWithRows({
             dateLabel={date}
             timeLabel={time}
             reminderSections={reminderSections}
+            remindersAutomatedPolicy={reminderPanelLabels.automatedPolicy}
+            reminderNoRowsMessage={
+              reminderRowsLoaded ? reminderPanelLabels.noReminders : ""
+            }
             showNeedsActionReason={listFilter === "needs_action"}
             language={listUiLanguage}
             staffByService={staffByService}

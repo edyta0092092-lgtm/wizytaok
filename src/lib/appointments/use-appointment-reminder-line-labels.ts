@@ -3,6 +3,9 @@
 import * as React from "react"
 
 import type { AppointmentReminderPanelLabels } from "@/lib/appointments/appointment-reminder-panel-display"
+import { buildReminderPanelLabels } from "@/lib/appointments/build-reminder-panel-labels"
+import { useBusinessReminderSettings } from "@/lib/appointments/use-business-reminder-settings"
+import type { ReminderUiLanguage } from "@/lib/appointments/reminder-duration-label"
 import type { SupabaseBookingReminderLineLabels } from "@/lib/appointments/supabase-booking-reminder-line"
 
 export type AppointmentReminderLabelsBundle = {
@@ -12,7 +15,9 @@ export type AppointmentReminderLabelsBundle = {
 
 export function useAppointmentReminderLineLabels(
   t: (key: string) => string,
+  language: ReminderUiLanguage,
 ): AppointmentReminderLabelsBundle {
+  const settings = useBusinessReminderSettings()
   return React.useMemo(
     () => ({
       legacyLine: {
@@ -22,19 +27,8 @@ export function useAppointmentReminderLineLabels(
         notConfigured: t("appointments.reminderStatusNotConfigured"),
         scheduled: t("appointments.reminderStatusScheduled"),
       },
-      panel: {
-        firstTitle: t("appointments.reminderPanelFirstTitle"),
-        secondTitle: t("appointments.reminderPanelSecondTitle"),
-        channelEmail: t("appointments.reminderChannelEmail"),
-        channelSms: t("appointments.reminderChannelSms"),
-        statusPending: t("appointments.reminderQueuePending"),
-        statusSent: t("appointments.reminderQueueSent"),
-        statusFailed: t("appointments.reminderQueueFailed"),
-        statusCancelled: t("appointments.reminderQueueCancelled"),
-        statusSkipped: t("appointments.reminderQueueSkipped"),
-        statusProcessing: t("appointments.reminderQueueProcessing"),
-      },
+      panel: buildReminderPanelLabels({ settings, language, t }),
     }),
-    [t],
+    [t, language, settings],
   )
 }

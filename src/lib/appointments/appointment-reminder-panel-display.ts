@@ -1,4 +1,5 @@
 import type { Tables } from "@/types/database"
+import type { BusinessReminderChannelPersisted } from "@/types/domain"
 
 export type AppointmentReminderQueueRow = Pick<
   Tables<"appointment_reminders">,
@@ -6,6 +7,8 @@ export type AppointmentReminderQueueRow = Pick<
 >
 
 export type AppointmentReminderPanelLabels = {
+  automatedPolicy: string
+  noReminders: string
   firstTitle: string
   secondTitle: string
   channelEmail: string
@@ -16,6 +19,8 @@ export type AppointmentReminderPanelLabels = {
   statusCancelled: string
   statusSkipped: string
   statusProcessing: string
+  reminderChannel: BusinessReminderChannelPersisted
+  secondReminderEnabled: boolean
 }
 
 export type AppointmentReminderChannelLine = {
@@ -73,10 +78,16 @@ function sectionFromRows(
   labels: AppointmentReminderPanelLabels,
 ): AppointmentReminderSection | null {
   if (rows.length === 0) return null
-  const channels = [
-    channelLine(rows, "email", labels.channelEmail, labels),
-    channelLine(rows, "sms", labels.channelSms, labels),
-  ].filter((line): line is AppointmentReminderChannelLine => line !== null)
+  const channels: AppointmentReminderChannelLine[] = []
+  const ch = labels.reminderChannel
+  if (ch === "email" || ch === "both") {
+    const email = channelLine(rows, "email", labels.channelEmail, labels)
+    if (email) channels.push(email)
+  }
+  if (ch === "sms" || ch === "both") {
+    const sms = channelLine(rows, "sms", labels.channelSms, labels)
+    if (sms) channels.push(sms)
+  }
   if (channels.length === 0) return null
   return { title, channels }
 }
@@ -86,12 +97,16 @@ export function buildAppointmentReminderSections(
   labels: AppointmentReminderPanelLabels,
 ): AppointmentReminderSection[] {
   const first = rows.filter((r) => normalizeToken(r.reminder_kind) === "first")
-  const second = rows.filter((r) => normalizeToken(r.reminder_kind) === "second")
+  const second = labels.secondReminderEnabled
+    ? rows.filter((r) => normalizeToken(r.reminder_kind) === "second")
+    : []
   const sections: AppointmentReminderSection[] = []
   const firstSection = sectionFromRows(labels.firstTitle, first, labels)
   if (firstSection) sections.push(firstSection)
-  const secondSection = sectionFromRows(labels.secondTitle, second, labels)
-  if (secondSection) sections.push(secondSection)
+  if (labels.secondReminderEnabled) {
+    const secondSection = sectionFromRows(labels.secondTitle, second, labels)
+    if (secondSection) sections.push(secondSection)
+  }
   return sections
 }
 
