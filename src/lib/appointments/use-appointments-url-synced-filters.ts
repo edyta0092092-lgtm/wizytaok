@@ -4,7 +4,7 @@ import * as React from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
 import {
-  APPOINTMENTS_STATUS_FILTERS,
+  normalizeAppointmentsStatusFilterFromUrl,
   type AppointmentsListFilter,
 } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentSourceFilter } from "@/lib/bookings/booking-source"
@@ -31,24 +31,17 @@ export function useAppointmentsUrlSyncedFilters() {
 
     queueMicrotask(() => setRestrictToToday(dateParam === "today"))
 
-    if (filterParam === "needs_action" || filterParam === "needs_contact") {
-      queueMicrotask(() => setFilter("needs_action"))
-      return
-    }
-    if (filterParam === "unconfirmed") {
-      queueMicrotask(() => setFilter("unconfirmed"))
-      return
-    }
-    if (status === "needs_action" || status === "needs_contact") {
-      queueMicrotask(() => setFilter("needs_action"))
-      return
-    }
-    if (
-      status &&
-      APPOINTMENTS_STATUS_FILTERS.includes(status as AppointmentsListFilter)
-    ) {
-      queueMicrotask(() => setFilter(status as AppointmentsListFilter))
-    }
+    const legacyFilter =
+      filterParam === "needs_action" ||
+      filterParam === "needs_contact" ||
+      filterParam === "unconfirmed"
+
+    if (!filterParam && !status && !legacyFilter) return
+
+    const fromUrl = normalizeAppointmentsStatusFilterFromUrl(
+      legacyFilter ? null : filterParam ?? status,
+    )
+    queueMicrotask(() => setFilter(fromUrl))
   }, [searchParams])
 
   React.useEffect(() => {

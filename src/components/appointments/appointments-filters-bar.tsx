@@ -174,41 +174,19 @@ export function AppointmentsFiltersBar({
           >
             {value === "all"
               ? t("appointments.all")
-              : value === "booked"
-                ? t("appointments.booked")
-                : value === "pending"
-                  ? t("appointments.pending")
-                  : value === "confirmed"
-                    ? t("appointments.confirmed")
-                    : value === "no_show"
-                      ? t("appointments.noShow")
-                      : value === "needs_action"
-                        ? t("appointments.filterNeedsAction")
-                        : t("appointments.cancelled")}
+              : value === "confirmed"
+                ? t("appointments.confirmed")
+                : t("appointments.cancelled")}
           </Button>
         ))}
       </div>
       {filter !== "all" ? (
         <p className="text-xs leading-relaxed text-muted-foreground" role="status">
-          {filter === "needs_action"
+          {filter === "confirmed"
             ? restrictToToday
-              ? t("appointments.filterHintNeedsActionToday")
-              : t("appointments.filterHintNeedsAction")
-            : filter === "unconfirmed"
-              ? t("appointments.filterHintUnconfirmed")
-              : filter === "pending"
-                ? restrictToToday
-                  ? t("appointments.filterHintPendingToday")
-                  : t("appointments.filterHintBooked")
-                : filter === "booked"
-                  ? t("appointments.filterHintBooked")
-                  : filter === "confirmed"
-                    ? restrictToToday
-                      ? t("appointments.filterHintConfirmedToday")
-                      : t("appointments.filterHintConfirmed")
-                    : filter === "no_show"
-                      ? t("appointments.filterHintNoShow")
-                      : t("appointments.filterHintCancelled")}
+              ? t("appointments.filterHintConfirmedToday")
+              : t("appointments.filterHintConfirmed")
+            : t("appointments.filterHintCancelled")}
         </p>
       ) : null}
       {staffFilter !== "all" ? (

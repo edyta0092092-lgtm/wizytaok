@@ -13,10 +13,19 @@ export const APPOINTMENTS_SOURCE_FILTERS: AppointmentSourceFilter[] = [
   "manual",
 ]
 
+/** Widoczne przyciski statusu na liście wizyt (pozostałe statusy tylko w danych / starych linkach). */
 export const APPOINTMENTS_STATUS_FILTERS: AppointmentsListFilter[] = [
   "all",
   "confirmed",
-  "no_show",
   "cancelled",
-  "needs_action",
 ]
+
+export function normalizeAppointmentsStatusFilterFromUrl(
+  raw: string | null | undefined,
+): AppointmentsListFilter {
+  const value = String(raw ?? "").trim()
+  if (value === "confirmed" || value === "cancelled" || value === "all") {
+    return value
+  }
+  return "all"
+}
