@@ -41,5 +41,19 @@ export async function cancelPublicBookingById(
   if (sourceErr) {
     return { ok: false, error: sourceErr.message }
   }
+
+  const { data: row, error: readErr } = await admin
+    .from("bookings")
+    .select("status, last_status_change_source")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (readErr) return { ok: false, error: readErr.message }
+  if (row?.status !== "cancelled" || row.last_status_change_source !== "cancel") {
+    return {
+      ok: false,
+      error: `cancel_source_not_persisted:${row?.last_status_change_source ?? "null"}`,
+    }
+  }
   return { ok: true }
 }
