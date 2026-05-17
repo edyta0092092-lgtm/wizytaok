@@ -79,9 +79,24 @@ export function ManualAppointmentSheet({
         </SheetHeader>
         <form onSubmit={onSubmit} className="premium-scrollbar flex flex-1 flex-col overflow-y-auto">
           <div className="flex-1 space-y-4 px-6 py-5 pb-4">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t("appointments.manualContactHint")}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              <span className="text-destructive" aria-hidden="true">
+                *
+              </span>{" "}
+              {t("bookingPublic.required")}
+            </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label htmlFor="ma-client-first">{t("appointments.fieldClientFirstName")}</Label>
+                <Label htmlFor="ma-client-first">
+                  {t("appointments.fieldClientFirstName")}
+                  <span className="text-destructive" aria-hidden="true">
+                    {" "}
+                    *
+                  </span>
+                </Label>
                 <Input
                   id="ma-client-first"
                   required
@@ -90,7 +105,13 @@ export function ManualAppointmentSheet({
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="ma-client-last">{t("appointments.fieldClientLastName")}</Label>
+                <Label htmlFor="ma-client-last">
+                  {t("appointments.fieldClientLastName")}
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    ({t("bookingPublic.fieldOptional")})
+                  </span>
+                </Label>
                 <Input
                   id="ma-client-last"
                   value={form.clientLastName}
@@ -99,7 +120,7 @@ export function ManualAppointmentSheet({
               </div>
             </div>
             <InternationalPhoneFieldGroup
-              label={t("appointments.fieldPhone")}
+              label={`${t("appointments.fieldPhone")} *`}
               dialCode={form.clientPhoneDialCode}
               nationalDigits={form.clientPhoneNational}
               onDialCodeChange={(v) => setForm((f) => ({ ...f, clientPhoneDialCode: v }))}
@@ -110,7 +131,13 @@ export function ManualAppointmentSheet({
               nationalInputId="ma-phone"
             />
             <div className="space-y-1">
-              <Label htmlFor="ma-email">{t("appointments.fieldEmail")}</Label>
+              <Label htmlFor="ma-email">
+                {t("appointments.fieldEmail")}
+                <span className="font-normal text-muted-foreground">
+                  {" "}
+                  ({t("bookingPublic.fieldOptional")})
+                </span>
+              </Label>
               <Input
                 id="ma-email"
                 type="email"
@@ -228,7 +255,6 @@ export function ManualAppointmentSheet({
                 }
               >
                 <option value="confirmed">{t("labels.appointmentStatus.confirmed")}</option>
-                <option value="no_show">{t("labels.appointmentStatus.no_show")}</option>
                 <option value="cancelled">{t("labels.appointmentStatus.cancelled")}</option>
               </select>
             </div>

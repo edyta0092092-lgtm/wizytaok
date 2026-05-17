@@ -1054,6 +1054,11 @@ export default function PublicBookingPage() {
                     {t("availability.loadAvailabilityError")}
                   </p>
                 ) : null}
+                {availabilityReady &&
+                !availabilityLoadFailed &&
+                bookingAvailability.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("bookingPublic.noSlotsInRange")}</p>
+                ) : null}
 
                 <PublicBookingCalendar
               language={language}

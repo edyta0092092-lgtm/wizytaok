@@ -29,12 +29,10 @@ import {
   updateAppointmentStatus,
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
-import { countBookingsNeedingAction } from "@/lib/bookings/booking-needs-action"
-import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import {
-  countAppointmentReminderIssues,
-  countPendingConfirmationAppointments,
-} from "@/lib/dashboard/todo-metrics"
+  isConfirmedVisitStatus,
+  isPlannedVisitForDashboardStats,
+} from "@/lib/appointments/stats-rules"
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -45,11 +43,7 @@ import type { Appointment, AppointmentStatus } from "@/types/domain"
 
 const DASHBOARD_TIP_COUNT = 16
 
-const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = [
-  "confirmed",
-  "cancelled",
-  "no_show",
-]
+const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = ["confirmed", "cancelled"]
 
 function MiniStat({
   label,
@@ -245,21 +239,20 @@ export default function DashboardPage() {
     [todaysList]
   )
   const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
-    const confirmedTodayCount = todaysList.filter((a) => a.status === "confirmed").length
+    const confirmedTodayCount = todaysList.filter((a) => isConfirmedVisitStatus(a.status)).length
     const cancelledTodayCount = todaysList.filter((a) => a.status === "cancelled").length
     return {
       todayAppointmentsCount: confirmedTodayCount + cancelledTodayCount,
       confirmedTodayCount,
       cancelledTodayCount,
-      pendingTodayCount: countPendingConfirmationAppointments(plannedToday),
-      requiresActionCount: countBookingsNeedingAction(allAppointments),
-      reminderErrorsCount: countAppointmentReminderIssues(allAppointments),
+      pendingTodayCount: 0,
+      requiresActionCount: 0,
+      reminderErrorsCount: 0,
     }
-  }, [todaysList, plannedToday, allAppointments])
+  }, [todaysList])
   const visitsTodayComputed = stats.todayAppointmentsCount
   const confirmedToday = stats.confirmedTodayCount
   const cancelledToday = stats.cancelledTodayCount
-  const needsActionCount = stats.requiresActionCount
 
   const timeFmt = React.useMemo(
     () =>
@@ -547,13 +540,15 @@ export default function DashboardPage() {
                   t("dashboard.youHaveToday").replace("{count}", String(visitsTodayComputed))
                 )}
               </h2>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                {statsContextState ? null : statsReady ? (
-                  t("dashboard.needsActionSummary").replace("{count}", String(needsActionCount))
-                ) : statsError ? null : (
-                  t("dashboard.statsLoading")
-                )}
-              </p>
+              {statsContextState || !statsReady || statsError ? (
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  {statsContextState
+                    ? null
+                    : statsError
+                      ? t("dashboard.summaryLoadFailed")
+                      : t("dashboard.statsLoading")}
+                </p>
+              ) : null}
             </div>
             <div className="grid min-h-[5.25rem] grid-cols-2 gap-2 sm:gap-3">
               {statsContextState ? (

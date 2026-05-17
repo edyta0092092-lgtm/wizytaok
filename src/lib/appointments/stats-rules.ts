@@ -3,6 +3,12 @@ import type { Appointment, AppointmentStatus } from "@/types/domain"
 
 const EXCLUDED_FROM_PLANNED: AppointmentStatus[] = ["cancelled", "no_show", "completed"]
 
+/** Statusy traktowane jako potwierdzona wizyta w statystykach i UI. */
+export function isConfirmedVisitStatus(status: AppointmentStatus | string): boolean {
+  const s = String(status)
+  return s === "confirmed" || s === "booked" || s === "pending"
+}
+
 /**
  * "Zaplanowane wizyty" w statystykach dnia: aktywne terminy, bez anulacji i zakończonych.
  * Spójne z /dashboard i paskiem bocznym.

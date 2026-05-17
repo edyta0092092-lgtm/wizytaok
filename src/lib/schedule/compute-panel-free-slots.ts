@@ -47,12 +47,13 @@ function startOfLocalDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
 
-export function computePanelFreeSlotsForMonth(
-  input: ComputePanelFreeSlotsInput,
-): PanelFreeSlotsByDate[] {
+type PanelFreeSlotsDayInput = Omit<ComputePanelFreeSlotsInput, "year" | "month">
+
+function computeFreeSlotTimesForDay(
+  cellDate: Date,
+  input: PanelFreeSlotsDayInput,
+): string[] {
   const {
-    year,
-    month,
     durationMinutes,
     businessAvailability,
     businessExceptionsByDate,
@@ -65,64 +66,82 @@ export function computePanelFreeSlotsForMonth(
   const duration = Math.max(15, Math.floor(durationMinutes || 30))
   const asOf = getAppToday()
   const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())
-  const dim = daysInMonth(year, month)
   const activeStaff = staffMembers.filter((s) => s.isActive)
   const staffScope = personFilterStaffId
     ? activeStaff.filter((s) => s.id === personFilterStaffId)
     : activeStaff
 
+  const dateKey = toLocalDateKey(cellDate)
+  const exc = resolveBookingException(
+    businessExceptionsByDate.get(dateKey) ?? null,
+    cellDate,
+  )
+  const businessDays = buildEffectiveAvailabilityDaysForDate(
+    businessAvailability,
+    cellDate,
+    exc,
+    true,
+    null,
+  )
+
+  const union = new Set<string>()
+  const staffList = staffScope.length > 0 ? staffScope : activeStaff
+
+  if (staffList.length === 0) {
+    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, null, duration)
+    return getSlotsForSelectedDate(cellDate, today, asOf, duration, businessDays, blocked)
+  }
+
+  for (const member of staffList) {
+    const ctx = staffContexts.get(member.id)
+    const days = ctx
+      ? applyStaffOverlayToWeek(businessDays, cellDate, ctx.rules, ctx.exceptions)
+      : businessDays
+    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, member.id, duration)
+    const slots = getSlotsForSelectedDate(cellDate, today, asOf, duration, days, blocked)
+    for (const t of slots) union.add(t)
+  }
+
+  return Array.from(union).sort((a, b) => a.localeCompare(b))
+}
+
+export function computePanelFreeSlotsForMonth(
+  input: ComputePanelFreeSlotsInput,
+): PanelFreeSlotsByDate[] {
+  const { year, month, ...dayInput } = input
+  const asOf = getAppToday()
+  const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())
+  const dim = daysInMonth(year, month)
   const out: PanelFreeSlotsByDate[] = []
 
   for (let d = 1; d <= dim; d++) {
     const cellDate = new Date(year, month - 1, d)
     if (startOfLocalDay(cellDate) < startOfLocalDay(today)) continue
 
-    const dateKey = toLocalDateKey(cellDate)
-    const exc = resolveBookingException(
-      businessExceptionsByDate.get(dateKey) ?? null,
-      cellDate,
-    )
-    const businessDays = buildEffectiveAvailabilityDaysForDate(
-      businessAvailability,
-      cellDate,
-      exc,
-      true,
-      null,
-    )
-
-    const union = new Set<string>()
-    const staffList = staffScope.length > 0 ? staffScope : activeStaff
-
-    if (staffList.length === 0) {
-      const blocked = toBlockedSlotKeySetForStaff(bookedSlots, null, duration)
-      const slots = getSlotsForSelectedDate(
-        cellDate,
-        today,
-        asOf,
-        duration,
-        businessDays,
-        blocked,
-      )
-      if (slots.length > 0) out.push({ date: dateKey, times: slots })
-      continue
+    const times = computeFreeSlotTimesForDay(cellDate, dayInput)
+    if (times.length > 0) {
+      out.push({ date: toLocalDateKey(cellDate), times })
     }
+  }
 
-    for (const member of staffList) {
-      const ctx = staffContexts.get(member.id)
-      const days = ctx
-        ? applyStaffOverlayToWeek(businessDays, cellDate, ctx.rules, ctx.exceptions)
-        : businessDays
-      const blocked = toBlockedSlotKeySetForStaff(bookedSlots, member.id, duration)
-      const slots = getSlotsForSelectedDate(cellDate, today, asOf, duration, days, blocked)
-      for (const t of slots) union.add(t)
-    }
+  return out
+}
 
-    if (union.size > 0) {
-      out.push({
-        date: dateKey,
-        times: Array.from(union).sort((a, b) => a.localeCompare(b)),
-      })
-    }
+export function computePanelFreeSlotsForNextDays(
+  input: PanelFreeSlotsDayInput & { dayCount?: number },
+): PanelFreeSlotsByDate[] {
+  const { dayCount = 7, ...dayInput } = input
+  const asOf = getAppToday()
+  const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())
+  const out: PanelFreeSlotsByDate[] = []
+
+  for (let i = 0; i < dayCount; i++) {
+    const cellDate = new Date(today)
+    cellDate.setDate(cellDate.getDate() + i)
+    out.push({
+      date: toLocalDateKey(cellDate),
+      times: computeFreeSlotTimesForDay(cellDate, dayInput),
+    })
   }
 
   return out

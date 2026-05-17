@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import type { PanelFreeSlotsByDate } from "@/lib/schedule/compute-panel-free-slots"
 
 type ScheduleFreeSlotsPanelProps = {
+  title?: string
   monthLabel: string
   durationMinutes: number
   onDurationChange: (minutes: number) => void
@@ -20,6 +21,7 @@ type ScheduleFreeSlotsPanelProps = {
 }
 
 export function ScheduleFreeSlotsPanel({
+  title,
   monthLabel,
   durationMinutes,
   onDurationChange,
@@ -48,7 +50,7 @@ export function ScheduleFreeSlotsPanel({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <h2 id="schedule-free-slots-heading" className="text-base font-semibold text-foreground">
-            {t("schedule.freeSlotsTitle")} — {monthLabel}
+            {title ?? `${t("schedule.freeSlotsTitle")} — ${monthLabel}`}
           </h2>
           <p className="text-xs leading-relaxed text-muted-foreground">{t("schedule.freeSlotsHint")}</p>
           {!loading && days.length > 0 ? (
@@ -105,7 +107,9 @@ export function ScheduleFreeSlotsPanel({
                     </span>
                   </div>
                   <p className="mt-1.5 text-sm leading-relaxed text-foreground tabular-nums">
-                    {day.times.join(", ")}
+                    {day.times.length > 0
+                      ? day.times.join(", ")
+                      : t("schedule.freeSlotsDayEmpty")}
                   </p>
                 </button>
               </li>

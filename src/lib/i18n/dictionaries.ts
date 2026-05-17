@@ -734,6 +734,8 @@ export const dictionaries = {
       manualSlotOutsideHours: "Ta osoba jest niedostępna w wybranym terminie.",
       manualSaveFailed: "Nie udało się zapisać wizyty.",
       fieldNote: "Notatka",
+      manualContactHint:
+        "E-mail i telefon są potrzebne do wysłania potwierdzenia oraz przypomnień. Jeśli klient ich nie poda, nie otrzyma wiadomości.",
       saveAppointment: "Zapisz wizytę",
       appointmentAdded: "Wizyta została zapisana.",
       appointmentDeleted: "Wizyta została usunięta.",
@@ -939,6 +941,7 @@ export const dictionaries = {
       chooseTime: "Wybierz termin",
       availableTimes: "Dostępne godziny",
       noSlotsToday: "Brak dostępnych godzin w tym dniu.",
+      noSlotsInRange: "Brak dostępnych terminów w wybranym zakresie.",
       availabilityNotConfigured:
         "Firma nie ustawiła jeszcze dostępności.",
       noAvailableTimesForSelectedDay:
@@ -980,7 +983,7 @@ export const dictionaries = {
       optionalNote: "Notatka opcjonalnie",
       fieldOptional: "opcjonalnie",
       contactRemindersHint:
-        "Telefon i e-mail służą do wysyłania potwierdzeń oraz przypomnień o wizycie. Bez poprawnych danych kontaktowych nie otrzymasz przypomnienia.",
+        "E-mail i telefon są potrzebne do wysłania potwierdzenia oraz przypomnień. Jeśli klient ich nie poda, nie otrzyma wiadomości.",
       validationEmailInvalid: "Podaj poprawny adres e-mail lub zostaw pole puste.",
       bookingSavedTitle: "Wizyta potwierdzona",
       bookingSavedDescription:
@@ -1342,6 +1345,8 @@ export const dictionaries = {
       weekdaySaturday: "Sobota",
       weekdaySunday: "Niedziela",
       freeSlotsTitle: "Wolne terminy",
+      freeSlotsNextSevenTitle: "Wolne terminy — najbliższe 7 dni",
+      freeSlotsDayEmpty: "Brak wolnych terminów",
       freeSlotsHint:
         "Lista godzin, w których można umówić wizytę (wg dostępności firmy, grafiku osób i zajętych rezerwacji).",
       freeSlotsDuration: "Czas wizyty",
@@ -2904,6 +2909,8 @@ Pozdrawiamy,
       manualSlotOutsideHours: "This staff member is unavailable at the selected time.",
       manualSaveFailed: "Failed to save appointment.",
       fieldNote: "Note",
+      manualContactHint:
+        "Email and phone are used to send confirmation and reminders. If the client does not provide them, they will not receive messages.",
       saveAppointment: "Save appointment",
       appointmentAdded: "Appointment saved.",
       appointmentDeleted: "Appointment deleted.",
@@ -3108,6 +3115,7 @@ Pozdrawiamy,
       chooseTime: "Choose a date and time",
       availableTimes: "Available times",
       noSlotsToday: "No available times on this day.",
+      noSlotsInRange: "No available times in the selected range.",
       availabilityNotConfigured:
         "The business has not set availability yet.",
       noAvailableTimesForSelectedDay:
@@ -3149,7 +3157,7 @@ Pozdrawiamy,
       optionalNote: "Optional note",
       fieldOptional: "optional",
       contactRemindersHint:
-        "Phone and email are used to send confirmations and appointment reminders. Without valid contact details you will not receive reminders.",
+        "Email and phone are used to send confirmation and reminders. If the client does not provide them, they will not receive messages.",
       validationEmailInvalid: "Enter a valid email address or leave the field empty.",
       bookingSavedTitle: "Booking saved",
       bookingSavedDescription: "Your booking has been saved.",
@@ -3500,6 +3508,8 @@ Pozdrawiamy,
       weekdaySaturday: "Saturday",
       weekdaySunday: "Sunday",
       freeSlotsTitle: "Available slots",
+      freeSlotsNextSevenTitle: "Available slots — next 7 days",
+      freeSlotsDayEmpty: "No available times",
       freeSlotsHint:
         "Times when an appointment can be booked (based on business hours, staff schedules, and existing bookings).",
       freeSlotsDuration: "Appointment length",

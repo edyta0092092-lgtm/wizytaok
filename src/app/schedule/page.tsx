@@ -20,13 +20,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { bookingNeedsAction } from "@/lib/bookings/booking-needs-action"
 import { getAvailabilityRules } from "@/lib/availability/availability-store"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import {
   calendarEntriesToBookedSlots,
   computePanelFreeSlotsForMonth,
+  computePanelFreeSlotsForNextDays,
 } from "@/lib/schedule/compute-panel-free-slots"
 import { loadPanelFreeSlotsContext } from "@/lib/schedule/load-panel-free-slots-context"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
@@ -81,11 +81,11 @@ function weekMondayFirstCells(year: number, month: number): (number | null)[] {
 }
 
 function normalizeStatus(raw: string): AppointmentStatus {
-  if (raw === "pending") return "pending"
-  if (raw === "confirmed") return "confirmed"
   if (raw === "cancelled") return "cancelled"
-  if (raw === "no_show") return "no_show"
-  return "booked"
+  if (raw === "confirmed" || raw === "pending" || raw === "booked" || raw === "no_show") {
+    return "confirmed"
+  }
+  return "confirmed"
 }
 
 function formatHm(raw: string): string {
@@ -109,40 +109,13 @@ function visitCountLabel(count: number): string {
   return `${count} wizyt`
 }
 
-function toAppointmentForNeedsAction(row: CalendarEntry): Appointment {
-  return {
-    id: `sb-${row.id}`,
-    clientName: row.client_name,
-    phone: row.client_phone,
-    serviceLabel: row.service_name,
-    startsAt: `${row.appointment_date}T${formatHm(row.appointment_time)}:00`,
-    status: normalizeStatus(row.status),
-    staffId: row.staff_id ?? undefined,
-    staffName: row.staff_name ?? undefined,
-    reminderStatus: row.reminder_status,
-    secondReminderStatus: row.second_reminder_status,
-    reminderSentAt: row.reminder_sent_at,
-  }
-}
-
 function matchesViewFilter(row: CalendarEntry, filter: ViewFilter): boolean {
   const status = normalizeStatus(row.status)
   if (filter === "active") return status !== "cancelled"
   if (filter === "cancelled") return status === "cancelled"
-  if (filter === "pending") return status === "pending"
+  if (filter === "pending") return status === "confirmed"
   if (filter === "confirmed") return status === "confirmed"
   return true
-}
-
-function BookingStatusBadge({ row }: { row: CalendarEntry }) {
-  if (bookingNeedsAction(toAppointmentForNeedsAction(row))) {
-    return (
-      <span className="inline-flex rounded-full border border-amber-400/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:text-amber-100">
-        Wymaga reakcji
-      </span>
-    )
-  }
-  return <StatusBadge status={normalizeStatus(row.status)} />
 }
 
 export default function SchedulePage() {
@@ -422,15 +395,13 @@ export default function SchedulePage() {
     [detailDate, bookingsByDate]
   )
 
-  const freeSlotsList = React.useMemo(() => {
-    if (!freeSlotsContext) return []
+  const freeSlotsDayInput = React.useMemo(() => {
+    if (!freeSlotsContext) return null
     const booked =
       freeSlotsContext.bookedSlots.length > 0
         ? freeSlotsContext.bookedSlots
         : calendarEntriesToBookedSlots(bookings)
-    return computePanelFreeSlotsForMonth({
-      year: ym.year,
-      month: ym.month,
+    return {
       durationMinutes: slotDurationMinutes,
       businessAvailability: freeSlotsContext.businessAvailability,
       businessExceptionsByDate: freeSlotsContext.businessExceptionsByDate,
@@ -438,16 +409,22 @@ export default function SchedulePage() {
       staffMembers,
       staffContexts: freeSlotsContext.staffContexts,
       personFilterStaffId: effectivePersonFilter || null,
+    }
+  }, [freeSlotsContext, bookings, slotDurationMinutes, staffMembers, effectivePersonFilter])
+
+  const freeSlotsList = React.useMemo(() => {
+    if (!freeSlotsDayInput) return []
+    return computePanelFreeSlotsForMonth({
+      year: ym.year,
+      month: ym.month,
+      ...freeSlotsDayInput,
     })
-  }, [
-    freeSlotsContext,
-    bookings,
-    ym.year,
-    ym.month,
-    slotDurationMinutes,
-    staffMembers,
-    effectivePersonFilter,
-  ])
+  }, [freeSlotsDayInput, ym.year, ym.month])
+
+  const freeSlotsNextSeven = React.useMemo(() => {
+    if (!freeSlotsDayInput) return []
+    return computePanelFreeSlotsForNextDays({ ...freeSlotsDayInput, dayCount: 7 })
+  }, [freeSlotsDayInput])
 
   const freeSlotsByDate = React.useMemo(() => {
     const map = new Map<string, string[]>()
@@ -535,7 +512,6 @@ export default function SchedulePage() {
                 <option value="all">Wszyscy</option>
                 <option value="active">Tylko aktywne</option>
                 <option value="cancelled">Tylko anulowane</option>
-                <option value="pending">Tylko do potwierdzenia</option>
                 <option value="confirmed">Tylko potwierdzone</option>
               </select>
             </div>
@@ -550,12 +526,13 @@ export default function SchedulePage() {
           <>
             <ScheduleFreeSlotsPanel
               className="mb-5"
+              title={t("schedule.freeSlotsNextSevenTitle")}
               monthLabel={formatters.monthYear.format(new Date(ym.year, ym.month - 1, 1))}
               durationMinutes={slotDurationMinutes}
               onDurationChange={setSlotDurationMinutes}
               durationOptions={SLOT_DURATION_OPTIONS}
               loading={freeSlotsLoading || loading}
-              days={freeSlotsList}
+              days={freeSlotsNextSeven}
               selectedDate={detailDate}
               onSelectDate={setDetailDate}
               formatDayHeading={formatFreeSlotDayHeading}
@@ -689,7 +666,7 @@ export default function SchedulePage() {
                     <p className="text-sm font-semibold text-foreground">
                       {formatHm(row.appointment_time)} · {row.client_name}
                     </p>
-                    <BookingStatusBadge row={row} />
+                    <StatusBadge status={normalizeStatus(row.status)} />
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">{row.service_name}</p>
                   <p className="text-sm text-muted-foreground">

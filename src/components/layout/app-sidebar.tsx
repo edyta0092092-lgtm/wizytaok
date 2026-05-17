@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { getAppNavForRole } from "@/config/navigation"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getAppointmentsForToday, useAppointmentsStore } from "@/lib/appointments/appointments-store"
-import { countBookingsNeedingAction } from "@/lib/bookings/booking-needs-action"
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import { getAppToday } from "@/lib/date/current-date"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -78,8 +77,6 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
     [allAppointments, appToday]
   )
   const totalToday = todayAppointments.filter((a) => isPlannedVisitForDashboardStats(a)).length
-  const pendingCount = todayAppointments.filter((a) => a.status === "pending").length
-  const needsActionCount = countBookingsNeedingAction(allAppointments)
 
   const statsReady = appointmentsReady && !appointmentsLoadError
 
@@ -114,17 +111,9 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
         <p className="mt-1 text-[0.75rem] leading-relaxed text-muted-foreground">
           {!statsReady ? (
             appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")
-          ) : totalToday === 0 ? (
-            t("dashboard.noAppointmentsTodayLong")
-          ) : (
-            <>
-              {t("dashboard.youHaveToday").replace("{count}", String(totalToday))}{" "}
-              · {t("sidebar.pendingSummary").replace("{count}", String(pendingCount))}
-            </>
-          )}
-          {statsReady && needsActionCount > 0
-            ? ` · ${t("dashboard.needsActionSummary").replace("{count}", String(needsActionCount))}`
-            : ""}
+          ) : totalToday === 0
+            ? t("dashboard.noAppointmentsTodayLong")
+            : t("dashboard.youHaveToday").replace("{count}", String(totalToday))}
         </p>
       </div>
 

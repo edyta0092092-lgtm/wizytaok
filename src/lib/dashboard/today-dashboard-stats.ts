@@ -17,7 +17,15 @@ export type TodayDashboardStats = {
 }
 
 const CANCELLED_STATUSES = new Set(["cancelled", "anulowana", "anulowane"])
-const CONFIRMED_STATUSES = new Set(["confirmed", "potwierdzona", "potwierdzone"])
+const CONFIRMED_STATUSES = new Set([
+  "confirmed",
+  "potwierdzona",
+  "potwierdzone",
+  "booked",
+  "pending",
+  "zarezerwowana",
+  "do_potwierdzenia",
+])
 const PENDING_STATUSES = new Set(["pending", "to_confirm", "do_potwierdzenia", "do potwierdzenia"])
 const REMINDER_TYPES = new Set([
   "reminder_24h",
