@@ -389,8 +389,12 @@ function StartTrialContent() {
               <Button type="button" onClick={() => void beginCheckout()}>
                 Spróbuj ponownie
               </Button>
-              <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
-                Przejdź do panelu
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push("/settings?billing=required")}
+              >
+                Ustawienia i płatność
               </Button>
             </div>
           ) : null}
@@ -401,8 +405,12 @@ function StartTrialContent() {
                 <Button type="button" onClick={() => void beginPaidCheckout()}>
                   Wykup subskrypcję
                 </Button>
-                <Button type="button" variant="outline" onClick={() => router.push("/dashboard")}>
-                  Przejdź do panelu
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push("/settings?billing=required")}
+                >
+                  Ustawienia i płatność
                 </Button>
               </div>
             </>

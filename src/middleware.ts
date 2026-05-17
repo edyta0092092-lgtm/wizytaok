@@ -1,6 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server"
 
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
+import {
+  billingRecoveryRedirectPath,
+  resolveBusinessPanelAccess,
+} from "@/lib/auth/resolve-business-panel-access"
+import {
+  isAuthRequiredPanelPath,
+  isOperationalPanelPath,
+} from "@/lib/auth/panel-paths"
 import { updateSession } from "@/lib/supabase/middleware"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 
@@ -19,6 +27,8 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/confirm/")) return true
   if (pathname.startsWith("/auth/")) return true
   if (pathname.startsWith("/accept-invite/")) return true
+  if (pathname === "/start-trial") return true
+  if (pathname === "/subscription-required") return true
   return false
 }
 
@@ -31,23 +41,17 @@ function normalizeSlugForRewrite(raw: string | null | undefined): string | null 
   return trimmed.toLowerCase()
 }
 
-function isProtectedPath(pathname: string): boolean {
-  const prefixes = [
-    "/dashboard",
-    "/appointments",
-    "/schedule",
-    "/services",
-    "/team",
-    "/availability",
-    "/clients",
-    "/messages",
-    "/templates",
-    "/settings",
-    "/account",
-    "/guide",
-    "/help",
-  ]
-  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+function redirectToBillingRecovery(request: NextRequest, path: string): NextResponse {
+  const url = new URL(path, request.url)
+  const returnTo = `${request.nextUrl.pathname}${request.nextUrl.search}`
+  if (path.startsWith("/settings")) {
+    url.searchParams.set("next", returnTo)
+  }
+  return NextResponse.redirect(url)
+}
+
+function isSettingsSetupPath(pathname: string, searchParams: URLSearchParams): boolean {
+  return pathname.startsWith("/settings") && searchParams.has("setup")
 }
 
 export async function middleware(request: NextRequest) {
@@ -99,12 +103,26 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  if (isProtectedPath(pathname) && !user) {
+  if (isAuthRequiredPanelPath(pathname) && !user) {
     const loginUrl = new URL("/login", request.url)
     const returnTo = `${pathname}${request.nextUrl.search}`
     loginUrl.searchParams.set("next", returnTo)
     loginUrl.searchParams.set("redirectTo", returnTo)
     return NextResponse.redirect(loginUrl)
+  }
+
+  if (user && isOperationalPanelPath(pathname)) {
+    const access = await resolveBusinessPanelAccess(supabase, user.id)
+    if (!access.hasActiveAccess) {
+      return redirectToBillingRecovery(request, billingRecoveryRedirectPath(access))
+    }
+  }
+
+  if (user && pathname.startsWith("/settings") && !isSettingsSetupPath(pathname, request.nextUrl.searchParams)) {
+    const access = await resolveBusinessPanelAccess(supabase, user.id)
+    if (!access.hasActiveAccess && !access.canManageBilling) {
+      return redirectToBillingRecovery(request, "/subscription-required")
+    }
   }
 
   return response
