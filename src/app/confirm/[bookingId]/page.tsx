@@ -25,6 +25,34 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 
 type Screen = "main" | "cancel"
 
+function hasPendingReminderFromPublicBooking(booking: PublicBooking): boolean | null {
+  const tokens = [
+    booking.firstReminderStatus,
+    booking.secondReminderStatus,
+    booking.reminderStatus,
+  ]
+    .map((s) => String(s ?? "").trim().toLowerCase())
+    .filter(Boolean)
+  if (tokens.length === 0) return null
+  return tokens.some((s) => s === "pending" || s === "processing")
+}
+
+async function fetchPendingReminderFromQueue(token: string): Promise<boolean | null> {
+  const trimmed = token.trim()
+  if (!trimmed) return null
+  try {
+    const res = await fetch(
+      `/api/public/appointment-reminder-status?token=${encodeURIComponent(trimmed)}`,
+    )
+    if (!res.ok) return null
+    const json = (await res.json()) as { ok?: boolean; hasPendingReminder?: boolean }
+    if (json.ok !== true || typeof json.hasPendingReminder !== "boolean") return null
+    return json.hasPendingReminder
+  } catch {
+    return null
+  }
+}
+
 export default function PublicConfirmAppointmentPage() {
   const { t, language } = useTranslations()
   const params = useParams<{ bookingId: string }>()
@@ -42,6 +70,9 @@ export default function PublicConfirmAppointmentPage() {
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
   const [slotFlowError, setSlotFlowError] = React.useState<string | null>(null)
   const [showConfirmedReminderBadge, setShowConfirmedReminderBadge] = React.useState(false)
+  const [confirmedReminderPending, setConfirmedReminderPending] = React.useState<boolean | null>(
+    null,
+  )
   const screenRef = React.useRef<Screen>("main")
   const bookingPollSigRef = React.useRef("")
   const [remoteRefreshHint, setRemoteRefreshHint] = React.useState(false)
@@ -176,15 +207,6 @@ export default function PublicConfirmAppointmentPage() {
     [language],
   )
 
-  const formatSecondReminderDate = (rawIso: string) =>
-    new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(rawIso))
-
   if (!ready) {
     return (
       <main className="min-h-screen bg-background px-4 py-10 sm:px-6">
@@ -239,6 +261,19 @@ export default function PublicConfirmAppointmentPage() {
     return second.ok ? second : first
   }
 
+  const resolveConfirmedReminderPending = React.useCallback(
+    async (sourceBooking: PublicBooking | null) => {
+      if (dataSource === "supabase") {
+        return fetchPendingReminderFromQueue(confirmToken)
+      }
+      if (sourceBooking) {
+        return hasPendingReminderFromPublicBooking(sourceBooking)
+      }
+      return null
+    },
+    [confirmToken, dataSource],
+  )
+
   const confirmAttendance = () => {
     void (async () => {
       if (dataSource === "supabase") {
@@ -254,17 +289,17 @@ export default function PublicConfirmAppointmentPage() {
           body: JSON.stringify({ token: confirmToken, language }),
         }).catch(() => undefined)
         const client = getBrowserClient()
-        if (!client) {
-          setSuccessMessage(t("confirmPublic.successConfirmed"))
-          setShowConfirmedReminderBadge(true)
-          return
+        let fresh: PublicBooking | null = null
+        if (client) {
+          fresh = await getBookingByConfirmationToken(client, confirmToken)
+          if (fresh) {
+            setBooking(fresh)
+          } else {
+            await refreshSupabaseBooking()
+          }
         }
-        const fresh = await getBookingByConfirmationToken(client, confirmToken)
-        if (fresh) {
-          setBooking(fresh)
-        } else {
-          await refreshSupabaseBooking()
-        }
+        const pending = await resolveConfirmedReminderPending(fresh)
+        setConfirmedReminderPending(pending)
         setSuccessMessage(t("confirmPublic.successConfirmed"))
         setShowConfirmedReminderBadge(true)
         return
@@ -272,6 +307,7 @@ export default function PublicConfirmAppointmentPage() {
       applyLocalPatch({ status: "confirmed", lastUpdatedBy: "customer" })
       const fresh = findPublicBookingById(confirmToken)
       if (fresh) enqueueBookingConfirmedNotifications(fresh, language)
+      setConfirmedReminderPending(await resolveConfirmedReminderPending(fresh))
       setSuccessMessage(t("confirmPublic.successConfirmed"))
       setShowConfirmedReminderBadge(true)
     })()
@@ -304,22 +340,16 @@ export default function PublicConfirmAppointmentPage() {
         setScreen("main")
         setSuccessMessage(cancelledMessage)
         setShowConfirmedReminderBadge(false)
+        setConfirmedReminderPending(null)
         return
       }
       applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
       setScreen("main")
       setSuccessMessage(cancelledMessage)
       setShowConfirmedReminderBadge(false)
+      setConfirmedReminderPending(null)
     })()
   }
-
-  const secondReminderLabel = (() => {
-    const raw = booking.secondReminderDueAt?.trim()
-    if (!raw) return null
-    const parsed = new Date(raw)
-    if (Number.isNaN(parsed.getTime())) return null
-    return formatSecondReminderDate(parsed.toISOString())
-  })()
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -402,8 +432,8 @@ export default function PublicConfirmAppointmentPage() {
               ) : null}
               {showConfirmedReminderBadge ? (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                  {secondReminderLabel
-                    ? `${t("confirmPublic.confirmedReminderInfoPrefix")} ${secondReminderLabel}. ${t("confirmPublic.confirmedReminderInfoSuffix")}`
+                  {confirmedReminderPending === true
+                    ? t("confirmPublic.confirmedReminderInfoWithPending")
                     : t("confirmPublic.confirmedReminderInfoNoDate")}
                 </div>
               ) : null}

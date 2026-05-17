@@ -1059,11 +1059,11 @@ export const dictionaries = {
       cancelConfirmYes: "Tak, anuluj rezerwację",
       cancelConfirmNo: "Nie, wróć",
       successConfirmed: "Obecność potwierdzona. Dziękujemy!",
-      confirmedReminderInfoPrefix: "Dziękujemy za potwierdzenie. Dnia",
-      confirmedReminderInfoSuffix:
-        "wyślemy Ci jeszcze jedno przypomnienie o wizycie. Do zobaczenia!",
-      confirmedReminderInfoNoDate:
-        "Dziękujemy za potwierdzenie. Wyślemy Ci jeszcze jedno przypomnienie o wizycie. Do zobaczenia!",
+      confirmedReminderInfoPrefix: "Dziękujemy za potwierdzenie.",
+      confirmedReminderInfoSuffix: "Do zobaczenia!",
+      confirmedReminderInfoWithPending:
+        "Dziękujemy za potwierdzenie. Przypomnimy Ci jeszcze o wizycie. Do zobaczenia!",
+      confirmedReminderInfoNoDate: "Dziękujemy za potwierdzenie. Do zobaczenia!",
       changeOptionsRemovedInfo:
         "Jeśli chcesz dokonać zmian, anuluj rezerwację i wróć do strony rezerwacji.",
       backToOnlineBookingSystem: "Powrót do systemu rezerwacji online",
@@ -3165,11 +3165,11 @@ Pozdrawiamy,
       cancelConfirmYes: "Yes, cancel booking",
       cancelConfirmNo: "No, go back",
       successConfirmed: "Attendance confirmed. Thank you!",
-      confirmedReminderInfoPrefix: "Thank you for confirming. On",
-      confirmedReminderInfoSuffix:
-        "we will send one more reminder about your appointment. See you soon!",
-      confirmedReminderInfoNoDate:
-        "Thank you for confirming. We will send one more reminder about your appointment. See you soon!",
+      confirmedReminderInfoPrefix: "Thank you for confirming.",
+      confirmedReminderInfoSuffix: "See you soon!",
+      confirmedReminderInfoWithPending:
+        "Thank you for confirming. We'll remind you about your appointment once more. See you soon!",
+      confirmedReminderInfoNoDate: "Thank you for confirming. See you soon!",
       changeOptionsRemovedInfo:
         "If you want to make changes, cancel the booking and return to the booking page.",
       backToOnlineBookingSystem: "Back to online booking system",
