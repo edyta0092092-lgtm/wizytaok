@@ -1,4 +1,8 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
+import {
+  buildTransactionalEmailHtml,
+  buildTransactionalEmailText,
+} from "@/lib/notifications/transactional-email-layout"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { TablesInsert } from "@/types/database"
@@ -86,36 +90,63 @@ function buildMessages(
     language,
   )
 
-  if (language === "en") {
-    const emailText = `Your appointment has been confirmed.
+  const detailRows = language === "en"
+    ? [
+        { label: "Service", value: serviceName },
+        { label: "Date and time", value: appointmentDateTime },
+        { label: "Client", value: clientName },
+      ]
+    : [
+        { label: "Usługa", value: serviceName },
+        { label: "Termin", value: appointmentDateTime },
+        { label: "Klient", value: clientName },
+      ]
 
-Service: ${serviceName}
-Date and time: ${appointmentDateTime}
-Client: ${clientName}
+  const emailSubject = language === "en" ? "Appointment confirmed" : "Wizyta potwierdzona"
+  const intro =
+    language === "en"
+      ? "Your appointment has been confirmed."
+      : "Twoja wizyta została potwierdzona."
+  const cta =
+    language === "en"
+      ? {
+          href: confirmUrl,
+          label: "Cancel booking",
+          hint: "If you cannot attend, cancel your booking as soon as possible.",
+        }
+      : {
+          href: confirmUrl,
+          label: "Anuluj rezerwację",
+          hint: "Jeśli nie możesz przyjść, anuluj rezerwację jak najwcześniej.",
+        }
 
-If you cannot attend, cancel your appointment using this link:
-${confirmUrl}`
-    return {
-      sms: `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Cancel if needed: ${confirmUrl}`,
-      emailSubject: "Appointment confirmed",
-      emailText,
-      emailHtml: emailText.replace(/\n/g, "<br/>"),
-    }
-  }
+  const emailText = buildTransactionalEmailText({
+    lang: language,
+    intro,
+    detailRows,
+    cta,
+  })
+  const emailHtml = buildTransactionalEmailHtml({
+    lang: language,
+    subject: emailSubject,
+    preheader:
+      language === "en"
+        ? `Appointment confirmed — ${appointmentDateTime}.`
+        : `Wizyta potwierdzona — ${appointmentDateTime}.`,
+    title: emailSubject,
+    intro,
+    detailRows,
+    cta,
+  })
 
-  const emailText = `Twoja wizyta została potwierdzona.
-
-Usługa: ${serviceName}
-Termin: ${appointmentDateTime}
-Klient: ${clientName}
-
-Jeśli nie możesz przyjść, anuluj wizytę przez link:
-${confirmUrl}`
   return {
-    sms: `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Jeśli nie możesz przyjść, anuluj: ${confirmUrl}`,
-    emailSubject: "Wizyta potwierdzona",
+    sms:
+      language === "en"
+        ? `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Cancel if needed: ${confirmUrl}`
+        : `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Anuluj: ${confirmUrl}`,
+    emailSubject,
     emailText,
-    emailHtml: emailText.replace(/\n/g, "<br/>"),
+    emailHtml,
   }
 }
 

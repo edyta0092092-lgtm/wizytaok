@@ -1,4 +1,9 @@
-import { Resend } from "resend"
+﻿import { Resend } from "resend"
+
+import {
+  buildTransactionalEmailHtml,
+  buildTransactionalEmailText,
+} from "@/lib/notifications/transactional-email-layout"
 
 const DEFAULT_FROM = "WizytaOK <no-reply@nordigital.pl>"
 
@@ -11,15 +16,15 @@ const POLISH_MONTHS = [
   "czerwca",
   "lipca",
   "sierpnia",
-  "września",
-  "października",
+  "wrzeĹ›nia",
+  "paĹşdziernika",
   "listopada",
   "grudnia",
 ] as const
 
 /**
  * Format daty i godziny w Europe/Warsaw bez konwersji do strefy serwera.
- * Wejście: `appointment_date` (YYYY-MM-DD) + `appointment_time` (HH:MM:SS).
+ * WejĹ›cie: `appointment_date` (YYYY-MM-DD) + `appointment_time` (HH:MM:SS).
  */
 export function formatPolishAppointmentLabel(
   appointmentDate: string,
@@ -42,30 +47,22 @@ export function formatPolishAppointmentLabel(
   return { dateLabel, timeLabel, longLabel }
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
-
 /**
- * Wyciąga TYLKO pierwsze imię klienta — do użycia w powitaniach maila / SMS.
+ * WyciÄ…ga TYLKO pierwsze imiÄ™ klienta â€” do uĹĽycia w powitaniach maila / SMS.
  *
- * Zasada projektowa (etap 1 e-mail i przyszły etap 2 SMS):
- *   - W powitaniach NIE używamy nazwiska klienta (UX / RODO),
- *     tylko pierwsze imię (a jeśli nie da się ustalić — bezosobowe „Dzień dobry,").
- *   - "Anna Kowalska"        → "Anna"
- *   - " Anna Kowalska "      → "Anna"
- *   - "Anna Maria Kowalska"  → "Anna"
- *   - "Kowalski"             → "Kowalski"   (jednoczłonowy zostaje, bo nie wiemy czy to imię)
- *   - ""                     → null
- *   - null / undefined       → null
+ * Zasada projektowa (etap 1 e-mail i przyszĹ‚y etap 2 SMS):
+ *   - W powitaniach NIE uĹĽywamy nazwiska klienta (UX / RODO),
+ *     tylko pierwsze imiÄ™ (a jeĹ›li nie da siÄ™ ustaliÄ‡ â€” bezosobowe â€žDzieĹ„ dobry,").
+ *   - "Anna Kowalska"        â†’ "Anna"
+ *   - " Anna Kowalska "      â†’ "Anna"
+ *   - "Anna Maria Kowalska"  â†’ "Anna"
+ *   - "Kowalski"             â†’ "Kowalski"   (jednoczĹ‚onowy zostaje, bo nie wiemy czy to imiÄ™)
+ *   - ""                     â†’ null
+ *   - null / undefined       â†’ null
  *
- * UWAGA dla przyszłej integracji SMS / SMSAPI:
- *   W treści SMS-a używaj WYŁĄCZNIE wartości zwróconej przez `getClientFirstName(...)`.
- *   Jeśli zwróci `null` — pomiń powitanie zupełnie, NIE wstawiaj nazwiska.
+ * UWAGA dla przyszĹ‚ej integracji SMS / SMSAPI:
+ *   W treĹ›ci SMS-a uĹĽywaj WYĹÄ„CZNIE wartoĹ›ci zwrĂłconej przez `getClientFirstName(...)`.
+ *   JeĹ›li zwrĂłci `null` â€” pomiĹ„ powitanie zupeĹ‚nie, NIE wstawiaj nazwiska.
  */
 export function getClientFirstName(
   fullName: string | null | undefined
@@ -86,13 +83,13 @@ export type AppointmentReminderEmailInput = {
   staffName: string | null
   clientName: string | null
   /**
-   * Absolutny URL do istniejącej strony zarządzania wizytą (token-based),
+   * Absolutny URL do istniejÄ…cej strony zarzÄ…dzania wizytÄ… (token-based),
    * np. `https://wizytaok.example/confirm/{confirmation_token}?source=reminder`.
-   * Jeżeli null/pusty, sekcja z przyciskiem nie jest renderowana.
-   * NIE jest to link do bezpośredniego anulowania — klient anuluje wizytę na stronie zarządzania.
+   * JeĹĽeli null/pusty, sekcja z przyciskiem nie jest renderowana.
+   * NIE jest to link do bezpoĹ›redniego anulowania â€” klient anuluje wizytÄ™ na stronie zarzÄ…dzania.
    */
   manageUrl?: string | null
-  /** Adres kontaktowy firmy — używany jako reply_to, jeśli podany. */
+  /** Adres kontaktowy firmy â€” uĹĽywany jako reply_to, jeĹ›li podany. */
   replyTo?: string | null
 }
 
@@ -101,9 +98,9 @@ export type AppointmentReminderEmailResult =
   | { ok: false; code: "not_configured" | "failed"; error: string }
 
 /**
- * Wysyłka e-mail z przypomnieniem o wizycie przez Resend SDK.
+ * WysyĹ‚ka e-mail z przypomnieniem o wizycie przez Resend SDK.
  * Wymagane envy: `RESEND_API_KEY`. Nadawca: `REMINDERS_FROM_EMAIL` (fallback `RESEND_FROM`,
- * a w ostateczności default `WizytaOK <no-reply@nordigital.pl>`).
+ * a w ostatecznoĹ›ci default `WizytaOK <no-reply@nordigital.pl>`).
  */
 export async function sendAppointmentReminderEmail(
   input: AppointmentReminderEmailInput
@@ -132,7 +129,7 @@ export async function sendAppointmentReminderEmail(
   const hasManageLink = trimmedManageUrl.length > 0
 
   const detailRows: Array<{ label: string; value: string }> = [
-    { label: "Usługa", value: trimmedService },
+    { label: "UsĹ‚uga", value: trimmedService },
     { label: "Termin", value: appointmentDateTime },
   ]
   const trimmedStaff = input.staffName?.trim()
@@ -140,112 +137,35 @@ export async function sendAppointmentReminderEmail(
     detailRows.push({ label: "Osoba", value: trimmedStaff })
   }
 
-  const text = [
-    "Przypominamy o Twojej wizycie.",
-    "",
-    `Usługa: ${trimmedService}`,
-    `Termin: ${appointmentDateTime}`,
-    ...(hasManageLink
-      ? [
-          "",
-          "Jeśli nie możesz przyjść, anuluj wizytę przez link:",
-          trimmedManageUrl,
-        ]
-      : []),
-    "",
-    "Ta wiadomość została wysłana automatycznie przez WizytaOK.",
-  ].join("\n")
+  const intro = "Przypominamy o Twojej wizycie."
+  const preheader = `Przypominamy o wizycie â€” ${longLabel}.`
+  const cta = hasManageLink
+    ? {
+        href: trimmedManageUrl,
+        label: "Anuluj rezerwacjÄ™",
+        hint: "JeĹ›li nie moĹĽesz przyjĹ›Ä‡, anuluj rezerwacjÄ™ jak najwczeĹ›niej.",
+      }
+    : null
 
-  const preheader = `Przypominamy o wizycie — ${longLabel}.`
+  const text = buildTransactionalEmailText({
+    lang: "pl",
+    intro,
+    detailRows,
+    cta,
+  })
 
-  const fontStack =
-    "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+  const html = buildTransactionalEmailHtml({
+    lang: "pl",
+    subject,
+    preheader,
+    title: "Przypomnienie o wizycie",
+    intro,
+    detailRows,
+    cta,
+    extraParagraph:
+      "Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.",
+  })
 
-  const detailRowsHtml = detailRows
-    .map((row, idx) => {
-      const topPadding = idx === 0 ? 0 : 18
-      return `
-                      <tr>
-                        <td style="padding:${topPadding}px 0 0 0;">
-                          <div style="font-family:${fontStack}; font-size:12px; line-height:1.4; color:#5b6d6a; text-transform:uppercase; letter-spacing:0.06em; font-weight:600;">${escapeHtml(row.label)}</div>
-                          <div style="font-family:${fontStack}; font-size:16px; line-height:1.45; color:#0f1f1c; font-weight:600; margin-top:4px;">${escapeHtml(row.value)}</div>
-                        </td>
-                      </tr>`
-    })
-    .join("")
-
-  const html = `<!doctype html>
-<html lang="pl">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="x-apple-disable-message-reformatting" />
-<meta name="color-scheme" content="light only" />
-<meta name="supported-color-schemes" content="light" />
-<title>${escapeHtml(subject)}</title>
-</head>
-<body style="margin:0; padding:0; background-color:#F6FAF9; width:100%;">
-<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; visibility:hidden; opacity:0; color:transparent; height:0; width:0;">${escapeHtml(preheader)}</div>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9;">
-  <tr>
-    <td align="center" style="padding:40px 16px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;">
-        <tr>
-          <td style="padding:0 4px 18px 4px; font-family:${fontStack}; font-size:13px; line-height:1.3; color:#1f6b5d; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;">
-            WizytaOK
-          </td>
-        </tr>
-        <tr>
-          <td style="background-color:#ffffff; border:1px solid #DDEDEA; border-radius:16px; padding:36px 32px;">
-            <h1 style="margin:0 0 12px 0; font-family:${fontStack}; font-size:24px; line-height:1.3; color:#0f1f1c; font-weight:700;">
-              Przypomnienie o wizycie
-            </h1>
-            <p style="margin:0 0 22px 0; font-family:${fontStack}; font-size:15px; line-height:1.6; color:#0f1f1c;">
-              Przypominamy o Twojej wizycie.
-            </p>
-            <p style="margin:0 0 10px 0; font-family:${fontStack}; font-size:14px; line-height:1.4; color:#0f1f1c; font-weight:700;">
-              Szczegóły:
-            </p>
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9; border:1px solid #DDEDEA; border-radius:12px;">
-              <tr>
-                <td style="padding:22px 24px;">
-                  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${detailRowsHtml}
-                  </table>
-                </td>
-              </tr>
-            </table>${
-              hasManageLink
-                ? `
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
-              <tr>
-                <td align="center" style="background-color:#1f6b5d; border-radius:10px;">
-                  <a href="${escapeHtml(trimmedManageUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:13px 26px; font-family:${fontStack}; font-size:15px; line-height:1.2; color:#ffffff; text-decoration:none; font-weight:600;">
-                    Anuluj wizytę
-                  </a>
-                </td>
-              </tr>
-            </table>
-            <p style="margin:10px 0 0 0; font-family:${fontStack}; font-size:13px; line-height:1.5; color:#5b6d6a;">
-              Jeśli nie możesz przyjść, anuluj wizytę jak najwcześniej.
-            </p>`
-                : ""
-            }
-            <p style="margin:24px 0 0 0; font-family:${fontStack}; font-size:14px; line-height:1.55; color:#4a5b58;">
-              Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding:20px 4px 0 4px; font-family:${fontStack}; font-size:12px; line-height:1.5; color:#7a8a87;">
-            Ta wiadomość została wysłana automatycznie przez WizytaOK.
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-</body>
-</html>`
 
   const replyTo = input.replyTo?.trim() || undefined
 
