@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { cancelPublicBookingById } from "@/lib/bookings/cancel-public-booking-server"
+import { cancelPublicBookingByToken } from "@/lib/bookings/cancel-public-booking-server"
 import { notifyBookingCancelledByClient } from "@/lib/notifications/booking-cancelled-by-client-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -21,32 +21,26 @@ export async function POST(req: Request) {
   const admin = getServiceRoleClient()
   if (!admin) return NextResponse.json({ ok: false, error: "service_role_missing" }, { status: 500 })
 
-  const { data: bookingRaw } = await admin.rpc("get_booking_by_confirmation_token", { p_token: token })
-  if (!bookingRaw || typeof bookingRaw !== "object") {
-    return NextResponse.json({ ok: false, error: "booking_not_found" }, { status: 404 })
-  }
-  const raw = bookingRaw as Record<string, unknown>
-  const bookingId = String(raw.id ?? "").trim()
-  const businessId = String(raw.business_id ?? "").trim()
-  if (!bookingId || !businessId) {
-    return NextResponse.json({ ok: false, error: "booking_not_found" }, { status: 404 })
-  }
-
-  const cancelRes = await cancelPublicBookingById(admin, bookingId)
+  const cancelRes = await cancelPublicBookingByToken(admin, token)
   if (!cancelRes.ok) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[cancel-booking]", cancelRes.error)
+    }
     return NextResponse.json({ ok: false, error: cancelRes.error }, { status: 500 })
   }
+
+  const bookingId = cancelRes.bookingId
+
+  const { data: booking } = await admin.from("bookings").select("*").eq("id", bookingId).maybeSingle()
+  if (!booking) return NextResponse.json({ ok: true, notice: "queued" })
 
   const { data: business } = await admin
     .from("business_profiles")
     .select("slug,phone,business_name")
-    .eq("id", businessId)
+    .eq("id", booking.business_id)
     .maybeSingle()
 
   if (!business) return NextResponse.json({ ok: true, notice: "queued" })
-
-  const { data: booking } = await admin.from("bookings").select("*").eq("id", bookingId).maybeSingle()
-  if (!booking) return NextResponse.json({ ok: true, notice: "queued" })
 
   const result = await notifyBookingCancelledByClient({
     booking,

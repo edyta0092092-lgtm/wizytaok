@@ -97,7 +97,6 @@ export default function PublicBookingSuccessPage() {
   const [loadError, setLoadError] = React.useState(false)
   const [loading, setLoading] = React.useState(Boolean(tokenFromQuery))
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
-  const [returningToBooking, setReturningToBooking] = React.useState(false)
   const popstateHandlingRef = React.useRef(false)
   const popstateReadyRef = React.useRef(false)
 
@@ -232,13 +231,6 @@ export default function PublicBookingSuccessPage() {
 
   const dayIso = summary?.day ?? ""
 
-  const handleBookAnother = React.useCallback(() => {
-    if (returningToBooking) return
-    const targetHref = `/rezerwacje/${encodeURIComponent(String(businessSlug))}`
-    setReturningToBooking(true)
-    router.push(targetHref)
-  }, [returningToBooking, businessSlug, router])
-
   React.useEffect(() => {
     if (!tokenFromQuery || !summary?.id) return
     popstateReadyRef.current = false
@@ -343,21 +335,13 @@ export default function PublicBookingSuccessPage() {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-col gap-2">
-              {manageAppointmentHref ? (
+            {manageAppointmentHref ? (
+              <div className="mt-4">
                 <Button asChild variant="outline" className="w-full">
                   <Link href={manageAppointmentHref}>{t("bookingPublic.cancelAppointment")}</Link>
                 </Button>
-              ) : null}
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleBookAnother()}
-                disabled={returningToBooking}
-              >
-                {t("bookingPublic.bookAnotherAppointment")}
-              </Button>
-            </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>
