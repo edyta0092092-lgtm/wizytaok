@@ -13,6 +13,11 @@ import {
 } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import {
+  confirmedReminderCopyKey,
+  fetchPendingReminderFromQueue,
+  mergeReminderPendingState,
+} from "@/lib/appointments/confirm-reminder-copy-client"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { BusinessReminderChannelPersisted } from "@/types/domain"
@@ -262,14 +267,28 @@ export default function PublicBookingSuccessPage() {
   const handleConfirm = React.useCallback(async () => {
     setActionError(null)
     setActionSuccess(null)
+    const reminderToken = (publicBooking?.confirmationToken ?? tokenFromQuery).trim()
+    const pendingBeforeConfirm =
+      reminderToken.length > 0 ? await fetchPendingReminderFromQueue(reminderToken) : null
+
     const r = await runActionWithFallback("confirm")
     if (!r.ok) {
       setActionError(t("bookings.createFailed"))
       return
     }
     await refreshBooking()
-    setActionSuccess(t("confirmPublic.successConfirmed"))
-  }, [refreshBooking, runActionWithFallback, t])
+
+    let pendingAfterConfirm =
+      reminderToken.length > 0 ? await fetchPendingReminderFromQueue(reminderToken) : null
+    if (pendingAfterConfirm === null && reminderToken.length > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, 400))
+      pendingAfterConfirm = await fetchPendingReminderFromQueue(reminderToken)
+    }
+
+    setActionSuccess(
+      t(confirmedReminderCopyKey(mergeReminderPendingState(pendingBeforeConfirm, pendingAfterConfirm))),
+    )
+  }, [publicBooking?.confirmationToken, refreshBooking, runActionWithFallback, t, tokenFromQuery])
 
   const handleCancel = React.useCallback(async () => {
     setActionError(null)
