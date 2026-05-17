@@ -1341,6 +1341,17 @@ export const dictionaries = {
       weekdayFriday: "Piątek",
       weekdaySaturday: "Sobota",
       weekdaySunday: "Niedziela",
+      freeSlotsTitle: "Wolne terminy",
+      freeSlotsHint:
+        "Lista godzin, w których można umówić wizytę (wg dostępności firmy, grafiku osób i zajętych rezerwacji).",
+      freeSlotsDuration: "Czas wizyty",
+      freeSlotsMinutes: "{n} min",
+      freeSlotsLoading: "Obliczanie wolnych terminów…",
+      freeSlotsEmpty: "Brak wolnych terminów w tym miesiącu dla wybranych ustawień.",
+      freeSlotsCount: "{count} wolnych",
+      freeSlotsTotal: "Łącznie {count} wolnych godzin w miesiącu",
+      freeSlotsDayNone: "Brak wolnych godzin w tym dniu.",
+      freeSlotsDayHeading: "Wolne godziny",
     },
     labels: {
       appointmentStatus: {
@@ -3488,6 +3499,17 @@ Pozdrawiamy,
       weekdayFriday: "Friday",
       weekdaySaturday: "Saturday",
       weekdaySunday: "Sunday",
+      freeSlotsTitle: "Available slots",
+      freeSlotsHint:
+        "Times when an appointment can be booked (based on business hours, staff schedules, and existing bookings).",
+      freeSlotsDuration: "Appointment length",
+      freeSlotsMinutes: "{n} min",
+      freeSlotsLoading: "Calculating available slots…",
+      freeSlotsEmpty: "No available slots this month for the selected filters.",
+      freeSlotsCount: "{count} available",
+      freeSlotsTotal: "{count} available time slots this month",
+      freeSlotsDayNone: "No available hours on this day.",
+      freeSlotsDayHeading: "Available hours",
     },
     labels: {
       appointmentStatus: {

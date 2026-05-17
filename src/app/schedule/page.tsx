@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { ScheduleFreeSlotsPanel } from "@/components/schedule/schedule-free-slots-panel"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,8 +21,14 @@ import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-sta
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { bookingNeedsAction } from "@/lib/bookings/booking-needs-action"
+import { getAvailabilityRules } from "@/lib/availability/availability-store"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import {
+  calendarEntriesToBookedSlots,
+  computePanelFreeSlotsForMonth,
+} from "@/lib/schedule/compute-panel-free-slots"
+import { loadPanelFreeSlotsContext } from "@/lib/schedule/load-panel-free-slots-context"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -47,6 +54,7 @@ type CalendarEntry = {
 type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
 
 const DAY_PREVIEW_LIMIT = 4
+const SLOT_DURATION_OPTIONS = [15, 30, 45, 60] as const
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0")
@@ -154,6 +162,11 @@ export default function SchedulePage() {
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
+  const [slotDurationMinutes, setSlotDurationMinutes] = React.useState(30)
+  const [freeSlotsLoading, setFreeSlotsLoading] = React.useState(true)
+  const [freeSlotsContext, setFreeSlotsContext] = React.useState<
+    Awaited<ReturnType<typeof loadPanelFreeSlotsContext>> | null
+  >(null)
 
   React.useEffect(() => {
     if (!statusNotice) return
@@ -254,11 +267,15 @@ export default function SchedulePage() {
     window.addEventListener("pw-bookings", forceReload)
     window.addEventListener("pw-public-bookings", forceReload)
     window.addEventListener("pw-manual-appointments", forceReload)
+    window.addEventListener("pw-availability", forceReload)
+    window.addEventListener("pw-staff", forceReload)
     window.addEventListener("focus", forceReload)
     return () => {
       window.removeEventListener("pw-bookings", forceReload)
       window.removeEventListener("pw-public-bookings", forceReload)
       window.removeEventListener("pw-manual-appointments", forceReload)
+      window.removeEventListener("pw-availability", forceReload)
+      window.removeEventListener("pw-staff", forceReload)
       window.removeEventListener("focus", forceReload)
     }
   }, [])
@@ -308,6 +325,44 @@ export default function SchedulePage() {
       cancelled = true
     }
   }, [ym, access.businessId, mapAppointmentToEntry, refreshTick])
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setFreeSlotsLoading(true)
+      try {
+        const client = getBrowserClient()
+        const loaded = await loadPanelFreeSlotsContext(
+          client,
+          access.businessId,
+          staffMembers,
+          ym.year,
+          ym.month,
+        )
+        if (cancelled) return
+        if (loaded) {
+          setFreeSlotsContext(loaded)
+          return
+        }
+        const availability = await getAvailabilityRules(client, access.businessId ?? null)
+        if (!cancelled) {
+          setFreeSlotsContext({
+            businessAvailability: availability,
+            businessExceptionsByDate: new Map(),
+            bookedSlots: [],
+            staffContexts: new Map(),
+          })
+        }
+      } catch {
+        if (!cancelled) setFreeSlotsContext(null)
+      } finally {
+        if (!cancelled) setFreeSlotsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [ym, access.businessId, staffMembers, refreshTick])
 
   const visibleStaff = React.useMemo(() => {
     if (access.effectiveRole !== "staff") return staffMembers
@@ -366,6 +421,53 @@ export default function SchedulePage() {
     () => (detailDate ? bookingsByDate.get(detailDate) ?? [] : []),
     [detailDate, bookingsByDate]
   )
+
+  const freeSlotsList = React.useMemo(() => {
+    if (!freeSlotsContext) return []
+    const booked =
+      freeSlotsContext.bookedSlots.length > 0
+        ? freeSlotsContext.bookedSlots
+        : calendarEntriesToBookedSlots(bookings)
+    return computePanelFreeSlotsForMonth({
+      year: ym.year,
+      month: ym.month,
+      durationMinutes: slotDurationMinutes,
+      businessAvailability: freeSlotsContext.businessAvailability,
+      businessExceptionsByDate: freeSlotsContext.businessExceptionsByDate,
+      bookedSlots: booked,
+      staffMembers,
+      staffContexts: freeSlotsContext.staffContexts,
+      personFilterStaffId: effectivePersonFilter || null,
+    })
+  }, [
+    freeSlotsContext,
+    bookings,
+    ym.year,
+    ym.month,
+    slotDurationMinutes,
+    staffMembers,
+    effectivePersonFilter,
+  ])
+
+  const freeSlotsByDate = React.useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const day of freeSlotsList) map.set(day.date, day.times)
+    return map
+  }, [freeSlotsList])
+
+  const formatFreeSlotDayHeading = React.useCallback(
+    (dateKey: string) =>
+      formatters.dayLong.format(
+        new Date(
+          Number(dateKey.slice(0, 4)),
+          Number(dateKey.slice(5, 7)) - 1,
+          Number(dateKey.slice(8, 10)),
+        ),
+      ),
+    [formatters.dayLong],
+  )
+
+  const detailFreeTimes = detailDate ? freeSlotsByDate.get(detailDate) ?? [] : []
   React.useEffect(() => {
     if (!detailDate) return
     if (process.env.NODE_ENV === "development") {
@@ -446,6 +548,18 @@ export default function SchedulePage() {
           <p className="text-sm text-destructive">Nie udało się załadować danych grafiku.</p>
         ) : (
           <>
+            <ScheduleFreeSlotsPanel
+              className="mb-5"
+              monthLabel={formatters.monthYear.format(new Date(ym.year, ym.month - 1, 1))}
+              durationMinutes={slotDurationMinutes}
+              onDurationChange={setSlotDurationMinutes}
+              durationOptions={SLOT_DURATION_OPTIONS}
+              loading={freeSlotsLoading || loading}
+              days={freeSlotsList}
+              selectedDate={detailDate}
+              onSelectDate={setDetailDate}
+              formatDayHeading={formatFreeSlotDayHeading}
+            />
             <div className="mb-1 hidden grid-cols-7 gap-1 text-center text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground md:grid">
               {weekdayHeader.map((w) => (
                 <div key={w}>{w}</div>
@@ -462,6 +576,7 @@ export default function SchedulePage() {
                   language === "en" ? "en" : "pl"
                 )
                 const rows = bookingsByDate.get(key) ?? []
+                const dayFreeTimes = freeSlotsByDate.get(key)
                 const preview = rows.slice(0, DAY_PREVIEW_LIMIT)
                 const more = Math.max(0, rows.length - DAY_PREVIEW_LIMIT)
                 const isToday = key === todayKey
@@ -479,6 +594,14 @@ export default function SchedulePage() {
                       <div>
                         <p className="text-sm font-semibold text-foreground">{dayNum}</p>
                         <p className="text-[11px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
+                        {dayFreeTimes && dayFreeTimes.length > 0 ? (
+                          <p className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+                            {t("schedule.freeSlotsCount").replace(
+                              "{count}",
+                              String(dayFreeTimes.length),
+                            )}
+                          </p>
+                        ) : null}
                       </div>
                       {holidayLabel ? (
                         <span
@@ -537,6 +660,18 @@ export default function SchedulePage() {
             </SheetTitle>
           </SheetHeader>
           <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
+                {t("schedule.freeSlotsDayHeading")}
+              </p>
+              {detailFreeTimes.length > 0 ? (
+                <p className="mt-2 text-sm leading-relaxed tabular-nums text-foreground">
+                  {detailFreeTimes.join(", ")}
+                </p>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{t("schedule.freeSlotsDayNone")}</p>
+              )}
+            </div>
             {detailRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
             ) : (

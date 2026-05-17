@@ -37,7 +37,7 @@ function parseYmd(ymd: string): Date {
   return new Date(y, m - 1, d)
 }
 
-function applyStaffOverlayToWeek(
+export function applyStaffOverlayToWeek(
   days: AvailabilityDay[],
   cellDate: Date,
   staffRules: StaffAvailabilityRuleInput[],
