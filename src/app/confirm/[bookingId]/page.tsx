@@ -174,6 +174,19 @@ export default function PublicConfirmAppointmentPage() {
     [booking, reloadLocalBooking],
   )
 
+  const resolveReminderPendingForBooking = React.useCallback(
+    async (sourceBooking: PublicBooking | null, reminderToken: string) => {
+      if (dataSource === "supabase") {
+        return fetchPendingReminderFromQueue(reminderToken)
+      }
+      if (sourceBooking) {
+        return hasPendingReminderFromPublicBooking(sourceBooking)
+      }
+      return null
+    },
+    [dataSource],
+  )
+
   const fmtDay = React.useMemo(
     () =>
       new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
@@ -238,19 +251,6 @@ export default function PublicConfirmAppointmentPage() {
     const second = await updateBookingByConfirmationToken(client, fallbackToken, action, payload)
     return second.ok ? second : first
   }
-
-  const resolveReminderPendingForBooking = React.useCallback(
-    async (sourceBooking: PublicBooking | null, reminderToken: string) => {
-      if (dataSource === "supabase") {
-        return fetchPendingReminderFromQueue(reminderToken)
-      }
-      if (sourceBooking) {
-        return hasPendingReminderFromPublicBooking(sourceBooking)
-      }
-      return null
-    },
-    [dataSource],
-  )
 
   const confirmAttendance = () => {
     void (async () => {
