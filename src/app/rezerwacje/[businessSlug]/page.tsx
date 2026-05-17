@@ -127,7 +127,6 @@ export default function PublicBookingPage() {
   const [bookingAvailability, setBookingAvailability] = React.useState<AvailabilityDay[]>([])
   const [availabilityStrict, setAvailabilityStrict] = React.useState(false)
   const [availabilityLoadFailed, setAvailabilityLoadFailed] = React.useState(false)
-  const [availabilityNotConfigured, setAvailabilityNotConfigured] = React.useState(false)
   const [availabilityReady, setAvailabilityReady] = React.useState(false)
   const [dayOverride, setDayOverride] = React.useState<string | null>(null)
   const [blockedSlotKeys, setBlockedSlotKeys] = React.useState<ReadonlySet<string>>(() => new Set())
@@ -246,7 +245,6 @@ export default function PublicBookingPage() {
         setBookingAvailability(res.days)
         setAvailabilityStrict(res.strict)
         setAvailabilityLoadFailed(res.loadFailed)
-        setAvailabilityNotConfigured(res.notConfigured)
         setAvailabilityReady(true)
         queueMicrotask(() => {
           setDayOverride(null)
@@ -260,7 +258,6 @@ export default function PublicBookingPage() {
       setBookingAvailability(res.days)
       setAvailabilityStrict(res.strict)
       setAvailabilityLoadFailed(res.loadFailed)
-      setAvailabilityNotConfigured(res.notConfigured)
       setAvailabilityReady(true)
       queueMicrotask(() => {
         setDayOverride(null)
@@ -1055,11 +1052,6 @@ export default function PublicBookingPage() {
                 {availabilityLoadFailed ? (
                   <p className="text-sm text-muted-foreground" role="alert">
                     {t("availability.loadAvailabilityError")}
-                  </p>
-                ) : null}
-                {availabilityNotConfigured && !availabilityLoadFailed && catalog.length > 0 ? (
-                  <p className="text-sm text-muted-foreground" role="status">
-                    {t("bookingPublic.availabilityNotConfigured")}
                   </p>
                 ) : null}
 

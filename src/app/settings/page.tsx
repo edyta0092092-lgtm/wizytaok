@@ -89,12 +89,9 @@ const defaultSettings: SettingsForm = {
 }
 
 export default function SettingsPage() {
-  const { t, language, setLanguage, theme, setTheme } = useTranslations()
-  const { ready, businessId, canManageSettings, effectiveRole } = useBusinessAccess()
-  const staffAppearanceOnly = Boolean(ready && effectiveRole === "staff")
+  const { t } = useTranslations()
+  const { ready, businessId, canManageSettings } = useBusinessAccess()
   const [form, setForm] = React.useState<SettingsForm>(defaultSettings)
-  const [draftLanguage, setDraftLanguage] = React.useState<"pl" | "en">(language)
-  const [draftTheme, setDraftTheme] = React.useState<"light" | "dark">(theme)
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
@@ -139,17 +136,6 @@ export default function SettingsPage() {
   }, [form.phoneDialCode, form.phoneNational, t])
 
   const settingsSaveBlocked = Boolean(taxIdDigitsHint || phoneNationalError)
-  React.useEffect(() => {
-    queueMicrotask(() => {
-      setDraftLanguage(language)
-    })
-  }, [language])
-
-  React.useEffect(() => {
-    queueMicrotask(() => {
-      setDraftTheme(theme)
-    })
-  }, [theme])
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -184,7 +170,7 @@ export default function SettingsPage() {
   }, [])
 
   React.useEffect(() => {
-    if (!isSupabaseConfigured() || staffAppearanceOnly) return
+    if (!isSupabaseConfigured()) return
     const client = getBrowserClient()
     if (!client) return
     void client.auth.getUser().then(({ data: { user } }) => {
@@ -235,20 +221,7 @@ export default function SettingsPage() {
           }))
         })
     })
-  }, [staffAppearanceOnly])
-
-  const saveAppearancePrefs = (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaveError(null)
-    setSaving(true)
-    try {
-      setLanguage(draftLanguage)
-      setTheme(draftTheme)
-      setShowSaved(true)
-    } finally {
-      setSaving(false)
-    }
-  }
+  }, [])
 
   React.useEffect(() => {
     if (!showSaved) return
@@ -427,85 +400,10 @@ export default function SettingsPage() {
         }
       }
 
-      setLanguage(draftLanguage)
-      setTheme(draftTheme)
       setShowSaved(true)
     } finally {
       setSaving(false)
     }
-  }
-
-  if (staffAppearanceOnly) {
-    return (
-      <AppShell
-        title={t("navigation.settings")}
-        pageDescription={t("settings.staffAppearancePageDescription")}
-        primaryAction={
-          <Button
-            type="submit"
-            form="staff-settings-appearance-form"
-            size="sm"
-            className="h-10 rounded-xl px-4 text-sm"
-            disabled={saving}
-          >
-            {saving ? "..." : t("common.saveChanges")}
-          </Button>
-        }
-      >
-        <PageShell>
-          {showSaved ? (
-            <div
-              role="status"
-              className="mb-4 flex items-center gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success-foreground shadow-sm shadow-slate-900/5"
-            >
-              <Check className="size-4 shrink-0 text-success" aria-hidden />
-              {t("settings.savedBanner")}
-            </div>
-          ) : null}
-          <form
-            id="staff-settings-appearance-form"
-            onSubmit={saveAppearancePrefs}
-            className="max-w-xl space-y-6"
-          >
-            <Card className="self-start rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-              <CardHeader className="border-b border-border/70 py-4">
-                <CardTitle className="text-sm font-semibold">{t("settings.appearance")}</CardTitle>
-                <CardDescription className="text-xs text-muted-foreground">
-                  {t("settings.appearancePrefsDesc")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="staff-ui-language">{t("settings.language")}</Label>
-                  <Select value={draftLanguage} onValueChange={(v) => setDraftLanguage(v as "pl" | "en")}>
-                    <SelectTrigger id="staff-ui-language" className="h-11 w-full rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pl">{t("settings.polish")}</SelectItem>
-                      <SelectItem value="en">{t("settings.english")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="staff-ui-theme">{t("settings.theme")}</Label>
-                  <Select value={draftTheme} onValueChange={(v) => setDraftTheme(v as "light" | "dark")}>
-                    <SelectTrigger id="staff-ui-theme" className="h-11 w-full rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">{t("settings.light")}</SelectItem>
-                      <SelectItem value="dark">{t("settings.dark")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardContent>
-            </Card>
-            <p className="text-xs text-muted-foreground">{t("settings.staffAppearanceFooterNote")}</p>
-          </form>
-        </PageShell>
-      </AppShell>
-    )
   }
 
   if (ready && businessId && !canManageSettings) {
@@ -561,55 +459,6 @@ export default function SettingsPage() {
           {/* Dwie osobne kolumny-flex – brak współdzielonej wysokości rzędu siatki między kartami */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
             <div className="flex min-w-0 flex-col gap-6">
-              <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardHeader className="border-b border-border/70 py-4">
-              <CardTitle className="text-sm font-semibold">
-                {t("settings.appearance")}
-              </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">
-                {t("settings.appearancePrefsDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="ui-language">{t("settings.language")}</Label>
-                <Select
-                  value={draftLanguage}
-                  onValueChange={(v) => setDraftLanguage(v as "pl" | "en")}
-                >
-                  <SelectTrigger
-                    id="ui-language"
-                    className="h-11 w-full min-w-0 rounded-xl"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pl">{t("settings.polish")}</SelectItem>
-                    <SelectItem value="en">{t("settings.english")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ui-theme">{t("settings.theme")}</Label>
-                <Select
-                  value={draftTheme}
-                  onValueChange={(v) => setDraftTheme(v as "light" | "dark")}
-                >
-                  <SelectTrigger
-                    id="ui-theme"
-                    className="h-11 w-full min-w-0 rounded-xl"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="light">{t("settings.light")}</SelectItem>
-                    <SelectItem value="dark">{t("settings.dark")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card
             data-tour="settings-reminders"
             className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
