@@ -219,12 +219,14 @@ function coercePublicBooking(raw: unknown): PublicBooking | null {
   const lastStatusChangeSource:
     | "manual"
     | "confirm"
+    | "cancel"
     | "system"
     | "auto_reminder_24h"
     | "automatic_24h_reminder"
     | undefined =
     o.lastStatusChangeSource === "manual" ||
     o.lastStatusChangeSource === "confirm" ||
+    o.lastStatusChangeSource === "cancel" ||
     o.lastStatusChangeSource === "system" ||
     o.lastStatusChangeSource === "auto_reminder_24h" ||
     o.lastStatusChangeSource === "automatic_24h_reminder"

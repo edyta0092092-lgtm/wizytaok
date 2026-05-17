@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server"
 
+import { cancelPublicBookingById } from "@/lib/bookings/cancel-public-booking-server"
 import { notifyBookingCancelledByClient } from "@/lib/notifications/booking-cancelled-by-client-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
-import type { TablesUpdate } from "@/types/database"
 
 type Body = {
   token?: string
@@ -32,17 +32,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "booking_not_found" }, { status: 404 })
   }
 
-  const patch: TablesUpdate<"bookings"> = {
-    cancelled_by: "client",
-    cancelled_at: new Date().toISOString(),
-    status: "cancelled",
-    last_updated_by: "customer",
-    last_status_change_source: "cancel",
-    updated_at: new Date().toISOString(),
-  }
-  const { error: updateError } = await admin.from("bookings").update(patch).eq("id", bookingId)
-  if (updateError) {
-    return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 })
+  const cancelRes = await cancelPublicBookingById(admin, bookingId)
+  if (!cancelRes.ok) {
+    return NextResponse.json({ ok: false, error: cancelRes.error }, { status: 500 })
   }
 
   const { data: business } = await admin

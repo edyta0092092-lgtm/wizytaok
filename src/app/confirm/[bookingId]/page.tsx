@@ -321,10 +321,7 @@ export default function PublicConfirmAppointmentPage() {
         const client = getBrowserClient()
         if (!client) return
         const apiOk = await cancelPublicBookingViaApi(confirmToken, language)
-        if (!apiOk) {
-          const r = await runConfirmRpcWithFallback("cancel", {})
-          if (!r.ok) return
-        }
+        if (!apiOk) return
         await refreshSupabaseBooking()
         setScreen("main")
         setSuccessMessage(cancelledMessage)
