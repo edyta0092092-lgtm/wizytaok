@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button"
 import {
   PUBLIC_BOOKINGS_STORAGE_KEY,
   getPublicBookings,
+  updatePublicBooking,
 } from "@/lib/bookings/public-bookings"
+import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -49,6 +51,8 @@ type DisplaySummary = {
   phone: string
   email?: string
 }
+
+type CancelUiPhase = "idle" | "done"
 
 function pickLatestBooking(
   slug: string,
@@ -97,6 +101,10 @@ export default function PublicBookingSuccessPage() {
   const [loadError, setLoadError] = React.useState(false)
   const [loading, setLoading] = React.useState(Boolean(tokenFromQuery))
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
+  const [usesSupabase, setUsesSupabase] = React.useState(false)
+  const [cancelPhase, setCancelPhase] = React.useState<CancelUiPhase>("idle")
+  const [cancelling, setCancelling] = React.useState(false)
+  const [cancelError, setCancelError] = React.useState<string | null>(null)
   const popstateHandlingRef = React.useRef(false)
   const popstateReadyRef = React.useRef(false)
 
@@ -106,10 +114,8 @@ export default function PublicBookingSuccessPage() {
     return (publicBooking?.confirmationToken ?? summary?.confirmationToken ?? "").trim()
   }, [publicBooking?.confirmationToken, summary?.confirmationToken, tokenFromQuery])
 
-  const manageAppointmentHref = React.useMemo(() => {
-    if (!confirmationToken) return null
-    return `/confirm/${encodeURIComponent(confirmationToken)}?source=booking`
-  }, [confirmationToken])
+  const isCancelled =
+    publicBooking?.status === "cancelled" || cancelPhase === "done"
 
   React.useEffect(() => {
     if (loading) return
@@ -119,7 +125,7 @@ export default function PublicBookingSuccessPage() {
         "[booking.success] Brak confirmation_token — przycisk „Anuluj wizytę” ukryty. Oczekiwany URL: /rezerwacje/.../success?token=...",
       )
     } else {
-      console.warn("[booking.success] Missing confirmation_token; cancel link hidden.")
+      console.warn("[booking.success] Missing confirmation_token; cancel button hidden.")
     }
   }, [loading, confirmationToken])
 
@@ -127,6 +133,7 @@ export default function PublicBookingSuccessPage() {
     let cancelled = false
     const run = async () => {
       if (!tokenFromQuery) {
+        setUsesSupabase(false)
         setLoading(false)
         setLoadError(false)
         queueMicrotask(() => {
@@ -155,6 +162,11 @@ export default function PublicBookingSuccessPage() {
               phone: picked.phone ?? "",
               email: typeof picked.email === "string" ? picked.email.trim() || undefined : undefined,
             })
+            const local = getPublicBookings().find((b) => b.id === picked.id) ?? null
+            if (local) {
+              setPublicBooking(local)
+              if (local.status === "cancelled") setCancelPhase("done")
+            }
           } catch {
             setSummary(null)
           }
@@ -164,7 +176,7 @@ export default function PublicBookingSuccessPage() {
       setLoading(true)
       setLoadError(false)
 
-      const applyPublicBooking = (b: PublicBooking) => {
+      const applyPublicBooking = (b: PublicBooking, fromSupabase: boolean) => {
         setSummary({
           id: b.id,
           confirmationToken: b.confirmationToken ?? tokenFromQuery,
@@ -176,8 +188,10 @@ export default function PublicBookingSuccessPage() {
           email: b.customerEmail?.trim() || undefined,
         })
         setPublicBooking(b)
+        setUsesSupabase(fromSupabase)
         setLoadError(false)
         setLoading(false)
+        if (b.status === "cancelled") setCancelPhase("done")
       }
 
       const localByToken = getPublicBookings().find(
@@ -190,7 +204,7 @@ export default function PublicBookingSuccessPage() {
       if (!isSupabaseConfigured() || !client) {
         if (cancelled) return
         if (localByToken) {
-          applyPublicBooking(localByToken)
+          applyPublicBooking(localByToken, false)
           return
         }
         setSummary(null)
@@ -203,7 +217,7 @@ export default function PublicBookingSuccessPage() {
       if (cancelled) return
       if (!b) {
         if (localByToken) {
-          applyPublicBooking(localByToken)
+          applyPublicBooking(localByToken, false)
           return
         }
         setSummary(null)
@@ -211,13 +225,57 @@ export default function PublicBookingSuccessPage() {
         setLoading(false)
         return
       }
-      applyPublicBooking(b)
+      applyPublicBooking(b, true)
     }
     void run()
     return () => {
       cancelled = true
     }
   }, [normalizedSlug, tokenFromQuery])
+
+  const refreshSupabaseBooking = React.useCallback(async () => {
+    const client = getBrowserClient()
+    if (!client || !tokenFromQuery) return
+    const b = await getBookingByConfirmationToken(client, tokenFromQuery)
+    if (!b) return
+    setPublicBooking(b)
+    setSummary({
+      id: b.id,
+      confirmationToken: b.confirmationToken,
+      serviceName: b.serviceName,
+      day: b.date,
+      time: b.time,
+      fullName: b.customerName,
+      phone: b.customerPhone,
+      email: b.customerEmail?.trim() || undefined,
+    })
+  }, [tokenFromQuery])
+
+  const handleCancelVisit = React.useCallback(() => {
+    if (cancelling || !confirmationToken) return
+    void (async () => {
+      setCancelling(true)
+      setCancelError(null)
+      try {
+        if (usesSupabase) {
+          const apiRes = await cancelPublicBookingViaApi(confirmationToken, language)
+          if (!apiRes.ok) {
+            setCancelError(t("confirmPublic.cancelActionFailed"))
+            return
+          }
+          await refreshSupabaseBooking()
+        } else if (summary?.id) {
+          updatePublicBooking(summary.id, { status: "cancelled", lastUpdatedBy: "customer" })
+          setPublicBooking((prev) =>
+            prev ? { ...prev, status: "cancelled", lastUpdatedBy: "customer" } : prev,
+          )
+        }
+        setCancelPhase("done")
+      } finally {
+        setCancelling(false)
+      }
+    })()
+  }, [cancelling, confirmationToken, usesSupabase, language, refreshSupabaseBooking, summary?.id, t])
 
   const fmtDay = React.useMemo(
     () =>
@@ -291,11 +349,25 @@ export default function PublicBookingSuccessPage() {
         <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
           <CardHeader>
             <CardTitle className="text-xl font-semibold">
-              {t("bookingPublic.appointmentConfirmedTitle")}
+              {isCancelled
+                ? t("confirmPublic.successCancelledConfirmed")
+                : t("bookingPublic.appointmentConfirmedTitle")}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">{t("bookingPublic.appointmentConfirmedDescription")}</p>
+            <p className="text-sm text-muted-foreground">
+              {isCancelled
+                ? t("bookingPublic.visitCancelledBanner")
+                : t("bookingPublic.appointmentConfirmedDescription")}
+            </p>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
+            {cancelError ? (
+              <div
+                className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                role="alert"
+              >
+                {cancelError}
+              </div>
+            ) : null}
             <p>
               <span className="text-muted-foreground">{t("bookingPublic.service")}:</span>{" "}
               <span className="font-medium text-foreground">
@@ -320,27 +392,37 @@ export default function PublicBookingSuccessPage() {
             </p>
             <p className="mt-4 text-sm">
               <span className="text-muted-foreground">{t("bookingPublic.statusLabel")}:</span>{" "}
-              <span className="font-medium text-foreground">{t("bookingPublic.statusConfirmed")}</span>
+              <span className="font-medium text-foreground">
+                {isCancelled
+                  ? t("bookingPublic.statusCancelled")
+                  : t("bookingPublic.statusConfirmed")}
+              </span>
             </p>
-            <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("bookingPublic.whatNextImmediateNotifySafe")}
-                </p>
+            {!isCancelled ? (
+              <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t("bookingPublic.whatNextImmediateNotifySafe")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{t("bookingPublic.remindersSectionTitle")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("bookingPublic.whatNextReminderOnly")}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">{t("bookingPublic.remindersSectionTitle")}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{t("bookingPublic.whatNextReminderOnly")}</p>
-              </div>
-            </div>
+            ) : null}
 
-            {manageAppointmentHref ? (
-              <div className="mt-4">
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={manageAppointmentHref}>{t("bookingPublic.cancelAppointment")}</Link>
-                </Button>
-              </div>
+            {confirmationToken && !isCancelled ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 w-full"
+                disabled={cancelling}
+                onClick={() => handleCancelVisit()}
+              >
+                {cancelling ? t("bookings.loading") : t("bookingPublic.cancelAppointment")}
+              </Button>
             ) : null}
           </CardContent>
         </Card>

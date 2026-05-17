@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,24 +20,14 @@ import { getBookingStaffDetailValue, shouldShowStaffDetailRow } from "@/lib/staf
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
-type Screen = "main" | "cancel"
-
 export default function PublicConfirmAppointmentPage() {
   const { t, language } = useTranslations()
   const params = useParams<{ bookingId: string }>()
-  const searchParams = useSearchParams()
   const bookingId = typeof params.bookingId === "string" ? params.bookingId : ""
-  // Strona zarządzania wizytą jest współdzielona z ekranem sukcesu po rezerwacji.
-  // Gdy klient wchodzi tu z linka w przypomnieniu (e-mail / w przyszłości SMS),
-  // doklejamy `?source=reminder`, żeby ukryć przycisk „Wróć do strony rezerwacji".
-  // Strona służy wyłącznie do podglądu wizyty i anulowania (bez potwierdzania obecności).
-  const fromReminderLink = (searchParams?.get("source") ?? "").trim() === "reminder"
   const [booking, setBooking] = React.useState<PublicBooking | null>(null)
   const [ready, setReady] = React.useState(false)
-  const [screen, setScreen] = React.useState<Screen>("main")
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
   const [slotFlowError, setSlotFlowError] = React.useState<string | null>(null)
-  const screenRef = React.useRef<Screen>("main")
   const bookingPollSigRef = React.useRef("")
   const [remoteRefreshHint, setRemoteRefreshHint] = React.useState(false)
   const [cancelling, setCancelling] = React.useState(false)
@@ -46,10 +36,6 @@ export default function PublicConfirmAppointmentPage() {
     () => decodeURIComponent(bookingId || "").trim(),
     [bookingId],
   )
-
-  React.useEffect(() => {
-    screenRef.current = screen
-  }, [screen])
 
   const triggerRemoteRefreshHint = React.useCallback(() => {
     setRemoteRefreshHint(true)
@@ -117,7 +103,7 @@ export default function PublicConfirmAppointmentPage() {
     if (!confirmToken || dataSource !== "supabase") return
     const tick = () => {
       void (async () => {
-        if (screenRef.current !== "main") return
+        if (cancelling) return
         const client = getBrowserClient()
         if (!client) return
         const next = await getBookingByConfirmationToken(client, confirmToken)
@@ -130,13 +116,13 @@ export default function PublicConfirmAppointmentPage() {
     }
     const intervalId = window.setInterval(tick, 1700)
     return () => window.clearInterval(intervalId)
-  }, [confirmToken, dataSource, triggerRemoteRefreshHint])
+  }, [confirmToken, dataSource, triggerRemoteRefreshHint, cancelling])
 
   React.useEffect(() => {
     if (dataSource !== "local") return
     const onStorage = (e: StorageEvent) => {
       if (!confirmToken || e.key !== PUBLIC_BOOKINGS_STORAGE_KEY) return
-      if (screenRef.current !== "main") return
+      if (cancelling) return
       const sig = publicBookingSyncSignature(confirmToken)
       if (sig === bookingPollSigRef.current) return
       bookingPollSigRef.current = sig
@@ -145,12 +131,12 @@ export default function PublicConfirmAppointmentPage() {
     }
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
-  }, [confirmToken, dataSource, triggerRemoteRefreshHint])
+  }, [confirmToken, dataSource, triggerRemoteRefreshHint, cancelling])
 
   React.useEffect(() => {
-    if (screen !== "main" || dataSource !== "local") return
+    if (dataSource !== "local") return
     queueMicrotask(reloadLocalBooking)
-  }, [screen, confirmToken, dataSource, reloadLocalBooking])
+  }, [confirmToken, dataSource, reloadLocalBooking])
 
   const applyLocalPatch = React.useCallback(
     (patch: Partial<PublicBooking>) => {
@@ -171,6 +157,48 @@ export default function PublicConfirmAppointmentPage() {
       }),
     [language],
   )
+
+  const cancelAppointment = React.useCallback(() => {
+    if (cancelling || !booking) return
+    void (async () => {
+      const wasConfirmed = booking.status === "confirmed"
+      const cancelledMessage = wasConfirmed
+        ? t("confirmPublic.successCancelledConfirmed")
+        : t("confirmPublic.successCancelled")
+      const cancelToken = (booking.confirmationToken ?? confirmToken).trim()
+      setCancelling(true)
+      setSlotFlowError(null)
+      try {
+        if (dataSource === "supabase") {
+          if (!cancelToken) {
+            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
+            return
+          }
+          const apiRes = await cancelPublicBookingViaApi(cancelToken, language)
+          if (!apiRes.ok) {
+            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
+            return
+          }
+          await refreshSupabaseBooking()
+          setSuccessMessage(cancelledMessage)
+          return
+        }
+        applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
+        setSuccessMessage(cancelledMessage)
+      } finally {
+        setCancelling(false)
+      }
+    })()
+  }, [
+    applyLocalPatch,
+    booking,
+    cancelling,
+    confirmToken,
+    dataSource,
+    language,
+    refreshSupabaseBooking,
+    t,
+  ])
 
   if (!ready) {
     return (
@@ -207,51 +235,7 @@ export default function PublicConfirmAppointmentPage() {
     booking.status === "confirmed" ||
     booking.status === "booked" ||
     booking.status === "pending"
-  const canCancel = isActiveVisit
-  const bookingBackHref = booking.businessSlug?.trim()
-    ? `/rezerwacje/${encodeURIComponent(booking.businessSlug.trim())}`
-    : "/"
-
-  const cancelAppointment = () => {
-    if (cancelling) return
-    void (async () => {
-      // Dobór tekstu sukcesu PRZED zmianą statusu — patrzymy na status, który
-      // wizyta miała w momencie, gdy klient kliknął „Tak, odwołaj":
-      //   • confirmed   → „Wizyta odwołana"      (successCancelledConfirmed)
-      //   • inny status → „Rezerwacja odwołana"  (successCancelled)
-      // Klient po anulowaniu nadal trafia do tabeli klientów — nic nie usuwamy.
-      // Status w bazie ustawiamy przez /api/public/cancel-booking, nigdy przez DELETE.
-      const wasConfirmed = booking?.status === "confirmed"
-      const cancelledMessage = wasConfirmed
-        ? t("confirmPublic.successCancelledConfirmed")
-        : t("confirmPublic.successCancelled")
-      const cancelToken = (booking?.confirmationToken ?? confirmToken).trim()
-      setCancelling(true)
-      setSlotFlowError(null)
-      try {
-        if (dataSource === "supabase") {
-          if (!cancelToken) {
-            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
-            return
-          }
-          const apiRes = await cancelPublicBookingViaApi(cancelToken, language)
-          if (!apiRes.ok) {
-            setSlotFlowError(t("confirmPublic.cancelActionFailed"))
-            return
-          }
-          await refreshSupabaseBooking()
-          setScreen("main")
-          setSuccessMessage(cancelledMessage)
-          return
-        }
-        applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
-        setScreen("main")
-        setSuccessMessage(cancelledMessage)
-      } finally {
-        setCancelling(false)
-      }
-    })()
-  }
+  const canCancel = isActiveVisit && !successMessage
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -275,20 +259,23 @@ export default function PublicConfirmAppointmentPage() {
         <Card>
           <CardHeader>
             <CardTitle>
-              {isCancelled
+              {isCancelled || successMessage
                 ? t("confirmPublic.labelStatusCancelled")
                 : isNoShow
                   ? t("labels.appointmentStatus.no_show")
                   : t("confirmPublic.manageAppointmentTitle")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {isCancelled
-                ? t("confirmPublic.notFoundBody")
+              {isCancelled || successMessage
+                ? successMessage ??
+                  (isCancelled
+                    ? t("bookingPublic.visitCancelledBanner")
+                    : t("confirmPublic.notFoundBody"))
                 : isNoShow
                   ? t("labels.appointmentStatusDescription.no_show")
                   : t("confirmPublic.manageAppointmentDescription")}
             </p>
-            {!isCancelled && !isNoShow && isActiveVisit ? (
+            {!isCancelled && !isNoShow && isActiveVisit && !successMessage ? (
               <div className="space-y-1 pt-1 text-sm">
                 <p className="font-medium text-foreground">{t("confirmPublic.statusLineConfirmed")}</p>
               </div>
@@ -319,57 +306,21 @@ export default function PublicConfirmAppointmentPage() {
                       : t("confirmPublic.lastUpdateByBusiness")}
                 </p>
               ) : null}
-              {successMessage ? (
-                <p className="pt-2 font-medium text-emerald-700 dark:text-emerald-300">{successMessage}</p>
-              ) : null}
             </div>
+
+            {canCancel ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-2 w-full"
+                disabled={cancelling}
+                onClick={() => cancelAppointment()}
+              >
+                {cancelling ? t("bookings.loading") : t("confirmPublic.actionCancel")}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
-
-        {screen === "main" && canCancel ? (
-          <Card>
-            <CardContent className="space-y-2 p-4">
-              <Button variant="outline" className="w-full" onClick={() => setScreen("cancel")}>
-                {t("confirmPublic.actionCancel")}
-              </Button>
-              {!fromReminderLink ? (
-                <Button asChild variant="outline" className="w-full">
-                  <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {screen === "cancel" && canCancel ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("confirmPublic.cancelPanelTitle")}</CardTitle>
-              <p className="text-sm text-muted-foreground">{t("confirmPublic.cancelPanelDescription")}</p>
-            </CardHeader>
-            <CardContent className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                disabled={cancelling}
-                onClick={() => setScreen("main")}
-              >
-                {t("confirmPublic.cancelConfirmNo")}
-              </Button>
-              <Button className="flex-1" disabled={cancelling} onClick={cancelAppointment}>
-                {cancelling ? t("bookings.loading") : t("confirmPublic.cancelConfirmYes")}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {!canCancel && !fromReminderLink ? (
-          <div className="flex justify-center">
-            <Button asChild variant="outline" className="w-full max-w-md">
-              <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>
-            </Button>
-          </div>
-        ) : null}
       </div>
     </main>
   )
