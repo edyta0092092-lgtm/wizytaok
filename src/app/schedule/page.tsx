@@ -6,7 +6,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { ScheduleFreeSlotsPanel } from "@/components/schedule/schedule-free-slots-panel"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -26,7 +25,6 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 import {
   calendarEntriesToBookedSlots,
   computePanelFreeSlotsForMonth,
-  computePanelFreeSlotsForNextDays,
 } from "@/lib/schedule/compute-panel-free-slots"
 import { loadPanelFreeSlotsContext } from "@/lib/schedule/load-panel-free-slots-context"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
@@ -54,7 +52,7 @@ type CalendarEntry = {
 type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
 
 const DAY_PREVIEW_LIMIT = 4
-const SLOT_DURATION_OPTIONS = [15, 30, 45, 60] as const
+const FREE_SLOT_DURATION_MINUTES = 30
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0")
@@ -135,8 +133,6 @@ export default function SchedulePage() {
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
-  const [slotDurationMinutes, setSlotDurationMinutes] = React.useState(30)
-  const [freeSlotsLoading, setFreeSlotsLoading] = React.useState(true)
   const [freeSlotsContext, setFreeSlotsContext] = React.useState<
     Awaited<ReturnType<typeof loadPanelFreeSlotsContext>> | null
   >(null)
@@ -302,7 +298,6 @@ export default function SchedulePage() {
   React.useEffect(() => {
     let cancelled = false
     void (async () => {
-      setFreeSlotsLoading(true)
       try {
         const client = getBrowserClient()
         const loaded = await loadPanelFreeSlotsContext(
@@ -328,8 +323,6 @@ export default function SchedulePage() {
         }
       } catch {
         if (!cancelled) setFreeSlotsContext(null)
-      } finally {
-        if (!cancelled) setFreeSlotsLoading(false)
       }
     })()
     return () => {
@@ -402,7 +395,7 @@ export default function SchedulePage() {
         ? freeSlotsContext.bookedSlots
         : calendarEntriesToBookedSlots(bookings)
     return {
-      durationMinutes: slotDurationMinutes,
+      durationMinutes: FREE_SLOT_DURATION_MINUTES,
       businessAvailability: freeSlotsContext.businessAvailability,
       businessExceptionsByDate: freeSlotsContext.businessExceptionsByDate,
       bookedSlots: booked,
@@ -410,7 +403,7 @@ export default function SchedulePage() {
       staffContexts: freeSlotsContext.staffContexts,
       personFilterStaffId: effectivePersonFilter || null,
     }
-  }, [freeSlotsContext, bookings, slotDurationMinutes, staffMembers, effectivePersonFilter])
+  }, [freeSlotsContext, bookings, staffMembers, effectivePersonFilter])
 
   const freeSlotsList = React.useMemo(() => {
     if (!freeSlotsDayInput) return []
@@ -421,28 +414,11 @@ export default function SchedulePage() {
     })
   }, [freeSlotsDayInput, ym.year, ym.month])
 
-  const freeSlotsNextSeven = React.useMemo(() => {
-    if (!freeSlotsDayInput) return []
-    return computePanelFreeSlotsForNextDays({ ...freeSlotsDayInput, dayCount: 7 })
-  }, [freeSlotsDayInput])
-
   const freeSlotsByDate = React.useMemo(() => {
     const map = new Map<string, string[]>()
     for (const day of freeSlotsList) map.set(day.date, day.times)
     return map
   }, [freeSlotsList])
-
-  const formatFreeSlotDayHeading = React.useCallback(
-    (dateKey: string) =>
-      formatters.dayLong.format(
-        new Date(
-          Number(dateKey.slice(0, 4)),
-          Number(dateKey.slice(5, 7)) - 1,
-          Number(dateKey.slice(8, 10)),
-        ),
-      ),
-    [formatters.dayLong],
-  )
 
   const detailFreeTimes = detailDate ? freeSlotsByDate.get(detailDate) ?? [] : []
   React.useEffect(() => {
@@ -524,19 +500,6 @@ export default function SchedulePage() {
           <p className="text-sm text-destructive">Nie udało się załadować danych grafiku.</p>
         ) : (
           <>
-            <ScheduleFreeSlotsPanel
-              className="mb-5"
-              title={t("schedule.freeSlotsNextSevenTitle")}
-              monthLabel={formatters.monthYear.format(new Date(ym.year, ym.month - 1, 1))}
-              durationMinutes={slotDurationMinutes}
-              onDurationChange={setSlotDurationMinutes}
-              durationOptions={SLOT_DURATION_OPTIONS}
-              loading={freeSlotsLoading || loading}
-              days={freeSlotsNextSeven}
-              selectedDate={detailDate}
-              onSelectDate={setDetailDate}
-              formatDayHeading={formatFreeSlotDayHeading}
-            />
             <div className="mb-1 hidden grid-cols-7 gap-1 text-center text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground md:grid">
               {weekdayHeader.map((w) => (
                 <div key={w}>{w}</div>

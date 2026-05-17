@@ -127,26 +127,6 @@ export function computePanelFreeSlotsForMonth(
   return out
 }
 
-export function computePanelFreeSlotsForNextDays(
-  input: PanelFreeSlotsDayInput & { dayCount?: number },
-): PanelFreeSlotsByDate[] {
-  const { dayCount = 7, ...dayInput } = input
-  const asOf = getAppToday()
-  const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())
-  const out: PanelFreeSlotsByDate[] = []
-
-  for (let i = 0; i < dayCount; i++) {
-    const cellDate = new Date(today)
-    cellDate.setDate(cellDate.getDate() + i)
-    out.push({
-      date: toLocalDateKey(cellDate),
-      times: computeFreeSlotTimesForDay(cellDate, dayInput),
-    })
-  }
-
-  return out
-}
-
 export function calendarEntriesToBookedSlots(rows: readonly {
   id: string
   appointment_date: string
