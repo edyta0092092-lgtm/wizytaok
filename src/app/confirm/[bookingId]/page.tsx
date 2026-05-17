@@ -18,53 +18,18 @@ import {
   getBookingByConfirmationToken,
   updateBookingByConfirmationToken,
 } from "@/lib/bookings/bookings-store"
+import {
+  fetchPendingReminderFromQueue,
+  hasPendingReminderFromPublicBooking,
+  mergeReminderPendingState,
+  resolveConfirmationReminderPending,
+} from "@/lib/appointments/confirm-reminder-copy-client"
 import { enqueueBookingConfirmedNotifications } from "@/lib/notifications/notifications"
 import { getBookingStaffDetailValue, shouldShowStaffDetailRow } from "@/lib/staff/staff-display"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 type Screen = "main" | "cancel"
-
-function hasPendingReminderFromPublicBooking(booking: PublicBooking): boolean | null {
-  const tokens = [
-    booking.firstReminderStatus,
-    booking.secondReminderStatus,
-    booking.reminderStatus,
-  ]
-    .map((s) => String(s ?? "").trim().toLowerCase())
-    .filter(Boolean)
-  if (tokens.length === 0) return null
-  return tokens.some((s) => s === "pending" || s === "processing")
-}
-
-async function fetchPendingReminderFromQueue(token: string): Promise<boolean | null> {
-  const trimmed = token.trim()
-  if (!trimmed) return null
-  try {
-    const res = await fetch(
-      `/api/public/appointment-reminder-status?token=${encodeURIComponent(trimmed)}`,
-      { cache: "no-store" },
-    )
-    if (!res.ok) return null
-    const json = (await res.json()) as { ok?: boolean; hasPendingReminder?: boolean }
-    if (json.ok !== true || typeof json.hasPendingReminder !== "boolean") return null
-    return json.hasPendingReminder
-  } catch {
-    return null
-  }
-}
-
-/** Po confirm: wynik „po” ma pierwszeństwo; przy błędzie API — snapshot sprzed confirm. */
-function mergeReminderPendingState(
-  beforeConfirm: boolean | null,
-  afterConfirm: boolean | null,
-): boolean | null {
-  if (afterConfirm === true) return true
-  if (afterConfirm === false) return false
-  if (beforeConfirm === true) return true
-  if (beforeConfirm === false) return false
-  return null
-}
 
 export default function PublicConfirmAppointmentPage() {
   const { t, language } = useTranslations()
@@ -290,48 +255,42 @@ export default function PublicConfirmAppointmentPage() {
   const confirmAttendance = () => {
     void (async () => {
       const reminderToken = (booking?.confirmationToken ?? confirmToken).trim()
-      const pendingBeforeConfirm = await resolveReminderPendingForBooking(booking, reminderToken)
 
       if (dataSource === "supabase") {
-        const confirmed = await runConfirmRpcWithFallback("confirm", {})
-        if (!confirmed.ok) {
+        let pending: boolean | null = null
+        try {
+          pending = await resolveConfirmationReminderPending(reminderToken, async () => {
+            const confirmed = await runConfirmRpcWithFallback("confirm", {})
+            if (!confirmed.ok) {
+              throw new Error("confirm_failed")
+            }
+            setSlotFlowError(null)
+            void fetch("/api/public/confirm-attendance", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: confirmToken, language }),
+            }).catch(() => undefined)
+            const client = getBrowserClient()
+            if (client) {
+              const fresh = await getBookingByConfirmationToken(client, confirmToken)
+              if (fresh) {
+                setBooking(fresh)
+              } else {
+                await refreshSupabaseBooking()
+              }
+            }
+          })
+        } catch {
           setSlotFlowError(t("bookings.createFailed"))
           return
         }
-        setSlotFlowError(null)
-        void fetch("/api/public/confirm-attendance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: confirmToken, language }),
-        }).catch(() => undefined)
-        const client = getBrowserClient()
-        let fresh: PublicBooking | null = null
-        if (client) {
-          fresh = await getBookingByConfirmationToken(client, confirmToken)
-          if (fresh) {
-            setBooking(fresh)
-          } else {
-            await refreshSupabaseBooking()
-          }
-        }
-        let pendingAfterConfirm = await resolveReminderPendingForBooking(
-          fresh,
-          (fresh?.confirmationToken ?? reminderToken).trim(),
-        )
-        if (pendingAfterConfirm === null) {
-          await new Promise((resolve) => window.setTimeout(resolve, 400))
-          pendingAfterConfirm = await resolveReminderPendingForBooking(
-            fresh,
-            (fresh?.confirmationToken ?? reminderToken).trim(),
-          )
-        }
-        setConfirmedReminderPending(
-          mergeReminderPendingState(pendingBeforeConfirm, pendingAfterConfirm),
-        )
+        setConfirmedReminderPending(pending)
         setSuccessMessage(t("confirmPublic.successConfirmed"))
         setShowConfirmedReminderBadge(true)
         return
       }
+
+      const pendingBeforeConfirm = await resolveReminderPendingForBooking(booking, reminderToken)
       applyLocalPatch({ status: "confirmed", lastUpdatedBy: "customer" })
       const fresh = findPublicBookingById(confirmToken)
       if (fresh) enqueueBookingConfirmedNotifications(fresh, language)

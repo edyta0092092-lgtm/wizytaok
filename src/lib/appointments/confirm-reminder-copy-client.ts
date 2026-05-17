@@ -1,5 +1,6 @@
 import type { PublicBooking } from "@/lib/bookings/public-bookings"
 
+/** Fallback offline: dowolne pole statusu z pending/processing (nie tylko drugie przypomnienie). */
 export function hasPendingReminderFromPublicBooking(booking: PublicBooking): boolean | null {
   const tokens = [
     booking.firstReminderStatus,
@@ -29,16 +30,37 @@ export async function fetchPendingReminderFromQueue(token: string): Promise<bool
   }
 }
 
-/** Po confirm: wynik „po” ma pierwszeństwo; przy błędzie API — snapshot sprzed confirm. */
+/**
+ * true = pokaż copy „Przypomnimy jeszcze…” — gdy przed lub po confirm
+ * w kolejce był jakikolwiek pending/processing (w tym przed pierwszym wysłaniem).
+ */
 export function mergeReminderPendingState(
   beforeConfirm: boolean | null,
   afterConfirm: boolean | null,
 ): boolean | null {
-  if (afterConfirm === true) return true
-  if (afterConfirm === false) return false
-  if (beforeConfirm === true) return true
-  if (beforeConfirm === false) return false
+  if (beforeConfirm === true || afterConfirm === true) return true
+  if (beforeConfirm === false && afterConfirm === false) return false
   return null
+}
+
+/** Odczyt kolejki przed i po confirm (ten sam warunek: dowolny pending/processing). */
+export async function resolveConfirmationReminderPending(
+  reminderToken: string,
+  runConfirm: () => Promise<void>,
+): Promise<boolean | null> {
+  const token = reminderToken.trim()
+  if (!token) return null
+
+  const beforeConfirm = await fetchPendingReminderFromQueue(token)
+  await runConfirm()
+
+  let afterConfirm = await fetchPendingReminderFromQueue(token)
+  if (afterConfirm === null) {
+    await new Promise((resolve) => window.setTimeout(resolve, 400))
+    afterConfirm = await fetchPendingReminderFromQueue(token)
+  }
+
+  return mergeReminderPendingState(beforeConfirm, afterConfirm)
 }
 
 export type ConfirmedReminderCopyKey =

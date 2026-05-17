@@ -2,7 +2,11 @@ import type { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 type ServiceAdmin = NonNullable<ReturnType<typeof getServiceRoleClient>>
 
-/** Odczyt kolejki — bez mutacji `appointment_reminders`. */
+/**
+ * Czy dla wizyty istnieje jakikolwiek wiersz w `appointment_reminders`
+ * ze statusem `pending` lub `processing` (first/second, e-mail/SMS).
+ * Odczyt tylko — bez mutacji tabeli.
+ */
 export async function appointmentHasPendingOrProcessingReminders(
   admin: ServiceAdmin,
   appointmentId: string,
