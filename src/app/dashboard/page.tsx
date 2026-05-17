@@ -52,8 +52,6 @@ import type { Appointment, AppointmentStatus } from "@/types/domain"
 const DASHBOARD_TIP_COUNT = 16
 
 const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = [
-  "booked",
-  "pending",
   "confirmed",
   "cancelled",
   "no_show",

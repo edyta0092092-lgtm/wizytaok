@@ -17,18 +17,7 @@ import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import type { BusinessReminderChannelPersisted } from "@/types/domain"
 import type { PublicBooking } from "@/lib/bookings/public-bookings"
-
-function reminderCopyKey(
-  channel: BusinessReminderChannelPersisted | null,
-  prefix: "whatNextReminder" | "messageStatusReminder"
-): `bookingPublic.${typeof prefix}Both` | `bookingPublic.${typeof prefix}Email` | `bookingPublic.${typeof prefix}Sms` {
-  const ch = channel ?? "both"
-  if (ch === "email") return `bookingPublic.${prefix}Email`
-  if (ch === "sms") return `bookingPublic.${prefix}Sms`
-  return `bookingPublic.${prefix}Both`
-}
 
 function pickImmediateNotifySentKey(
   status: BookingCreatedNotifyApiResult | null,
@@ -133,8 +122,6 @@ export default function PublicBookingSuccessPage() {
   const [loadError, setLoadError] = React.useState(false)
   const [loading, setLoading] = React.useState(Boolean(tokenFromQuery))
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
-  const [reminderChannel, setReminderChannel] =
-    React.useState<BusinessReminderChannelPersisted | null>(null)
   const [returningToBooking, setReturningToBooking] = React.useState(false)
   const [bookingCreatedNotifyStatus, setBookingCreatedNotifyStatus] =
     React.useState<BookingCreatedNotifyApiResult | null>(null)
@@ -217,28 +204,6 @@ export default function PublicBookingSuccessPage() {
       cancelled = true
     }
   }, [normalizedSlug, tokenFromQuery])
-
-  React.useEffect(() => {
-    if (!normalizedSlug) return
-    const client = getBrowserClient()
-    if (!isSupabaseConfigured() || !client) return
-    let cancelled = false
-    void (async () => {
-      const { data } = await client
-        .from("business_profiles")
-        .select("reminder_channel")
-        .eq("slug", normalizedSlug)
-        .maybeSingle()
-      if (cancelled || !data?.reminder_channel) return
-      const ch = data.reminder_channel
-      if (ch === "sms" || ch === "email" || ch === "both") {
-        setReminderChannel(ch)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [normalizedSlug])
 
   React.useEffect(() => {
     if (!tokenFromQuery) return
@@ -408,15 +373,21 @@ export default function PublicBookingSuccessPage() {
                   : t("bookingPublic.noSelection")}
               </span>
             </p>
-            <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
-              <p className="text-sm font-semibold text-foreground">{t("bookingPublic.whatNextTitle")}</p>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {tokenFromQuery ? (
-                  <li>- {t(immediateNotifyKey)}</li>
-                ) : null}
-                <li>- {t("bookingPublic.whatNextReminderOnly")}</li>
-                <li>- {t(reminderCopyKey(reminderChannel, "whatNextReminder"))}</li>
-              </ul>
+            <p className="mt-4 text-sm">
+              <span className="text-muted-foreground">{t("bookingPublic.statusLabel")}:</span>{" "}
+              <span className="font-medium text-foreground">{t("bookingPublic.statusConfirmed")}</span>
+            </p>
+            <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+              {tokenFromQuery ? (
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t(immediateNotifyKey)}</p>
+                </div>
+              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t("bookingPublic.remindersSectionTitle")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{t("bookingPublic.whatNextReminderOnly")}</p>
+              </div>
             </div>
 
             <div className="mt-4 flex flex-col gap-2">

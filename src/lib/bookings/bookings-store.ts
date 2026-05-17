@@ -93,7 +93,9 @@ function mapAppointmentStatusToDb(s: AppointmentStatus): string {
 export function mapBookingRowToPublicBooking(row: Tables<"bookings">, businessSlug: string): PublicBooking {
   const dateStr = String(row.appointment_date).slice(0, 10)
   const timeStr = formatTimeFromDb(row.appointment_time)
-  const st = row.status as PublicBookingStatus
+  const rawStatus = String(row.status ?? "confirmed")
+  const st: PublicBookingStatus =
+    rawStatus === "booked" || rawStatus === "pending" ? "confirmed" : (rawStatus as PublicBookingStatus)
   return {
     id: row.id,
     confirmationToken: row.confirmation_token,
@@ -768,7 +770,10 @@ export async function getBookingByConfirmationToken(
     proposed_staff_name: (o.proposed_staff_name as string | null) ?? null,
     appointment_date: String(o.appointment_date ?? "").slice(0, 10),
     appointment_time: String(o.appointment_time ?? "09:00:00"),
-    status: String(o.status ?? "booked"),
+    status: (() => {
+      const s = String(o.status ?? "confirmed")
+      return s === "booked" || s === "pending" ? "confirmed" : s
+    })(),
     source: String(o.source ?? "manual"),
     customer_note: (o.customer_note as string | null) ?? null,
     business_note: (o.business_note as string | null) ?? null,

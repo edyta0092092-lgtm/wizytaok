@@ -190,23 +190,6 @@ export function AppointmentListRow({
                 </div>
               ))
             : null}
-          {row.id.startsWith("sb-") &&
-          row.status === "pending" &&
-          (row.lastStatusChangeSource === "auto_reminder_24h" ||
-            row.lastStatusChangeSource === "automatic_24h_reminder") ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("appointments.statusAutoPendingHint")}
-            </p>
-          ) : null}
-          {row.id.startsWith("sb-") &&
-          row.status === "pending" &&
-          !row.reminderSentAt &&
-          row.lastStatusChangeSource !== "auto_reminder_24h" &&
-          row.lastStatusChangeSource !== "automatic_24h_reminder" ? (
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {t("appointments.waitingClientConfirmation")}
-            </p>
-          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-2 md:max-w-full md:items-end">

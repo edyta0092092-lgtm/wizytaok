@@ -879,7 +879,7 @@ export default function PublicBookingPage() {
         customerPhone: customerPhone,
         customerEmail: form.email.trim() || undefined,
         note: form.note.trim() || undefined,
-        status: "booked",
+        status: "confirmed",
         source: "online",
         createdAt: new Date().toISOString(),
       }

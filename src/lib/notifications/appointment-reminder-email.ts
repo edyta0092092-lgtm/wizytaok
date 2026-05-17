@@ -89,8 +89,7 @@ export type AppointmentReminderEmailInput = {
    * Absolutny URL do istniejącej strony zarządzania wizytą (token-based),
    * np. `https://wizytaok.example/confirm/{confirmation_token}?source=reminder`.
    * Jeżeli null/pusty, sekcja z przyciskiem nie jest renderowana.
-   * NIE jest to link do bezpośredniego anulowania — klient musi kliknąć
-   * na stronie zarządzania, żeby potwierdzić obecność lub odwołać wizytę.
+   * NIE jest to link do bezpośredniego anulowania — klient anuluje wizytę na stronie zarządzania.
    */
   manageUrl?: string | null
   /** Adres kontaktowy firmy — używany jako reply_to, jeśli podany. */

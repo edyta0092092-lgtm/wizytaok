@@ -227,9 +227,7 @@ export function ManualAppointmentSheet({
                   }))
                 }
               >
-                <option value="booked">{t("labels.appointmentStatus.booked")}</option>
                 <option value="confirmed">{t("labels.appointmentStatus.confirmed")}</option>
-                <option value="pending">{t("appointments.pending")}</option>
                 <option value="no_show">{t("labels.appointmentStatus.no_show")}</option>
                 <option value="cancelled">{t("labels.appointmentStatus.cancelled")}</option>
               </select>

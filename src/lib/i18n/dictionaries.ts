@@ -543,7 +543,7 @@ export const dictionaries = {
       tomorrow: "Jutro",
       upcoming: "Nadchodzące",
       all: "Wszystkie",
-      pending: "Do potwierdzenia",
+      pending: "Potwierdzona",
       booked: "Potwierdzona",
       confirmed: "Potwierdzone",
       filterNeedsAction: "Wymaga reakcji",
@@ -682,9 +682,9 @@ export const dictionaries = {
       bookingSource: {
         filterLabel: "Źródło wizyty",
         filterAll: "Wszystkie źródła",
-        filterOnline: "Rezerwacja online",
+        filterOnline: "Wizyta online",
         filterManual: "Dodane ręcznie",
-        onlineBooking: "Rezerwacja online",
+        onlineBooking: "Wizyta online",
         addedManually: "Dodane ręcznie",
         shortOnline: "Online",
         shortManual: "Ręcznie",
@@ -770,13 +770,13 @@ export const dictionaries = {
       filterHintPendingToday: "Wizyty do potwierdzenia z dzisiejszym terminem.",
     },
     bookings: {
-      loading: "Ładowanie rezerwacji...",
-      loadFailed: "Nie udało się załadować rezerwacji.",
-      saved: "Rezerwacja została zapisana.",
-      updated: "Rezerwacja została zaktualizowana.",
-      notFound: "Nie znaleziono rezerwacji.",
-      createFailed: "Nie udało się zapisać rezerwacji. Spróbuj ponownie.",
-      slotJustBooked: "Ten termin został właśnie zarezerwowany. Wybierz inną godzinę.",
+      loading: "Ładowanie wizyty...",
+      loadFailed: "Nie udało się załadować wizyty.",
+      saved: "Wizyta została zapisana.",
+      updated: "Wizyta została zaktualizowana.",
+      notFound: "Nie znaleziono wizyty.",
+      createFailed: "Nie udało się zapisać wizyty. Spróbuj ponownie.",
+      slotJustBooked: "Ten termin został właśnie zajęty. Wybierz inną godzinę.",
       slotNoLongerAvailable: "Ten termin nie jest już dostępny. Wybierz inny.",
       slotAlreadyTaken: "Ten termin jest już zajęty.",
     },
@@ -958,14 +958,17 @@ export const dictionaries = {
       appointmentConfirmedTitle: "Wizyta potwierdzona",
       appointmentConfirmedDescription:
         "Twoja wizyta została zapisana i potwierdzona.",
+      statusLabel: "Status",
+      statusConfirmed: "Potwierdzona",
+      remindersSectionTitle: "Przypomnienia",
       whatNextReminderOnly:
         "Przypomnimy Ci o wizycie zgodnie z ustawieniami gabinetu.",
       whatNextImmediateNotifySent:
-        "Wysłaliśmy SMS i e-mail z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+        "Wysłaliśmy SMS i e-mail z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySentSmsOnly:
-        "Wysłaliśmy SMS z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+        "Wysłaliśmy SMS z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySentEmailOnly:
-        "Wysłaliśmy e-mail z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+        "Wysłaliśmy e-mail z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySafe:
         "Jeśli dane kontaktowe są poprawne, otrzymasz SMS/e-mail z informacją o potwierdzonej wizycie.",
       fullName: "Imię i nazwisko",
@@ -974,15 +977,15 @@ export const dictionaries = {
       phone: "Telefon",
       email: "E-mail",
       optionalNote: "Notatka opcjonalnie",
-      bookingSavedTitle: "Rezerwacja zapisana",
+      bookingSavedTitle: "Wizyta potwierdzona",
       bookingSavedDescription:
-        "Rezerwacja została zapisana.",
+        "Twoja wizyta została zapisana i potwierdzona.",
       bookingSavedDescriptionNotifySent:
-        "Rezerwacja została zapisana. Wysłaliśmy wiadomość z linkiem do zarządzania wizytą.",
+        "Twoja wizyta została zapisana i potwierdzona. Wysłaliśmy wiadomość z linkiem do zarządzania wizytą.",
       bookingSavedDescriptionNotifySafe:
-        "Rezerwacja została zapisana. Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
+        "Twoja wizyta została zapisana i potwierdzona. Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
       bookingSavedDescriptionNoEmail:
-        "Rezerwacja została zapisana.",
+        "Twoja wizyta została zapisana i potwierdzona.",
       panelHintBusiness:
         "Wizyta pojawi się w panelu firmy jako potwierdzona.",
       manageBooking: "Zarządzaj wizytą",
@@ -1006,9 +1009,9 @@ export const dictionaries = {
       messageStatusEmailInfo:
         "E-mail z linkiem do rezerwacji nie jest wysyłany automatycznie w tym kroku — skontaktuj się z gabinetem, jeśli go nie otrzymasz.",
       messageStatusBookingCreatedSent:
-        "Potwierdzenie rezerwacji: wysłano wiadomość z linkiem do zarządzania wizytą.",
+        "Wysłaliśmy wiadomość z informacją o potwierdzonej wizycie oraz linkiem do zarządzania.",
       messageStatusBookingCreatedSafe:
-        "Potwierdzenie rezerwacji: jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
+        "Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z informacją o potwierdzonej wizycie.",
       messageStatusReminderBoth:
         "Przypomnienie 24h przed wizytą: SMS i e-mail (wg ustawień firmy).",
       messageStatusReminderEmail:
@@ -1071,7 +1074,7 @@ export const dictionaries = {
       cardPhone: "Telefon",
       cardEmail: "E-mail",
       cardStatus: "Status",
-      actionConfirm: "Potwierdzam obecność",
+      actionConfirm: "Potwierdź wizytę",
       actionChangeTime: "Zmień termin",
       actionChangeService: "Zmień usługę",
       actionCancel: "Anuluję wizytę",
@@ -1107,7 +1110,7 @@ export const dictionaries = {
       notFoundTitle: "Nie znaleziono rezerwacji",
       notFoundBody:
         "Link może być nieaktualny albo rezerwacja została usunięta.",
-      labelStatusPending: "Zarezerwowana",
+      labelStatusPending: "Potwierdzona",
       labelStatusConfirmed: "Potwierdzona",
       labelStatusChange: "Prośba o zmianę",
       labelStatusBusinessProposed: "Firma proponuje zmianę",
@@ -1125,11 +1128,11 @@ export const dictionaries = {
       successTimeUpdated: "Termin został zmieniony",
       successServiceUpdated: "Usługa została zmieniona",
       dismissChange: "Zamknij",
-      confirmAttendanceTitle: "Potwierdź obecność",
-      confirmAttendanceDescription: "Twoja wizyta jest zapisana. Potwierdź, że nadal przyjdziesz, albo wybierz inną opcję.",
+      confirmAttendanceTitle: "Zarządzaj wizytą",
+      confirmAttendanceDescription: "Sprawdź szczegóły wizyty. Możesz anulować wizytę, jeśli nie możesz przyjść.",
       confirmedTitle: "Twoja obecność jest potwierdzona",
       confirmedDescription: "Możesz anulować wizytę, jeśli plany się zmieniły.",
-      confirmAttendanceAction: "Potwierdzam obecność",
+      confirmAttendanceAction: "Anuluj wizytę",
       wantChangeTime: "Chcę zmienić termin",
       wantChangeService: "Chcę zmienić usługę",
       wantCancel: "Anuluję wizytę",
@@ -1182,8 +1185,8 @@ export const dictionaries = {
       roleBusinessShort: "Firma",
       roleClientShort: "Klient",
       statusLineConfirmed: "Status: Potwierdzona",
-      statusLineBooked: "Status: Zarezerwowana",
-      statusLinePending: "Status: Do potwierdzenia",
+      statusLineBooked: "Status: Potwierdzona",
+      statusLinePending: "Status: Potwierdzona",
       lastChangeLabel: "Ostatnia zmiana",
       lastChangeTimeAcceptedSummary: "zaakceptowano nowy termin",
       lastChangeServiceAcceptedSummary: "zaakceptowano zmianę usługi",
@@ -1364,7 +1367,7 @@ export const dictionaries = {
     templatesLibrary: {
       tpl1Title: "Przypomnienie 24h przed wizytą",
       tpl1Body:
-        "Cześć {{imie}}, przypominamy o wizycie jutro o {{godzina}} - {{usluga}}. Potwierdź obecność, zmień termin albo anuluj tutaj: {{link_potwierdzenia}}",
+        "Cześć {{imie}}, przypominamy o wizycie jutro o {{godzina}} - {{usluga}}. Jeśli nie możesz przyjść, anuluj wizytę tutaj: {{link_potwierdzenia}}",
       tpl2Title: "Potwierdzenie wizyty",
       tpl2Body:
         "Dziękujemy, {{imię}}. Twoja wizyta na {{data}} o {{godzina}} jest potwierdzona. W razie pytań: {{telefon_salonu}}",
@@ -2687,8 +2690,8 @@ Pozdrawiamy,
       tomorrow: "Tomorrow",
       upcoming: "Upcoming",
       all: "All",
-      pending: "To confirm",
-      booked: "Booked",
+      pending: "Confirmed",
+      booked: "Confirmed",
       confirmed: "Confirmed",
       filterNeedsAction: "Needs action",
       changeRequested: "Reschedule request",
@@ -2825,9 +2828,9 @@ Pozdrawiamy,
       bookingSource: {
         filterLabel: "Booking source",
         filterAll: "All sources",
-        filterOnline: "Online booking",
+        filterOnline: "Online appointment",
         filterManual: "Added manually",
-        onlineBooking: "Online booking",
+        onlineBooking: "Online appointment",
         addedManually: "Added manually",
         shortOnline: "Online",
         shortManual: "Manual",
@@ -3100,14 +3103,17 @@ Pozdrawiamy,
       appointmentConfirmedTitle: "Appointment confirmed",
       appointmentConfirmedDescription:
         "Your appointment has been saved and confirmed.",
+      statusLabel: "Status",
+      statusConfirmed: "Confirmed",
+      remindersSectionTitle: "Reminders",
       whatNextReminderOnly:
         "We will remind you about your appointment according to the business settings.",
       whatNextImmediateNotifySent:
-        "We sent an SMS and email with a link to cancel your appointment if needed.",
+        "We sent SMS and email with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySentSmsOnly:
-        "We sent an SMS with a link to cancel your appointment if needed.",
+        "We sent an SMS with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySentEmailOnly:
-        "We sent an email with a link to cancel your appointment if needed.",
+        "We sent an email with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySafe:
         "If your contact details are correct, you will receive an SMS/email about your confirmed appointment.",
       fullName: "Full name",
@@ -3459,8 +3465,8 @@ Pozdrawiamy,
     },
     labels: {
       appointmentStatus: {
-        booked: "Booked",
-        pending: "To confirm",
+        booked: "Confirmed",
+        pending: "Confirmed",
         confirmed: "Confirmed",
         cancelled: "Cancelled",
         completed: "Completed",

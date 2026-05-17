@@ -12,7 +12,7 @@ import type {
 } from "@/types/domain"
 
 function mapAppointmentStatus(status: Tables<"appointments">["status"]): AppointmentStatus {
-  if (status === "pending") return "booked"
+  if (status === "pending") return "confirmed"
   if (status === "change_requested") return "booked"
   return status
 }

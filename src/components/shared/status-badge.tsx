@@ -5,7 +5,7 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 import type { AppointmentStatus } from "@/types/domain"
 
 function normalizeStatus(status: AppointmentStatus | "scheduled"): AppointmentStatus {
-  if (status === "scheduled") return "booked"
+  if (status === "scheduled" || status === "booked" || status === "pending") return "confirmed"
   return status
 }
 
@@ -13,8 +13,8 @@ const statusTone: Record<
   AppointmentStatus,
   "success" | "warning" | "info" | "danger" | "neutral"
 > = {
-  booked: "info",
-  pending: "warning",
+  booked: "success",
+  pending: "success",
   confirmed: "success",
   cancelled: "neutral",
   completed: "neutral",

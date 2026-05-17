@@ -10,6 +10,6 @@ export const EMPTY_MANUAL_APPOINTMENT_FORM: ManualAppointmentFormState = {
   manualStaffId: "",
   date: "",
   time: "",
-  status: "booked",
+  status: "confirmed",
   note: "",
 }

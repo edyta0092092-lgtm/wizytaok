@@ -84,16 +84,16 @@ function buildMessage(
   if (lang === "en") {
     return {
       subject: "Appointment reminder",
-      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. Confirm, reschedule or cancel here: ${payload.confirmUrl}`,
-      html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Confirm, reschedule or cancel</a></p>`,
-      sms: `Reminder: ${payload.serviceName} ${payload.dateLabel} at ${payload.timeHm}. Confirm, reschedule or cancel: ${payload.confirmUrl}`,
+      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. If you cannot attend, cancel your appointment: ${payload.confirmUrl}`,
+      html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Cancel your appointment if needed</a></p>`,
+      sms: `Appointment reminder: ${payload.serviceName}, ${payload.dateLabel} at ${payload.timeHm}. Cancel if needed: ${payload.confirmUrl}`,
     }
   }
   return {
     subject: "Przypomnienie o wizycie",
-    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Potwierdź obecność, zmień termin lub anuluj wizytę tutaj: ${payload.confirmUrl}`,
-    html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Potwierdź obecność, zmień termin lub anuluj wizytę</a></p>`,
-    sms: `Przypomnienie: ${payload.serviceName} ${payload.dateLabel} o ${payload.timeHm}. Potwierdź, zmień lub anuluj: ${payload.confirmUrl}`,
+    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Jeśli nie możesz przyjść, anuluj wizytę: ${payload.confirmUrl}`,
+    html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Anuluj wizytę, jeśli nie możesz przyjść</a></p>`,
+    sms: `Przypomnienie o wizycie: ${payload.serviceName}, ${payload.dateLabel} o ${payload.timeHm}. Jeśli nie możesz przyjść, anuluj wizytę: ${payload.confirmUrl}`,
   }
 }
 
@@ -175,7 +175,7 @@ async function processSingleReminder(
   const nowIso = new Date().toISOString()
   const lang = reminderLocale()
   const origin = getPublicAppOrigin()
-  const confirmUrl = `${origin}/confirm/${encodeURIComponent(row.confirmation_token)}`
+  const confirmUrl = `${origin}/confirm/${encodeURIComponent(row.confirmation_token)}?source=reminder`
   const timeHm = formatTimeHmFromDb(row.appointment_time)
   const dateLabel = String(row.appointment_date).slice(0, 10)
   const fallbackMessage = buildMessage(kind, lang, {
@@ -326,7 +326,7 @@ async function processSingleReminder(
   }
 
   if (statuses.includes("sent")) {
-    await updateBookingReminderStatus(admin, row, kind, "sent", nowIso, null, true)
+    await updateBookingReminderStatus(admin, row, kind, "sent", nowIso, null, false)
     return "processed"
   }
   if (statuses.some((s) => s === "failed")) {

@@ -30,8 +30,7 @@ export default function PublicConfirmAppointmentPage() {
   // Strona zarządzania wizytą jest współdzielona z ekranem sukcesu po rezerwacji.
   // Gdy klient wchodzi tu z linka w przypomnieniu (e-mail / w przyszłości SMS),
   // doklejamy `?source=reminder`, żeby ukryć przycisk „Wróć do strony rezerwacji".
-  // Reszta flow pozostaje bez zmian (potwierdzanie / anulowanie wymaga osobnego
-  // kliknięcia na tej stronie — nigdy z poziomu maila).
+  // Strona służy wyłącznie do podglądu wizyty i anulowania (bez potwierdzania obecności).
   const fromReminderLink = (searchParams?.get("source") ?? "").trim() === "reminder"
   const [booking, setBooking] = React.useState<PublicBooking | null>(null)
   const [ready, setReady] = React.useState(false)
