@@ -131,12 +131,9 @@ Pozdrawiamy,
 {{nazwa_firmy}}`,
   },
   booking_cancelled_by_company: {
-    smsBody:
-      "Przepraszamy {{imie}}, Twoja wizyta {{data}} o {{godzina}} została anulowana przez firmę. Zarezerwuj nowy termin: {{link_rezerwacji}}",
-    emailSubject: "Twoja wizyta została anulowana",
-    emailBody: `Cześć {{imie}},
-
-przepraszamy, Twoja wizyta została anulowana przez firmę.
+    smsBody: "Wizyta odwołana: {{usluga}}, {{data}} o {{godzina}}.",
+    emailSubject: "Wizyta odwołana",
+    emailBody: `Twoja wizyta została odwołana.
 
 Anulowany termin:
 - Data: {{data}}
@@ -152,12 +149,9 @@ Pozdrawiamy,
 {{nazwa_firmy}}`,
   },
   booking_cancelled_by_client: {
-    smsBody:
-      "{{imie}}, potwierdzamy anulowanie Twojej wizyty {{data}} o {{godzina}}. Jeśli chcesz, zarezerwuj ponownie: {{link_rezerwacji}}",
-    emailSubject: "Potwierdzenie anulowania wizyty",
-    emailBody: `Cześć {{imie}},
-
-potwierdzamy anulowanie Twojej wizyty.
+    smsBody: "Wizyta odwołana: {{usluga}}, {{data}} o {{godzina}}.",
+    emailSubject: "Wizyta odwołana",
+    emailBody: `Twoja wizyta została odwołana.
 
 Anulowany termin:
 - Data: {{data}}

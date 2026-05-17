@@ -1,0 +1,248 @@
+import { sendReminderEmail } from "@/lib/notifications/email"
+import {
+  buildTransactionalEmailHtml,
+  buildTransactionalEmailText,
+} from "@/lib/notifications/transactional-email-layout"
+import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
+import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import { getStaffDisplayName } from "@/lib/staff/staff-display"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { Tables, TablesInsert } from "@/types/database"
+
+export type CancelNotifyLanguage = "pl" | "en"
+export type BookingCancelledLogType = "booking_cancelled_by_client" | "booking_cancelled_by_company"
+
+function getPublicAppOrigin(): string {
+  const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (explicit) return explicit.replace(/\/$/, "")
+  const vercel = process.env.VERCEL_URL?.trim()
+  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
+  return "http://localhost:3000"
+}
+
+function formatTimeHmFromDb(t: string): string {
+  const m = String(t).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!m) return "09:00"
+  return `${String(Number(m[1])).padStart(2, "0")}:${m[2]}`
+}
+
+function formatDateLabel(ymd: string, lang: CancelNotifyLanguage): string {
+  const raw = String(ymd).slice(0, 10)
+  const d = new Date(`${raw}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return raw
+  return new Intl.DateTimeFormat(lang === "en" ? "en-US" : "pl-PL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(d)
+}
+
+function formatAppointmentDateTime(
+  appointmentDate: string,
+  appointmentTime: string,
+  language: CancelNotifyLanguage,
+): string {
+  const dateLabel = formatDateLabel(appointmentDate, language)
+  const timeHm = formatTimeHmFromDb(appointmentTime)
+  return `${dateLabel}, ${timeHm}`
+}
+
+function firstToken(name: string): string {
+  const s = name.trim()
+  if (!s) return ""
+  return s.split(/\s+/)[0] ?? s
+}
+
+export type BookingCancelledMessageOverrides = {
+  smsBody?: string | null
+  emailSubject?: string | null
+  emailBodyPlain?: string | null
+}
+
+export function buildBookingCancelledMessages(
+  language: CancelNotifyLanguage,
+  vars: Record<string, string>,
+  overrides?: BookingCancelledMessageOverrides,
+): {
+  sms: string
+  emailSubject: string
+  emailText: string
+  emailHtml: string
+} {
+  const appointmentDateTime = vars.termin ?? vars.data ?? ""
+  const serviceName = vars.usluga ?? ""
+
+  const defaultSmsPl = `Wizyta odwołana: ${serviceName}, ${appointmentDateTime}.`
+  const defaultSmsEn = `Appointment cancelled: ${serviceName}, ${appointmentDateTime}.`
+  const defaultSms = language === "en" ? defaultSmsEn : defaultSmsPl
+
+  const emailSubject =
+    overrides?.emailSubject?.trim()
+      ? applyTemplateVariables(overrides.emailSubject, vars)
+      : language === "en"
+        ? "Appointment cancelled"
+        : "Wizyta odwołana"
+
+  const intro =
+    overrides?.emailBodyPlain?.trim()
+      ? applyTemplateVariables(overrides.emailBodyPlain, vars).split("\n")[0]?.trim() ||
+        (language === "en" ? "Your appointment has been cancelled." : "Twoja wizyta została odwołana.")
+      : language === "en"
+        ? "Your appointment has been cancelled."
+        : "Twoja wizyta została odwołana."
+
+  const detailRows =
+    language === "en"
+      ? [
+          { label: "Service", value: serviceName },
+          { label: "Date and time", value: appointmentDateTime },
+        ]
+      : [
+          { label: "Usługa", value: serviceName },
+          { label: "Termin", value: appointmentDateTime },
+        ]
+
+  const rebookUrl = vars.link_rezerwacji?.trim() ?? ""
+  const cta = rebookUrl
+    ? language === "en"
+      ? {
+          href: rebookUrl,
+          label: "Book again",
+          hint: "You can schedule a new appointment at any time.",
+        }
+      : {
+          href: rebookUrl,
+          label: "Umów ponownie",
+          hint: "W każdej chwili możesz umówić nową wizytę.",
+        }
+    : null
+
+  const sms = overrides?.smsBody?.trim()
+    ? applyTemplateVariables(overrides.smsBody, vars)
+    : defaultSms
+
+  const emailText = buildTransactionalEmailText({
+    lang: language,
+    intro,
+    detailRows,
+    cta,
+  })
+
+  const emailHtml = buildTransactionalEmailHtml({
+    lang: language,
+    subject: emailSubject,
+    preheader:
+      language === "en"
+        ? `Appointment cancelled — ${appointmentDateTime}.`
+        : `Wizyta odwołana — ${appointmentDateTime}.`,
+    title: emailSubject,
+    intro,
+    detailRows,
+    cta,
+  })
+
+  return { sms, emailSubject, emailText, emailHtml }
+}
+
+async function insertLog(row: TablesInsert<"notification_logs">) {
+  const admin = getServiceRoleClient()
+  if (!admin) return
+  const { error } = await admin.from("notification_logs").insert(row)
+  if (error && error.code !== "23505") {
+    console.error("[booking-cancelled.notify.log]", error.message)
+  }
+}
+
+function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notification_logs">["status"] {
+  if (ok) return "sent"
+  if (code === "simulated_dev" || code === "not_configured") return "queued"
+  return "failed"
+}
+
+/**
+ * Wysyła SMS i e-mail z potwierdzeniem „Wizyta odwołana” — zawsze gdy klient ma telefon/e-mail.
+ */
+export async function sendBookingCancelledConfirmation(args: {
+  booking: Tables<"bookings">
+  business: Pick<Tables<"business_profiles">, "slug" | "phone" | "business_name">
+  language: CancelNotifyLanguage
+  logType: BookingCancelledLogType
+  staffDisplayName?: string
+  messageOverrides?: BookingCancelledMessageOverrides
+}): Promise<{ notice: "sent" | "queued" }> {
+  const { booking, business, language, logType } = args
+  const appUrl = getPublicAppOrigin()
+  const slug = business.slug?.trim() ?? ""
+  const linkRezerwacji = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
+  const appointmentDateTime = formatAppointmentDateTime(
+    String(booking.appointment_date),
+    String(booking.appointment_time),
+    language,
+  )
+  const vars: Record<string, string> = {
+    imie: firstToken(booking.client_name),
+    data: String(booking.appointment_date).slice(0, 10),
+    godzina: formatTimeHmFromDb(String(booking.appointment_time)),
+    termin: appointmentDateTime,
+    usluga: booking.service_name,
+    osoba: args.staffDisplayName ?? getStaffDisplayName({ name: booking.staff_name ?? "" }),
+    link_rezerwacji: linkRezerwacji,
+    link_potwierdzenia: `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`,
+    link_anulowania: `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`,
+    telefon_firmy: business.phone?.trim() ?? "",
+    nazwa_firmy: business.business_name?.trim() ?? "",
+  }
+
+  const messages = buildBookingCancelledMessages(language, vars, args.messageOverrides)
+  const nowIso = new Date().toISOString()
+  let anySent = false
+
+  const phone = booking.client_phone?.trim() ?? ""
+  if (phone) {
+    const smsRes = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
+    const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
+    if (smsRes.ok) anySent = true
+    await insertLog({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      channel: "sms",
+      type: logType,
+      recipient: phone,
+      status,
+      subject: null,
+      body: messages.sms,
+      provider: smsRes.ok ? smsRes.provider : null,
+      provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
+      error: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
+      sent_at: smsRes.ok ? nowIso : null,
+    })
+  }
+
+  const email = booking.client_email?.trim() ?? ""
+  if (email) {
+    const emailRes = await sendReminderEmail({
+      to: email,
+      subject: messages.emailSubject,
+      textBody: messages.emailText,
+      htmlBody: messages.emailHtml,
+    })
+    const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
+    if (emailRes.ok) anySent = true
+    await insertLog({
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      channel: "email",
+      type: logType,
+      recipient: email,
+      status,
+      subject: messages.emailSubject,
+      body: messages.emailText,
+      provider: emailRes.ok ? emailRes.provider : null,
+      provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
+      error: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
+      sent_at: emailRes.ok ? nowIso : null,
+    })
+  }
+
+  return { notice: anySent ? "sent" : "queued" }
+}
