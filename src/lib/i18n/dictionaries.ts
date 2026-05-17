@@ -963,7 +963,11 @@ export const dictionaries = {
       optionalNote: "Notatka opcjonalnie",
       bookingSavedTitle: "Rezerwacja zapisana",
       bookingSavedDescription:
-        "Rezerwacja została zapisana. Jeśli podałeś poprawny adres e-mail, otrzymasz wiadomość z linkiem do zarządzania rezerwacją.",
+        "Rezerwacja została zapisana.",
+      bookingSavedDescriptionNotifySent:
+        "Rezerwacja została zapisana. Wysłaliśmy wiadomość z linkiem do zarządzania wizytą.",
+      bookingSavedDescriptionNotifySafe:
+        "Rezerwacja została zapisana. Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
       bookingSavedDescriptionNoEmail:
         "Rezerwacja została zapisana.",
       panelHintBusiness:
@@ -972,6 +976,10 @@ export const dictionaries = {
       whatNextTitle: "Co dalej?",
       whatNextEmailNote:
         "Na podany adres e-mail możesz otrzymać link do zarządzania rezerwacją (gdy wysyłka jest skonfigurowana).",
+      whatNextBookingCreatedSent:
+        "Wysłaliśmy wiadomość z linkiem do zarządzania wizytą (e-mail i/lub SMS, zależnie od podanych danych).",
+      whatNextBookingCreatedSafe:
+        "Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
       whatNextReminderBoth:
         "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (SMS i e-mail, zgodnie z ustawieniami firmy).",
       whatNextReminderEmail:
@@ -984,6 +992,10 @@ export const dictionaries = {
       messageStatusTitle: "Powiadomienia",
       messageStatusEmailInfo:
         "E-mail z linkiem do rezerwacji nie jest wysyłany automatycznie w tym kroku — skontaktuj się z gabinetem, jeśli go nie otrzymasz.",
+      messageStatusBookingCreatedSent:
+        "Potwierdzenie rezerwacji: wysłano wiadomość z linkiem do zarządzania wizytą.",
+      messageStatusBookingCreatedSafe:
+        "Potwierdzenie rezerwacji: jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
       messageStatusReminderBoth:
         "Przypomnienie 24h przed wizytą: SMS i e-mail (wg ustawień firmy).",
       messageStatusReminderEmail:
@@ -3076,8 +3088,11 @@ Pozdrawiamy,
       email: "Email",
       optionalNote: "Optional note",
       bookingSavedTitle: "Booking saved",
-      bookingSavedDescription:
-        "Your booking has been saved. If you provided a valid email address, you will receive a message with a link to manage your booking.",
+      bookingSavedDescription: "Your booking has been saved.",
+      bookingSavedDescriptionNotifySent:
+        "Your booking has been saved. We sent a message with a link to manage your appointment.",
+      bookingSavedDescriptionNotifySafe:
+        "Your booking has been saved. If your contact details are correct, you will receive a message with a link to manage your appointment.",
       bookingSavedDescriptionNoEmail: "Your booking has been saved.",
       panelHintBusiness:
         "The booking will appear in the business panel as a new appointment to confirm.",
@@ -3085,6 +3100,10 @@ Pozdrawiamy,
       whatNextTitle: "What happens next?",
       whatNextEmailNote:
         "If you provided an email address, you may receive a link to manage your booking (when outbound email is configured).",
+      whatNextBookingCreatedSent:
+        "We sent a message with a link to manage your appointment (email and/or SMS, depending on the details you provided).",
+      whatNextBookingCreatedSafe:
+        "If your contact details are correct, you will receive a message with a link to manage your appointment.",
       whatNextReminderBoth:
         "Reminders are sent automatically about 24h before the appointment (SMS and email, per business settings).",
       whatNextReminderEmail:
@@ -3097,6 +3116,10 @@ Pozdrawiamy,
       messageStatusTitle: "Notifications",
       messageStatusEmailInfo:
         "A booking link email is not sent automatically in this step — contact the business if you need the link.",
+      messageStatusBookingCreatedSent:
+        "Booking confirmation: we sent a message with a link to manage your appointment.",
+      messageStatusBookingCreatedSafe:
+        "Booking confirmation: if your contact details are correct, you will receive a message with a link to manage your appointment.",
       messageStatusReminderBoth: "24h reminder: SMS and email (per business settings).",
       messageStatusReminderEmail: "24h reminder: email (per business settings).",
       messageStatusReminderSms: "24h reminder: SMS (per business settings).",

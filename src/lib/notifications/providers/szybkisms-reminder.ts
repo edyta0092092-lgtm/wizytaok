@@ -33,9 +33,10 @@ function isAcceptedSzybkiStatus(code: unknown): boolean {
  * Wysyłka SMS przez REST SzybkiSMS (`POST /messages/sms`).
  * Dokumentacja: https://api.szybkisms.pl/rest/
  */
-export async function sendSzybkiSmsAppointmentReminder(
-  input: AppointmentReminderSmsInput
-): Promise<AppointmentReminderSmsResult> {
+export async function sendSzybkiSmsPlainText(input: {
+  to: string
+  body: string
+}): Promise<AppointmentReminderSmsResult> {
   const token = process.env.SZYBKISMS_TOKEN?.trim()
   if (!token) {
     return { ok: false, code: "not_configured", error: "SZYBKISMS_TOKEN not set" }
@@ -47,7 +48,10 @@ export async function sendSzybkiSmsAppointmentReminder(
   }
 
   const from = process.env.SZYBKISMS_FROM?.trim() || DEFAULT_FROM
-  const message = buildSmsMessage(input)
+  const message = input.body.trim()
+  if (!message) {
+    return { ok: false, code: "failed", error: "empty_message" }
+  }
   const base = normalizeSzybkiSmsBaseUrl()
   const url = `${base}/messages/sms`
 
@@ -129,4 +133,10 @@ export async function sendSzybkiSmsAppointmentReminder(
     const errMessage = err instanceof Error ? err.message : "unknown_error"
     return { ok: false, code: "failed", error: errMessage }
   }
+}
+
+export async function sendSzybkiSmsAppointmentReminder(
+  input: AppointmentReminderSmsInput
+): Promise<AppointmentReminderSmsResult> {
+  return sendSzybkiSmsPlainText({ to: input.to, body: buildSmsMessage(input) })
 }

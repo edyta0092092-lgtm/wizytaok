@@ -10,9 +10,10 @@ import type {
 const SMSAPI_ENDPOINT = "https://api.smsapi.pl/sms.do"
 const DEFAULT_FROM = "WizytaOK"
 
-export async function sendSmsapiAppointmentReminder(
-  input: AppointmentReminderSmsInput
-): Promise<AppointmentReminderSmsResult> {
+export async function sendSmsapiPlainText(input: {
+  to: string
+  body: string
+}): Promise<AppointmentReminderSmsResult> {
   const token = process.env.SMSAPI_TOKEN?.trim()
   if (!token) {
     return { ok: false, code: "not_configured", error: "SMSAPI_TOKEN not set" }
@@ -24,7 +25,10 @@ export async function sendSmsapiAppointmentReminder(
   }
 
   const from = process.env.SMSAPI_FROM?.trim() || DEFAULT_FROM
-  const message = buildSmsMessage(input)
+  const message = input.body.trim()
+  if (!message) {
+    return { ok: false, code: "failed", error: "empty_message" }
+  }
 
   const params = new URLSearchParams()
   params.set("to", to)
@@ -83,4 +87,10 @@ export async function sendSmsapiAppointmentReminder(
     const errMessage = err instanceof Error ? err.message : "unknown_error"
     return { ok: false, code: "failed", error: errMessage }
   }
+}
+
+export async function sendSmsapiAppointmentReminder(
+  input: AppointmentReminderSmsInput
+): Promise<AppointmentReminderSmsResult> {
+  return sendSmsapiPlainText({ to: input.to, body: buildSmsMessage(input) })
 }

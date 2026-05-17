@@ -71,10 +71,7 @@ import {
   type StaffAvailabilityExceptionRecord,
   type StaffAvailabilityRuleInput,
 } from "@/lib/staff/staff-store"
-import {
-  createBookingCreatedMessages,
-  saveNotificationMessagesBatch,
-} from "@/lib/notifications/notifications"
+import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
 
 type BookingForm = {
   firstName: string
@@ -836,10 +833,9 @@ export default function PublicBookingPage() {
             createdAt: new Date().toISOString(),
           }
           try {
-            const immediate = createBookingCreatedMessages(publicBooking, language)
-            saveNotificationMessagesBatch(immediate)
-          } catch {
-            // noop for MVP
+            await notifyBookingCreatedAfterOnlineBooking(res.confirmationToken, language)
+          } catch (err) {
+            console.error("[booking.created.notify]", err)
           }
           router.push(
             `/rezerwacje/${encodeURIComponent(String(businessSlug))}/success?token=${encodeURIComponent(res.confirmationToken)}`
@@ -890,8 +886,6 @@ export default function PublicBookingPage() {
 
       try {
         savePublicBooking(publicBooking)
-        const immediate = createBookingCreatedMessages(publicBooking, language)
-        saveNotificationMessagesBatch(immediate)
       } catch {
         // noop for MVP
       }
