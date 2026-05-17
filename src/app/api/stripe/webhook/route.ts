@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic"
 type HandlerOutcome =
   | { kind: "ok" }
   | { kind: "skipped"; reason: string }
+  | { kind: "failed"; reason: string }
 
 function stripeLog(payload: Record<string, unknown>) {
   console.info(
@@ -153,12 +154,35 @@ function buildSubscriptionPatch(input: {
   return patch
 }
 
+function isValidStripeSecretKey(secret: string): boolean {
+  return secret.startsWith("sk_test_") || secret.startsWith("sk_live_")
+}
+
 function getStripeForWebhook(): Stripe | NextResponse {
   const secret = process.env.STRIPE_SECRET_KEY?.trim()
-  if (!secret || !secret.startsWith("sk_test_")) {
-    return NextResponse.json({ error: "stripe_test_secret_required" }, { status: 500 })
+  if (!secret || !isValidStripeSecretKey(secret)) {
+    return NextResponse.json({ error: "stripe_secret_key_invalid" }, { status: 500 })
   }
   return new Stripe(secret)
+}
+
+function webhookHttpResponse(eventType: string, outcome: HandlerOutcome): NextResponse {
+  if (outcome.kind === "failed") {
+    stripeLog({
+      message: "stripe_webhook_subscription_sync_error",
+      stripe_webhook_event_type: eventType,
+      reason: outcome.reason,
+    })
+    return NextResponse.json(
+      {
+        received: false,
+        error: "subscription_sync_failed",
+        reason: outcome.reason,
+      },
+      { status: 500 }
+    )
+  }
+  return NextResponse.json({ received: true, outcome })
 }
 
 function getWebhookSecret(): string | NextResponse {
@@ -375,7 +399,7 @@ async function syncCheckoutByBusiness(
       stripe_webhook_customer_id: customerId,
       error: error.message,
     })
-    return { kind: "skipped", reason: "db_update_failed" }
+    return { kind: "failed", reason: "db_update_failed" }
   }
 
   if (!data?.length) {
@@ -386,12 +410,7 @@ async function syncCheckoutByBusiness(
       stripe_webhook_subscription_id: subscription.id,
       stripe_webhook_customer_id: customerId,
     })
-    stripeLog({
-      message: "stripe_webhook_subscription_sync_skipped",
-      stripe_webhook_event_type: "checkout.session.completed",
-      reason: "no_row_updated",
-    })
-    return { kind: "skipped", reason: "no_row_updated" }
+    return { kind: "failed", reason: "no_row_updated" }
   }
 
   stripeLog({
@@ -456,7 +475,7 @@ async function handleSubscriptionEvent(
       stripe_webhook_customer_id: customerId,
       error: error.message,
     })
-    return { kind: "skipped", reason: "db_update_failed" }
+    return { kind: "failed", reason: "db_update_failed" }
   }
 
   if (!data?.length) {
@@ -467,12 +486,7 @@ async function handleSubscriptionEvent(
       stripe_webhook_subscription_id: sub.id,
       stripe_webhook_customer_id: customerId,
     })
-    stripeLog({
-      message: "stripe_webhook_subscription_sync_skipped",
-      stripe_webhook_event_type: eventType,
-      reason: "no_row_updated",
-    })
-    return { kind: "skipped", reason: "no_row_updated" }
+    return { kind: "failed", reason: "no_row_updated" }
   }
 
   stripeLog({
@@ -545,7 +559,7 @@ async function handleInvoice(
       stripe_webhook_business_id: businessId,
       error: upd.error.message,
     })
-    return { kind: "skipped", reason: "db_update_failed" }
+    return { kind: "failed", reason: "db_update_failed" }
   }
 
   if (!upd.data?.length) {
@@ -556,12 +570,7 @@ async function handleInvoice(
       stripe_webhook_subscription_id: sub.id,
       stripe_webhook_customer_id: customerId,
     })
-    stripeLog({
-      message: "stripe_webhook_subscription_sync_skipped",
-      stripe_webhook_event_type: eventType,
-      reason: "no_row_updated",
-    })
-    return { kind: "skipped", reason: "no_row_updated" }
+    return { kind: "failed", reason: "no_row_updated" }
   }
 
   stripeLog({
@@ -642,8 +651,11 @@ export async function POST(req: Request) {
       stripe_webhook_event_type: event.type,
       error: msg,
     })
-    return NextResponse.json({ received: true, skipped: true, reason: "handler_threw" })
+    return NextResponse.json(
+      { received: false, error: "handler_threw", reason: msg },
+      { status: 500 }
+    )
   }
 
-  return NextResponse.json({ received: true, outcome })
+  return webhookHttpResponse(event.type, outcome)
 }
