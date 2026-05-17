@@ -44,13 +44,15 @@ function isBookingCreatedNotifyConfidentSuccess(
 ): boolean {
   if (!status?.ok) return false
   if (!hasEmail && !hasPhone) return false
-  const emailOk =
-    !hasEmail || status.email === "sent" || status.email === "already_sent"
+  const emailOk = !hasEmail || status.email === "sent" || status.email === "already_sent"
   const smsOk = !hasPhone || status.sms === "sent" || status.sms === "already_sent"
   const anySent =
     (hasEmail && (status.email === "sent" || status.email === "already_sent")) ||
     (hasPhone && (status.sms === "sent" || status.sms === "already_sent"))
-  return anySent && emailOk && smsOk
+  const noneFailed =
+    (!hasEmail || (status.email !== "failed" && status.email !== "missing")) &&
+    (!hasPhone || (status.sms !== "failed" && status.sms !== "missing"))
+  return anySent && emailOk && smsOk && noneFailed
 }
 
 type StoredBookingLegacy = {

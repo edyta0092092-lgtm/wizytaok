@@ -1,7 +1,7 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
-import type { Tables, TablesInsert } from "@/types/database"
+import type { TablesInsert } from "@/types/database"
 
 export type BookingCreatedChannelStatus =
   | "sent"
@@ -16,16 +16,14 @@ export type BookingCreatedNotifyResult = {
   sms: BookingCreatedChannelStatus
 }
 
-type BookingRow = Pick<
-  Tables<"bookings">,
-  | "id"
-  | "business_id"
-  | "confirmation_token"
-  | "service_name"
-  | "appointment_date"
-  | "appointment_time"
-  | "client_name"
-> & {
+type BookingRow = {
+  id: string
+  business_id: string
+  confirmation_token: string
+  service_name: string
+  appointment_date: string
+  appointment_time: string
+  client_name: string
   client_phone: string | null
   client_email: string | null
 }
@@ -54,40 +52,78 @@ function formatTimeHmFromDb(t: string): string {
   return `${String(Number(m[1])).padStart(2, "0")}:${m[2]}`
 }
 
-function buildManageUrl(confirmationToken: string): string {
+function formatAppointmentDateTime(
+  appointmentDate: string,
+  appointmentTime: string,
+  language: "pl" | "en",
+): string {
+  const dateLabel = formatDateLabel(appointmentDate, language)
+  const timeHm = formatTimeHmFromDb(appointmentTime)
+  if (language === "en") return `${dateLabel}, ${timeHm}`
+  return `${dateLabel}, ${timeHm}`
+}
+
+function buildConfirmUrl(confirmationToken: string): string {
   return `${getPublicAppOrigin()}/confirm/${encodeURIComponent(confirmationToken)}?source=booking`
+}
+
+function readOptionalString(value: unknown): string | null {
+  if (value == null) return null
+  const s = String(value).trim()
+  return s.length > 0 ? s : null
 }
 
 function buildMessages(
   booking: BookingRow,
-  businessName: string,
   language: "pl" | "en",
-  manageUrl: string,
+  confirmUrl: string,
 ) {
-  const dateLabel = formatDateLabel(String(booking.appointment_date), language)
-  const timeHm = formatTimeHmFromDb(String(booking.appointment_time))
-  const name = booking.client_name.trim()
-  const service = booking.service_name.trim()
-  const business = businessName.trim() || "WizytaOK"
+  const serviceName = booking.service_name.trim()
+  const clientName = booking.client_name.trim()
+  const appointmentDateTime = formatAppointmentDateTime(
+    String(booking.appointment_date),
+    String(booking.appointment_time),
+    language,
+  )
 
   if (language === "en") {
+    const emailText = `Your appointment has been booked.
+
+Service: ${serviceName}
+Date and time: ${appointmentDateTime}
+Client: ${clientName}
+
+Confirm your attendance or cancel your appointment using this link:
+${confirmUrl}
+
+If you cannot attend, please cancel as early as possible.`
     return {
-      sms: `Booking confirmed: ${service}, ${dateLabel} at ${timeHm}. Manage: ${manageUrl}`,
-      emailSubject: "Appointment confirmation",
-      emailText: `Hi ${name},\n\nyour booking is confirmed.\n\nService: ${service}\nTime: ${dateLabel} at ${timeHm}\n\nManage your visit:\n${manageUrl}\n\n${business}`,
-      emailHtml: `<p>Hi ${name},</p><p>Your booking is confirmed.</p><p>Service: <strong>${service}</strong><br/>Time: ${dateLabel} at ${timeHm}</p><p><a href="${manageUrl}">Manage your visit</a></p><p>${business}</p>`,
+      sms: `Appointment booked: ${serviceName}, ${appointmentDateTime}. Confirm or cancel: ${confirmUrl}`,
+      emailSubject: "Appointment booking",
+      emailText,
+      emailHtml: emailText.replace(/\n/g, "<br/>"),
     }
   }
 
+  const emailText = `Twoja wizyta została zarezerwowana.
+
+Usługa: ${serviceName}
+Termin: ${appointmentDateTime}
+Klient: ${clientName}
+
+Potwierdź obecność lub anuluj wizytę przez link:
+${confirmUrl}
+
+Jeśli nie możesz przyjść, anuluj wizytę jak najwcześniej.`
   return {
-    sms: `Potwierdzenie wizyty: ${service}, ${dateLabel} o ${timeHm}. Link: ${manageUrl}`,
-    emailSubject: "Potwierdzenie wizyty",
-    emailText: `Cześć ${name},\n\npotwierdzamy rezerwację wizyty.\n\nUsługa: ${service}\nTermin: ${dateLabel} o ${timeHm}\n\nZarządzaj wizytą:\n${manageUrl}\n\n${business}`,
-    emailHtml: `<p>Cześć ${name},</p><p>Potwierdzamy rezerwację wizyty.</p><p>Usługa: <strong>${service}</strong><br/>Termin: ${dateLabel} o ${timeHm}</p><p><a href="${manageUrl}">Zarządzaj wizytą</a></p><p>${business}</p>`,
+    sms: `Rezerwacja wizyty: ${serviceName}, ${appointmentDateTime}. Potwierdź lub anuluj: ${confirmUrl}`,
+    emailSubject: "Rezerwacja wizyty",
+    emailText,
+    emailHtml: emailText.replace(/\n/g, "<br/>"),
   }
 }
 
-async function hasExistingLog(
+async function hasAlreadySentLog(
   admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
   bookingId: string,
   channel: "email" | "sms",
@@ -98,6 +134,7 @@ async function hasExistingLog(
     .eq("booking_id", bookingId)
     .eq("type", "booking_created")
     .eq("channel", channel)
+    .eq("status", "sent")
     .limit(1)
     .maybeSingle()
   return Boolean(data?.id)
@@ -180,29 +217,23 @@ export async function sendBookingCreatedNotifications(
     appointment_date: String(o.appointment_date ?? ""),
     appointment_time: String(o.appointment_time ?? ""),
     client_name: String(o.client_name ?? ""),
-    client_phone: typeof o.client_phone === "string" ? o.client_phone : null,
-    client_email: typeof o.client_email === "string" ? o.client_email : null,
+    client_phone: readOptionalString(o.client_phone),
+    client_email: readOptionalString(o.client_email),
   }
 
   if (!booking.id || !booking.business_id) {
     return { ok: false, email: "failed", sms: "failed" }
   }
 
-  const { data: business } = await admin
-    .from("business_profiles")
-    .select("business_name")
-    .eq("id", booking.business_id)
-    .maybeSingle()
-
-  const manageUrl = buildManageUrl(booking.confirmation_token)
-  const messages = buildMessages(booking, business?.business_name ?? "", language, manageUrl)
+  const confirmUrl = buildConfirmUrl(booking.confirmation_token)
+  const messages = buildMessages(booking, language, confirmUrl)
   const nowIso = new Date().toISOString()
 
   let emailStatus: BookingCreatedChannelStatus = "missing"
-  const email = booking.client_email?.trim() ?? ""
+  const email = booking.client_email ?? ""
   if (!email) {
     emailStatus = "missing"
-  } else if (await hasExistingLog(admin, booking.id, "email")) {
+  } else if (await hasAlreadySentLog(admin, booking.id, "email")) {
     emailStatus = "already_sent"
   } else {
     try {
@@ -225,23 +256,38 @@ export async function sendBookingCreatedNotifications(
         body: messages.emailText,
         provider: sent.ok ? sent.provider : null,
         provider_message_id: sent.ok ? sent.messageId ?? null : null,
-        error: sent.ok ? null : sent.error ?? sent.code,
+        error: sent.ok ? null : `${sent.code}${sent.error ? `: ${sent.error}` : ""}`,
         sent_at: sent.ok ? nowIso : null,
       })
       if (!sent.ok) {
-        console.error("[booking-created.notify.email]", sent.error ?? sent.code)
+        console.error("[booking-created.notify.email]", sent.code, sent.error ?? "")
       }
     } catch (err) {
       emailStatus = "failed"
-      console.error("[booking-created.notify.email]", err)
+      const errMsg = err instanceof Error ? err.message : "unknown_error"
+      console.error("[booking-created.notify.email]", errMsg)
+      await insertLog(admin, {
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        channel: "email",
+        type: "booking_created",
+        recipient: email,
+        status: "failed",
+        subject: messages.emailSubject,
+        body: messages.emailText,
+        provider: null,
+        provider_message_id: null,
+        error: errMsg,
+        sent_at: null,
+      })
     }
   }
 
   let smsStatus: BookingCreatedChannelStatus = "missing"
-  const phone = booking.client_phone?.trim() ?? ""
+  const phone = booking.client_phone ?? ""
   if (!phone) {
     smsStatus = "missing"
-  } else if (await hasExistingLog(admin, booking.id, "sms")) {
+  } else if (await hasAlreadySentLog(admin, booking.id, "sms")) {
     smsStatus = "already_sent"
   } else {
     try {
@@ -259,15 +305,30 @@ export async function sendBookingCreatedNotifications(
         body: messages.sms,
         provider: sent.ok ? sent.provider : null,
         provider_message_id: sent.ok ? sent.messageId ?? null : null,
-        error: sent.ok ? null : sent.error ?? sent.code,
+        error: sent.ok ? null : `${sent.code}${sent.error ? `: ${sent.error}` : ""}`,
         sent_at: sent.ok ? nowIso : null,
       })
       if (!sent.ok) {
-        console.error("[booking-created.notify.sms]", sent.error ?? sent.code)
+        console.error("[booking-created.notify.sms]", sent.code, sent.error ?? "")
       }
     } catch (err) {
       smsStatus = "failed"
-      console.error("[booking-created.notify.sms]", err)
+      const errMsg = err instanceof Error ? err.message : "unknown_error"
+      console.error("[booking-created.notify.sms]", errMsg)
+      await insertLog(admin, {
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        channel: "sms",
+        type: "booking_created",
+        recipient: phone,
+        status: "failed",
+        subject: null,
+        body: messages.sms,
+        provider: null,
+        provider_message_id: null,
+        error: errMsg,
+        sent_at: null,
+      })
     }
   }
 
