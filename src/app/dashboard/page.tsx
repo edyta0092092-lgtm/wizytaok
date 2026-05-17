@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import * as React from "react"
 import Link from "next/link"
@@ -31,11 +31,7 @@ import {
   updateAppointmentStatus,
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
-import {
-  bookingNeedsAction,
-  countBookingsNeedingAction,
-  getBookingActionReason,
-} from "@/lib/bookings/booking-needs-action"
+import { countBookingsNeedingAction } from "@/lib/bookings/booking-needs-action"
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import {
   countAppointmentReminderIssues,
@@ -350,14 +346,6 @@ export default function DashboardPage() {
   const confirmedToday = stats.confirmedTodayCount
   const cancelledToday = stats.cancelledTodayCount
   const toConfirm = stats.pendingTodayCount
-  const needsActionAll = React.useMemo(() => {
-    // Defer heavier list prep until dashboard stats are ready.
-    if (!statsReady || allAppointments.length === 0) return []
-    const rows = allAppointments.filter((a) => bookingNeedsAction(a))
-    rows.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
-    return rows
-  }, [allAppointments, statsReady])
-  const needsAttention = React.useMemo(() => needsActionAll.slice(0, 12), [needsActionAll])
   const needsActionCount = stats.requiresActionCount
   const reminderIssuesAll = stats.reminderErrorsCount
 
@@ -369,16 +357,6 @@ export default function DashboardPage() {
       }),
     [language]
   )
-
-  const supabaseReminderStatusLine = (a: Appointment): string | null => {
-    if (!a.id.startsWith("sb-")) return null
-    const rs = a.reminderStatus
-    if (rs === "sent") return t("appointments.reminderStatusSent")
-    if (rs === "failed") return t("appointments.reminderStatusFailed")
-    if (rs === "skipped") return t("appointments.reminderStatusSkipped")
-    if (rs === "not_configured" || rs === "simulated_dev") return t("appointments.reminderStatusNotConfigured")
-    return t("appointments.reminderStatusScheduled")
-  }
 
   React.useEffect(() => {
     let cancelled = false
@@ -698,78 +676,6 @@ export default function DashboardPage() {
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr] lg:items-start">
           <div className="min-w-0 space-y-6">
-            <Card
-              data-tour="dashboard-attention"
-              className="rounded-2xl border border-border bg-[color:var(--accent-soft)] shadow-sm shadow-slate-900/5"
-            >
-              <CardHeader className="pb-0">
-                <CardTitle className="text-sm font-semibold">
-                  {t("dashboard.needsAttention")}
-                </CardTitle>
-                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  {t("dashboard.needsActionSectionLead")}
-                </p>
-              </CardHeader>
-              <CardContent className="pt-3">
-                <div className="space-y-2.5">
-                  {!statsReady ? (
-                    <p className="text-sm text-muted-foreground">
-                      {appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")}
-                    </p>
-                  ) : needsAttention.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      {t("dashboard.attentionCalm")}
-                    </p>
-                  ) : (
-                    needsAttention.map((row) => {
-                      const when = new Date(row.startsAt)
-                      const reminderLine = supabaseReminderStatusLine(row)
-                      return (
-                        <div
-                          key={row.id}
-                          className="flex flex-col gap-2 rounded-2xl border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                            <div className="min-w-0">
-                            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-foreground">
-                              <span>
-                                {row.clientName}{" "}
-                                <span className="font-normal tabular-nums text-muted-foreground">
-                                  {timeFmt.format(when)}
-                                </span>
-                              </span>
-                              <BookingSourceBadge source={row.source} variant="short" />
-                            </p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">{row.serviceLabel}</p>
-                            <p className="mt-0.5 text-xs text-amber-800 dark:text-amber-200/95">
-                              {getBookingActionReason(row, language)}
-                            </p>
-                            {reminderLine ? (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {t("appointments.reminderAutoCaption")}: {reminderLine}
-                              </p>
-                            ) : null}
-                            <AppointmentStaffCaption
-                              appointment={row}
-                              variant="compact"
-                              className="mt-1"
-                            />
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                  {needsActionAll.length > needsAttention.length ? (
-                    <div className="pt-1">
-                      <Button variant="link" asChild className="h-auto px-0 py-1 text-sm font-medium">
-                        <Link href="/appointments?filter=needs_action">
-                          {t("dashboard.needsActionViewAll")}
-                        </Link>
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              </CardContent>
-            </Card>
 
             <Card
               data-tour="dashboard-today"
