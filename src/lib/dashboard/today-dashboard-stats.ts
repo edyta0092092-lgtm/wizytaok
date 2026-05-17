@@ -5,8 +5,12 @@ type ReminderLogRow = Pick<Tables<"notification_logs">, "booking_id" | "status" 
 type BookingRow = Pick<Tables<"bookings">, "id" | "status" | "appointment_date">
 
 export type TodayDashboardStats = {
-  todayAppointmentsCount: number
+  /** Potwierdzone wizyty z terminem na dziś. */
   confirmedTodayCount: number
+  /** Anulowane wizyty z terminem na dziś. */
+  cancelledTodayCount: number
+  /** Suma kafelków dnia (potwierdzone + anulowane). */
+  todayAppointmentsCount: number
   pendingTodayCount: number
   requiresActionCount: number
   reminderErrorsCount: number
@@ -52,16 +56,18 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
     throw new Error(todayError.message)
   }
 
-  const rows = ((todayBookings ?? []) as BookingRow[]).filter((row) => {
-    return !CANCELLED_STATUSES.has(normalizeStatus(row.status))
-  })
+  const rows = (todayBookings ?? []) as BookingRow[]
 
-  const todayAppointmentsCount = rows.length
   const confirmedTodayCount = rows.filter((row) =>
-    CONFIRMED_STATUSES.has(normalizeStatus(row.status))
+    CONFIRMED_STATUSES.has(normalizeStatus(row.status)),
   ).length
+  const cancelledTodayCount = rows.filter((row) =>
+    CANCELLED_STATUSES.has(normalizeStatus(row.status)),
+  ).length
+  const todayAppointmentsCount = confirmedTodayCount + cancelledTodayCount
+
   const pendingTodayCount = rows.filter((row) =>
-    PENDING_STATUSES.has(normalizeStatus(row.status))
+    PENDING_STATUSES.has(normalizeStatus(row.status)),
   ).length
 
   const { data: upcomingBookingIds, error: idsError } = await client
@@ -92,15 +98,16 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
     }
 
     reminderErrorsCount = ((reminderErrors ?? []) as ReminderLogRow[]).filter((row) =>
-      REMINDER_TYPES.has(String(row.type ?? "").trim().toLowerCase())
+      REMINDER_TYPES.has(String(row.type ?? "").trim().toLowerCase()),
     ).length
   }
 
   const requiresActionCount = pendingTodayCount + reminderErrorsCount
 
   return {
-    todayAppointmentsCount,
     confirmedTodayCount,
+    cancelledTodayCount,
+    todayAppointmentsCount,
     pendingTodayCount,
     requiresActionCount,
     reminderErrorsCount,

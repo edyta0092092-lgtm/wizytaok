@@ -5,9 +5,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
   AlertCircle,
+  Ban,
   CheckCircle2,
   ChevronRight,
-  Clock,
   CalendarDays,
   ListTodo,
   Sparkles,
@@ -299,6 +299,7 @@ export default function DashboardPage() {
   const [stats, setStats] = React.useState<TodayDashboardStats>({
     todayAppointmentsCount: 0,
     confirmedTodayCount: 0,
+    cancelledTodayCount: 0,
     pendingTodayCount: 0,
     requiresActionCount: 0,
     reminderErrorsCount: 0,
@@ -333,18 +334,21 @@ export default function DashboardPage() {
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a)),
     [todaysList]
   )
-  const fallbackStats = React.useMemo<TodayDashboardStats>(
-    () => ({
-      todayAppointmentsCount: plannedToday.length,
-      confirmedTodayCount: plannedToday.filter((a) => a.status === "confirmed").length,
+  const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
+    const confirmedTodayCount = todaysList.filter((a) => a.status === "confirmed").length
+    const cancelledTodayCount = todaysList.filter((a) => a.status === "cancelled").length
+    return {
+      todayAppointmentsCount: confirmedTodayCount + cancelledTodayCount,
+      confirmedTodayCount,
+      cancelledTodayCount,
       pendingTodayCount: countPendingConfirmationAppointments(plannedToday),
       requiresActionCount: countBookingsNeedingAction(allAppointments),
       reminderErrorsCount: countAppointmentReminderIssues(allAppointments),
-    }),
-    [plannedToday, allAppointments]
-  )
+    }
+  }, [todaysList, plannedToday, allAppointments])
   const visitsTodayComputed = stats.todayAppointmentsCount
   const confirmedToday = stats.confirmedTodayCount
+  const cancelledToday = stats.cancelledTodayCount
   const toConfirm = stats.pendingTodayCount
   const needsActionAll = React.useMemo(() => {
     // Defer heavier list prep until dashboard stats are ready.
@@ -661,15 +665,15 @@ export default function DashboardPage() {
                 )}
               </p>
             </div>
-            <div className="grid min-h-[5.25rem] grid-cols-3 gap-2 sm:gap-3">
+            <div className="grid min-h-[5.25rem] grid-cols-2 gap-2 sm:gap-3">
               {statsContextState ? (
-                <div className="col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                <div className="col-span-2 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                   {statsContextState === "login_required"
                     ? t("dashboard.signInToSeePlan")
                     : t("dashboard.noDataInBrowser")}
                 </div>
               ) : !statsReady ? (
-                <div className="col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                <div className="col-span-2 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                   {statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")}
                 </div>
               ) : (
@@ -681,10 +685,10 @@ export default function DashboardPage() {
                     href="/appointments?status=confirmed&date=today"
                   />
                   <MiniStat
-                    label={t("dashboard.requiresContact")}
-                    value={needsActionCount}
-                    icon={AlertCircle}
-                    href="/appointments?filter=needs_action"
+                    label={t("dashboard.cancelled")}
+                    value={cancelledToday}
+                    icon={Ban}
+                    href="/appointments?status=cancelled&date=today"
                   />
                 </>
               )}
