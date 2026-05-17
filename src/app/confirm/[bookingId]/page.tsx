@@ -43,6 +43,7 @@ async function fetchPendingReminderFromQueue(token: string): Promise<boolean | n
   try {
     const res = await fetch(
       `/api/public/appointment-reminder-status?token=${encodeURIComponent(trimmed)}`,
+      { cache: "no-store" },
     )
     if (!res.ok) return null
     const json = (await res.json()) as { ok?: boolean; hasPendingReminder?: boolean }
@@ -51,6 +52,18 @@ async function fetchPendingReminderFromQueue(token: string): Promise<boolean | n
   } catch {
     return null
   }
+}
+
+/** Po confirm: wynik „po” ma pierwszeństwo; przy błędzie API — snapshot sprzed confirm. */
+function mergeReminderPendingState(
+  beforeConfirm: boolean | null,
+  afterConfirm: boolean | null,
+): boolean | null {
+  if (afterConfirm === true) return true
+  if (afterConfirm === false) return false
+  if (beforeConfirm === true) return true
+  if (beforeConfirm === false) return false
+  return null
 }
 
 export default function PublicConfirmAppointmentPage() {
@@ -261,21 +274,24 @@ export default function PublicConfirmAppointmentPage() {
     return second.ok ? second : first
   }
 
-  const resolveConfirmedReminderPending = React.useCallback(
-    async (sourceBooking: PublicBooking | null) => {
+  const resolveReminderPendingForBooking = React.useCallback(
+    async (sourceBooking: PublicBooking | null, reminderToken: string) => {
       if (dataSource === "supabase") {
-        return fetchPendingReminderFromQueue(confirmToken)
+        return fetchPendingReminderFromQueue(reminderToken)
       }
       if (sourceBooking) {
         return hasPendingReminderFromPublicBooking(sourceBooking)
       }
       return null
     },
-    [confirmToken, dataSource],
+    [dataSource],
   )
 
   const confirmAttendance = () => {
     void (async () => {
+      const reminderToken = (booking?.confirmationToken ?? confirmToken).trim()
+      const pendingBeforeConfirm = await resolveReminderPendingForBooking(booking, reminderToken)
+
       if (dataSource === "supabase") {
         const confirmed = await runConfirmRpcWithFallback("confirm", {})
         if (!confirmed.ok) {
@@ -298,8 +314,20 @@ export default function PublicConfirmAppointmentPage() {
             await refreshSupabaseBooking()
           }
         }
-        const pending = await resolveConfirmedReminderPending(fresh)
-        setConfirmedReminderPending(pending)
+        let pendingAfterConfirm = await resolveReminderPendingForBooking(
+          fresh,
+          (fresh?.confirmationToken ?? reminderToken).trim(),
+        )
+        if (pendingAfterConfirm === null) {
+          await new Promise((resolve) => window.setTimeout(resolve, 400))
+          pendingAfterConfirm = await resolveReminderPendingForBooking(
+            fresh,
+            (fresh?.confirmationToken ?? reminderToken).trim(),
+          )
+        }
+        setConfirmedReminderPending(
+          mergeReminderPendingState(pendingBeforeConfirm, pendingAfterConfirm),
+        )
         setSuccessMessage(t("confirmPublic.successConfirmed"))
         setShowConfirmedReminderBadge(true)
         return
@@ -307,7 +335,10 @@ export default function PublicConfirmAppointmentPage() {
       applyLocalPatch({ status: "confirmed", lastUpdatedBy: "customer" })
       const fresh = findPublicBookingById(confirmToken)
       if (fresh) enqueueBookingConfirmedNotifications(fresh, language)
-      setConfirmedReminderPending(await resolveConfirmedReminderPending(fresh))
+      const pendingAfterConfirm = await resolveReminderPendingForBooking(fresh, reminderToken)
+      setConfirmedReminderPending(
+        mergeReminderPendingState(pendingBeforeConfirm, pendingAfterConfirm),
+      )
       setSuccessMessage(t("confirmPublic.successConfirmed"))
       setShowConfirmedReminderBadge(true)
     })()
