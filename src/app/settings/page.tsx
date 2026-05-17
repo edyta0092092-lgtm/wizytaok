@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
+import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
@@ -90,7 +91,14 @@ const defaultSettings: SettingsForm = {
 
 export default function SettingsPage() {
   const { t } = useTranslations()
+  const [showBillingRequiredBanner, setShowBillingRequiredBanner] = React.useState(false)
   const { ready, businessId, canManageSettings } = useBusinessAccess()
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const billing = new URLSearchParams(window.location.search).get("billing")
+    setShowBillingRequiredBanner(billing === "required")
+  }, [])
   const [form, setForm] = React.useState<SettingsForm>(defaultSettings)
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
@@ -434,6 +442,7 @@ export default function SettingsPage() {
     >
       <PageShell
       >
+        {showBillingRequiredBanner ? <BillingRequiredSettingsBanner /> : null}
         {saveError ? (
           <div
             role="status"

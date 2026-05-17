@@ -268,6 +268,18 @@ export const dictionaries = {
       onlyAdminServices: "Tylko administrator może zarządzać usługami.",
       onlyAdminAvailability: "Tylko administrator może zarządzać dostępnością.",
       onlyAdminTeam: "Tylko administrator może zarządzać zespołem.",
+      activateTitle: "Aktywuj dostęp do WizytaOK",
+      activateDescription:
+        "Aby korzystać z panelu, rozpocznij trial albo wybierz plan. Po aktywacji dostęp do wizyt, grafiku, klientów i ustawień zostanie odblokowany automatycznie.",
+      activateTrialCta: "Rozpocznij trial",
+      activatePaymentCta: "Przejdź do płatności",
+      activatePaymentPending:
+        "Jeśli płatność została już wykonana, odśwież stronę za chwilę — Stripe może potrzebować kilkunastu sekund na potwierdzenie.",
+      billingRequiredOnSettingsHint:
+        "Poniżej uruchomisz trial lub opłacisz subskrypcję. Po zapisaniu statusu w Stripe panel odblokuje się automatycznie.",
+      staffInactiveTitle: "Dostęp do panelu jest nieaktywny",
+      staffInactiveDescription:
+        "Firma nie ma obecnie aktywnego triala ani subskrypcji. Skontaktuj się z właścicielem lub administratorem konta.",
     },
     invitations: {
       panelAccess: "Dostęp do panelu",
@@ -2438,6 +2450,18 @@ Pozdrawiamy,
       onlyAdminServices: "Only an administrator can manage services.",
       onlyAdminAvailability: "Only an administrator can manage availability.",
       onlyAdminTeam: "Only an administrator can manage the team.",
+      activateTitle: "Activate access to WizytaOK",
+      activateDescription:
+        "To use the panel, start a trial or choose a plan. After activation, access to appointments, schedule, clients, and settings will unlock automatically.",
+      activateTrialCta: "Start trial",
+      activatePaymentCta: "Go to payment",
+      activatePaymentPending:
+        "If you have already paid, refresh this page in a moment — Stripe may need a few seconds to confirm.",
+      billingRequiredOnSettingsHint:
+        "Use the billing section below to start a trial or subscribe. Once Stripe confirms payment, the panel will unlock automatically.",
+      staffInactiveTitle: "Panel access is inactive",
+      staffInactiveDescription:
+        "This business does not currently have an active trial or subscription. Contact the account owner or administrator.",
     },
     invitations: {
       panelAccess: "Panel access",

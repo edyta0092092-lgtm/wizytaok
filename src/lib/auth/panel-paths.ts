@@ -16,6 +16,7 @@ const AUTH_REQUIRED_PREFIXES = [
   "/support",
   "/start-trial",
   "/subscription-required",
+  "/activate-access",
 ] as const
 
 /** Operacyjny panel — wymaga `trialing` lub `active`. */
@@ -35,7 +36,12 @@ const OPERATIONAL_PANEL_PREFIXES = [
 ] as const
 
 /** Dostęp bez aktywnej subskrypcji (płatność / komunikat). */
-const BILLING_RECOVERY_PREFIXES = ["/start-trial", "/subscription-required", "/settings"] as const
+const BILLING_RECOVERY_PREFIXES = [
+  "/start-trial",
+  "/subscription-required",
+  "/activate-access",
+  "/settings",
+] as const
 
 /** Konto użytkownika (wylogowanie) bez aktywnej subskrypcji. */
 const ACCOUNT_PATH = "/account"

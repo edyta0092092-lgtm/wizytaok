@@ -29,7 +29,20 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/accept-invite/")) return true
   if (pathname === "/start-trial") return true
   if (pathname === "/subscription-required") return true
+  if (pathname === "/activate-access") return true
   return false
+}
+
+function isSettingsStripeReturnPath(searchParams: URLSearchParams): boolean {
+  const stripeTest = searchParams.get("stripe_test")
+  if (stripeTest === "success" || stripeTest === "cancel") return true
+  const stripePaid = searchParams.get("stripe_paid")
+  if (stripePaid === "success" || stripePaid === "cancel") return true
+  return false
+}
+
+function isSettingsBillingRecoveryPath(searchParams: URLSearchParams): boolean {
+  return searchParams.get("billing") === "required"
 }
 
 function normalizeSlugForRewrite(raw: string | null | undefined): string | null {
@@ -118,10 +131,20 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (user && pathname.startsWith("/settings") && !isSettingsSetupPath(pathname, request.nextUrl.searchParams)) {
-    const access = await resolveBusinessPanelAccess(supabase, user.id)
-    if (!access.hasActiveAccess && !access.canManageBilling) {
-      return redirectToBillingRecovery(request, "/subscription-required")
+  if (user && pathname.startsWith("/settings")) {
+    const searchParams = request.nextUrl.searchParams
+    const settingsExempt =
+      isSettingsSetupPath(pathname, searchParams) ||
+      isSettingsStripeReturnPath(searchParams) ||
+      isSettingsBillingRecoveryPath(searchParams)
+    if (!settingsExempt) {
+      const access = await resolveBusinessPanelAccess(supabase, user.id)
+      if (!access.hasActiveAccess && !access.canManageBilling) {
+        return redirectToBillingRecovery(request, "/subscription-required")
+      }
+      if (!access.hasActiveAccess && access.canManageBilling) {
+        return redirectToBillingRecovery(request, "/activate-access")
+      }
     }
   }
 

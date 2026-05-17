@@ -392,9 +392,9 @@ function StartTrialContent() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push("/settings?billing=required")}
+                onClick={() => router.push("/activate-access")}
               >
-                Ustawienia i płatność
+                Aktywuj dostęp
               </Button>
             </div>
           ) : null}
@@ -408,9 +408,9 @@ function StartTrialContent() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push("/settings?billing=required")}
+                  onClick={() => router.push("/activate-access")}
                 >
-                  Ustawienia i płatność
+                  Aktywuj dostęp
                 </Button>
               </div>
             </>

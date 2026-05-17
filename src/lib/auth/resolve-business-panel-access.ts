@@ -150,5 +150,5 @@ export function billingRecoveryRedirectPath(access: BusinessPanelAccess): string
   if (!access.canManageBilling) {
     return "/subscription-required"
   }
-  return "/settings?billing=required"
+  return "/activate-access"
 }
