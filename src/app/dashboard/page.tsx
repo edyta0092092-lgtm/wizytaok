@@ -4,10 +4,8 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  AlertCircle,
   Ban,
   CheckCircle2,
-  ChevronRight,
   CalendarDays,
   ListTodo,
   Sparkles,
@@ -80,90 +78,6 @@ function MiniStat({
   )
 }
 
-function TodoPanel({
-  appointmentsReady,
-  appointmentsError,
-  needsActionCount,
-  pendingConfirmationCount,
-  reminderIssuesCount,
-}: {
-  appointmentsReady: boolean
-  appointmentsError: boolean
-  needsActionCount: number
-  pendingConfirmationCount: number
-  reminderIssuesCount: number
-}) {
-  const { t } = useTranslations()
-
-  if (appointmentsError) {
-    return (
-      <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm font-semibold">{t("dashboard.todo")}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <p className="text-sm text-destructive">{t("dashboard.todoLoadError")}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (!appointmentsReady) {
-    return (
-      <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-        <CardHeader className="pb-0">
-          <CardTitle className="text-sm font-semibold">{t("dashboard.todo")}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <p className="text-sm text-muted-foreground">{t("dashboard.todoLoadingTasks")}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const total = needsActionCount + pendingConfirmationCount + reminderIssuesCount
-  const rowClass =
-    "group flex min-h-[2.75rem] items-center justify-between gap-3 rounded-xl border border-transparent px-2 py-2 text-sm outline-none transition-colors hover:border-border/80 hover:bg-muted/40 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-
-  return (
-    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-      <CardHeader className="pb-0">
-        <CardTitle className="text-sm font-semibold">{t("dashboard.todo")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 pt-2">
-        <ul className="space-y-0.5">
-          <li>
-            <Link href="/appointments?filter=needs_action" className={rowClass}>
-              <span className="min-w-0 text-muted-foreground group-hover:text-foreground">
-                {t("dashboard.todoNeedsActionLabel")}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
-                <span className="font-semibold text-foreground">{needsActionCount}</span>
-                <ChevronRight className="size-4 text-muted-foreground opacity-60 group-hover:opacity-100" aria-hidden />
-              </span>
-            </Link>
-          </li>
-          <li>
-            <Link href="/messages?filter=failed" className={rowClass}>
-              <span className="min-w-0 text-muted-foreground group-hover:text-foreground">
-                {t("dashboard.todoReminderIssuesLabel")}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
-                <span className="font-semibold text-foreground">{reminderIssuesCount}</span>
-                <ChevronRight className="size-4 text-muted-foreground opacity-60 group-hover:opacity-100" aria-hidden />
-              </span>
-            </Link>
-          </li>
-        </ul>
-        {total === 0 ? (
-          <p className="border-t border-border/60 px-2 pt-3 text-xs text-muted-foreground">
-            {t("dashboard.todoAllClear")}
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
-  )
-}
 
 function TipCard() {
   const { t } = useTranslations()
@@ -345,9 +259,7 @@ export default function DashboardPage() {
   const visitsTodayComputed = stats.todayAppointmentsCount
   const confirmedToday = stats.confirmedTodayCount
   const cancelledToday = stats.cancelledTodayCount
-  const toConfirm = stats.pendingTodayCount
   const needsActionCount = stats.requiresActionCount
-  const reminderIssuesAll = stats.reminderErrorsCount
 
   const timeFmt = React.useMemo(
     () =>
@@ -764,13 +676,6 @@ export default function DashboardPage() {
 
           <aside className="min-w-0 space-y-6 lg:sticky lg:top-6">
             <OnboardingChecklistCard state={onboarding} />
-            <TodoPanel
-              appointmentsReady={appointmentsReady}
-              appointmentsError={appointmentsLoadError}
-              needsActionCount={needsActionCount}
-              pendingConfirmationCount={toConfirm}
-              reminderIssuesCount={reminderIssuesAll}
-            />
             <TipCard />
           </aside>
         </div>
