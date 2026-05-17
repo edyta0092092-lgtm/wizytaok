@@ -847,6 +847,7 @@ export default function PublicBookingPage() {
       }
 
       const bookingId = crypto.randomUUID()
+      const demoConfirmationToken = crypto.randomUUID()
       let resolvedStaffId: string | null = null
       let resolvedStaffName: string | undefined
       if (serviceStaff.length === 1) {
@@ -866,6 +867,7 @@ export default function PublicBookingPage() {
 
       const publicBooking: PublicBooking = {
         id: bookingId,
+        confirmationToken: demoConfirmationToken,
         businessSlug: normalizedSlug,
         serviceId: selectedServiceId,
         staffId: resolvedStaffId ?? undefined,
@@ -890,7 +892,9 @@ export default function PublicBookingPage() {
         // noop for MVP
       }
 
-      router.push(`/rezerwacje/${encodeURIComponent(String(businessSlug))}/success`)
+      router.push(
+        `/rezerwacje/${encodeURIComponent(String(businessSlug))}/success?token=${encodeURIComponent(demoConfirmationToken)}`,
+      )
     })()
   }
 

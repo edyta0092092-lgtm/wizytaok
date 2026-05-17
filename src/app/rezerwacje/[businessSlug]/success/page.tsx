@@ -6,12 +6,10 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { PUBLIC_BOOKINGS_STORAGE_KEY } from "@/lib/bookings/public-bookings"
-import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
 import {
-  fetchBookingCreatedNotifyStatus,
-  type BookingCreatedNotifyApiResult,
-} from "@/lib/bookings/notify-booking-created-client"
+  PUBLIC_BOOKINGS_STORAGE_KEY,
+  getPublicBookings,
+} from "@/lib/bookings/public-bookings"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -19,32 +17,9 @@ import { normalizePublicSlug } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { PublicBooking } from "@/lib/bookings/public-bookings"
 
-function pickImmediateNotifySentKey(
-  status: BookingCreatedNotifyApiResult | null,
-  hasEmail: boolean,
-  hasPhone: boolean,
-): "bookingPublic.whatNextImmediateNotifySent" | "bookingPublic.whatNextImmediateNotifySentSmsOnly" | "bookingPublic.whatNextImmediateNotifySentEmailOnly" | "bookingPublic.whatNextImmediateNotifySafe" {
-  if (!status?.ok || (!hasEmail && !hasPhone)) {
-    return "bookingPublic.whatNextImmediateNotifySafe"
-  }
-  const emailOk =
-    !hasEmail || status.email === "sent" || status.email === "already_sent"
-  const smsOk = !hasPhone || status.sms === "sent" || status.sms === "already_sent"
-  const emailFailed = hasEmail && status.email === "failed"
-  const smsFailed = hasPhone && status.sms === "failed"
-  const emailSent = hasEmail && (status.email === "sent" || status.email === "already_sent")
-  const smsSent = hasPhone && (status.sms === "sent" || status.sms === "already_sent")
-  if (emailFailed || smsFailed || (!emailSent && !smsSent)) {
-    return "bookingPublic.whatNextImmediateNotifySafe"
-  }
-  if (emailSent && smsSent) return "bookingPublic.whatNextImmediateNotifySent"
-  if (smsSent && emailOk) return "bookingPublic.whatNextImmediateNotifySentSmsOnly"
-  if (emailSent && smsOk) return "bookingPublic.whatNextImmediateNotifySentEmailOnly"
-  return "bookingPublic.whatNextImmediateNotifySafe"
-}
-
 type StoredBookingLegacy = {
   id: string
+  confirmationToken?: string
   businessSlug?: string
   serviceName?: string
   durationMinutes?: number
@@ -123,15 +98,31 @@ export default function PublicBookingSuccessPage() {
   const [loading, setLoading] = React.useState(Boolean(tokenFromQuery))
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
   const [returningToBooking, setReturningToBooking] = React.useState(false)
-  const [bookingCreatedNotifyStatus, setBookingCreatedNotifyStatus] =
-    React.useState<BookingCreatedNotifyApiResult | null>(null)
   const popstateHandlingRef = React.useRef(false)
   const popstateReadyRef = React.useRef(false)
 
-  const actionToken = React.useMemo(
-    () => (publicBooking?.confirmationToken ?? tokenFromQuery).trim(),
-    [publicBooking?.confirmationToken, tokenFromQuery],
-  )
+  const confirmationToken = React.useMemo(() => {
+    const fromQuery = tokenFromQuery.trim()
+    if (fromQuery) return fromQuery
+    return (publicBooking?.confirmationToken ?? summary?.confirmationToken ?? "").trim()
+  }, [publicBooking?.confirmationToken, summary?.confirmationToken, tokenFromQuery])
+
+  const manageAppointmentHref = React.useMemo(() => {
+    if (!confirmationToken) return null
+    return `/confirm/${encodeURIComponent(confirmationToken)}?source=booking`
+  }, [confirmationToken])
+
+  React.useEffect(() => {
+    if (loading) return
+    if (confirmationToken) return
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "[booking.success] Brak confirmation_token — przycisk „Anuluj wizytę” ukryty. Oczekiwany URL: /rezerwacje/.../success?token=...",
+      )
+    } else {
+      console.warn("[booking.success] Missing confirmation_token; cancel link hidden.")
+    }
+  }, [loading, confirmationToken])
 
   React.useEffect(() => {
     let cancelled = false
@@ -153,8 +144,11 @@ export default function PublicBookingSuccessPage() {
               setSummary(null)
               return
             }
+            const storedToken =
+              typeof picked.confirmationToken === "string" ? picked.confirmationToken.trim() : ""
             setSummary({
               id: picked.id,
+              confirmationToken: storedToken || undefined,
               serviceName: picked.serviceName ?? "",
               day: picked.day ?? "",
               time: picked.time ?? "",
@@ -170,52 +164,61 @@ export default function PublicBookingSuccessPage() {
       }
       setLoading(true)
       setLoadError(false)
+
+      const applyPublicBooking = (b: PublicBooking) => {
+        setSummary({
+          id: b.id,
+          confirmationToken: b.confirmationToken ?? tokenFromQuery,
+          serviceName: b.serviceName,
+          day: b.date,
+          time: b.time,
+          fullName: b.customerName,
+          phone: b.customerPhone,
+          email: b.customerEmail?.trim() || undefined,
+        })
+        setPublicBooking(b)
+        setLoadError(false)
+        setLoading(false)
+      }
+
+      const localByToken = getPublicBookings().find(
+        (b) =>
+          normalizePublicSlug(b.businessSlug) === normalizedSlug &&
+          (b.confirmationToken ?? "").trim() === tokenFromQuery,
+      )
+
       const client = getBrowserClient()
       if (!isSupabaseConfigured() || !client) {
-        if (!cancelled) {
-          setLoading(false)
-          setLoadError(true)
+        if (cancelled) return
+        if (localByToken) {
+          applyPublicBooking(localByToken)
+          return
         }
-        return
-      }
-      const b = await getBookingByConfirmationToken(client, tokenFromQuery)
-      if (cancelled) return
-      if (!b) {
         setSummary(null)
         setLoadError(true)
         setLoading(false)
         return
       }
-      setSummary({
-        id: b.id,
-        confirmationToken: b.confirmationToken,
-        serviceName: b.serviceName,
-        day: b.date,
-        time: b.time,
-        fullName: b.customerName,
-        phone: b.customerPhone,
-        email: b.customerEmail?.trim() || undefined,
-      })
-      setPublicBooking(b)
-      setLoading(false)
+
+      const b = await getBookingByConfirmationToken(client, tokenFromQuery)
+      if (cancelled) return
+      if (!b) {
+        if (localByToken) {
+          applyPublicBooking(localByToken)
+          return
+        }
+        setSummary(null)
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
+      applyPublicBooking(b)
     }
     void run()
     return () => {
       cancelled = true
     }
   }, [normalizedSlug, tokenFromQuery])
-
-  React.useEffect(() => {
-    if (!tokenFromQuery) return
-    let cancelled = false
-    void (async () => {
-      const status = await fetchBookingCreatedNotifyStatus(tokenFromQuery)
-      if (!cancelled) setBookingCreatedNotifyStatus(status)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [tokenFromQuery])
 
   const fmtDay = React.useMemo(
     () =>
@@ -228,57 +231,13 @@ export default function PublicBookingSuccessPage() {
   )
 
   const dayIso = summary?.day ?? ""
-  const customerEmail = (publicBooking?.customerEmail ?? summary?.email ?? "").trim()
-  const hasEmail = customerEmail.length > 0
-  const customerPhone = (publicBooking?.customerPhone ?? summary?.phone ?? "").trim()
-  const hasPhone = customerPhone.length > 0
-  const immediateNotifyKey = React.useMemo(
-    () => pickImmediateNotifySentKey(bookingCreatedNotifyStatus, hasEmail, hasPhone),
-    [bookingCreatedNotifyStatus, hasEmail, hasPhone],
-  )
 
-  const refreshBooking = React.useCallback(async () => {
-    const client = getBrowserClient()
-    if (!client || !tokenFromQuery) return
-    const b = await getBookingByConfirmationToken(client, tokenFromQuery)
-    if (!b) return
-    setPublicBooking(b)
-    setSummary({
-      id: b.id,
-      confirmationToken: b.confirmationToken,
-      serviceName: b.serviceName,
-      day: b.date,
-      time: b.time,
-      fullName: b.customerName,
-      phone: b.customerPhone,
-      email: b.customerEmail?.trim() || undefined,
-    })
-  }, [tokenFromQuery])
-
-  const cancelViaSupabase = React.useCallback(async () => {
-    if (!actionToken) return false
-    const res = await cancelPublicBookingViaApi(actionToken, language)
-    return res.ok
-  }, [actionToken, language])
-
-  const cancelIfNeeded = React.useCallback(async () => {
-    if (!tokenFromQuery || !publicBooking || publicBooking.status === "cancelled") return
-    const ok = await cancelViaSupabase()
-    if (ok) {
-      await refreshBooking()
-    }
-  }, [cancelViaSupabase, publicBooking, refreshBooking, tokenFromQuery])
-
-  const handleBackToBooking = React.useCallback(async () => {
+  const handleBookAnother = React.useCallback(() => {
     if (returningToBooking) return
     const targetHref = `/rezerwacje/${encodeURIComponent(String(businessSlug))}`
     setReturningToBooking(true)
-    try {
-      await cancelIfNeeded()
-    } finally {
-      router.push(targetHref)
-    }
-  }, [returningToBooking, businessSlug, cancelIfNeeded, router])
+    router.push(targetHref)
+  }, [returningToBooking, businessSlug, router])
 
   React.useEffect(() => {
     if (!tokenFromQuery || !summary?.id) return
@@ -295,20 +254,14 @@ export default function PublicBookingSuccessPage() {
     const onPopState = () => {
       if (!popstateReadyRef.current || popstateHandlingRef.current) return
       popstateHandlingRef.current = true
-      void (async () => {
-        try {
-          await cancelIfNeeded()
-        } finally {
-          router.replace(`/rezerwacje/${encodeURIComponent(String(businessSlug))}`)
-        }
-      })()
+      router.replace(`/rezerwacje/${encodeURIComponent(String(businessSlug))}`)
     }
     window.addEventListener("popstate", onPopState)
     return () => {
       window.clearTimeout(readyTimer)
       window.removeEventListener("popstate", onPopState)
     }
-  }, [tokenFromQuery, summary?.id, cancelIfNeeded, router, businessSlug])
+  }, [tokenFromQuery, summary?.id, router, businessSlug])
 
   if (loading) {
     return (
@@ -378,12 +331,12 @@ export default function PublicBookingSuccessPage() {
               <span className="font-medium text-foreground">{t("bookingPublic.statusConfirmed")}</span>
             </p>
             <div className="mt-4 space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-              {tokenFromQuery ? (
-                <div>
-                  <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{t(immediateNotifyKey)}</p>
-                </div>
-              ) : null}
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("bookingPublic.whatNextImmediateNotifySafe")}
+                </p>
+              </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">{t("bookingPublic.remindersSectionTitle")}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t("bookingPublic.whatNextReminderOnly")}</p>
@@ -391,13 +344,18 @@ export default function PublicBookingSuccessPage() {
             </div>
 
             <div className="mt-4 flex flex-col gap-2">
+              {manageAppointmentHref ? (
+                <Button asChild variant="outline" className="w-full">
+                  <Link href={manageAppointmentHref}>{t("bookingPublic.cancelAppointment")}</Link>
+                </Button>
+              ) : null}
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => void handleBackToBooking()}
+                onClick={() => handleBookAnother()}
                 disabled={returningToBooking}
               >
-                {t("bookingPublic.backToBooking")}
+                {t("bookingPublic.bookAnotherAppointment")}
               </Button>
             </div>
           </CardContent>
