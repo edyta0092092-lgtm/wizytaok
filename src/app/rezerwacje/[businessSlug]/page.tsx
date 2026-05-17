@@ -86,6 +86,12 @@ function joinPersonName(firstName: string, lastName: string): string {
   return `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ")
 }
 
+function isEmailFormatValid(email: string): boolean {
+  const value = email.trim()
+  if (!value) return true
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
 export default function PublicBookingPage() {
   const { t, language } = useTranslations()
   const router = useRouter()
@@ -725,6 +731,10 @@ export default function PublicBookingPage() {
       setError(t("bookingPublic.fillRequired"))
       return
     }
+    if (!isEmailFormatValid(form.email)) {
+      setError(t("bookingPublic.validationEmailInvalid"))
+      return
+    }
     const pv = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
     if (!pv.ok) {
       setError(
@@ -1083,10 +1093,27 @@ export default function PublicBookingPage() {
                 <CardTitle className="text-base">{t("bookingPublic.yourDetails")}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2.5 pt-0">
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {t("bookingPublic.contactRemindersHint")}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-destructive" aria-hidden="true">
+                    *
+                  </span>{" "}
+                  {t("bookingPublic.required")}
+                </p>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="book-firstname">{t("bookingPublic.firstName")}</Label>
+                  <Label htmlFor="book-firstname">
+                    {t("bookingPublic.firstName")}
+                    <span className="text-destructive" aria-hidden="true">
+                      {" "}
+                      *
+                    </span>
+                  </Label>
                   <Input
                     id="book-firstname"
+                    required
+                    autoComplete="given-name"
                     value={form.firstName}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, firstName: e.target.value }))
@@ -1094,9 +1121,16 @@ export default function PublicBookingPage() {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="book-lastname">{t("bookingPublic.lastName")}</Label>
+                  <Label htmlFor="book-lastname">
+                    {t("bookingPublic.lastName")}
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      ({t("bookingPublic.fieldOptional")})
+                    </span>
+                  </Label>
                   <Input
                     id="book-lastname"
+                    autoComplete="family-name"
                     value={form.lastName}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, lastName: e.target.value }))
@@ -1104,7 +1138,15 @@ export default function PublicBookingPage() {
                   />
                 </div>
                 <InternationalPhoneFieldGroup
-                  label={t("bookingPublic.phone")}
+                  label={
+                    <>
+                      {t("bookingPublic.phone")}
+                      <span className="text-destructive" aria-hidden="true">
+                        {" "}
+                        *
+                      </span>
+                    </>
+                  }
                   dialCode={form.phoneDialCode}
                   nationalDigits={form.phoneNational}
                   onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
@@ -1115,10 +1157,17 @@ export default function PublicBookingPage() {
                   nationalInputId="book-phone"
                 />
                 <div className="grid gap-1.5">
-                  <Label htmlFor="book-email">{t("bookingPublic.email")}</Label>
+                  <Label htmlFor="book-email">
+                    {t("bookingPublic.email")}
+                    <span className="font-normal text-muted-foreground">
+                      {" "}
+                      ({t("bookingPublic.fieldOptional")})
+                    </span>
+                  </Label>
                   <Input
                     id="book-email"
                     type="email"
+                    autoComplete="email"
                     value={form.email}
                     onChange={(e) =>
                       setForm((f) => ({ ...f, email: e.target.value }))

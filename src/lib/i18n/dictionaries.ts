@@ -978,6 +978,10 @@ export const dictionaries = {
       phone: "Telefon",
       email: "E-mail",
       optionalNote: "Notatka opcjonalnie",
+      fieldOptional: "opcjonalnie",
+      contactRemindersHint:
+        "Telefon i e-mail służą do wysyłania potwierdzeń oraz przypomnień o wizycie. Bez poprawnych danych kontaktowych nie otrzymasz przypomnienia.",
+      validationEmailInvalid: "Podaj poprawny adres e-mail lub zostaw pole puste.",
       bookingSavedTitle: "Wizyta potwierdzona",
       bookingSavedDescription:
         "Twoja wizyta została zapisana i potwierdzona.",
@@ -3132,6 +3136,10 @@ Pozdrawiamy,
       phone: "Phone",
       email: "Email",
       optionalNote: "Optional note",
+      fieldOptional: "optional",
+      contactRemindersHint:
+        "Phone and email are used to send confirmations and appointment reminders. Without valid contact details you will not receive reminders.",
+      validationEmailInvalid: "Enter a valid email address or leave the field empty.",
       bookingSavedTitle: "Booking saved",
       bookingSavedDescription: "Your booking has been saved.",
       bookingSavedDescriptionNotifySent:
