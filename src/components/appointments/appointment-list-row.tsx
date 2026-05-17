@@ -10,7 +10,6 @@ import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { getBookingSourceLabel } from "@/lib/bookings/booking-source"
 import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
@@ -107,7 +106,6 @@ export function AppointmentListRow({
   isCancellingVisit,
 }: AppointmentListRowProps) {
   const { t } = useTranslations()
-  const sourceLabel = getBookingSourceLabel(row.source, language)
 
   return (
     <React.Fragment>
@@ -211,7 +209,6 @@ export function AppointmentListRow({
             allowAppointmentDelete={allowAppointmentDelete}
             onDelete={onDeleteRequest}
           />
-          <p className="text-xs text-muted-foreground md:text-right">{sourceLabel}</p>
         </div>
       </div>
 

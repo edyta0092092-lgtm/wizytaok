@@ -9,8 +9,6 @@ import {
 } from "@/lib/appointments/appointments-grouping"
 import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
 import { appointmentRequiresBusinessContact } from "@/lib/appointments/stats-rules"
-import { appointmentMatchesSourceFilter } from "@/lib/bookings/booking-source"
-import type { AppointmentSourceFilter } from "@/lib/bookings/booking-source"
 import { getAppToday, isSameAppDay } from "@/lib/date/current-date"
 import { bookingMatchesStaffFilter } from "@/lib/staff/staff-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
@@ -19,7 +17,6 @@ import type { Appointment } from "@/types/domain"
 export function useAppointmentsListPresentation(args: {
   appointments: Appointment[]
   filter: AppointmentsListFilter
-  sourceFilter: AppointmentSourceFilter
   staffFilter: StaffAppointmentFilterValue
   restrictToToday: boolean
   clientNameFilter: string
@@ -29,7 +26,6 @@ export function useAppointmentsListPresentation(args: {
   const {
     appointments,
     filter,
-    sourceFilter,
     staffFilter,
     restrictToToday,
     clientNameFilter,
@@ -83,7 +79,6 @@ export function useAppointmentsListPresentation(args: {
       stage = base.filter((a) => a.status === filter)
     }
     return stage
-      .filter((a) => appointmentMatchesSourceFilter(a.source, sourceFilter))
       .filter((a) => bookingMatchesStaffFilter(a, staffFilter))
       .filter((a) =>
         qClient ? String(a.clientName ?? "").toLowerCase().includes(qClient) : true
@@ -94,7 +89,6 @@ export function useAppointmentsListPresentation(args: {
   }, [
     appointments,
     filter,
-    sourceFilter,
     staffFilter,
     restrictToToday,
     clientNameFilter,

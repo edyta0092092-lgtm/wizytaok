@@ -14,7 +14,6 @@ export const TOUR_STEPS: TourStepConfig[] = [
   { id: "settings-company", path: "/settings", target: "settings-company" },
   { id: "settings-reminders", path: "/settings", target: "settings-reminders" },
   { id: "clients-add", path: "/clients", target: "clients-add" },
-  { id: "appointments-add", path: "/appointments", target: "appointments-add" },
   { id: "dashboard-today", path: "/dashboard", target: "dashboard-today" },
   { id: "appointments-statuses", path: "/appointments", target: "appointments-statuses" },
   { id: "dashboard-attention", path: "/dashboard", target: "dashboard-attention" },

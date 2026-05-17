@@ -2,22 +2,12 @@
 
 import * as React from "react"
 
-/**
- * Ukrywa komunikat „dodano” i tymczasowe `actionNotice` po krótkim czasie (jak na stronie wizyt).
- */
+/** Ukrywa tymczasowe `actionNotice` po krótkim czasie. */
 export function useAppointmentsTransientBanners(args: {
-  showAdded: boolean
-  setShowAdded: React.Dispatch<React.SetStateAction<boolean>>
   actionNotice: string
   setActionNotice: React.Dispatch<React.SetStateAction<string>>
 }): void {
-  const { showAdded, setShowAdded, actionNotice, setActionNotice } = args
-
-  React.useEffect(() => {
-    if (!showAdded) return
-    const tid = window.setTimeout(() => setShowAdded(false), 2500)
-    return () => window.clearTimeout(tid)
-  }, [showAdded, setShowAdded])
+  const { actionNotice, setActionNotice } = args
 
   React.useEffect(() => {
     if (!actionNotice) return

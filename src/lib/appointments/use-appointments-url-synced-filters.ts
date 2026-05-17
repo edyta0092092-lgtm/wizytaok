@@ -7,11 +7,10 @@ import {
   normalizeAppointmentsStatusFilterFromUrl,
   type AppointmentsListFilter,
 } from "@/lib/appointments/appointments-list-filters"
-import type { AppointmentSourceFilter } from "@/lib/bookings/booking-source"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 
 /**
- * Stan filtrów listy wizyt zsynchronizowany z query string (?filter ?status ?date ?source ?staff).
+ * Stan filtrów listy wizyt zsynchronizowany z query string (?filter ?status ?date ?staff).
  * `setFilter` nie zapisuje URL (jak wcześniej na stronie) — tylko przyciski statusów lokalnie.
  */
 export function useAppointmentsUrlSyncedFilters() {
@@ -20,7 +19,6 @@ export function useAppointmentsUrlSyncedFilters() {
   const router = useRouter()
 
   const [filter, setFilter] = React.useState<AppointmentsListFilter>("all")
-  const [sourceFilter, setSourceFilter] = React.useState<AppointmentSourceFilter>("all")
   const [staffFilter, setStaffFilter] = React.useState<StaffAppointmentFilterValue>("all")
   const [restrictToToday, setRestrictToToday] = React.useState(false)
 
@@ -44,39 +42,6 @@ export function useAppointmentsUrlSyncedFilters() {
     queueMicrotask(() => setFilter(fromUrl))
   }, [searchParams])
 
-  React.useEffect(() => {
-    const src = searchParams.get("source")
-    if (src === "manual_admin" || src === "manual_staff") {
-      const p = new URLSearchParams(searchParams.toString())
-      p.set("source", "manual")
-      const q = p.toString()
-      queueMicrotask(() => {
-        setSourceFilter("manual")
-        router.replace(q ? `${pathname}?${q}` : pathname)
-      })
-      return
-    }
-    if (src === "online") {
-      queueMicrotask(() => setSourceFilter("online"))
-    } else if (src === "manual") {
-      queueMicrotask(() => setSourceFilter("manual"))
-    } else {
-      queueMicrotask(() => setSourceFilter("all"))
-    }
-  }, [searchParams, pathname, router])
-
-  const setSourceFilterAndUrl = React.useCallback(
-    (next: AppointmentSourceFilter) => {
-      setSourceFilter(next)
-      const p = new URLSearchParams(searchParams.toString())
-      if (next === "all") p.delete("source")
-      else p.set("source", next)
-      const q = p.toString()
-      router.replace(q ? `${pathname}?${q}` : pathname)
-    },
-    [pathname, router, searchParams]
-  )
-
   const setStaffFilterAndUrl = React.useCallback(
     (next: StaffAppointmentFilterValue) => {
       setStaffFilter(next)
@@ -87,7 +52,7 @@ export function useAppointmentsUrlSyncedFilters() {
       const q = p.toString()
       router.replace(q ? `${pathname}?${q}` : pathname)
     },
-    [pathname, router, searchParams]
+    [pathname, router, searchParams],
   )
 
   React.useEffect(() => {
@@ -104,10 +69,8 @@ export function useAppointmentsUrlSyncedFilters() {
   return {
     filter,
     setFilter,
-    sourceFilter,
     staffFilter,
     restrictToToday,
-    setSourceFilterAndUrl,
     setStaffFilterAndUrl,
   }
 }

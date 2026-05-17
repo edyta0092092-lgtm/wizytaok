@@ -3,13 +3,10 @@
 import * as React from "react"
 
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
-import type { AppointmentSourceFilter } from "@/lib/bookings/booking-source"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { StaffMember } from "@/types/domain"
 
 export type UseAppointmentsFiltersControllerParams = {
-  sourceFilter: AppointmentSourceFilter
-  onSourceFilterChange: (next: AppointmentSourceFilter) => void
   staffFilter: StaffAppointmentFilterValue
   onStaffFilterChange: (next: StaffAppointmentFilterValue) => void
   staffLoading: boolean
@@ -26,8 +23,6 @@ export type UseAppointmentsFiltersControllerParams = {
 }
 
 export function useAppointmentsFiltersController({
-  sourceFilter,
-  onSourceFilterChange,
   staffFilter,
   onStaffFilterChange,
   staffLoading,
@@ -44,8 +39,6 @@ export function useAppointmentsFiltersController({
 }: UseAppointmentsFiltersControllerParams) {
   return React.useMemo(
     () => ({
-      sourceFilter,
-      onSourceFilterChange,
       staffFilter,
       onStaffFilterChange,
       staffLoading,
@@ -61,8 +54,6 @@ export function useAppointmentsFiltersController({
       serviceOptions,
     }),
     [
-      sourceFilter,
-      onSourceFilterChange,
       staffFilter,
       onStaffFilterChange,
       staffLoading,

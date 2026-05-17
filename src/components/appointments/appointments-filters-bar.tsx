@@ -1,26 +1,20 @@
 "use client"
 
-import * as React from "react"
-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  APPOINTMENTS_SOURCE_FILTERS,
   APPOINTMENTS_STATUS_FILTERS,
   type AppointmentsListFilter,
 } from "@/lib/appointments/appointments-list-filters"
-import { type AppointmentSourceFilter } from "@/lib/bookings/booking-source"
 import { type StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import type { StaffMember } from "@/types/domain"
 
 export type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
-export { APPOINTMENTS_SOURCE_FILTERS, APPOINTMENTS_STATUS_FILTERS } from "@/lib/appointments/appointments-list-filters"
+export { APPOINTMENTS_STATUS_FILTERS } from "@/lib/appointments/appointments-list-filters"
 
 export type AppointmentsFiltersBarProps = {
-  sourceFilter: AppointmentSourceFilter
-  onSourceFilterChange: (next: AppointmentSourceFilter) => void
   staffFilter: StaffAppointmentFilterValue
   onStaffFilterChange: (next: StaffAppointmentFilterValue) => void
   staffLoading: boolean
@@ -37,8 +31,6 @@ export type AppointmentsFiltersBarProps = {
 }
 
 export function AppointmentsFiltersBar({
-  sourceFilter,
-  onSourceFilterChange,
   staffFilter,
   onStaffFilterChange,
   staffLoading,
@@ -58,32 +50,6 @@ export function AppointmentsFiltersBar({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
-        <div className="min-w-0">
-          <label
-            htmlFor="appointments-source-filter"
-            className="mb-1 block text-xs font-medium text-muted-foreground"
-          >
-            {t("appointments.bookingSource.filterLabel")}
-          </label>
-          <select
-            id="appointments-source-filter"
-            className="h-9 w-full max-w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
-            value={sourceFilter}
-            onChange={(e) =>
-              onSourceFilterChange(e.target.value as AppointmentSourceFilter)
-            }
-          >
-            {APPOINTMENTS_SOURCE_FILTERS.map((sf) => (
-              <option key={sf} value={sf}>
-                {sf === "all"
-                  ? t("appointments.bookingSource.filterAll")
-                  : sf === "online"
-                    ? t("appointments.bookingSource.filterOnline")
-                    : t("appointments.bookingSource.filterManual")}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="min-w-0">
           <label
             htmlFor="appointments-staff-filter"
@@ -120,8 +86,6 @@ export function AppointmentsFiltersBar({
             </p>
           ) : null}
         </div>
-      </div>
-      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
         <div className="min-w-0">
           <label
             htmlFor="appointments-client-filter"
@@ -137,6 +101,8 @@ export function AppointmentsFiltersBar({
             className="h-9 rounded-xl"
           />
         </div>
+      </div>
+      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:max-w-md sm:items-end">
         <div className="min-w-0">
           <label
             htmlFor="appointments-service-filter"

@@ -4,10 +4,8 @@ import * as React from "react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { ManualAppointmentSheet } from "@/components/appointments/manual-appointment-sheet"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
-import { AppointmentsPagePrimaryAction } from "@/components/appointments/appointments-page-primary-action"
 import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
 import { useAppointmentsFiltersController } from "@/lib/appointments/use-appointments-filters-controller"
 import { useAppointmentsUrlSyncedFilters } from "@/lib/appointments/use-appointments-url-synced-filters"
@@ -18,25 +16,18 @@ import { useStaffByServiceCacheForAppointments } from "@/lib/appointments/use-st
 import { useAppointmentsTransientBanners } from "@/lib/appointments/use-appointments-transient-banners"
 import { useAppointmentsDeleteFlow } from "@/lib/appointments/use-appointments-delete-flow"
 import { useAppointmentsPageListController } from "@/lib/appointments/use-appointments-page-list-controller"
-import { useManualAppointmentCreateSheet } from "@/lib/appointments/use-manual-appointment-create-sheet"
+import { EMPTY_MANUAL_APPOINTMENT_FORM } from "@/lib/appointments/manual-appointment-form-defaults"
+import { useManualAppointmentSheetData } from "@/lib/appointments/use-manual-appointment-sheet-data"
 import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export function AppointmentsPageInner() {
-  // Access, i18n and source data.
   const { ready: accessReady, canDeleteBookings, businessId } = useBusinessAccess()
   const { t, language } = useTranslations()
   const { appointments } = useAppointmentsStore()
-  const {
-    filter,
-    setFilter,
-    sourceFilter,
-    staffFilter,
-    restrictToToday,
-    setSourceFilterAndUrl,
-    setStaffFilterAndUrl,
-  } = useAppointmentsUrlSyncedFilters()
+  const { filter, setFilter, staffFilter, restrictToToday, setStaffFilterAndUrl } =
+    useAppointmentsUrlSyncedFilters()
   const { allStaffMembers, staffLoading, staffLoadError, staffSelectOptions } =
     useAppointmentsStaffForFilters(appointments, staffFilter, setStaffFilterAndUrl)
   const [clientNameFilter, setClientNameFilter] = React.useState("")
@@ -52,7 +43,6 @@ export function AppointmentsPageInner() {
   const { filtered, grouped, formatWhen } = useAppointmentsListPresentation({
     appointments,
     filter,
-    sourceFilter,
     staffFilter,
     restrictToToday,
     clientNameFilter,
@@ -60,8 +50,6 @@ export function AppointmentsPageInner() {
     language,
   })
 
-  // Page-level UI state.
-  const [showAdded, setShowAdded] = React.useState(false)
   const [actionNotice, setActionNotice] = React.useState("")
   const allowAppointmentDelete = accessReady && canDeleteBookings
   const { staffByService, setStaffByService } = useStaffByServiceCacheForAppointments(appointments)
@@ -72,8 +60,15 @@ export function AppointmentsPageInner() {
   )
 
   const uiLang = appointmentsUiLanguage(language)
+  const [, setManualFormStub] = React.useState(EMPTY_MANUAL_APPOINTMENT_FORM)
+  const { manualServiceOptions } = useManualAppointmentSheetData(
+    businessId,
+    "",
+    "",
+    "",
+    setManualFormStub,
+  )
 
-  // Delete flow.
   const {
     setConfirmDeleteAppointmentId,
     effectiveConfirmDeleteAppointmentId,
@@ -87,28 +82,6 @@ export function AppointmentsPageInner() {
     setActionNotice,
   })
 
-  // Create sheet flow.
-  const {
-    sheetOpen: createOpen,
-    setSheetOpen: setCreateOpen,
-    form,
-    setForm,
-    isSaving,
-    manualServiceOptions,
-    manualStaffForService,
-    manualAvailableStaffIds,
-    canSubmitManual,
-    openCreate,
-    saveManual,
-  } = useManualAppointmentCreateSheet({
-    businessId,
-    hasActiveTeamMembers,
-    t,
-    setActionNotice,
-    setShowAdded,
-  })
-
-  // Propose/edit panel flow.
   const {
     proposeForId,
     setProposeForId,
@@ -144,9 +117,8 @@ export function AppointmentsPageInner() {
     setActionNotice,
   })
 
-  useAppointmentsTransientBanners({ showAdded, setShowAdded, actionNotice, setActionNotice })
+  useAppointmentsTransientBanners({ actionNotice, setActionNotice })
 
-  // View-models for page sections.
   const appointmentsListBundles = useAppointmentsPageListController({
     t,
     setActionNotice,
@@ -189,8 +161,6 @@ export function AppointmentsPageInner() {
   })
 
   const filtersController = useAppointmentsFiltersController({
-    sourceFilter,
-    onSourceFilterChange: setSourceFilterAndUrl,
     staffFilter,
     onStaffFilterChange: setStaffFilterAndUrl,
     staffLoading,
@@ -207,38 +177,14 @@ export function AppointmentsPageInner() {
   })
 
   return (
-    <AppShell
-      title={t("navigation.appointments")}
-      pageDescription={t("appointments.description")}
-      primaryAction={
-        <AppointmentsPagePrimaryAction label={t("common.addAppointment")} onClick={openCreate} />
-      }
-    >
+    <AppShell title={t("navigation.appointments")} pageDescription={t("appointments.description")}>
       <PageShell>
-        <AppointmentsPageBanners
-          showAdded={showAdded}
-          appointmentAddedLabel={t("appointments.appointmentAdded")}
-          actionNotice={actionNotice}
-        />
+        <AppointmentsPageBanners actionNotice={actionNotice} />
         <AppointmentsFiltersAndListSection
           filters={filtersController}
           list={appointmentsListBundles}
         />
       </PageShell>
-      <ManualAppointmentSheet
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        form={form}
-        setForm={setForm}
-        manualServiceOptions={manualServiceOptions}
-        manualStaffForService={manualStaffForService}
-        manualAvailableStaffIds={manualAvailableStaffIds}
-        hasActiveTeamMembers={hasActiveTeamMembers}
-        canSubmitManualAppointment={canSubmitManual}
-        isSaving={isSaving}
-        language={language}
-        onSubmit={saveManual}
-      />
     </AppShell>
   )
 }
