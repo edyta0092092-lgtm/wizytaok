@@ -8,11 +8,15 @@ import { AppointmentsListEmpty } from "@/components/appointments/appointments-li
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
-import { getBookingReminderStatus, type ReminderUiStatus } from "@/lib/appointments/booking-reminder-status"
-import type { SupabaseBookingReminderLineLabels } from "@/lib/appointments/supabase-booking-reminder-line"
+import {
+  buildAppointmentReminderSections,
+  groupAppointmentReminderRowsByBookingId,
+  type AppointmentReminderPanelLabels,
+  type AppointmentReminderQueueRow,
+  type AppointmentReminderSection,
+} from "@/lib/appointments/appointment-reminder-panel-display"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import type { Tables } from "@/types/database"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
@@ -22,7 +26,7 @@ export type AppointmentsListPresentationBundle = {
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
-  reminderLineLabels: SupabaseBookingReminderLineLabels
+  reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
 }
 
@@ -85,12 +89,12 @@ export function AppointmentsListWithRows({
     staffFilter,
     listFilter,
     formatWhen,
-    reminderLineLabels: _reminderLineLabels,
+    reminderPanelLabels,
     listUiLanguage,
   } = presentation
 
-  const [reminderLogsByBookingId, setReminderLogsByBookingId] = React.useState<
-    Record<string, Array<Pick<Tables<"notification_logs">, "status" | "type" | "channel">>>
+  const [reminderSectionsByBookingId, setReminderSectionsByBookingId] = React.useState<
+    Record<string, AppointmentReminderSection[]>
   >({})
 
   React.useEffect(() => {
@@ -104,53 +108,36 @@ export function AppointmentsListWithRows({
         .filter((row) => row.id.startsWith("sb-"))
         .map((row) => row.id.slice(3))
       if (bookingIds.length === 0) {
-        if (!cancelled) setReminderLogsByBookingId({})
+        if (!cancelled) setReminderSectionsByBookingId({})
         return
       }
       const businessId = await getCurrentBusinessProfileIdForClient(client)
       if (!businessId) return
       const { data, error } = await client
-        .from("notification_logs")
-        .select("booking_id,status,type,channel,created_at")
+        .from("appointment_reminders")
+        .select("appointment_id,channel,reminder_kind,status")
         .eq("business_id", businessId)
-        .in("booking_id", bookingIds)
-        .order("created_at", { ascending: false })
+        .in("appointment_id", bookingIds)
       if (error) return
       if (cancelled) return
-      const groupedLogs: Record<
-        string,
-        Array<Pick<Tables<"notification_logs">, "status" | "type" | "channel">>
-      > = {}
-      for (const row of data ?? []) {
-        const bookingId = String(row.booking_id ?? "")
-        if (!bookingId) continue
-        if (!groupedLogs[bookingId]) groupedLogs[bookingId] = []
-        groupedLogs[bookingId]!.push({
-          status: row.status,
-          type: row.type,
-          channel: row.channel,
-        })
+      const rows = (data ?? []) as AppointmentReminderQueueRow[]
+      const groupedRows = groupAppointmentReminderRowsByBookingId(rows)
+      const sectionsByBooking: Record<string, AppointmentReminderSection[]> = {}
+      for (const bookingId of bookingIds) {
+        const sections = buildAppointmentReminderSections(
+          groupedRows[bookingId] ?? [],
+          reminderPanelLabels,
+        )
+        if (sections.length > 0) {
+          sectionsByBooking[bookingId] = sections
+        }
       }
-      setReminderLogsByBookingId(groupedLogs)
+      setReminderSectionsByBookingId(sectionsByBooking)
     })()
     return () => {
       cancelled = true
     }
-  }, [grouped])
-
-  const statusLabel = React.useCallback(
-    (status: ReminderUiStatus): string => {
-      if (status === "failed") return "nieudane"
-      if (status === "sent") return "wysłane"
-      if (status === "partial") return "częściowo wysłane"
-      if (status === "unsent") return "niewysłane"
-      if (status === "disabled") return "wyłączone"
-      return "zaplanowane"
-    },
-    []
-  )
-
-  void _reminderLineLabels
+  }, [grouped, reminderPanelLabels])
 
   const {
     staffByService,
@@ -200,27 +187,8 @@ export function AppointmentsListWithRows({
       grouped={grouped}
       renderRow={({ row, indexInGroup, groupLength }) => {
         const { date, time } = formatWhen(row.startsAt)
-        const reminderLines: string[] = []
-        if (row.id.startsWith("sb-")) {
-          const bookingId = row.id.slice(3)
-          const resolved = getBookingReminderStatus(
-            bookingId,
-            row,
-            reminderLogsByBookingId[bookingId] ?? [],
-            true
-          )
-          if (resolved.overall === "disabled") {
-            reminderLines.push("Przypomnienia wyłączone")
-          } else {
-            for (const line of resolved.lines) {
-              if (line.kind === "reminder24h") {
-                reminderLines.push(`Przypomnienie 24h: ${statusLabel(line.status)}`)
-              } else {
-                reminderLines.push(`Przypomnienie przed wizytą: ${statusLabel(line.status)}`)
-              }
-            }
-          }
-        }
+        const reminderSections =
+          row.id.startsWith("sb-") ? reminderSectionsByBookingId[row.id.slice(3)] ?? [] : []
         const saveEditDisabled =
           isSavingDirectEdit ||
           isCancellingVisit ||
@@ -234,7 +202,7 @@ export function AppointmentsListWithRows({
             isLastInSection={indexInGroup === groupLength - 1}
             dateLabel={date}
             timeLabel={time}
-            reminderLines={reminderLines}
+            reminderSections={reminderSections}
             showNeedsActionReason={listFilter === "needs_action"}
             language={listUiLanguage}
             staffByService={staffByService}

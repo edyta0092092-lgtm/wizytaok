@@ -99,7 +99,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     onEditVisit,
   } = args
 
-  const reminderLineLabels = useAppointmentReminderLineLabels(t)
+  const { panel: reminderPanelLabels } = useAppointmentReminderLineLabels(t)
   const onChangeStatus = useApplyManualAppointmentStatus(t, setActionNotice)
 
   const onStaffChange = React.useCallback(
@@ -115,7 +115,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     staffFilter,
     listFilter,
     formatWhen,
-    reminderLineLabels,
+    reminderPanelLabels,
     listUiLanguage,
     staffByService,
     hasActiveTeamMembers,

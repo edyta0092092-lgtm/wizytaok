@@ -5,7 +5,7 @@ import * as React from "react"
 import type { AppointmentsListWithRowsProps } from "@/components/appointments/appointments-list-with-rows"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
-import type { SupabaseBookingReminderLineLabels } from "@/lib/appointments/supabase-booking-reminder-line"
+import type { AppointmentReminderPanelLabels } from "@/lib/appointments/appointment-reminder-panel-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
@@ -15,7 +15,7 @@ export type AppointmentsListWithRowsBundlesParams = {
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
-  reminderLineLabels: SupabaseBookingReminderLineLabels
+  reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
   staffByService: Record<string, StaffMember[]>
   hasActiveTeamMembers: boolean
@@ -57,7 +57,7 @@ export function useAppointmentsListWithRowsBundles({
   staffFilter,
   listFilter,
   formatWhen,
-  reminderLineLabels,
+  reminderPanelLabels,
   listUiLanguage,
   staffByService,
   hasActiveTeamMembers,
@@ -100,7 +100,7 @@ export function useAppointmentsListWithRowsBundles({
         staffFilter,
         listFilter,
         formatWhen,
-        reminderLineLabels,
+        reminderPanelLabels,
         listUiLanguage,
       },
       handlers: {
@@ -171,7 +171,7 @@ export function useAppointmentsListWithRowsBundles({
       staffFilter,
       listFilter,
       formatWhen,
-      reminderLineLabels,
+      reminderPanelLabels,
       listUiLanguage,
       staffByService,
       hasActiveTeamMembers,

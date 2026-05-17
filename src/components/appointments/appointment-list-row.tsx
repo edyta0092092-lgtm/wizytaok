@@ -14,6 +14,7 @@ import { getBookingSourceLabel } from "@/lib/bookings/booking-source"
 import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
+import type { AppointmentReminderSection } from "@/lib/appointments/appointment-reminder-panel-display"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
@@ -23,7 +24,7 @@ export type AppointmentListRowProps = {
   isLastInSection: boolean
   dateLabel: string
   timeLabel: string
-  reminderLines: string[]
+  reminderSections: AppointmentReminderSection[]
   showNeedsActionReason: boolean
   language: "pl" | "en"
   staffByService: Record<string, StaffMember[]>
@@ -65,7 +66,7 @@ export function AppointmentListRow({
   isLastInSection,
   dateLabel,
   timeLabel,
-  reminderLines,
+  reminderSections,
   showNeedsActionReason,
   language,
   staffByService,
@@ -172,11 +173,21 @@ export function AppointmentListRow({
               {t("appointments.remindersAutomatedPolicy")}
             </p>
           ) : null}
-          {row.id.startsWith("sb-") && reminderLines.length > 0
-            ? reminderLines.map((line) => (
-                <p key={`${row.id}-${line}`} className="mt-0.5 text-xs text-muted-foreground">
-                  {line}
-                </p>
+          {row.id.startsWith("sb-") && reminderSections.length > 0
+            ? reminderSections.map((section) => (
+                <div
+                  key={`${row.id}-${section.title}`}
+                  className="mt-1 space-y-0.5 text-xs text-muted-foreground"
+                >
+                  <p className="font-medium text-muted-foreground">{section.title}</p>
+                  <ul className="list-none space-y-0.5 pl-0">
+                    {section.channels.map((channel) => (
+                      <li key={`${section.title}-${channel.channelLabel}`}>
+                        {channel.channelLabel}: {channel.statusLabel}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               ))
             : null}
           {row.id.startsWith("sb-") &&
