@@ -8,7 +8,7 @@ export type TourStepConfig = {
 }
 
 /**
- * 10 kroków: 1-9 podświetlenia, krok 10 - ekran końcowy (target null).
+ * 9 kroków: 1-8 podświetlenia, krok 9 - ekran końcowy (target null).
  */
 export const TOUR_STEPS: TourStepConfig[] = [
   { id: "settings-company", path: "/settings", target: "settings-company" },
@@ -19,6 +19,5 @@ export const TOUR_STEPS: TourStepConfig[] = [
   { id: "appointments-statuses", path: "/appointments", target: "appointments-statuses" },
   { id: "dashboard-attention", path: "/dashboard", target: "dashboard-attention" },
   { id: "messages-list", path: "/messages", target: "messages-list" },
-  { id: "clients-risk", path: "/clients", target: "clients-risk" },
   { id: "finale", path: "/dashboard", target: null },
 ]

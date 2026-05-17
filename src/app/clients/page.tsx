@@ -13,7 +13,6 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { ClientRiskTierBadge } from "@/components/shared/client-risk-tier-badge"
 import { EmptyState } from "@/components/shared/empty-state"
 import { FormActions } from "@/components/shared/form-actions"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
@@ -49,13 +48,11 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import {
   buildPriorIdentity,
-  deriveRiskScoreFromStats,
   isLikelyUuidClientId,
   loadClientsWorkspace,
   type ClientsLoadMode,
   persistClientsCatalog,
   persistClientUpdates,
-  riskTierFromScore,
 } from "@/lib/clients/clients-store"
 import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -156,8 +153,6 @@ function dedupeClientsForRender(rows: Client[]): Client[] {
       if (h.status === "cancelled") mergedCancelled += 1
     }
     const mergedVisitCount = mergedVisitHistory.length
-    const mergedRiskScore = deriveRiskScoreFromStats(mergedVisitCount, mergedNoShow, mergedConfirmed)
-    const mergedRiskTier = riskTierFromScore(mergedRiskScore)
     byId.set(key, {
       ...row,
       id: key,
@@ -169,8 +164,6 @@ function dedupeClientsForRender(rows: Client[]): Client[] {
       confirmedVisitCount: mergedConfirmed,
       noShowCount: mergedNoShow,
       cancelledVisitCount: mergedCancelled,
-      riskScore: mergedRiskScore,
-      riskTier: mergedRiskTier,
       visitHistory: mergedVisitHistory,
     })
   }
@@ -575,7 +568,7 @@ export default function ClientsPage() {
           />
         </div>
 
-        <div className="mt-5 min-w-0" data-tour="clients-risk">
+        <div className="mt-5 min-w-0">
           {catalogLoading ? (
             <p className="text-sm text-muted-foreground">{t("clients.loadingClients")}</p>
           ) : isGloballyEmpty ? (
@@ -730,21 +723,6 @@ export default function ClientsPage() {
                                   {row.cancelledVisitCount}
                                 </span>{" "}
                                 {t("clients.cancelledShort")}
-                              </span>
-                            </div>
-                            <div
-                              className="flex flex-wrap items-center gap-2"
-                              title={t("clients.riskScoreNativeTooltip").replace(
-                                "{score}",
-                                String(row.riskScore)
-                              )}
-                            >
-                              <span className="text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">
-                                {t("clients.tableRisk")}
-                              </span>
-                              <ClientRiskTierBadge tier={row.riskTier} className="text-[0.65rem]" />
-                              <span className="tabular-nums text-xs text-muted-foreground">
-                                {row.riskScore}/100
                               </span>
                             </div>
                           </div>
@@ -982,28 +960,7 @@ export default function ClientsPage() {
                       </div>
                     </section>
 
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionRiskHead")}
-                      </h3>
-                      <div
-                        className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4"
-                        title={t("clients.riskScoreNativeTooltip").replace(
-                          "{score}",
-                          String(detailsClient.riskScore)
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <ClientRiskTierBadge tier={detailsClient.riskTier} />
-                          <span className="tabular-nums text-sm text-muted-foreground">
-                            {detailsClient.riskScore}/100
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs leading-snug text-muted-foreground">
-                          {t("clients.riskBasedOnHistory")} {t("clients.riskHowBody")}
-                        </p>
-                      </div>
-                    </section>
+                    
 
                     <section className="space-y-3">
                       <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1095,29 +1052,6 @@ export default function ClientsPage() {
                             </p>
                           </div>
                         </div>
-                      </div>
-                    </section>
-
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionRiskHead")}
-                      </h3>
-                      <div
-                        className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4"
-                        title={t("clients.riskScoreNativeTooltip").replace(
-                          "{score}",
-                          String(detailsClient.riskScore)
-                        )}
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <ClientRiskTierBadge tier={detailsClient.riskTier} />
-                          <span className="tabular-nums text-sm text-muted-foreground">
-                            {detailsClient.riskScore}/100
-                          </span>
-                        </div>
-                        <p className="mt-2 text-xs leading-snug text-muted-foreground">
-                          {t("clients.riskBasedOnHistory")} {t("clients.riskHowBody")}
-                        </p>
                       </div>
                     </section>
 
