@@ -544,7 +544,7 @@ export const dictionaries = {
       upcoming: "Nadchodzące",
       all: "Wszystkie",
       pending: "Do potwierdzenia",
-      booked: "Zarezerwowana",
+      booked: "Potwierdzona",
       confirmed: "Potwierdzone",
       filterNeedsAction: "Wymaga reakcji",
       changeRequested: "Prośba o zmianę",
@@ -916,7 +916,7 @@ export const dictionaries = {
       invalidPrice: "Cena nie może być ujemna.",
     },
     bookingPublic: {
-      onlineBadge: "Rezerwacja online",
+      onlineBadge: "Wizyta online",
       pageDescription: "Wybierz usługę i dogodny termin.",
       stepsAriaLabel: "Postęp rezerwacji",
       step1: "Usługa",
@@ -954,7 +954,20 @@ export const dictionaries = {
       dowSun: "Nd",
       yourDetails: "Twoje dane",
       summary: "Podsumowanie",
-      confirmBooking: "Potwierdź rezerwację",
+      confirmBooking: "Potwierdź wizytę",
+      appointmentConfirmedTitle: "Wizyta potwierdzona",
+      appointmentConfirmedDescription:
+        "Twoja wizyta została zapisana i potwierdzona.",
+      whatNextReminderOnly:
+        "Przypomnimy Ci o wizycie zgodnie z ustawieniami gabinetu.",
+      whatNextImmediateNotifySent:
+        "Wysłaliśmy SMS i e-mail z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+      whatNextImmediateNotifySentSmsOnly:
+        "Wysłaliśmy SMS z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+      whatNextImmediateNotifySentEmailOnly:
+        "Wysłaliśmy e-mail z linkiem do anulowania wizyty, jeśli będzie taka potrzeba.",
+      whatNextImmediateNotifySafe:
+        "Jeśli dane kontaktowe są poprawne, otrzymasz SMS/e-mail z informacją o potwierdzonej wizycie.",
       fullName: "Imię i nazwisko",
       firstName: "Imię",
       lastName: "Nazwisko",
@@ -971,8 +984,8 @@ export const dictionaries = {
       bookingSavedDescriptionNoEmail:
         "Rezerwacja została zapisana.",
       panelHintBusiness:
-        "Rezerwacja pojawi się w panelu firmy jako nowa wizyta do potwierdzenia.",
-      manageBooking: "Zarządzaj rezerwacją",
+        "Wizyta pojawi się w panelu firmy jako potwierdzona.",
+      manageBooking: "Zarządzaj wizytą",
       whatNextTitle: "Co dalej?",
       whatNextEmailNote:
         "Na podany adres e-mail możesz otrzymać link do zarządzania rezerwacją (gdy wysyłka jest skonfigurowana).",
@@ -986,9 +999,9 @@ export const dictionaries = {
         "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (e-mail, zgodnie z ustawieniami firmy).",
       whatNextReminderSms:
         "Przypomnienia są wysyłane automatycznie ok. 24h przed wizytą (SMS, zgodnie z ustawieniami firmy).",
-      whatNextConfirm: "W linku z przypomnienia potwierdzisz obecność.",
+      whatNextConfirm: "W linku z przypomnienia możesz anulować wizytę, jeśli nie możesz przyjść.",
       whatNextChange: "Jeśli coś się zmieni, możesz poprosić o inny termin albo anulować wizytę.",
-      whatNextManageFull: "W linku możesz potwierdzić obecność, zmienić termin, zmienić usługę albo anulować wizytę.",
+      whatNextManageFull: "W linku możesz anulować wizytę, jeśli nie możesz przyjść.",
       messageStatusTitle: "Powiadomienia",
       messageStatusEmailInfo:
         "E-mail z linkiem do rezerwacji nie jest wysyłany automatycznie w tym kroku — skontaktuj się z gabinetem, jeśli go nie otrzymasz.",
@@ -1030,7 +1043,10 @@ export const dictionaries = {
       title: "Potwierdzenie wizyty",
       subtitle:
         "Sprawdź szczegóły i wybierz, co chcesz zrobić.",
-      pageTitle: "Zarządzaj rezerwacją",
+      manageAppointmentTitle: "Twoja wizyta",
+      manageAppointmentDescription:
+        "Sprawdź szczegóły wizyty. Możesz anulować wizytę, jeśli nie możesz przyjść.",
+      pageTitle: "Zarządzaj wizytą",
       pageDescription:
         "Twoja wizyta jest zapisana. Potwierdź, że nadal przyjdziesz, albo wybierz inną opcję.",
       titleManage: "Twoja rezerwacja jest potwierdzona",
@@ -1312,10 +1328,10 @@ export const dictionaries = {
     },
     labels: {
       appointmentStatus: {
-        booked: "Zarezerwowana",
-        pending: "Do potwierdzenia",
+        booked: "Potwierdzona",
+        pending: "Potwierdzona",
         confirmed: "Potwierdzona",
-        cancelled: "Anulowane",
+        cancelled: "Anulowana",
         completed: "Zrealizowana",
         no_show: "Nieobecność klienta",
       },
@@ -1434,7 +1450,7 @@ Pozdrawiamy,
       simulated: "Symulacja",
       scheduled: "Zaplanowany",
       failed: "Nieudany",
-      bookingCreatedType: "Potwierdzenie rezerwacji",
+      bookingCreatedType: "Wizyta potwierdzona",
       bookingConfirmedType: "Potwierdzenie obecności",
       reminder24hType: "Przypomnienie 24h",
       secondReminderType: "Przypomnienie przed wizytą",
@@ -3041,7 +3057,7 @@ Pozdrawiamy,
       invalidPrice: "Price cannot be negative.",
     },
     bookingPublic: {
-      onlineBadge: "Online booking",
+      onlineBadge: "Online appointment",
       pageDescription: "Choose a service and a convenient time.",
       stepsAriaLabel: "Booking progress",
       step1: "Service",
@@ -3080,7 +3096,20 @@ Pozdrawiamy,
       dowSun: "Sun",
       yourDetails: "Your details",
       summary: "Summary",
-      confirmBooking: "Confirm booking",
+      confirmBooking: "Confirm appointment",
+      appointmentConfirmedTitle: "Appointment confirmed",
+      appointmentConfirmedDescription:
+        "Your appointment has been saved and confirmed.",
+      whatNextReminderOnly:
+        "We will remind you about your appointment according to the business settings.",
+      whatNextImmediateNotifySent:
+        "We sent an SMS and email with a link to cancel your appointment if needed.",
+      whatNextImmediateNotifySentSmsOnly:
+        "We sent an SMS with a link to cancel your appointment if needed.",
+      whatNextImmediateNotifySentEmailOnly:
+        "We sent an email with a link to cancel your appointment if needed.",
+      whatNextImmediateNotifySafe:
+        "If your contact details are correct, you will receive an SMS/email about your confirmed appointment.",
       fullName: "Full name",
       firstName: "First name",
       lastName: "Last name",
@@ -3110,7 +3139,7 @@ Pozdrawiamy,
         "Reminders are sent automatically about 24h before the appointment (email, per business settings).",
       whatNextReminderSms:
         "Reminders are sent automatically about 24h before the appointment (SMS, per business settings).",
-      whatNextConfirm: "In the reminder link, you can confirm attendance.",
+      whatNextConfirm: "In the reminder link, you can cancel if you cannot attend.",
       whatNextChange: "If anything changes, you can request another time or cancel.",
       whatNextManageFull: "In the link, you can confirm attendance, change the time, change the service or cancel.",
       messageStatusTitle: "Notifications",
@@ -3151,9 +3180,12 @@ Pozdrawiamy,
       title: "Appointment confirmation",
       subtitle:
         "Review the details and choose what you want to do.",
-      pageTitle: "Manage your booking",
+      manageAppointmentTitle: "Your appointment",
+      manageAppointmentDescription:
+        "Review your appointment details. You can cancel if you cannot attend.",
+      pageTitle: "Manage your appointment",
       pageDescription:
-        "Your appointment is booked. Confirm that you are still coming or choose another option.",
+        "Review your appointment details. You can cancel if you cannot attend.",
       titleManage: "Your booking is confirmed",
       subtitleManage:
         "Review your appointment details. You can change the time, change the service or cancel the booking.",
@@ -3548,7 +3580,7 @@ Regards,
       simulated: "Simulated",
       scheduled: "Scheduled",
       failed: "Failed",
-      bookingCreatedType: "Booking confirmation",
+      bookingCreatedType: "Appointment confirmed",
       bookingConfirmedType: "Attendance confirmation",
       reminder24hType: "24h reminder",
       secondReminderType: "Appointment reminder",

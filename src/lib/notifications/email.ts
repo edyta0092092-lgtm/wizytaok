@@ -9,18 +9,28 @@ export type SendReminderEmailResult =
   | { ok: true; provider: "resend"; messageId?: string }
   | { ok: false; code: "not_configured" | "simulated_dev" | "failed"; error?: string }
 
+const DEFAULT_RESEND_FROM = "WizytaOK <no-reply@nordigital.pl>"
+
+function resolveResendFromAddress(): string {
+  return (
+    process.env.REMINDERS_FROM_EMAIL?.trim() ||
+    process.env.RESEND_FROM?.trim() ||
+    DEFAULT_RESEND_FROM
+  )
+}
+
 /**
  * Wysyłka e-mail przypomnienia (Resend REST API przez fetch, bez dodatkowej paczki).
- * Wymaga RESEND_API_KEY i RESEND_FROM (adres nadawcy zweryfikowany w Resend).
+ * Wymaga RESEND_API_KEY. Nadawca: REMINDERS_FROM_EMAIL, RESEND_FROM lub domyślny adres.
  */
 export async function sendReminderEmail(input: SendReminderEmailInput): Promise<SendReminderEmailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim()
-  const from = process.env.RESEND_FROM?.trim()
-  if (!apiKey || !from) {
+  const from = resolveResendFromAddress()
+  if (!apiKey) {
     if (process.env.NODE_ENV === "development") {
-      return { ok: false, code: "simulated_dev", error: "RESEND_API_KEY or RESEND_FROM not set" }
+      return { ok: false, code: "simulated_dev", error: "RESEND_API_KEY not set" }
     }
-    return { ok: false, code: "not_configured", error: "RESEND_API_KEY or RESEND_FROM not set" }
+    return { ok: false, code: "not_configured", error: "RESEND_API_KEY not set" }
   }
 
   try {

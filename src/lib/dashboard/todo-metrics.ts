@@ -5,9 +5,9 @@ export function countUnconfirmedAppointments(rows: Appointment[]): number {
   return rows.filter((a) => a.status === "booked" || a.status === "pending").length
 }
 
-/** Wizyty oczekujące na potwierdzenie klienta (status pending). */
-export function countPendingConfirmationAppointments(rows: Appointment[]): number {
-  return rows.filter((a) => a.status === "pending").length
+/** @deprecated Nowe wizyty online są od razu confirmed — licznik wyłączony. */
+export function countPendingConfirmationAppointments(_rows: Appointment[]): number {
+  return 0
 }
 
 function isReminderAttentionStatus(status: string | null | undefined): boolean {

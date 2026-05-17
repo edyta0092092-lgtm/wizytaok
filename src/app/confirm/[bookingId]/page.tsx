@@ -15,17 +15,7 @@ import {
   type PublicBooking,
 } from "@/lib/bookings/public-bookings"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
-import {
-  getBookingByConfirmationToken,
-  updateBookingByConfirmationToken,
-} from "@/lib/bookings/bookings-store"
-import {
-  fetchPendingReminderFromQueue,
-  hasPendingReminderFromPublicBooking,
-  mergeReminderPendingState,
-  resolveConfirmationReminderPending,
-} from "@/lib/appointments/confirm-reminder-copy-client"
-import { enqueueBookingConfirmedNotifications } from "@/lib/notifications/notifications"
+import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { getBookingStaffDetailValue, shouldShowStaffDetailRow } from "@/lib/staff/staff-display"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -48,10 +38,6 @@ export default function PublicConfirmAppointmentPage() {
   const [screen, setScreen] = React.useState<Screen>("main")
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null)
   const [slotFlowError, setSlotFlowError] = React.useState<string | null>(null)
-  const [showConfirmedReminderBadge, setShowConfirmedReminderBadge] = React.useState(false)
-  const [confirmedReminderPending, setConfirmedReminderPending] = React.useState<boolean | null>(
-    null,
-  )
   const screenRef = React.useRef<Screen>("main")
   const bookingPollSigRef = React.useRef("")
   const [remoteRefreshHint, setRemoteRefreshHint] = React.useState(false)
@@ -176,19 +162,6 @@ export default function PublicConfirmAppointmentPage() {
     [booking, reloadLocalBooking],
   )
 
-  const resolveReminderPendingForBooking = React.useCallback(
-    async (sourceBooking: PublicBooking | null, reminderToken: string) => {
-      if (dataSource === "supabase") {
-        return fetchPendingReminderFromQueue(reminderToken)
-      }
-      if (sourceBooking) {
-        return hasPendingReminderFromPublicBooking(sourceBooking)
-      }
-      return null
-    },
-    [dataSource],
-  )
-
   const fmtDay = React.useMemo(
     () =>
       new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
@@ -231,79 +204,14 @@ export default function PublicConfirmAppointmentPage() {
   const when = `${fmtDay.format(new Date(`${booking.date}T00:00:00`))}, ${booking.time}`
   const isCancelled = booking.status === "cancelled"
   const isNoShow = booking.status === "no_show"
-  const isBooked = booking.status === "booked" || booking.status === "pending"
-  const canAct =
+  const isActiveVisit =
+    booking.status === "confirmed" ||
     booking.status === "booked" ||
-    booking.status === "pending" ||
-    booking.status === "confirmed"
+    booking.status === "pending"
+  const canCancel = isActiveVisit
   const bookingBackHref = booking.businessSlug?.trim()
     ? `/rezerwacje/${encodeURIComponent(booking.businessSlug.trim())}`
     : "/"
-
-  const runConfirmRpcWithFallback = async (
-    action: "confirm" | "cancel",
-    payload: Record<string, unknown> = {},
-  ) => {
-    const client = getBrowserClient()
-    if (!client) return { ok: false as const, error: "no_client" }
-    const first = await updateBookingByConfirmationToken(client, confirmToken, action, payload)
-    if (first.ok) return first
-    const fallbackToken = booking?.id?.trim() ?? ""
-    if (!fallbackToken || fallbackToken === confirmToken) return first
-    const second = await updateBookingByConfirmationToken(client, fallbackToken, action, payload)
-    return second.ok ? second : first
-  }
-
-  const confirmAttendance = () => {
-    void (async () => {
-      const reminderToken = (booking?.confirmationToken ?? confirmToken).trim()
-
-      if (dataSource === "supabase") {
-        let pending: boolean | null = null
-        try {
-          pending = await resolveConfirmationReminderPending(reminderToken, async () => {
-            const confirmed = await runConfirmRpcWithFallback("confirm", {})
-            if (!confirmed.ok) {
-              throw new Error("confirm_failed")
-            }
-            setSlotFlowError(null)
-            void fetch("/api/public/confirm-attendance", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token: confirmToken, language }),
-            }).catch(() => undefined)
-            const client = getBrowserClient()
-            if (client) {
-              const fresh = await getBookingByConfirmationToken(client, confirmToken)
-              if (fresh) {
-                setBooking(fresh)
-              } else {
-                await refreshSupabaseBooking()
-              }
-            }
-          })
-        } catch {
-          setSlotFlowError(t("confirmPublic.confirmActionFailed"))
-          return
-        }
-        setConfirmedReminderPending(pending)
-        setSuccessMessage(t("confirmPublic.successConfirmed"))
-        setShowConfirmedReminderBadge(true)
-        return
-      }
-
-      const pendingBeforeConfirm = await resolveReminderPendingForBooking(booking, reminderToken)
-      applyLocalPatch({ status: "confirmed", lastUpdatedBy: "customer" })
-      const fresh = findPublicBookingById(confirmToken)
-      if (fresh) enqueueBookingConfirmedNotifications(fresh, language)
-      const pendingAfterConfirm = await resolveReminderPendingForBooking(fresh, reminderToken)
-      setConfirmedReminderPending(
-        mergeReminderPendingState(pendingBeforeConfirm, pendingAfterConfirm),
-      )
-      setSuccessMessage(t("confirmPublic.successConfirmed"))
-      setShowConfirmedReminderBadge(true)
-    })()
-  }
 
   const cancelAppointment = () => {
     if (cancelling) return
@@ -335,15 +243,11 @@ export default function PublicConfirmAppointmentPage() {
           await refreshSupabaseBooking()
           setScreen("main")
           setSuccessMessage(cancelledMessage)
-          setShowConfirmedReminderBadge(false)
-          setConfirmedReminderPending(null)
           return
         }
         applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
         setScreen("main")
         setSuccessMessage(cancelledMessage)
-        setShowConfirmedReminderBadge(false)
-        setConfirmedReminderPending(null)
       } finally {
         setCancelling(false)
       }
@@ -376,28 +280,18 @@ export default function PublicConfirmAppointmentPage() {
                 ? t("confirmPublic.labelStatusCancelled")
                 : isNoShow
                   ? t("labels.appointmentStatus.no_show")
-                : isBooked
-                  ? t("confirmPublic.confirmAttendanceTitle")
-                  : t("confirmPublic.confirmedTitle")}
+                  : t("confirmPublic.manageAppointmentTitle")}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
               {isCancelled
                 ? t("confirmPublic.notFoundBody")
                 : isNoShow
                   ? t("labels.appointmentStatusDescription.no_show")
-                : isBooked
-                  ? t("confirmPublic.confirmAttendanceDescription")
-                  : t("confirmPublic.confirmedDescription")}
+                  : t("confirmPublic.manageAppointmentDescription")}
             </p>
-            {!isCancelled && !isNoShow && (booking.status === "confirmed" || booking.status === "booked" || booking.status === "pending") ? (
+            {!isCancelled && !isNoShow && isActiveVisit ? (
               <div className="space-y-1 pt-1 text-sm">
-                <p className="font-medium text-foreground">
-                  {booking.status === "confirmed"
-                    ? t("confirmPublic.statusLineConfirmed")
-                    : booking.status === "pending"
-                      ? t("confirmPublic.statusLinePending")
-                      : t("confirmPublic.statusLineBooked")}
-                </p>
+                <p className="font-medium text-foreground">{t("confirmPublic.statusLineConfirmed")}</p>
               </div>
             ) : null}
           </CardHeader>
@@ -429,27 +323,15 @@ export default function PublicConfirmAppointmentPage() {
               {successMessage ? (
                 <p className="pt-2 font-medium text-emerald-700 dark:text-emerald-300">{successMessage}</p>
               ) : null}
-              {showConfirmedReminderBadge ? (
-                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-                  {confirmedReminderPending === true
-                    ? t("confirmPublic.confirmedReminderInfoWithPending")
-                    : t("confirmPublic.confirmedReminderInfoNoDate")}
-                </div>
-              ) : null}
             </div>
           </CardContent>
         </Card>
 
-        {screen === "main" && canAct ? (
+        {screen === "main" && canCancel ? (
           <Card>
             <CardContent className="space-y-2 p-4">
-              {isBooked ? (
-                <Button className="w-full" onClick={confirmAttendance}>
-                  {t("confirmPublic.confirmAttendanceAction")}
-                </Button>
-              ) : null}
               <Button variant="outline" className="w-full" onClick={() => setScreen("cancel")}>
-                {isBooked ? t("confirmPublic.wantCancel") : t("confirmPublic.actionCancel")}
+                {t("confirmPublic.actionCancel")}
               </Button>
               {!fromReminderLink ? (
                 <Button asChild variant="outline" className="w-full">
@@ -460,7 +342,7 @@ export default function PublicConfirmAppointmentPage() {
           </Card>
         ) : null}
 
-        {screen === "cancel" && canAct ? (
+        {screen === "cancel" && canCancel ? (
           <Card>
             <CardHeader>
               <CardTitle>{t("confirmPublic.cancelPanelTitle")}</CardTitle>
@@ -482,7 +364,7 @@ export default function PublicConfirmAppointmentPage() {
           </Card>
         ) : null}
 
-        {!canAct && !fromReminderLink ? (
+        {!canCancel && !fromReminderLink ? (
           <div className="flex justify-center">
             <Button asChild variant="outline" className="w-full max-w-md">
               <Link href={bookingBackHref}>{t("confirmPublic.backToOnlineBookingSystem")}</Link>

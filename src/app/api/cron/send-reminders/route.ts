@@ -573,6 +573,7 @@ async function processSmsReminder(
     const smsResult: AppointmentReminderSmsResult = await sendAppointmentReminderSms({
       to: phone,
       businessName,
+      serviceName: booking.service_name,
       appointmentDate: booking.appointment_date,
       appointmentTime: booking.appointment_time,
       manageUrl,

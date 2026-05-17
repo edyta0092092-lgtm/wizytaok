@@ -531,6 +531,15 @@ export async function createOnlineBooking(
       }
     }
   }
+  const confirmAfterCreate = await updateBookingByConfirmationToken(
+    client,
+    String(row.confirmation_token),
+    "confirm",
+    {},
+  )
+  if (!confirmAfterCreate.ok && process.env.NODE_ENV === "development") {
+    console.warn("[bookings.createOnlineBooking.confirmAfterCreate]", confirmAfterCreate.error)
+  }
   dispatchBookingsUpdated()
   return { ok: true, id: row.id, confirmationToken: row.confirmation_token }
 }

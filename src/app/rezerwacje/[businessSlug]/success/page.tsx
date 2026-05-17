@@ -12,16 +12,9 @@ import {
   fetchBookingCreatedNotifyStatus,
   type BookingCreatedNotifyApiResult,
 } from "@/lib/bookings/notify-booking-created-client"
-import {
-  getBookingByConfirmationToken,
-  updateBookingByConfirmationToken,
-} from "@/lib/bookings/bookings-store"
+import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import {
-  confirmedReminderCopyKey,
-  resolveConfirmationReminderPending,
-} from "@/lib/appointments/confirm-reminder-copy-client"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { BusinessReminderChannelPersisted } from "@/types/domain"
@@ -37,22 +30,28 @@ function reminderCopyKey(
   return `bookingPublic.${prefix}Both`
 }
 
-function isBookingCreatedNotifyConfidentSuccess(
+function pickImmediateNotifySentKey(
   status: BookingCreatedNotifyApiResult | null,
   hasEmail: boolean,
   hasPhone: boolean,
-): boolean {
-  if (!status?.ok) return false
-  if (!hasEmail && !hasPhone) return false
-  const emailOk = !hasEmail || status.email === "sent" || status.email === "already_sent"
+): "bookingPublic.whatNextImmediateNotifySent" | "bookingPublic.whatNextImmediateNotifySentSmsOnly" | "bookingPublic.whatNextImmediateNotifySentEmailOnly" | "bookingPublic.whatNextImmediateNotifySafe" {
+  if (!status?.ok || (!hasEmail && !hasPhone)) {
+    return "bookingPublic.whatNextImmediateNotifySafe"
+  }
+  const emailOk =
+    !hasEmail || status.email === "sent" || status.email === "already_sent"
   const smsOk = !hasPhone || status.sms === "sent" || status.sms === "already_sent"
-  const anySent =
-    (hasEmail && (status.email === "sent" || status.email === "already_sent")) ||
-    (hasPhone && (status.sms === "sent" || status.sms === "already_sent"))
-  const noneFailed =
-    (!hasEmail || (status.email !== "failed" && status.email !== "missing")) &&
-    (!hasPhone || (status.sms !== "failed" && status.sms !== "missing"))
-  return anySent && emailOk && smsOk && noneFailed
+  const emailFailed = hasEmail && status.email === "failed"
+  const smsFailed = hasPhone && status.sms === "failed"
+  const emailSent = hasEmail && (status.email === "sent" || status.email === "already_sent")
+  const smsSent = hasPhone && (status.sms === "sent" || status.sms === "already_sent")
+  if (emailFailed || smsFailed || (!emailSent && !smsSent)) {
+    return "bookingPublic.whatNextImmediateNotifySafe"
+  }
+  if (emailSent && smsSent) return "bookingPublic.whatNextImmediateNotifySent"
+  if (smsSent && emailOk) return "bookingPublic.whatNextImmediateNotifySentSmsOnly"
+  if (emailSent && smsOk) return "bookingPublic.whatNextImmediateNotifySentEmailOnly"
+  return "bookingPublic.whatNextImmediateNotifySafe"
 }
 
 type StoredBookingLegacy = {
@@ -136,11 +135,7 @@ export default function PublicBookingSuccessPage() {
   const [publicBooking, setPublicBooking] = React.useState<PublicBooking | null>(null)
   const [reminderChannel, setReminderChannel] =
     React.useState<BusinessReminderChannelPersisted | null>(null)
-  const [actionError, setActionError] = React.useState<string | null>(null)
-  const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
   const [returningToBooking, setReturningToBooking] = React.useState(false)
-  const [confirming, setConfirming] = React.useState(false)
-  const [cancelling, setCancelling] = React.useState(false)
   const [bookingCreatedNotifyStatus, setBookingCreatedNotifyStatus] =
     React.useState<BookingCreatedNotifyApiResult | null>(null)
   const popstateHandlingRef = React.useRef(false)
@@ -215,7 +210,6 @@ export default function PublicBookingSuccessPage() {
         email: b.customerEmail?.trim() || undefined,
       })
       setPublicBooking(b)
-      setActionError(null)
       setLoading(false)
     }
     void run()
@@ -273,59 +267,9 @@ export default function PublicBookingSuccessPage() {
   const hasEmail = customerEmail.length > 0
   const customerPhone = (publicBooking?.customerPhone ?? summary?.phone ?? "").trim()
   const hasPhone = customerPhone.length > 0
-  const bookingCreatedNotifySent = React.useMemo(
-    () => isBookingCreatedNotifyConfidentSuccess(bookingCreatedNotifyStatus, hasEmail, hasPhone),
+  const immediateNotifyKey = React.useMemo(
+    () => pickImmediateNotifySentKey(bookingCreatedNotifyStatus, hasEmail, hasPhone),
     [bookingCreatedNotifyStatus, hasEmail, hasPhone],
-  )
-  const bookingCreatedDescriptionKey = React.useMemo(() => {
-    if (!tokenFromQuery) {
-      return hasEmail ? "bookingPublic.bookingSavedDescription" : "bookingPublic.bookingSavedDescriptionNoEmail"
-    }
-    if (bookingCreatedNotifySent) return "bookingPublic.bookingSavedDescriptionNotifySent"
-    return "bookingPublic.bookingSavedDescriptionNotifySafe"
-  }, [bookingCreatedNotifySent, hasEmail, tokenFromQuery])
-  const bookingCreatedWhatNextKey = tokenFromQuery
-    ? bookingCreatedNotifySent
-      ? "bookingPublic.whatNextBookingCreatedSent"
-      : "bookingPublic.whatNextBookingCreatedSafe"
-    : null
-  const bookingCreatedMessageStatusKey = tokenFromQuery
-    ? bookingCreatedNotifySent
-      ? "bookingPublic.messageStatusBookingCreatedSent"
-      : "bookingPublic.messageStatusBookingCreatedSafe"
-    : null
-  const statusLabel = React.useMemo(() => {
-    if (!publicBooking) return t("confirmPublic.labelStatusPending")
-    if (publicBooking.status === "confirmed") return t("confirmPublic.labelStatusConfirmed")
-    if (publicBooking.status === "cancelled") return t("confirmPublic.labelStatusCancelled")
-    return t("confirmPublic.labelStatusPending")
-  }, [publicBooking, t])
-
-  const runActionWithFallback = React.useCallback(
-    async (action: "confirm" | "cancel") => {
-      const client = getBrowserClient()
-      const token = actionToken
-      if (!client || !token) return { ok: false as const }
-      const first = await updateBookingByConfirmationToken(client, token, action, {})
-      if (first.ok) return first
-      const fallbackToken = publicBooking?.id?.trim() ?? ""
-      if (!fallbackToken || fallbackToken === token) return first
-      return updateBookingByConfirmationToken(client, fallbackToken, action, {})
-    },
-    [actionToken, publicBooking?.id],
-  )
-
-  const confirmViaApi = React.useCallback(
-    async (token: string) => {
-      const res = await fetch("/api/public/confirm-attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, language }),
-      })
-      const json = (await res.json().catch(() => ({}))) as { ok?: boolean }
-      return res.ok && json.ok === true
-    },
-    [language],
   )
 
   const refreshBooking = React.useCallback(async () => {
@@ -346,73 +290,11 @@ export default function PublicBookingSuccessPage() {
     })
   }, [tokenFromQuery])
 
-  const handleConfirm = React.useCallback(async () => {
-    if (confirming) return
-    const reminderToken = actionToken
-    if (!reminderToken) {
-      setActionError(t("confirmPublic.confirmActionFailed"))
-      return
-    }
-    setConfirming(true)
-    setActionError(null)
-    setActionSuccess(null)
-    let pending: boolean | null = null
-    try {
-      const runConfirm = async () => {
-        const r = await runActionWithFallback("confirm")
-        if (!r.ok) {
-          const apiOk = await confirmViaApi(reminderToken)
-          if (!apiOk) {
-            throw new Error("confirm_failed")
-          }
-        } else {
-          void confirmViaApi(reminderToken)
-        }
-        await refreshBooking()
-      }
-      if (reminderToken.length > 0) {
-        pending = await resolveConfirmationReminderPending(reminderToken, runConfirm)
-      } else {
-        await runConfirm()
-      }
-    } catch {
-      setActionError(t("confirmPublic.confirmActionFailed"))
-      return
-    } finally {
-      setConfirming(false)
-    }
-
-    setActionSuccess(t(confirmedReminderCopyKey(pending)))
-  }, [actionToken, confirmViaApi, confirming, refreshBooking, runActionWithFallback, t])
-
   const cancelViaSupabase = React.useCallback(async () => {
     if (!actionToken) return false
     const res = await cancelPublicBookingViaApi(actionToken, language)
     return res.ok
   }, [actionToken, language])
-
-  const handleCancel = React.useCallback(async () => {
-    if (cancelling) return
-    setCancelling(true)
-    setActionError(null)
-    setActionSuccess(null)
-    try {
-      const ok = await cancelViaSupabase()
-      if (!ok) {
-        setActionError(t("confirmPublic.cancelActionFailed"))
-        return
-      }
-      await refreshBooking()
-      const wasConfirmed = publicBooking?.status === "confirmed"
-      setActionSuccess(
-        wasConfirmed
-          ? t("confirmPublic.successCancelledConfirmed")
-          : t("confirmPublic.successCancelled"),
-      )
-    } finally {
-      setCancelling(false)
-    }
-  }, [cancelViaSupabase, cancelling, publicBooking?.status, refreshBooking, t])
 
   const cancelIfNeeded = React.useCallback(async () => {
     if (!tokenFromQuery || !publicBooking || publicBooking.status === "cancelled") return
@@ -431,12 +313,7 @@ export default function PublicBookingSuccessPage() {
     } finally {
       router.push(targetHref)
     }
-  }, [
-    returningToBooking,
-    businessSlug,
-    cancelIfNeeded,
-    router,
-  ])
+  }, [returningToBooking, businessSlug, cancelIfNeeded, router])
 
   React.useEffect(() => {
     if (!tokenFromQuery || !summary?.id) return
@@ -504,9 +381,9 @@ export default function PublicBookingSuccessPage() {
         <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
           <CardHeader>
             <CardTitle className="text-xl font-semibold">
-              {t("bookingPublic.bookingSavedTitle")}
+              {t("bookingPublic.appointmentConfirmedTitle")}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">{t(bookingCreatedDescriptionKey)}</p>
+            <p className="text-sm text-muted-foreground">{t("bookingPublic.appointmentConfirmedDescription")}</p>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p>
@@ -534,71 +411,15 @@ export default function PublicBookingSuccessPage() {
             <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
               <p className="text-sm font-semibold text-foreground">{t("bookingPublic.whatNextTitle")}</p>
               <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {bookingCreatedWhatNextKey ? (
-                  <li>- {t(bookingCreatedWhatNextKey)}</li>
-                ) : hasEmail ? (
-                  <li>- {t("bookingPublic.whatNextEmailNote")}</li>
+                {tokenFromQuery ? (
+                  <li>- {t(immediateNotifyKey)}</li>
                 ) : null}
+                <li>- {t("bookingPublic.whatNextReminderOnly")}</li>
                 <li>- {t(reminderCopyKey(reminderChannel, "whatNextReminder"))}</li>
-                <li>- {t("confirmPublic.changeOptionsRemovedInfo")}</li>
-              </ul>
-            </div>
-            <div className="rounded-xl border border-border bg-muted/20 p-3">
-              <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {bookingCreatedMessageStatusKey ? (
-                  <li>- {t(bookingCreatedMessageStatusKey)}</li>
-                ) : hasEmail ? (
-                  <li>- {t("bookingPublic.messageStatusEmailInfo")}</li>
-                ) : null}
-                <li>- {t(reminderCopyKey(reminderChannel, "messageStatusReminder"))}</li>
               </ul>
             </div>
 
             <div className="mt-4 flex flex-col gap-2">
-              {tokenFromQuery && publicBooking ? (
-                <div className="mt-2 rounded-xl border border-border bg-muted/20 p-3 text-sm">
-                  <p className="font-semibold text-foreground">{t("confirmPublic.confirmAttendanceTitle")}</p>
-                  <p className="mt-1 text-muted-foreground">{t("confirmPublic.confirmAttendanceDescription")}</p>
-                  <p className="mt-2 font-medium text-foreground">
-                    {t("confirmPublic.statusLinePending").replace(
-                      t("confirmPublic.labelStatusPending"),
-                      statusLabel
-                    )}
-                  </p>
-                  {actionError ? (
-                    <p className="mt-2 text-sm text-destructive">{actionError}</p>
-                  ) : null}
-                  {actionSuccess ? (
-                    <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{actionSuccess}</p>
-                  ) : null}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {publicBooking.status !== "confirmed" && publicBooking.status !== "cancelled" ? (
-                      <Button
-                        className="w-full"
-                        disabled={confirming || cancelling}
-                        onClick={() => void handleConfirm()}
-                      >
-                        {confirming
-                          ? t("bookings.loading")
-                          : t("confirmPublic.confirmAttendanceAction")}
-                      </Button>
-                    ) : null}
-                    {publicBooking.status !== "cancelled" ? (
-                      <Button
-                        variant="outline"
-                        className="w-full"
-                        disabled={confirming || cancelling}
-                        onClick={() => void handleCancel()}
-                      >
-                        {cancelling
-                          ? t("bookings.loading")
-                          : t("confirmPublic.cancelAppointmentAction")}
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
               <Button
                 variant="outline"
                 className="w-full"

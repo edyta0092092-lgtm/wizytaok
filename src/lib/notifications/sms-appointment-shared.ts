@@ -2,22 +2,28 @@ import { normalizePhone } from "@/lib/clients/normalize"
 import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-reminder-email"
 
 /**
- * Treść przypomnienia — wspólna dla SMSAPI i SzybkiSMS.
- * "{Nazwa firmy}: przypominamy o wizycie {data} o {godzina}. Zarządzaj wizytą: {manageUrl}"
+ * Treść SMS przypomnienia przed wizytą (link do anulowania na /confirm/{token}).
  */
 export function buildSmsMessage(input: {
-  businessName: string
+  serviceName?: string | null
   appointmentDate: string
   appointmentTime: string
   manageUrl: string
+  language?: "pl" | "en"
 }): string {
   const { dateLabel, timeLabel } = formatPolishAppointmentLabel(
     input.appointmentDate,
-    input.appointmentTime
+    input.appointmentTime,
   )
-  const trimmedName = input.businessName?.trim()
-  const business = trimmedName && trimmedName.length > 0 ? trimmedName : "WizytaOK"
-  return `${business}: przypominamy o wizycie ${dateLabel} o ${timeLabel}. Zarządzaj wizytą: ${input.manageUrl}`
+  const appointmentDateTime = `${dateLabel}, ${timeLabel}`
+  const service = input.serviceName?.trim() || (input.language === "en" ? "appointment" : "wizyta")
+  const confirmUrl = input.manageUrl.trim()
+
+  if (input.language === "en") {
+    return `Appointment reminder: ${service}, ${appointmentDateTime}. If you cannot attend, cancel your appointment: ${confirmUrl}`
+  }
+
+  return `Przypomnienie o wizycie: ${service}, ${appointmentDateTime}. Jeśli nie możesz przyjść, anuluj wizytę: ${confirmUrl}`
 }
 
 /** MSISDN bez „+” (SMSAPI). */

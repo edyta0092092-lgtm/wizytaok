@@ -150,17 +150,6 @@ function TodoPanel({
             </Link>
           </li>
           <li>
-            <Link href="/appointments?status=pending" className={rowClass}>
-              <span className="min-w-0 text-muted-foreground group-hover:text-foreground">
-                {t("dashboard.todoNotConfirmedLabel")}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
-                <span className="font-semibold text-foreground">{pendingConfirmationCount}</span>
-                <ChevronRight className="size-4 text-muted-foreground opacity-60 group-hover:opacity-100" aria-hidden />
-              </span>
-            </Link>
-          </li>
-          <li>
             <Link href="/messages?filter=failed" className={rowClass}>
               <span className="min-w-0 text-muted-foreground group-hover:text-foreground">
                 {t("dashboard.todoReminderIssuesLabel")}
@@ -692,12 +681,6 @@ export default function DashboardPage() {
                     value={confirmedToday}
                     icon={CheckCircle2}
                     href="/appointments?status=confirmed&date=today"
-                  />
-                  <MiniStat
-                    label={t("dashboard.toConfirm")}
-                    value={toConfirm}
-                    icon={Clock}
-                    href="/appointments?status=pending&date=today"
                   />
                   <MiniStat
                     label={t("dashboard.requiresContact")}

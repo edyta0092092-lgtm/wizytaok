@@ -34,6 +34,7 @@ import {
   getServiceAvailabilityForBusinessSlug,
 } from "@/lib/availability/availability-store"
 import { createOnlineBooking } from "@/lib/bookings/bookings-store"
+import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
 import {
   fetchBookedSlotsForPublicSlug,
   toBlockedSlotKeySetForStaff,
@@ -71,7 +72,6 @@ import {
   type StaffAvailabilityExceptionRecord,
   type StaffAvailabilityRuleInput,
 } from "@/lib/staff/staff-store"
-import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
 
 type BookingForm = {
   firstName: string
@@ -828,7 +828,7 @@ export default function PublicBookingPage() {
             customerPhone: customerPhone,
             customerEmail: form.email.trim() || undefined,
             note: form.note.trim() || undefined,
-            status: "booked",
+            status: "confirmed",
             source: "online",
             createdAt: new Date().toISOString(),
           }

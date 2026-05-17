@@ -1,0 +1,38 @@
+-- =============================================================================
+-- RĘCZNE WDROŻENIE — nie uruchamiaj przez Supabase CLI bez przeglądu.
+-- Cel: nowe wizyty online w RPC `create_online_booking` mają status `confirmed`
+-- zamiast `booked` (aplikacja dodatkowo wywołuje confirm po create jako fallback).
+-- =============================================================================
+--
+-- W aktualnej funkcji (np. 031_create_online_booking_staff_services_compat.sql)
+-- w INSERT INTO bookings zmień:
+--
+--   status,
+--   ...
+-- values (
+--   ...
+--   'booked',          -- BYŁO
+--   'online',
+--
+-- na:
+--
+--   'confirmed',       -- MA BYĆ
+--   'online',
+--
+-- Opcjonalnie (zalecane), jeśli kolumny istnieją:
+--   last_updated_by = 'customer',
+--   last_status_change_source = 'confirm'
+--
+-- Przykład fragmentu VALUES (dostosuj do pełnej definicji z produkcji):
+--
+--   'confirmed',
+--   'online',
+--   nullif(trim(coalesce(p_customer_note, '')), ''),
+--   v_reminder_due,
+--   'pending',
+--   'customer',
+--   'confirm'
+--
+-- Po zmianie: CREATE OR REPLACE FUNCTION public.create_online_booking ...
+-- z najnowszej wersji z repo + powyższa korekta statusu.
+-- =============================================================================

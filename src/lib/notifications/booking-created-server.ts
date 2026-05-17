@@ -87,37 +87,33 @@ function buildMessages(
   )
 
   if (language === "en") {
-    const emailText = `Your appointment has been booked.
+    const emailText = `Your appointment has been confirmed.
 
 Service: ${serviceName}
 Date and time: ${appointmentDateTime}
 Client: ${clientName}
 
-Confirm your attendance or cancel your appointment using this link:
-${confirmUrl}
-
-If you cannot attend, please cancel as early as possible.`
+If you cannot attend, cancel your appointment using this link:
+${confirmUrl}`
     return {
-      sms: `Appointment booked: ${serviceName}, ${appointmentDateTime}. Confirm or cancel: ${confirmUrl}`,
-      emailSubject: "Appointment booking",
+      sms: `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Cancel if needed: ${confirmUrl}`,
+      emailSubject: "Appointment confirmed",
       emailText,
       emailHtml: emailText.replace(/\n/g, "<br/>"),
     }
   }
 
-  const emailText = `Twoja wizyta została zarezerwowana.
+  const emailText = `Twoja wizyta została potwierdzona.
 
 Usługa: ${serviceName}
 Termin: ${appointmentDateTime}
 Klient: ${clientName}
 
-Potwierdź obecność lub anuluj wizytę przez link:
-${confirmUrl}
-
-Jeśli nie możesz przyjść, anuluj wizytę jak najwcześniej.`
+Jeśli nie możesz przyjść, anuluj wizytę przez link:
+${confirmUrl}`
   return {
-    sms: `Rezerwacja wizyty: ${serviceName}, ${appointmentDateTime}. Potwierdź lub anuluj: ${confirmUrl}`,
-    emailSubject: "Rezerwacja wizyty",
+    sms: `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Jeśli nie możesz przyjść, anuluj: ${confirmUrl}`,
+    emailSubject: "Wizyta potwierdzona",
     emailText,
     emailHtml: emailText.replace(/\n/g, "<br/>"),
   }

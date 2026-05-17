@@ -15,8 +15,6 @@ export const APPOINTMENTS_SOURCE_FILTERS: AppointmentSourceFilter[] = [
 
 export const APPOINTMENTS_STATUS_FILTERS: AppointmentsListFilter[] = [
   "all",
-  "booked",
-  "pending",
   "confirmed",
   "no_show",
   "cancelled",

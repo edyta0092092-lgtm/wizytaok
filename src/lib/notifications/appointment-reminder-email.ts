@@ -126,58 +126,38 @@ export async function sendAppointmentReminderEmail(
 
   const businessNameRaw = input.businessName?.trim()
   const businessName = businessNameRaw && businessNameRaw.length > 0 ? businessNameRaw : "WizytaOK"
-  const subject = `Przypomnienie o wizycie — ${businessName}`
-
-  // Powitanie: tylko pierwsze imię klienta (bez nazwiska). Jeżeli nie da się
-  // ustalić — degradujemy do bezosobowego „Dzień dobry,". Patrz `getClientFirstName`.
-  const clientFirstName = getClientFirstName(input.clientName)
-  const greetingLine = clientFirstName
-    ? `Dzień dobry ${clientFirstName},`
-    : "Dzień dobry,"
+  const subject = "Przypomnienie o wizycie"
+  const trimmedService = input.serviceName?.trim() || "wizyta"
+  const appointmentDateTime = `${dateLabel}, ${timeLabel}`
+  const trimmedManageUrl = input.manageUrl?.trim() || ""
+  const hasManageLink = trimmedManageUrl.length > 0
 
   const detailRows: Array<{ label: string; value: string }> = [
-    { label: "Data i godzina", value: `${dateLabel}, ${timeLabel}` },
+    { label: "Usługa", value: trimmedService },
+    { label: "Termin", value: appointmentDateTime },
   ]
-  const trimmedService = input.serviceName?.trim()
-  if (trimmedService && trimmedService.length > 0) {
-    detailRows.push({ label: "Usługa", value: trimmedService })
-  }
   const trimmedStaff = input.staffName?.trim()
   if (trimmedStaff && trimmedStaff.length > 0) {
     detailRows.push({ label: "Osoba", value: trimmedStaff })
   }
 
-  // Link do istniejącej strony zarządzania wizytą (`/confirm/{token}`).
-  // Nie tworzymy nowego flow — to ten sam adres, który klient dostaje przy
-  // potwierdzeniu rezerwacji. Anulowanie wymaga dodatkowego kliknięcia na
-  // stronie zarządzania (nie z poziomu maila), żeby uniknąć przypadkowych
-  // anulowań przez skanery linków w klientach pocztowych.
-  const trimmedManageUrl = input.manageUrl?.trim() || ""
-  const hasManageButton = trimmedManageUrl.length > 0
-
   const text = [
-    "Przypomnienie o wizycie",
+    "Przypominamy o Twojej wizycie.",
     "",
-    greetingLine,
-    "przypominamy o nadchodzącej wizycie.",
-    "",
-    "Szczegóły wizyty:",
-    ...detailRows.map((row) => `${row.label}: ${row.value}`),
-    ...(hasManageButton
+    `Usługa: ${trimmedService}`,
+    `Termin: ${appointmentDateTime}`,
+    ...(hasManageLink
       ? [
           "",
-          "Zarządzaj wizytą:",
+          "Jeśli nie możesz przyjść, anuluj wizytę przez link:",
           trimmedManageUrl,
-          "Możesz sprawdzić szczegóły wizyty albo ją odwołać.",
         ]
       : []),
-    "",
-    "Jeśli masz pytania lub chcesz zmienić termin, skontaktuj się bezpośrednio z firmą.",
     "",
     "Ta wiadomość została wysłana automatycznie przez WizytaOK.",
   ].join("\n")
 
-  const preheader = `Przypominamy o nadchodzącej wizycie w ${businessName} — ${longLabel}.`
+  const preheader = `Przypominamy o wizycie — ${longLabel}.`
 
   const fontStack =
     "-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
@@ -222,11 +202,10 @@ export async function sendAppointmentReminderEmail(
               Przypomnienie o wizycie
             </h1>
             <p style="margin:0 0 22px 0; font-family:${fontStack}; font-size:15px; line-height:1.6; color:#0f1f1c;">
-              ${escapeHtml(greetingLine)}<br />
-              przypominamy o nadchodzącej wizycie.
+              Przypominamy o Twojej wizycie.
             </p>
             <p style="margin:0 0 10px 0; font-family:${fontStack}; font-size:14px; line-height:1.4; color:#0f1f1c; font-weight:700;">
-              Szczegóły wizyty:
+              Szczegóły:
             </p>
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9; border:1px solid #DDEDEA; border-radius:12px;">
               <tr>
@@ -236,19 +215,19 @@ export async function sendAppointmentReminderEmail(
                 </td>
               </tr>
             </table>${
-              hasManageButton
+              hasManageLink
                 ? `
             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0 0 0;">
               <tr>
                 <td align="center" style="background-color:#1f6b5d; border-radius:10px;">
                   <a href="${escapeHtml(trimmedManageUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:13px 26px; font-family:${fontStack}; font-size:15px; line-height:1.2; color:#ffffff; text-decoration:none; font-weight:600;">
-                    Zarządzaj wizytą
+                    Anuluj wizytę
                   </a>
                 </td>
               </tr>
             </table>
             <p style="margin:10px 0 0 0; font-family:${fontStack}; font-size:13px; line-height:1.5; color:#5b6d6a;">
-              Możesz sprawdzić szczegóły wizyty albo ją odwołać.
+              Jeśli nie możesz przyjść, anuluj wizytę jak najwcześniej.
             </p>`
                 : ""
             }
