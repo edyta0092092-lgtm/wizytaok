@@ -55,6 +55,7 @@ export default function PublicConfirmAppointmentPage() {
   const screenRef = React.useRef<Screen>("main")
   const bookingPollSigRef = React.useRef("")
   const [remoteRefreshHint, setRemoteRefreshHint] = React.useState(false)
+  const [cancelling, setCancelling] = React.useState(false)
   const [dataSource, setDataSource] = React.useState<"supabase" | "local" | null>(null)
   const confirmToken = React.useMemo(
     () => decodeURIComponent(bookingId || "").trim(),
@@ -305,35 +306,47 @@ export default function PublicConfirmAppointmentPage() {
   }
 
   const cancelAppointment = () => {
+    if (cancelling) return
     void (async () => {
       // Dobór tekstu sukcesu PRZED zmianą statusu — patrzymy na status, który
       // wizyta miała w momencie, gdy klient kliknął „Tak, odwołaj":
       //   • confirmed   → „Wizyta odwołana"      (successCancelledConfirmed)
       //   • inny status → „Rezerwacja odwołana"  (successCancelled)
       // Klient po anulowaniu nadal trafia do tabeli klientów — nic nie usuwamy.
-      // Status w bazie ustawiamy przez UPDATE (RPC + /api/public/cancel-booking),
-      // nigdy przez DELETE.
+      // Status w bazie ustawiamy przez /api/public/cancel-booking, nigdy przez DELETE.
       const wasConfirmed = booking?.status === "confirmed"
       const cancelledMessage = wasConfirmed
         ? t("confirmPublic.successCancelledConfirmed")
         : t("confirmPublic.successCancelled")
-      if (dataSource === "supabase") {
-        const client = getBrowserClient()
-        if (!client) return
-        const apiOk = await cancelPublicBookingViaApi(confirmToken, language)
-        if (!apiOk) return
-        await refreshSupabaseBooking()
+      const cancelToken = (booking?.confirmationToken ?? confirmToken).trim()
+      setCancelling(true)
+      setSlotFlowError(null)
+      try {
+        if (dataSource === "supabase") {
+          if (!cancelToken) {
+            setSlotFlowError(t("bookings.createFailed"))
+            return
+          }
+          const apiRes = await cancelPublicBookingViaApi(cancelToken, language)
+          if (!apiRes.ok) {
+            setSlotFlowError(t("bookings.createFailed"))
+            return
+          }
+          await refreshSupabaseBooking()
+          setScreen("main")
+          setSuccessMessage(cancelledMessage)
+          setShowConfirmedReminderBadge(false)
+          setConfirmedReminderPending(null)
+          return
+        }
+        applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
         setScreen("main")
         setSuccessMessage(cancelledMessage)
         setShowConfirmedReminderBadge(false)
         setConfirmedReminderPending(null)
-        return
+      } finally {
+        setCancelling(false)
       }
-      applyLocalPatch({ status: "cancelled", lastUpdatedBy: "customer" })
-      setScreen("main")
-      setSuccessMessage(cancelledMessage)
-      setShowConfirmedReminderBadge(false)
-      setConfirmedReminderPending(null)
     })()
   }
 
@@ -454,11 +467,16 @@ export default function PublicConfirmAppointmentPage() {
               <p className="text-sm text-muted-foreground">{t("confirmPublic.cancelPanelDescription")}</p>
             </CardHeader>
             <CardContent className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setScreen("main")}>
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={cancelling}
+                onClick={() => setScreen("main")}
+              >
                 {t("confirmPublic.cancelConfirmNo")}
               </Button>
-              <Button className="flex-1" onClick={cancelAppointment}>
-                {t("confirmPublic.cancelConfirmYes")}
+              <Button className="flex-1" disabled={cancelling} onClick={cancelAppointment}>
+                {cancelling ? t("bookings.loading") : t("confirmPublic.cancelConfirmYes")}
               </Button>
             </CardContent>
           </Card>

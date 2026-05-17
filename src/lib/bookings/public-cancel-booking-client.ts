@@ -1,21 +1,27 @@
+export type CancelPublicBookingApiResult =
+  | { ok: true }
+  | { ok: false; error?: string }
+
 /** Anulowanie przez API (service role) — ustawia last_status_change_source=cancel. */
 export async function cancelPublicBookingViaApi(
   token: string,
   language: "pl" | "en",
-): Promise<boolean> {
+): Promise<CancelPublicBookingApiResult> {
   const trimmed = token.trim()
-  if (!trimmed) return false
+  if (!trimmed) return { ok: false, error: "token_required" }
   try {
     const res = await fetch("/api/public/cancel-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: trimmed, language }),
     })
-    if (!res.ok) return false
-    const json = (await res.json()) as { ok?: boolean }
-    return json.ok === true
+    const json = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
+    if (!res.ok || json.ok !== true) {
+      return { ok: false, error: json.error ?? `http_${res.status}` }
+    }
+    return { ok: true }
   } catch {
-    return false
+    return { ok: false, error: "network_error" }
   }
 }
 

@@ -296,9 +296,11 @@ export default function PublicBookingSuccessPage() {
   }, [publicBooking?.confirmationToken, refreshBooking, runActionWithFallback, t, tokenFromQuery])
 
   const cancelViaSupabase = React.useCallback(async () => {
-    if (!tokenFromQuery) return false
-    return cancelPublicBookingViaApi(tokenFromQuery, language)
-  }, [language, tokenFromQuery])
+    const token = (publicBooking?.confirmationToken ?? tokenFromQuery).trim()
+    if (!token) return false
+    const res = await cancelPublicBookingViaApi(token, language)
+    return res.ok
+  }, [language, publicBooking?.confirmationToken, tokenFromQuery])
 
   const handleCancel = React.useCallback(async () => {
     setActionError(null)
