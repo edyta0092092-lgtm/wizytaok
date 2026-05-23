@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import {
+  hasStripeCustomerId,
   resolveBillingActivationScenario,
   type BusinessBillingRow,
 } from "@/lib/billing/business-billing-state"
+import { openCustomerPortal } from "@/lib/billing/customer-portal-client"
 import { hasActiveBusinessAccess, resolveEffectiveSubscriptionStatus } from "@/lib/billing/subscription-status"
 import { startPaidStripeCheckout } from "@/lib/billing/paid-checkout-client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -30,7 +32,7 @@ async function fetchBusinessBillingRow(businessId: string): Promise<BusinessBill
   const { data, error } = await client
     .from("business_profiles")
     .select(
-      "subscription_status, stripe_subscription_status, trial_used_at, trial_started_at, stripe_subscription_id"
+      "subscription_status, stripe_subscription_status, trial_used_at, trial_started_at, stripe_subscription_id, stripe_customer_id"
     )
     .eq("id", businessId)
     .maybeSingle()
@@ -41,6 +43,7 @@ async function fetchBusinessBillingRow(businessId: string): Promise<BusinessBill
     trial_used_at: data.trial_used_at ?? null,
     trial_started_at: data.trial_started_at ?? null,
     stripe_subscription_id: data.stripe_subscription_id ?? null,
+    stripe_customer_id: data.stripe_customer_id ?? null,
   }
 }
 
@@ -52,6 +55,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   const [billingRow, setBillingRow] = React.useState<BusinessBillingRow | null>(null)
   const [billingLoading, setBillingLoading] = React.useState(variant === "owner")
   const [paidBusy, setPaidBusy] = React.useState(false)
+  const [portalBusy, setPortalBusy] = React.useState(false)
   const [paidError, setPaidError] = React.useState<string | null>(null)
   const [stripeReturnNotice, setStripeReturnNotice] = React.useState<string | null>(null)
 
@@ -76,7 +80,11 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     if (variant !== "owner") return
     const paid = searchParams.get("stripe_paid")
     const test = searchParams.get("stripe_test")
-    if (paid === "success" || test === "success") {
+    const portal = searchParams.get("portal")
+    if (portal === "return") {
+      setStripeReturnNotice(t("access.portalReturnNotice"))
+      void refreshBillingRow()
+    } else if (paid === "success" || test === "success") {
       setStripeReturnNotice(t("access.activatePaymentProcessing"))
       void refreshBillingRow()
     } else if (paid === "cancel" || test === "cancel") {
@@ -105,6 +113,21 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     }
   }, [])
 
+  const handleOpenCustomerPortal = React.useCallback(async () => {
+    setPaidError(null)
+    setPortalBusy(true)
+    try {
+      const result = await openCustomerPortal("activate-access")
+      if (result.ok) {
+        window.location.href = result.url
+        return
+      }
+      setPaidError(result.message)
+    } finally {
+      setPortalBusy(false)
+    }
+  }, [])
+
   if (variant === "staff") {
     return <StaffBillingAccessPaywall />
   }
@@ -124,10 +147,14 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
 
   let title = t("access.activateTitle")
   let description = t("access.activateDescription")
+  const hasCustomer = hasStripeCustomerId(billingRow)
+
   let showTrialCta = false
   let showPayCta = true
   let showAfterPayNote = false
   let showPastDueHint = false
+  let primaryPortalUpdate = false
+  let showManagePortal = false
 
   switch (scenario) {
     case "subscription_active":
@@ -135,6 +162,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
       description = t("access.activateAlreadyActiveDescription")
       showTrialCta = false
       showPayCta = false
+      showManagePortal = hasCustomer
       break
     case "trial_never_used":
       title = t("access.activateTitle")
@@ -154,18 +182,26 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
       title = t("access.activatePaymentPastDueTitle")
       description = t("access.activatePaymentPastDueDescription")
       showTrialCta = false
-      showPayCta = true
-      showPastDueHint = true
+      showPastDueHint = !hasCustomer
+      if (hasCustomer) {
+        primaryPortalUpdate = true
+        showPayCta = false
+      } else {
+        showPayCta = true
+      }
       break
     case "subscription_canceled":
       title = t("access.activateCanceledTitle")
       description = t("access.activateCanceledDescription")
       showTrialCta = false
       showPayCta = true
+      showManagePortal = hasCustomer
       break
     default:
       break
   }
+
+  const actionBusy = paidBusy || portalBusy
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -210,22 +246,68 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
           ) : null}
 
           {scenario === "subscription_active" || panelUnlocked ? (
-            <Button type="button" className="h-11 rounded-xl" asChild>
-              <Link href="/dashboard">{t("access.activateGoToPanel")}</Link>
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button type="button" className="h-11 rounded-xl" asChild>
+                <Link href="/dashboard">{t("access.activateGoToPanel")}</Link>
+              </Button>
+              {showManagePortal ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  disabled={actionBusy || scenario === "loading"}
+                  onClick={() => void handleOpenCustomerPortal()}
+                >
+                  {portalBusy ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      {t("settings.testBillingBusy")}
+                    </>
+                  ) : (
+                    t("access.manageSubscriptionCta")
+                  )}
+                </Button>
+              ) : null}
+            </div>
           ) : (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {primaryPortalUpdate ? (
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl"
+                  disabled={actionBusy || scenario === "loading"}
+                  onClick={() => void handleOpenCustomerPortal()}
+                >
+                  {portalBusy ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      {t("settings.testBillingBusy")}
+                    </>
+                  ) : (
+                    t("access.updatePaymentCta")
+                  )}
+                </Button>
+              ) : null}
               {showTrialCta ? (
-                <Button type="button" className="h-11 rounded-xl" asChild>
+                <Button
+                  type="button"
+                  className="h-11 rounded-xl"
+                  variant={scenario === "trial_never_used" ? "default" : "outline"}
+                  asChild
+                >
                   <Link href="/start-trial">{t("access.activateTrialCta")}</Link>
                 </Button>
               ) : null}
               {showPayCta ? (
                 <Button
                   type="button"
-                  variant={showTrialCta ? "outline" : "default"}
+                  variant={
+                    primaryPortalUpdate || scenario === "trial_never_used" || showManagePortal
+                      ? "outline"
+                      : "default"
+                  }
                   className="h-11 rounded-xl"
-                  disabled={paidBusy || scenario === "loading"}
+                  disabled={actionBusy || scenario === "loading"}
                   onClick={() => void handlePayForAccess()}
                 >
                   {paidBusy ? (
@@ -235,6 +317,24 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
                     </>
                   ) : (
                     t("access.activatePayCta")
+                  )}
+                </Button>
+              ) : null}
+              {showManagePortal && !primaryPortalUpdate ? (
+                <Button
+                  type="button"
+                  variant={showPayCta || showTrialCta ? "outline" : "default"}
+                  className="h-11 rounded-xl"
+                  disabled={actionBusy || scenario === "loading"}
+                  onClick={() => void handleOpenCustomerPortal()}
+                >
+                  {portalBusy ? (
+                    <>
+                      <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+                      {t("settings.testBillingBusy")}
+                    </>
+                  ) : (
+                    t("access.manageSubscriptionCta")
                   )}
                 </Button>
               ) : null}

@@ -9,6 +9,11 @@ export type BusinessBillingRow = {
   trial_used_at: string | null
   trial_started_at: string | null
   stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+}
+
+export function hasStripeCustomerId(row: BusinessBillingRow | null | undefined): boolean {
+  return Boolean(row?.stripe_customer_id?.trim())
 }
 
 export type BillingActivationScenario =

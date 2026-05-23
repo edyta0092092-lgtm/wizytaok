@@ -11,6 +11,7 @@ import {
   mapStripeSubscriptionToUiStatus,
   type SubscriptionUiStatus,
 } from "@/lib/stripe/business-subscription-sync"
+import { openCustomerPortal } from "@/lib/billing/customer-portal-client"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 type ServerIntegrationFlags = {
@@ -20,6 +21,7 @@ type ServerIntegrationFlags = {
 
 type BillingRow = {
   stripe_subscription_id: string | null
+  stripe_customer_id: string | null
   subscription_status: string | null
   subscription_current_period_end: string | null
   subscription_trial_ends_at: string | null
@@ -34,13 +36,14 @@ async function fetchBillingRowForBusiness(
   const { data, error } = await client
     .from("business_profiles")
     .select(
-      "stripe_subscription_id, subscription_status, subscription_current_period_end, subscription_trial_ends_at"
+      "stripe_subscription_id, stripe_customer_id, subscription_status, subscription_current_period_end, subscription_trial_ends_at"
     )
     .eq("id", businessId)
     .maybeSingle()
   if (error || !data) return null
   return {
     stripe_subscription_id: data.stripe_subscription_id ?? null,
+    stripe_customer_id: data.stripe_customer_id ?? null,
     subscription_status: data.subscription_status ?? null,
     subscription_current_period_end: data.subscription_current_period_end ?? null,
     subscription_trial_ends_at: data.subscription_trial_ends_at ?? null,
@@ -189,6 +192,10 @@ export function TestBillingSettingsCard() {
       }).format(new Date(relevantEndRaw))
     : "—"
   const canStartTrial = uiStatus === "none"
+  const hasStripeCustomer = Boolean(billingRow?.stripe_customer_id?.trim())
+  const showPortalCta =
+    hasStripeCustomer &&
+    (uiStatus === "trialing" || uiStatus === "active" || uiStatus === "payment_required")
 
   return (
     <div className="mb-6 space-y-3">
@@ -221,6 +228,36 @@ export function TestBillingSettingsCard() {
             >
               {checkoutError}
             </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+          {showPortalCta ? (
+            <Button
+              type="button"
+              variant={canStartTrial ? "outline" : "default"}
+              className="h-11 rounded-xl"
+              disabled={busy}
+              onClick={async () => {
+                setCheckoutError(null)
+                setBusy(true)
+                try {
+                  const result = await openCustomerPortal("settings")
+                  if (result.ok) {
+                    window.location.href = result.url
+                    return
+                  }
+                  setCheckoutError(result.message)
+                  toast.error(result.message)
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              {busy
+                ? t("settings.testBillingBusy")
+                : uiStatus === "payment_required"
+                  ? t("access.updatePaymentCta")
+                  : t("access.manageSubscriptionCta")}
+            </Button>
           ) : null}
           {canStartTrial ? (
             <Button
@@ -281,6 +318,7 @@ export function TestBillingSettingsCard() {
               {busy ? t("settings.testBillingBusy") : t("settings.testBillingCta")}
             </Button>
           ) : null}
+          </div>
         </CardContent>
       </Card>
     </div>

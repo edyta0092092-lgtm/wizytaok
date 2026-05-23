@@ -290,6 +290,12 @@ export const dictionaries = {
       activateAlreadyActiveDescription: "Możesz przejść do panelu i kontynuować pracę.",
       activateGoToPanel: "Przejdź do panelu",
       activateBackToSummary: "Ekran aktywacji",
+      updatePaymentCta: "Zaktualizuj płatność",
+      manageSubscriptionCta: "Zarządzaj subskrypcją",
+      portalReturnNotice:
+        "Wróciłeś z panelu płatności Stripe. Jeśli zmiany nie są jeszcze widoczne, odśwież stronę za chwilę.",
+      portalOpenFailed: "Nie udało się otworzyć panelu płatności.",
+      stripeCustomerMissing: "Brak klienta Stripe dla tej firmy.",
       activatePaymentProcessing:
         "Płatność jest przetwarzana. Jeśli dostęp nie odblokuje się od razu, odśwież stronę za chwilę.",
       activatePaymentPending:
@@ -2490,6 +2496,12 @@ Pozdrawiamy,
       activateAlreadyActiveDescription: "You can go to the panel and continue working.",
       activateGoToPanel: "Go to panel",
       activateBackToSummary: "Activation screen",
+      updatePaymentCta: "Update payment",
+      manageSubscriptionCta: "Manage subscription",
+      portalReturnNotice:
+        "You're back from Stripe billing. If changes are not visible yet, refresh the page in a moment.",
+      portalOpenFailed: "Could not open the billing portal.",
+      stripeCustomerMissing: "No Stripe customer exists for this business.",
       activatePaymentProcessing:
         "Payment is being processed. If access does not unlock right away, refresh this page in a moment.",
       activatePaymentPending:

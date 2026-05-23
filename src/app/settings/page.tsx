@@ -112,6 +112,13 @@ export default function SettingsPage() {
     const params = new URLSearchParams(window.location.search)
     const stripeTest = params.get("stripe_test")
     const stripePaid = params.get("stripe_paid")
+    const portalReturn = params.get("portal")
+    if (portalReturn === "return") {
+      if (stripeReturnHandledRef.current) return
+      stripeReturnHandledRef.current = true
+      toast.success(t("access.portalReturnNotice"))
+      return
+    }
     const p = stripePaid ?? stripeTest
     if (p !== "success" && p !== "cancel") return
     if (stripeReturnHandledRef.current) return
@@ -123,7 +130,7 @@ export default function SettingsPage() {
         toast.success(t("settings.testBillingSuccess"))
       }
     } else {
-      toast(stripePaid === "cancel" ? t("settings.testBillingCancel") : t("settings.testBillingCancel"))
+      toast(t("settings.testBillingCancel"))
     }
   }, [t])
 
