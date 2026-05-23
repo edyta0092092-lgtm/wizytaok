@@ -17,6 +17,7 @@ import { openCustomerPortal } from "@/lib/billing/customer-portal-client"
 import { hasActiveBusinessAccess, resolveEffectiveSubscriptionStatus } from "@/lib/billing/subscription-status"
 import { startPaidStripeCheckout } from "@/lib/billing/paid-checkout-client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 import { StaffBillingAccessPaywall } from "@/components/billing/staff-billing-access-paywall"
@@ -86,11 +87,14 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
       void refreshBillingRow()
     } else if (paid === "success" || test === "success") {
       setStripeReturnNotice(t("access.activatePaymentProcessing"))
+      if (businessId) {
+        markPanelAccessJustActivated(businessId)
+      }
       void refreshBillingRow()
     } else if (paid === "cancel" || test === "cancel") {
       setStripeReturnNotice(null)
     }
-  }, [searchParams, refreshBillingRow, t, variant])
+  }, [searchParams, refreshBillingRow, t, variant, businessId])
 
   const logout = async () => {
     const client = getBrowserClient()
@@ -248,7 +252,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
           {scenario === "subscription_active" || panelUnlocked ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button type="button" className="h-11 rounded-xl" asChild>
-                <Link href="/dashboard">{t("access.activateGoToPanel")}</Link>
+                <Link href="/dashboard?onboarding=welcome">{t("access.activateGoToPanel")}</Link>
               </Button>
               {showManagePortal ? (
                 <Button

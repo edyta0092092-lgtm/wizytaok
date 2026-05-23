@@ -20,6 +20,7 @@ import { AccessDenied } from "@/components/shared/access-denied"
 import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { loadClientsWorkspace } from "@/lib/clients/clients-store"
 import { bookingSourceCsvLabelKey } from "@/lib/bookings/booking-source"
@@ -124,6 +125,9 @@ export default function SettingsPage() {
     if (stripeReturnHandledRef.current) return
     stripeReturnHandledRef.current = true
     if (p === "success") {
+      if (businessId) {
+        markPanelAccessJustActivated(businessId)
+      }
       if (stripePaid === "success") {
         toast.success(t("access.activatePaymentProcessing"))
       } else {
@@ -132,7 +136,7 @@ export default function SettingsPage() {
     } else {
       toast(t("settings.testBillingCancel"))
     }
-  }, [t])
+  }, [t, businessId])
 
   const taxIdDigitsHint = React.useMemo(() => {
     if (!form.taxIdEntryEnabled) return null

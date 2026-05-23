@@ -7,7 +7,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { subscriptionStatusBlocksNewCheckout } from "@/lib/billing/subscription-status"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
 
 type StartTrialState =
   | "loading"
@@ -87,10 +89,17 @@ export default function StartTrialPage() {
 function StartTrialContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { businessId } = useBusinessAccess()
   const [state, setState] = React.useState<StartTrialState>("loading")
   const [error, setError] = React.useState<string | null>(null)
   const [trialHeadline, setTrialHeadline] = React.useState<string | null>(null)
   const [loadingKind, setLoadingKind] = React.useState<"trial" | "paid">("trial")
+
+  React.useEffect(() => {
+    if (state !== "subscription_active") return
+    const id = businessId?.trim()
+    if (id) markPanelAccessJustActivated(id)
+  }, [state, businessId])
 
   const beginPaidCheckout = React.useCallback(async () => {
     setError(null)
@@ -417,7 +426,10 @@ function StartTrialContent() {
           ) : null}
           {state === "subscription_active" ? (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => router.push("/dashboard")}>
+              <Button
+                type="button"
+                onClick={() => router.push("/dashboard?onboarding=welcome")}
+              >
                 Przejdź do panelu
               </Button>
             </div>

@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { TOUR_STEPS } from "@/lib/guide/tour-steps"
 import { useTour } from "@/lib/tour/tour-context"
-import { isTourExcludedPublicPath } from "@/lib/tour/tour-path-guard"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 const PADDING = 10
@@ -39,6 +38,7 @@ export function AppTour() {
     tourActive,
     stepIndex,
     tourReady,
+    canShowOnboardingUi,
     nextStep,
     prevStep,
     finishTour,
@@ -112,10 +112,11 @@ export function AppTour() {
     .replace("{total}", String(total))
 
   if (!tourReady) return null
-  if (isTourExcludedPublicPath(pathname)) return null
+  if (!canShowOnboardingUi) return null
 
   return (
     <>
+      {/* Welcome tylko po świeżej aktywacji dostępu (marker) na /dashboard */}
       {welcomeOpen && !tourActive ? (
         <div
           className="fixed inset-0 z-[200] flex items-end justify-center bg-black/48 p-4 pb-8 backdrop-blur-[2px] dark:bg-black/58 sm:items-center sm:p-6"

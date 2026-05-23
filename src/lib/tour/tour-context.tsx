@@ -3,25 +3,25 @@
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { TOUR_STEPS } from "@/lib/guide/tour-steps"
+import { TOUR_KEYS, writeTourRuntimeState } from "@/lib/tour/tour-storage"
 import {
-  TOUR_KEYS,
-  readTourRuntimeState,
-  writeTourRuntimeState,
-} from "@/lib/tour/tour-storage"
-import { isTourExcludedPublicPath } from "@/lib/tour/tour-path-guard"
+  clearPanelAccessJustActivated,
+  hasPendingAccessActivationForBusiness,
+  isWelcomeHandledForBusiness,
+  markPanelAccessJustActivated,
+  markWelcomeHandledForBusiness,
+} from "@/lib/tour/tour-access-activation"
+import {
+  isPanelWelcomePopupPath,
+  isPublicTourBlockedPath,
+} from "@/lib/tour/tour-path-guard"
+import { usePanelOnboardingEligibility } from "@/lib/tour/use-panel-onboarding-eligibility"
 
-function getFromStorage(key: string): string | null {
+function setLegacyWelcomeDismissed() {
   try {
-    return window.localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-function setInStorage(key: string, value: string) {
-  try {
-    window.localStorage.setItem(key, value)
+    window.localStorage.setItem(TOUR_KEYS.welcomeDismissed, "1")
   } catch {
     /* ignore */
   }
@@ -32,6 +32,8 @@ type TourContextValue = {
   tourActive: boolean
   stepIndex: number
   tourReady: boolean
+  /** false na landing / public / bez aktywnej subskrypcji. */
+  canShowOnboardingUi: boolean
   openWelcome: () => void
   dismissWelcome: () => void
   startTour: (fromStepIndex?: number) => void
@@ -47,11 +49,18 @@ const TourContext = React.createContext<TourContextValue | null>(null)
 export function TourProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
+  const { businessId, ready: accessReady } = useBusinessAccess()
 
   const [tourReady, setTourReady] = React.useState(false)
   const [welcomeOpen, setWelcomeOpen] = React.useState(false)
   const [tourActive, setTourActive] = React.useState(false)
   const [stepIndex, setStepIndex] = React.useState(0)
+
+  const { ready: eligibilityReady, eligible: panelOnboardingEligible } =
+    usePanelOnboardingEligibility(tourActive)
+
+  const canShowOnboardingUi =
+    tourReady && eligibilityReady && panelOnboardingEligible && (welcomeOpen || tourActive)
 
   const persistStep = React.useCallback((active: boolean, step: number) => {
     if (active) {
@@ -61,43 +70,87 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const handleWelcomeConsumed = React.useCallback(() => {
+    const id = businessId?.trim()
+    if (id) {
+      markWelcomeHandledForBusiness(id)
+    } else {
+      clearPanelAccessJustActivated()
+    }
+    setLegacyWelcomeDismissed()
+    setWelcomeOpen(false)
+  }, [businessId])
+
   React.useEffect(() => {
-    const dismissed = getFromStorage(TOUR_KEYS.welcomeDismissed)
-    const finishedTour = getFromStorage(TOUR_KEYS.tourFinished)
-    const runtime = readTourRuntimeState()
-    const onPublicPath = isTourExcludedPublicPath(pathname)
-
     queueMicrotask(() => {
-      if (onPublicPath) {
-        setWelcomeOpen(false)
+      setWelcomeOpen(false)
+      if (isPublicTourBlockedPath(pathname)) {
         setTourActive(false)
-        setTourReady(true)
-        return
-      }
-
-      if (runtime?.active) {
-        const idx = Math.min(
-          Math.max(0, runtime.stepIndex),
-          TOUR_STEPS.length - 1
-        )
-        setStepIndex(idx)
-        setTourActive(true)
-        setWelcomeOpen(false)
-        setTourReady(true)
-        return
-      }
-
-      if (finishedTour === "1" || dismissed === "1") {
-        setWelcomeOpen(false)
-      } else {
-        setWelcomeOpen(true)
+        persistStep(false, 0)
       }
       setTourReady(true)
     })
-  }, [pathname])
+  }, [pathname, persistStep])
+
+  /** ?onboarding=welcome → marker sesji (np. link z activate-access). */
+  React.useEffect(() => {
+    if (typeof window === "undefined" || !accessReady) return
+    const id = businessId?.trim()
+    if (!id) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("onboarding") !== "welcome") return
+    markPanelAccessJustActivated(id)
+    params.delete("onboarding")
+    const qs = params.toString()
+    const next = `${pathname}${qs ? `?${qs}` : ""}`
+    router.replace(next, { scroll: false })
+  }, [accessReady, businessId, pathname, router])
+
+  /** Welcome tylko: /dashboard + świeży marker aktywacji + trialing/active + nie obsłużono dla firmy. */
+  React.useEffect(() => {
+    if (!tourReady || !eligibilityReady || !panelOnboardingEligible) return
+    if (tourActive || welcomeOpen) return
+    const id = businessId?.trim()
+    if (!id) return
+    if (!isPanelWelcomePopupPath(pathname)) return
+    if (isWelcomeHandledForBusiness(id)) {
+      clearPanelAccessJustActivated()
+      return
+    }
+    if (!hasPendingAccessActivationForBusiness(id)) return
+
+    queueMicrotask(() => {
+      setWelcomeOpen(true)
+      clearPanelAccessJustActivated()
+    })
+  }, [
+    tourReady,
+    eligibilityReady,
+    panelOnboardingEligible,
+    tourActive,
+    welcomeOpen,
+    businessId,
+    pathname,
+  ])
 
   React.useEffect(() => {
-    if (!tourReady || !isTourExcludedPublicPath(pathname)) return
+    if (!tourReady || !eligibilityReady) return
+    if (panelOnboardingEligible) return
+    setWelcomeOpen(false)
+    if (tourActive) {
+      setTourActive(false)
+      persistStep(false, 0)
+    }
+  }, [
+    tourReady,
+    eligibilityReady,
+    panelOnboardingEligible,
+    tourActive,
+    persistStep,
+  ])
+
+  React.useEffect(() => {
+    if (!tourReady || !isPublicTourBlockedPath(pathname)) return
     setWelcomeOpen(false)
     if (tourActive) {
       setTourActive(false)
@@ -120,18 +173,18 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   }, [tourActive, tourReady, stepIndex, persistStep])
 
   const dismissWelcome = React.useCallback(() => {
-    setInStorage(TOUR_KEYS.welcomeDismissed, "1")
-    setWelcomeOpen(false)
-  }, [])
+    handleWelcomeConsumed()
+  }, [handleWelcomeConsumed])
 
   const openWelcome = React.useCallback(() => {
+    if (!panelOnboardingEligible) return
     setWelcomeOpen(true)
-  }, [])
+  }, [panelOnboardingEligible])
 
   const startTour = React.useCallback(
     (fromStepIndex = 0) => {
-      setInStorage(TOUR_KEYS.welcomeDismissed, "1")
-      setWelcomeOpen(false)
+      if (!panelOnboardingEligible) return
+      handleWelcomeConsumed()
       const next = Math.max(0, Math.min(fromStepIndex, TOUR_STEPS.length - 1))
       setStepIndex(next)
       setTourActive(true)
@@ -140,15 +193,21 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         router.push(step.path)
       }
     },
-    [pathname, router]
+    [pathname, router, panelOnboardingEligible, handleWelcomeConsumed]
   )
 
   const finishTourCompletely = React.useCallback(() => {
     setTourActive(false)
     persistStep(false, 0)
-    setInStorage(TOUR_KEYS.tourFinished, "1")
-    setInStorage(TOUR_KEYS.welcomeDismissed, "1")
-  }, [persistStep])
+    try {
+      window.localStorage.setItem(TOUR_KEYS.tourFinished, "1")
+    } catch {
+      /* ignore */
+    }
+    const id = businessId?.trim()
+    if (id) markWelcomeHandledForBusiness(id)
+    setLegacyWelcomeDismissed()
+  }, [persistStep, businessId])
 
   const nextStep = React.useCallback(() => {
     if (stepIndex >= TOUR_STEPS.length - 1) return
@@ -163,8 +222,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const skipTour = React.useCallback(() => {
     setTourActive(false)
     persistStep(false, 0)
-    setInStorage(TOUR_KEYS.welcomeDismissed, "1")
-  }, [persistStep])
+    const id = businessId?.trim()
+    if (id) markWelcomeHandledForBusiness(id)
+    setLegacyWelcomeDismissed()
+  }, [persistStep, businessId])
 
   const finishTour = React.useCallback(() => {
     finishTourCompletely()
@@ -180,6 +241,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       tourActive,
       stepIndex,
       tourReady,
+      canShowOnboardingUi,
       openWelcome,
       dismissWelcome,
       startTour,
@@ -194,6 +256,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       tourActive,
       stepIndex,
       tourReady,
+      canShowOnboardingUi,
       openWelcome,
       dismissWelcome,
       startTour,
