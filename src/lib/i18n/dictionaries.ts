@@ -1451,7 +1451,7 @@ export const dictionaries = {
     templatesLibrary: {
       tpl1Title: "Przypomnienie 24h przed wizytą",
       tpl1Body:
-        "Cześć {{imie}}, przypominamy o wizycie jutro o {{godzina}} - {{usluga}}. Jeśli nie możesz przyjść, anuluj wizytę tutaj: {{link_potwierdzenia}}",
+        "Cześć {{imie}}, przypominamy o wizycie jutro o {{godzina}} - {{usluga}}. Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
       tpl2Title: "Potwierdzenie wizyty",
       tpl2Body:
         "Dziękujemy, {{imię}}. Twoja wizyta na {{data}} o {{godzina}} jest potwierdzona. W razie pytań: {{telefon_salonu}}",
@@ -1466,7 +1466,7 @@ export const dictionaries = {
         "Cześć {{imie}}, przypominamy o wizycie dziś o {{godzina}} - {{usluga}}. Do zobaczenia!",
       tpl6Title: "Firma anuluje wizytę",
       tpl6Body:
-        "Przepraszamy! Niestety nie możemy zrealizować Twojej wizyty lub osoba, którą wybrałeś do wykonania usługi, będzie niedostępna. Wizyta została anulowana. Dokonaj nowej rezerwacji: {{link_rezerwacji}} lub skontaktuj się z nami: {{telefon_firmy}}",
+        "Przepraszamy! Niestety nie możemy zrealizować Twojej wizyty lub osoba, którą wybrałeś do wykonania usługi, będzie niedostępna. Wizyta została anulowana. Umów nową wizytę: {{link_rezerwacji}} lub skontaktuj się z nami: {{telefon_firmy}}",
       tpl7Title: "Twoja wizyta została anulowana",
       tpl7Body: `Cześć {{imie}},
 
@@ -1474,7 +1474,7 @@ przepraszamy, niestety nie możemy zrealizować Twojej wizyty lub osoba, którą
 
 Wizyta w systemie została anulowana.
 
-Prosimy o dokonanie nowej rezerwacji w systemie:
+Prosimy o umówienie nowej wizyty w systemie:
 {{link_rezerwacji}}
 
 Możesz też skontaktować się z nami telefonicznie:
@@ -1498,7 +1498,7 @@ Pozdrawiamy,
       deleteConfirm:
         "Czy na pewno chcesz usunąć ten szablon? Tej operacji nie można cofnąć.",
       previewVariablesHint:
-        "Zmienne np. {{imię}}, {{data}}, {{godzina}} oraz {{link_potwierdzenia}} lub {{confirmation_link}} (ten sam adres potwierdzenia).",
+        "Zmienne np. {{imię}}, {{data}}, {{godzina}} oraz {{link_potwierdzenia}} lub {{confirmation_link}} (link „Zarządzaj wizytą” — sprawdź szczegóły wizyty lub anuluj wizytę).",
       previewEditShortcut: "Edytuj",
       sheetEditTitle: "Edytuj szablon",
       sheetCreateTitle: "Nowy szablon",
@@ -3668,7 +3668,7 @@ Pozdrawiamy,
     templatesLibrary: {
       tpl1Title: "24h appointment reminder",
       tpl1Body:
-        "Hi {{name}}, this is a reminder about your appointment tomorrow at {{time}} - {{service}}. Confirm attendance, change the time or cancel here: {{confirmation_link}}",
+        "Hi {{name}}, this is a reminder about your appointment tomorrow at {{time}} - {{service}}. Manage your appointment or cancel here: {{confirmation_link}}",
       tpl2Title: "Appointment confirmation",
       tpl2Body:
         "Thank you, {{name}}. Your appointment on {{date}} at {{time}} is confirmed. Questions: {{salon_phone}}",
@@ -3683,7 +3683,7 @@ Pozdrawiamy,
         "Hi {{first_name}}, this is a reminder about your appointment today at {{time}} - {{service}}. See you soon!",
       tpl6Title: "Company cancels appointment",
       tpl6Body:
-        "We're sorry — we cannot keep your appointment or the staff you selected will be unavailable. The visit was cancelled. Book again: {{link_rezerwacji}} or contact us: {{telefon_firmy}}",
+        "We're sorry — we cannot keep your appointment or the staff you selected will be unavailable. The visit was cancelled. Book a new appointment: {{link_rezerwacji}} or contact us: {{telefon_firmy}}",
       tpl7Title: "Your appointment was cancelled",
       tpl7Body: `Hi {{imie}},
 
@@ -3691,7 +3691,7 @@ We're sorry — we cannot keep your appointment or the staff you selected will b
 
 The appointment has been cancelled in our system.
 
-Please make a new booking here:
+Please book a new appointment here:
 {{link_rezerwacji}}
 
 You can also reach us by phone:
@@ -3715,7 +3715,7 @@ Regards,
       deleteConfirm:
         "Are you sure you want to delete this template? This cannot be undone.",
       previewVariablesHint:
-        "Use variables such as {{name}}, {{date}}, {{time}} plus {{confirmation_link}} or Polish {{link_potwierdzenia}} for the client confirmation URL.",
+        "Use variables such as {{name}}, {{date}}, {{time}} plus {{confirmation_link}} or Polish {{link_potwierdzenia}} for the manage-appointment link (view details or cancel).",
       previewEditShortcut: "Edit",
       sheetEditTitle: "Edit template",
       sheetCreateTitle: "New template",

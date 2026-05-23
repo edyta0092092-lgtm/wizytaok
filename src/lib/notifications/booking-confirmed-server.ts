@@ -41,17 +41,17 @@ function buildMessages(
   const service = booking.service_name
   if (language === "en") {
     return {
-      sms: `Thank you ${name}. Your attendance for ${service} on ${dateLabel} at ${timeHm} has been confirmed.`,
-      emailSubject: "Appointment attendance confirmed",
-      emailText: `Thank you ${name},\n\nyour attendance has been confirmed.\n\nService: ${service}\nTime: ${dateLabel} at ${timeHm}\n\nManage booking:\n${confirmUrl}`,
-      emailHtml: `<p>Thank you ${name},</p><p>Your attendance has been confirmed.</p><p>Service: <strong>${service}</strong><br/>Time: ${dateLabel} at ${timeHm}</p><p><a href="${confirmUrl}">Manage booking</a></p>`,
+      sms: `Thank you ${name}. Your appointment on ${dateLabel} at ${timeHm} is confirmed. Manage your appointment or cancel here: ${confirmUrl}`,
+      emailSubject: "Appointment confirmed",
+      emailText: `Thank you ${name},\n\nYour appointment is confirmed.\n\nService: ${service}\nTime: ${dateLabel} at ${timeHm}\n\nManage your appointment:\n${confirmUrl}\n\nUse this link to view appointment details or cancel your visit.`,
+      emailHtml: `<p>Thank you ${name},</p><p>Your appointment is confirmed.</p><p>Service: <strong>${service}</strong><br/>Time: ${dateLabel} at ${timeHm}</p><p><a href="${confirmUrl}">Manage your appointment</a></p><p>Use this link to view appointment details or cancel your visit.</p>`,
     }
   }
   return {
-    sms: `Dziękujemy ${name}. Twoja obecność na wizycie ${service} dnia ${dateLabel} o ${timeHm} została potwierdzona.`,
-    emailSubject: "Potwierdzenie obecności na wizycie",
-    emailText: `Dziękujemy ${name},\n\npotwierdziliśmy Twoją obecność na wizycie.\n\nUsługa: ${service}\nTermin: ${dateLabel} o ${timeHm}\n\nZarządzanie rezerwacją:\n${confirmUrl}`,
-    emailHtml: `<p>Dziękujemy ${name},</p><p>Potwierdziliśmy Twoją obecność na wizycie.</p><p>Usługa: <strong>${service}</strong><br/>Termin: ${dateLabel} o ${timeHm}</p><p><a href="${confirmUrl}">Zarządzaj rezerwacją</a></p>`,
+    sms: `Dziękujemy ${name}. Twoja wizyta ${dateLabel} o ${timeHm} jest potwierdzona. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
+    emailSubject: "Wizyta potwierdzona",
+    emailText: `Dziękujemy ${name},\n\nTwoja wizyta jest potwierdzona.\n\nUsługa: ${service}\nTermin: ${dateLabel} o ${timeHm}\n\nZarządzaj wizytą:\n${confirmUrl}\n\nPod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.`,
+    emailHtml: `<p>Dziękujemy ${name},</p><p>Twoja wizyta jest potwierdzona.</p><p>Usługa: <strong>${service}</strong><br/>Termin: ${dateLabel} o ${timeHm}</p><p><a href="${confirmUrl}">Zarządzaj wizytą</a></p><p>Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.</p>`,
   }
 }
 

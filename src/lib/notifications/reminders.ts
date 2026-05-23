@@ -84,12 +84,12 @@ function buildReminderBodies(input: {
 }): { subject: string; text: string; html: string } {
   if (input.lang === "en") {
     const subject = "Appointment reminder"
-    const text = `Hi ${input.clientName}, this is a reminder for your appointment: ${input.serviceName} on ${input.dateLabel} at ${input.timeHm}. Confirm, reschedule or cancel here: ${input.confirmUrl}`
+    const text = `Hi ${input.clientName}, this is a reminder for your appointment: ${input.serviceName} on ${input.dateLabel} at ${input.timeHm}. Manage your appointment or cancel if needed: ${input.confirmUrl}`
     const html = `<p>Hi ${escapeHtml(input.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(
       input.serviceName
     )}</strong> on ${escapeHtml(input.dateLabel)} at ${escapeHtml(input.timeHm)}.</p><p><a href="${escapeHtml(
       input.confirmUrl
-    )}">Confirm, reschedule or cancel</a></p>`
+    )}">Manage appointment</a> — view details or cancel if you cannot attend.</p>`
     return { subject, text, html }
   }
   const subject = "Przypomnienie o wizycie"
@@ -98,7 +98,7 @@ function buildReminderBodies(input: {
     input.serviceName
   )}</strong> dnia ${escapeHtml(input.dateLabel)} o ${escapeHtml(input.timeHm)}.</p><p><a href="${escapeHtml(
     input.confirmUrl
-  )}">Anuluj wizytę, jeśli nie możesz przyjść</a></p>`
+  )}">Zarządzaj wizytą</a> — sprawdź szczegóły wizyty lub anuluj wizytę, jeśli nie możesz przyjść.</p>`
   return { subject, text, html }
 }
 
@@ -112,7 +112,7 @@ function escapeHtml(s: string): string {
 
 function smsBody(lang: "pl" | "en", service: string, dateLabel: string, timeHm: string, url: string): string {
   if (lang === "en") {
-    return `Reminder: ${service} ${dateLabel} at ${timeHm}. Confirm, reschedule or cancel: ${url}`
+    return `Reminder: ${service} ${dateLabel} at ${timeHm}. Manage your appointment or cancel: ${url}`
   }
   return `Przypomnienie o wizycie: ${service}, ${dateLabel} o ${timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${url}`
 }

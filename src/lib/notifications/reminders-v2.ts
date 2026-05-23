@@ -85,16 +85,16 @@ function buildMessage(
   if (lang === "en") {
     return {
       subject: "Appointment reminder",
-      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. If you cannot attend, cancel your appointment: ${payload.confirmUrl}`,
-      html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Cancel your appointment if needed</a></p>`,
-      sms: `Appointment reminder: ${payload.serviceName}, ${payload.dateLabel} at ${payload.timeHm}. Cancel if needed: ${payload.confirmUrl}`,
+      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. Manage your appointment or cancel if needed: ${payload.confirmUrl}`,
+      html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Manage appointment</a> — view details or cancel if you cannot attend.</p>`,
+      sms: `Appointment reminder: ${payload.serviceName}, ${payload.dateLabel} at ${payload.timeHm}. Manage your appointment or cancel: ${payload.confirmUrl}`,
     }
   }
   return {
     subject: "Przypomnienie o wizycie",
-    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Jeśli nie możesz przyjść, anuluj wizytę: ${payload.confirmUrl}`,
-    html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Anuluj wizytę, jeśli nie możesz przyjść</a></p>`,
-    sms: `Przypomnienie o wizycie: ${payload.serviceName}, ${payload.dateLabel} o ${payload.timeHm}. Jeśli nie możesz przyjść, anuluj wizytę: ${payload.confirmUrl}`,
+    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${payload.confirmUrl}`,
+    html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Zarządzaj wizytą</a> — sprawdź szczegóły wizyty lub anuluj wizytę, jeśli nie możesz przyjść.</p>`,
+    sms: `Przypomnienie o wizycie: ${payload.serviceName}, ${payload.dateLabel} o ${payload.timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${payload.confirmUrl}`,
   }
 }
 

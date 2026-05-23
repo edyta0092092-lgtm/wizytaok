@@ -141,7 +141,7 @@ Anulowany termin:
 - Godzina: {{godzina}}
 - Usługa: {{usluga}}
 
-Nową rezerwację możesz zrobić tutaj:
+Nową wizytę możesz umówić tutaj:
 {{link_rezerwacji}}
 
 W razie pytań: {{telefon_firmy}}
@@ -159,7 +159,7 @@ Anulowany termin:
 - Godzina: {{godzina}}
 - Usługa: {{usluga}}
 
-Nową wizytę zarezerwujesz tutaj:
+Nową wizytę umówisz tutaj:
 {{link_rezerwacji}}
 
 Pozdrawiamy,
@@ -167,11 +167,11 @@ Pozdrawiamy,
   },
   no_show_follow_up: {
     smsBody:
-      "Cześć {{imie}}, nie odnotowaliśmy Twojej obecności na wizycie {{data}} o {{godzina}}. Umów nowy termin: {{link_rezerwacji}}",
+      "Cześć {{imie}}, nie odnotowaliśmy Twojej wizyty {{data}} o {{godzina}}. Umów nowy termin: {{link_rezerwacji}}",
     emailSubject: "Nowy termin po nieobecności",
     emailBody: `Cześć {{imie}},
 
-nie odnotowaliśmy Twojej obecności na wizycie:
+nie odnotowaliśmy Twojej wizyty:
 - Data: {{data}}
 - Godzina: {{godzina}}
 - Usługa: {{usluga}}

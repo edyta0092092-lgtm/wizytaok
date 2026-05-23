@@ -141,14 +141,14 @@ export function createBookingCreatedMessages(
   const dateLabel = formatDate(booking.date, language)
   const smsBody =
     language === "pl"
-      ? `Cześć ${booking.customerName}, Twoja rezerwacja została zapisana: ${booking.serviceName}, ${dateLabel} o ${booking.time}. Zarządzaj rezerwacją: ${confirmationLink}`
-      : `Hi ${booking.customerName}, your booking has been saved: ${booking.serviceName}, ${dateLabel} at ${booking.time}. Manage your booking: ${confirmationLink}`
+      ? `Cześć ${booking.customerName}, Twoja wizyta została potwierdzona: ${booking.serviceName}, ${dateLabel} o ${booking.time}. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmationLink}`
+      : `Hi ${booking.customerName}, your appointment is confirmed: ${booking.serviceName}, ${dateLabel} at ${booking.time}. Manage your appointment or cancel here: ${confirmationLink}`
   const emailSubject =
-    language === "pl" ? "Twoja rezerwacja została zapisana" : "Your booking has been saved"
+    language === "pl" ? "Wizyta potwierdzona" : "Appointment confirmed"
   const emailBody =
     language === "pl"
-      ? `Cześć ${booking.customerName}, Twoja rezerwacja została zapisana.\n\nUsługa: ${booking.serviceName}\nTermin: ${dateLabel} o ${booking.time}\n\nTutaj możesz potwierdzić obecność albo anulować wizytę:\n${confirmationLink}`
-      : `Hi ${booking.customerName}, your booking has been saved.\n\nService: ${booking.serviceName}\nTime: ${dateLabel} at ${booking.time}\n\nYou can confirm attendance or cancel here:\n${confirmationLink}`
+      ? `Cześć ${booking.customerName}, Twoja wizyta została zapisana i potwierdzona.\n\nUsługa: ${booking.serviceName}\nTermin: ${dateLabel} o ${booking.time}\n\nZarządzaj wizytą (sprawdź szczegóły lub anuluj wizytę):\n${confirmationLink}`
+      : `Hi ${booking.customerName}, your appointment has been saved and confirmed.\n\nService: ${booking.serviceName}\nTime: ${dateLabel} at ${booking.time}\n\nManage your appointment (view details or cancel):\n${confirmationLink}`
   return [
     {
       id: crypto.randomUUID(),
@@ -192,14 +192,14 @@ export function createBookingConfirmedMessages(
   const hasEmail = Boolean(booking.customerEmail?.trim())
   const smsBodySent =
     language === "pl"
-      ? `Dziękujemy ${booking.customerName}. Twoja obecność na wizycie ${dateLabel} o ${booking.time} została potwierdzona.`
-      : `Thank you ${booking.customerName}. Your attendance for ${dateLabel} at ${booking.time} has been confirmed.`
+      ? `Dziękujemy ${booking.customerName}. Twoja wizyta ${dateLabel} o ${booking.time} jest potwierdzona.`
+      : `Thank you ${booking.customerName}. Your appointment on ${dateLabel} at ${booking.time} is confirmed.`
   const emailSubject =
-    language === "pl" ? "Potwierdzenie obecności na wizycie" : "Appointment attendance confirmed"
+    language === "pl" ? "Wizyta potwierdzona" : "Appointment confirmed"
   const emailBodySent =
     language === "pl"
-      ? `Dziękujemy ${booking.customerName},\n\npotwierdziliśmy Twoją obecność na wizycie.\n\nUsługa: ${booking.serviceName}\nTermin: ${dateLabel} o ${booking.time}\n\nZarządzanie rezerwacją:\n${confirmationLink}`
-      : `Thank you ${booking.customerName},\n\nyour attendance has been confirmed.\n\nService: ${booking.serviceName}\nTime: ${dateLabel} at ${booking.time}\n\nManage booking:\n${confirmationLink}`
+      ? `Dziękujemy ${booking.customerName},\n\nTwoja wizyta jest potwierdzona.\n\nUsługa: ${booking.serviceName}\nTermin: ${dateLabel} o ${booking.time}\n\nZarządzaj wizytą (sprawdź szczegóły lub anuluj wizytę):\n${confirmationLink}`
+      : `Thank you ${booking.customerName},\n\nyour appointment is confirmed.\n\nService: ${booking.serviceName}\nTime: ${dateLabel} at ${booking.time}\n\nManage your appointment (view details or cancel):\n${confirmationLink}`
 
   const sms: NotificationMessage = {
     id: crypto.randomUUID(),
