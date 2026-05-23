@@ -3,6 +3,11 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { mapOAuthCallbackQueryError } from "@/lib/auth/oauth-sign-in-client"
+import {
+  oauthErrorReturnPath,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/resolve-post-auth-redirect-server"
 import { safeInternalRedirectOrDashboard } from "@/lib/auth/safe-internal-redirect"
 import { prepareBusinessProfileForStartTrial } from "@/lib/start-trial/prepare-business-profile-server"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
@@ -22,12 +27,27 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   )!.trim()
-  const code = requestUrl.searchParams.get("code")
-  const trialParam = requestUrl.searchParams.get("trial")
+
   const requestedNext = safeInternalRedirectOrDashboard(
-    requestUrl.searchParams.get("next") ?? requestUrl.searchParams.get("redirectTo")
+    requestUrl.searchParams.get("next") ?? requestUrl.searchParams.get("redirectTo"),
   )
 
+  const oauthError = requestUrl.searchParams.get("error")
+  if (oauthError) {
+    const code = mapOAuthCallbackQueryError(
+      oauthError,
+      requestUrl.searchParams.get("error_description"),
+    )
+    const returnPath = oauthErrorReturnPath(requestedNext)
+    const dest = new URL(returnPath, origin)
+    dest.searchParams.set("oauth_error", code)
+    const nextPreserve = requestUrl.searchParams.get("next")
+    if (nextPreserve) dest.searchParams.set("next", nextPreserve)
+    return NextResponse.redirect(dest)
+  }
+
+  const code = requestUrl.searchParams.get("code")
+  const trialParam = requestUrl.searchParams.get("trial")
   const cookieStore = await cookies()
   const trialCookie = cookieStore.get("wizytaok_trial_intent")?.value
 
@@ -39,7 +59,7 @@ export async function GET(request: Request) {
       setAll(cookiesToSet: Parameters<SetAllCookies>[0]) {
         try {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
+            cookieStore.set(name, value, options),
           )
         } catch {
           /* ignore when not mutable */
@@ -49,29 +69,26 @@ export async function GET(request: Request) {
   }) as SupabaseClient<Database>
 
   if (code) {
-    await supabase.auth.exchangeCodeForSession(code)
-    await prepareBusinessProfileForStartTrial()
-  }
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    if (exchangeError) {
+      const returnPath = oauthErrorReturnPath(requestedNext)
+      const dest = new URL(returnPath, origin)
+      dest.searchParams.set("oauth_error", "oauth_failed")
+      return NextResponse.redirect(dest)
+    }
 
-  let next = requestedNext
-  const trialFromQuery = trialParam === "1" || trialParam?.toLowerCase() === "true"
-  const trialFromCookie = trialCookie === "1" || trialCookie?.toLowerCase() === "true"
-  if (trialFromQuery || trialFromCookie) {
-    next = "/start-trial"
-  } else if (next === "/dashboard") {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    const rawTrialIntent = user?.user_metadata?.trial_intent
-    const wantsTrial =
-      rawTrialIntent === true ||
-      rawTrialIntent === "true" ||
-      rawTrialIntent === 1 ||
-      rawTrialIntent === "1"
-    if (wantsTrial) {
-      next = "/start-trial"
+    const prepare = await prepareBusinessProfileForStartTrial()
+    if (prepare.ok === false && prepare.error === "missing_account_type") {
+      /* OAuth / brak metadanych z formularza — profil uzupełnia się w /settings?setup=business */
     }
   }
+
+  const trialFromQuery = trialParam === "1" || trialParam?.toLowerCase() === "true"
+  const trialFromCookie = trialCookie === "1" || trialCookie?.toLowerCase() === "true"
+
+  const next = await resolvePostAuthRedirect(supabase, requestedNext, {
+    trialFromCookie: trialFromQuery || trialFromCookie,
+  })
 
   const response = NextResponse.redirect(new URL(next, origin))
   if (trialFromQuery || trialFromCookie) {

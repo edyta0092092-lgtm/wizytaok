@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  OAuthProviderButtons,
+  oauthErrorMessageFromCode,
+} from "@/components/auth/oauth-provider-buttons"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -28,12 +32,16 @@ export function LoginForm() {
     searchParams.get("next") ?? searchParams.get("redirectTo")
   )
   const resetStatus = searchParams.get("reset")
+  const oauthErrorCode = searchParams.get("oauth_error")
 
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(
-    resetStatus === "success" ? t("auth.resetPasswordSuccess") : null
+    resetStatus === "success" ? t("auth.resetPasswordSuccess") : null,
+  )
+  const [oauthError, setOauthError] = React.useState<string | null>(() =>
+    oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null,
   )
   const [loading, setLoading] = React.useState(false)
   const [sendingReset, setSendingReset] = React.useState(false)
@@ -169,7 +177,11 @@ export function LoginForm() {
               {t("auth.loginDescription")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+            <OAuthProviderButtons
+              next={postLoginPath ?? "/dashboard"}
+              onError={(code) => setOauthError(oauthErrorMessageFromCode(code, t))}
+            />
             <form className="space-y-4" onSubmit={onSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="login-email">{t("auth.email")}</Label>
@@ -203,6 +215,11 @@ export function LoginForm() {
                   {t("auth.forgotPassword")}
                 </button>
               </div>
+              {oauthError ? (
+                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  {oauthError}
+                </p>
+              ) : null}
               {error ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {error}

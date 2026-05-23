@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Logo } from "@/components/brand/logo"
@@ -17,6 +17,10 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  OAuthProviderButtons,
+  oauthErrorMessageFromCode,
+} from "@/components/auth/oauth-provider-buttons"
 import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
@@ -45,7 +49,9 @@ function normalizeDigits(raw: string): string {
 
 export function SignupForm({ startTrial = false }: SignupFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useTranslations()
+  const oauthErrorCode = searchParams.get("oauth_error")
 
   const [businessName, setBusinessName] = React.useState("")
   const [ownerFirstName, setOwnerFirstName] = React.useState("")
@@ -59,6 +65,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
+  const [oauthError, setOauthError] = React.useState<string | null>(() =>
+    oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null,
+  )
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
   /** Blokada przed signUp: NIP, telefon lub e-mail już w business_profiles (preflight API). */
@@ -505,6 +514,23 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const loginHrefDup = startTrial ? "/login?next=%2Fdashboard" : "/login"
 
+  const persistTrialIntentForOAuth = React.useCallback(() => {
+    if (!startTrial) return
+    try {
+      document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
+      window.localStorage.setItem("wizytaok_trial_intent", "1")
+    } catch {
+      /* ignore */
+    }
+  }, [startTrial])
+
+  const handleOAuthError = React.useCallback(
+    (code: string) => {
+      setOauthError(oauthErrorMessageFromCode(code, t))
+    },
+    [t],
+  )
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/80 bg-card/80 px-4 py-3 sm:px-5">
@@ -523,7 +549,13 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <p className="text-sm text-muted-foreground">{t("auth.signupTrialStripeLead")}</p>
             ) : null}
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-5">
+            <OAuthProviderButtons
+              next="/settings?setup=business"
+              trialIntent={startTrial}
+              onBeforeSignIn={persistTrialIntentForOAuth}
+              onError={handleOAuthError}
+            />
             <form className="space-y-4" onSubmit={onSubmit}>
               <div className="space-y-2">
                 <Label htmlFor="signup-business">{t("auth.businessName")}</Label>
@@ -768,6 +800,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     </Button>
                   </div>
                 </div>
+              ) : null}
+              {oauthError ? (
+                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                  {oauthError}
+                </p>
               ) : null}
               {error ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">

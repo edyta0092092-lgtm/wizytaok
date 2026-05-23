@@ -483,6 +483,15 @@ export const dictionaries = {
       homeLink: "Strona główna",
       signupLegalPrefix: "Zakładając konto, akceptujesz",
       signupLegalAnd: "i zapoznałeś/zapoznałaś się z",
+      oauthDivider: "Lub kontynuuj z",
+      continueWithGoogle: "Kontynuuj z Google",
+      continueWithFacebook: "Kontynuuj z Facebook",
+      oauthFailed: "Logowanie przez zewnętrznego dostawcę nie powiodło się. Spróbuj ponownie.",
+      oauthProviderNotEnabled:
+        "Logowanie przez tego dostawcę nie jest jeszcze włączone. Skorzystaj z e-maila i hasła lub skontaktuj się z administratorem.",
+      oauthCancelled: "Logowanie zostało anulowane.",
+      oauthNoEmail:
+        "Konto zewnętrzne nie udostępniło adresu e-mail. Użyj logowania e-mail i hasła lub innego konta.",
     },
     dashboard: {
       title: "Plan dnia",
@@ -2686,6 +2695,15 @@ Pozdrawiamy,
       homeLink: "Home",
       signupLegalPrefix: "By creating an account, you accept the",
       signupLegalAnd: "and confirm you have read the",
+      oauthDivider: "Or continue with",
+      continueWithGoogle: "Continue with Google",
+      continueWithFacebook: "Continue with Facebook",
+      oauthFailed: "Sign-in with the external provider failed. Please try again.",
+      oauthProviderNotEnabled:
+        "Sign-in with this provider is not enabled yet. Use email and password or contact support.",
+      oauthCancelled: "Sign-in was cancelled.",
+      oauthNoEmail:
+        "The external account did not provide an email address. Use email and password or another account.",
     },
     dashboard: {
       title: "Day plan",
