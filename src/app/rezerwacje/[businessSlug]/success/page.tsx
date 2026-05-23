@@ -381,7 +381,7 @@ export default function PublicBookingSuccessPage() {
             <p className="text-sm text-muted-foreground">
               {isCancelled
                 ? t("bookingPublic.visitCancelledBanner")
-                : t("bookingPublic.appointmentConfirmedDescription")}
+                : t("bookingPublic.bookingSavedDescriptionNotifySafe")}
             </p>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
@@ -428,6 +428,9 @@ export default function PublicBookingSuccessPage() {
                 <div>
                   <p className="text-sm font-semibold text-foreground">{t("bookingPublic.messageStatusTitle")}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
+                    {t("bookingPublic.successNotifyManageLink")}
+                  </p>
+                  <p className="mt-2 text-sm text-muted-foreground">
                     {t("bookingPublic.whatNextImmediateNotifySafe")}
                   </p>
                 </div>
@@ -438,17 +441,41 @@ export default function PublicBookingSuccessPage() {
               </div>
             ) : null}
 
-            {confirmationToken && !isCancelled ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4 w-full"
-                disabled={cancelling}
-                onClick={() => handleCancelVisit()}
-              >
-                {cancelling ? t("bookings.loading") : t("bookingPublic.cancelAppointment")}
+            {!isCancelled ? (
+              <div className="mt-4 flex flex-col gap-2">
+                {confirmationToken ? (
+                  <Button type="button" className="w-full" asChild>
+                    <Link
+                      href={`/confirm/${encodeURIComponent(confirmationToken)}`}
+                    >
+                      {t("bookingPublic.manageBooking")}
+                    </Link>
+                  </Button>
+                ) : null}
+                <Button type="button" variant="secondary" className="w-full" asChild>
+                  <Link href={`/rezerwacje/${encodeURIComponent(String(businessSlug))}`}>
+                    {t("bookingPublic.bookAnotherAppointment")}
+                  </Link>
+                </Button>
+                {confirmationToken ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={cancelling}
+                    onClick={() => handleCancelVisit()}
+                  >
+                    {cancelling ? t("bookings.loading") : t("bookingPublic.cancelAppointment")}
+                  </Button>
+                ) : null}
+              </div>
+            ) : (
+              <Button type="button" variant="secondary" className="mt-4 w-full" asChild>
+                <Link href={`/rezerwacje/${encodeURIComponent(String(businessSlug))}`}>
+                  {t("bookingPublic.bookAnotherAppointment")}
+                </Link>
               </Button>
-            ) : null}
+            )}
           </CardContent>
         </Card>
       </div>

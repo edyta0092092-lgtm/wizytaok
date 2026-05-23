@@ -978,7 +978,7 @@ export const dictionaries = {
     bookingPublic: {
       onlineBadge: "Wizyta online",
       pageDescription: "Wybierz usługę i dogodny termin.",
-      stepsAriaLabel: "Postęp rezerwacji",
+      stepsAriaLabel: "Postęp umawiania wizyty",
       step1: "Usługa",
       step2: "Obsługa",
       step3: "Termin",
@@ -987,9 +987,9 @@ export const dictionaries = {
       step6: "Potwierdzenie",
       chooseService: "Wybierz usługę",
       noServicesAvailable:
-        "Brak dostępnych usług. Firma nie dodała jeszcze usług do rezerwacji.",
-      bookingPageNotFound: "Nie znaleziono strony rezerwacji.",
-      businessHasNoActiveServicesYet: "Ta firma nie dodała jeszcze usług do rezerwacji.",
+        "Brak dostępnych usług. Firma nie dodała jeszcze usług do umawiania wizyt online.",
+      bookingPageNotFound: "Nie znaleziono strony umawiania wizyt.",
+      businessHasNoActiveServicesYet: "Ta firma nie dodała jeszcze usług do umawiania wizyt online.",
       servicesLoadTryLater: "Nie udało się załadować usług. Spróbuj ponownie później.",
       noAssignedStaffContactBusiness:
         "Ta usługa nie ma jeszcze przypisanej osoby. Skontaktuj się z firmą.",
@@ -1031,7 +1031,9 @@ export const dictionaries = {
       whatNextImmediateNotifySentEmailOnly:
         "Wysłaliśmy e-mail z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySafe:
-        "Jeśli dane kontaktowe są poprawne, otrzymasz SMS/e-mail z informacją o potwierdzonej wizycie.",
+        "Jeśli dane kontaktowe są poprawne, otrzymasz SMS lub e-mail z linkiem „Zarządzaj wizytą” (szczegóły wizyty i anulowanie).",
+      successNotifyManageLink:
+        "Wysyłamy wiadomość SMS lub e-mail z linkiem „Zarządzaj wizytą”. Pod linkiem sprawdzisz szczegóły wizyty lub ją anulujesz.",
       fullName: "Imię i nazwisko",
       firstName: "Imię",
       lastName: "Nazwisko",
@@ -1040,7 +1042,7 @@ export const dictionaries = {
       optionalNote: "Notatka opcjonalnie",
       fieldOptional: "opcjonalnie",
       contactRemindersHint:
-        "E-mail i telefon są potrzebne do wysłania potwierdzenia oraz przypomnień. Jeśli klient ich nie poda, nie otrzyma wiadomości.",
+        "Telefon lub e-mail są potrzebne, aby wysłać potwierdzenie wizyty i link „Zarządzaj wizytą”. Bez tych danych nie otrzymasz wiadomości.",
       validationEmailInvalid: "Podaj poprawny adres e-mail lub zostaw pole puste.",
       bookingSavedTitle: "Wizyta potwierdzona",
       bookingSavedDescription:
@@ -1072,7 +1074,7 @@ export const dictionaries = {
       whatNextManageFull: "W linku możesz anulować wizytę, jeśli nie możesz przyjść.",
       messageStatusTitle: "Powiadomienia",
       messageStatusEmailInfo:
-        "E-mail z linkiem do rezerwacji nie jest wysyłany automatycznie w tym kroku — skontaktuj się z gabinetem, jeśli go nie otrzymasz.",
+        "Jeśli nie otrzymasz wiadomości z linkiem „Zarządzaj wizytą”, skontaktuj się z gabinetem.",
       messageStatusBookingCreatedSent:
         "Wysłaliśmy wiadomość z informacją o potwierdzonej wizycie oraz linkiem do zarządzania.",
       messageStatusBookingCreatedSafe:
@@ -1083,7 +1085,14 @@ export const dictionaries = {
         "Przypomnienie 24h przed wizytą: e-mail (wg ustawień firmy).",
       messageStatusReminderSms:
         "Przypomnienie 24h przed wizytą: SMS (wg ustawień firmy).",
-      backToBooking: "Wróć do strony rezerwacji",
+      backToBooking: "Wróć do strony umawiania wizyt",
+      fallbackPageTitle: "Umawianie wizyt online",
+      fallbackPageDescription:
+        "Aby umówić wizytę, użyj linku otrzymanego od firmy (np. „Otwórz stronę umawiania wizyt” w panelu właściciela). Link powinien wskazywać stronę tej firmy.",
+      fallbackOwnerHint:
+        "Prowadzisz firmę i chcesz zobaczyć podgląd strony umawiania wizyt — zaloguj się do panelu.",
+      fallbackLogin: "Zaloguj się",
+      fallbackHome: "Strona główna",
       bookAnotherAppointment: "Umów kolejną wizytę",
       cancelAppointment: "Anuluj wizytę",
       cancelVisitConfirmTitle: "Czy na pewno chcesz anulować wizytę?",
@@ -1104,7 +1113,7 @@ export const dictionaries = {
       clientDetails: "Dane klienta",
       noSelection: "Brak wyboru",
       slotHelp: "Wybierz dzień i godzinę wizyty.",
-      openConfirmationLink: "Otwórz link potwierdzenia",
+      openConfirmationLink: "Zarządzaj wizytą",
       dayUnavailable: "Ten dzień jest niedostępny.",
       serviceNotOnSelectedDay: "Ta usługa nie jest dostępna w wybranym dniu.",
       chooseStaffMember: "Wybierz osobę",
@@ -1112,19 +1121,18 @@ export const dictionaries = {
       noStaffAssignedToService:
         "Ta usługa nie ma jeszcze przypisanej osoby. Skontaktuj się z firmą.",
       staffMemberLabel: "Osoba",
-      privacyNoticePrefix: "Dokonując rezerwacji, zapoznaj się z",
+      privacyNoticePrefix: "Umawiając wizytę, zapoznaj się z",
       privacyNoticeLink: "Polityką prywatności",
     },
     confirmPublic: {
-      title: "Potwierdzenie wizyty",
-      subtitle:
-        "Sprawdź szczegóły i wybierz, co chcesz zrobić.",
+      title: "Zarządzaj wizytą",
+      subtitle: "Sprawdź szczegóły wizyty lub ją anuluj.",
       manageAppointmentTitle: "Twoja wizyta",
       manageAppointmentDescription:
         "Sprawdź szczegóły wizyty. Możesz anulować wizytę, jeśli nie możesz przyjść.",
       pageTitle: "Zarządzaj wizytą",
       pageDescription:
-        "Twoja wizyta jest zapisana. Potwierdź, że nadal przyjdziesz, albo wybierz inną opcję.",
+        "Twoja wizyta jest zapisana i potwierdzona. Sprawdź szczegóły lub anuluj wizytę, jeśli nie możesz przyjść.",
       titleManage: "Twoja wizyta jest potwierdzona",
       subtitleManage:
         "Sprawdź szczegóły wizyty. Możesz anulować wizytę, jeśli nie możesz przyjść.",
@@ -1162,15 +1170,15 @@ export const dictionaries = {
         "Czy na pewno chcesz anulować wizytę?",
       cancelConfirmYes: "Tak, anuluj wizytę",
       cancelConfirmNo: "Nie, wróć",
-      successConfirmed: "Obecność potwierdzona. Dziękujemy!",
-      confirmedReminderInfoPrefix: "Dziękujemy za potwierdzenie.",
+      successConfirmed: "Wizyta jest potwierdzona. Do zobaczenia!",
+      confirmedReminderInfoPrefix: "Dziękujemy.",
       confirmedReminderInfoSuffix: "Do zobaczenia!",
       confirmedReminderInfoWithPending:
-        "Dziękujemy za potwierdzenie. Przypomnimy Ci jeszcze o wizycie. Do zobaczenia!",
-      confirmedReminderInfoNoDate: "Dziękujemy za potwierdzenie. Do zobaczenia!",
+        "Przypomnimy Ci o wizycie zgodnie z ustawieniami gabinetu. Do zobaczenia!",
+      confirmedReminderInfoNoDate: "Do zobaczenia!",
       changeOptionsRemovedInfo:
-        "Jeśli chcesz dokonać zmian, anuluj wizytę i wróć do strony rezerwacji wizyty.",
-      backToOnlineBookingSystem: "Wróć do rezerwacji wizyty",
+        "Jeśli chcesz zmienić termin, anuluj wizytę i umów nową na stronie umawiania wizyt.",
+      backToOnlineBookingSystem: "Wróć do strony umawiania wizyt",
       successReschedule: "Prośba o zmianę została wysłana.",
       // Komunikat sukcesu po odwołaniu wizyty — wariant zależy od statusu PRZED anulowaniem:
       //   • `successCancelled` — wizyta nie była jeszcze potwierdzona (booked / pending)
@@ -1178,7 +1186,7 @@ export const dictionaries = {
       // Wybór wariantu odbywa się w `src/app/confirm/[bookingId]/page.tsx`.
       successCancelled: "Wizyta anulowana",
       successCancelledConfirmed: "Wizyta odwołana",
-      confirmActionFailed: "Nie udało się potwierdzić obecności. Spróbuj ponownie.",
+      confirmActionFailed: "Nie udało się wykonać operacji. Spróbuj ponownie.",
       cancelActionFailed: "Nie udało się anulować wizyty. Spróbuj ponownie.",
       notFoundTitle: "Nie znaleziono wizyty",
       notFoundBody:
@@ -1203,7 +1211,7 @@ export const dictionaries = {
       dismissChange: "Zamknij",
       confirmAttendanceTitle: "Zarządzaj wizytą",
       confirmAttendanceDescription: "Sprawdź szczegóły wizyty. Możesz anulować wizytę, jeśli nie możesz przyjść.",
-      confirmedTitle: "Twoja obecność jest potwierdzona",
+      confirmedTitle: "Twoja wizyta jest potwierdzona",
       confirmedDescription: "Możesz anulować wizytę, jeśli plany się zmieniły.",
       confirmAttendanceAction: "Anuluj wizytę",
       wantChangeTime: "Chcę zmienić termin",
@@ -1257,7 +1265,7 @@ export const dictionaries = {
       acceptedByLabel: "Zaakceptowane przez",
       roleBusinessShort: "Firma",
       roleClientShort: "Klient",
-      statusLineConfirmed: "Status: Potwierdzona",
+      statusLineConfirmed: "Wizyta jest potwierdzona.",
       statusLineBooked: "Status: Potwierdzona",
       statusLinePending: "Status: Potwierdzona",
       lastChangeLabel: "Ostatnia zmiana",
@@ -3197,7 +3205,7 @@ Pozdrawiamy,
     bookingPublic: {
       onlineBadge: "Online appointment",
       pageDescription: "Choose a service and a convenient time.",
-      stepsAriaLabel: "Booking progress",
+      stepsAriaLabel: "Appointment booking progress",
       step1: "Service",
       step2: "Support",
       step3: "Date",
@@ -3206,9 +3214,9 @@ Pozdrawiamy,
       step6: "Confirm",
       chooseService: "Choose a service",
       noServicesAvailable:
-        "No services available. The business has not added booking services yet.",
-      bookingPageNotFound: "Booking page not found.",
-      businessHasNoActiveServicesYet: "This business has not added any services for booking yet.",
+        "No services available. The business has not added online appointment services yet.",
+      bookingPageNotFound: "Online appointment page not found.",
+      businessHasNoActiveServicesYet: "This business has not added any online appointment services yet.",
       servicesLoadTryLater: "Could not load services. Please try again later.",
       noAssignedStaffContactBusiness:
         "This service does not have an assigned staff member yet. Please contact the business.",
@@ -3251,7 +3259,9 @@ Pozdrawiamy,
       whatNextImmediateNotifySentEmailOnly:
         "We sent an email with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySafe:
-        "If your contact details are correct, you will receive an SMS/email about your confirmed appointment.",
+        "If your contact details are correct, you will receive an SMS or email with a “Manage appointment” link (details and cancellation).",
+      successNotifyManageLink:
+        "We send an SMS or email with a “Manage appointment” link. There you can review details or cancel the appointment.",
       fullName: "Full name",
       firstName: "First name",
       lastName: "Last name",
@@ -3260,18 +3270,18 @@ Pozdrawiamy,
       optionalNote: "Optional note",
       fieldOptional: "optional",
       contactRemindersHint:
-        "Email and phone are used to send confirmation and reminders. If the client does not provide them, they will not receive messages.",
+        "Phone or email is required to send appointment confirmation and a “Manage appointment” link. Without them, you will not receive messages.",
       validationEmailInvalid: "Enter a valid email address or leave the field empty.",
-      bookingSavedTitle: "Booking saved",
-      bookingSavedDescription: "Your booking has been saved.",
+      bookingSavedTitle: "Appointment confirmed",
+      bookingSavedDescription: "Your appointment has been saved and confirmed.",
       bookingSavedDescriptionNotifySent:
-        "Your booking has been saved. We sent a message with a link to manage your appointment.",
+        "Your appointment has been saved and confirmed. We sent a message with a “Manage appointment” link.",
       bookingSavedDescriptionNotifySafe:
-        "Your booking has been saved. If your contact details are correct, you will receive a message with a link to manage your appointment.",
-      bookingSavedDescriptionNoEmail: "Your booking has been saved.",
+        "Your appointment has been saved and confirmed. If your contact details are correct, you will receive a message with a “Manage appointment” link.",
+      bookingSavedDescriptionNoEmail: "Your appointment has been saved and confirmed.",
       panelHintBusiness:
-        "The booking will appear in the business panel as a new appointment to confirm.",
-      manageBooking: "Manage booking",
+        "The appointment will appear in the business panel as confirmed.",
+      manageBooking: "Manage appointment",
       whatNextTitle: "What happens next?",
       whatNextEmailNote:
         "If you provided an email address, you may receive a link to manage your booking (when outbound email is configured).",
@@ -3290,7 +3300,7 @@ Pozdrawiamy,
       whatNextManageFull: "In the link, you can manage your appointment or cancel if you cannot attend.",
       messageStatusTitle: "Notifications",
       messageStatusEmailInfo:
-        "A booking link email is not sent automatically in this step — contact the business if you need the link.",
+        "If you do not receive a message with a “Manage appointment” link, contact the business.",
       messageStatusBookingCreatedSent:
         "Booking confirmation: we sent a message with a link to manage your appointment.",
       messageStatusBookingCreatedSafe:
@@ -3298,7 +3308,14 @@ Pozdrawiamy,
       messageStatusReminderBoth: "24h reminder: SMS and email (per business settings).",
       messageStatusReminderEmail: "24h reminder: email (per business settings).",
       messageStatusReminderSms: "24h reminder: SMS (per business settings).",
-      backToBooking: "Back to booking page",
+      backToBooking: "Back to appointment booking page",
+      fallbackPageTitle: "Book an appointment online",
+      fallbackPageDescription:
+        "To book an appointment, use the link from your business (e.g. “Open appointment booking page” in the owner panel). The link should point to that business page.",
+      fallbackOwnerHint:
+        "If you run the business and want a preview of the booking page — sign in to the panel.",
+      fallbackLogin: "Sign in",
+      fallbackHome: "Home",
       bookAnotherAppointment: "Book another appointment",
       cancelAppointment: "Cancel appointment",
       cancelVisitConfirmTitle: "Are you sure you want to cancel this appointment?",
@@ -3319,7 +3336,7 @@ Pozdrawiamy,
       clientDetails: "Client details",
       noSelection: "No selection",
       slotHelp: "Choose a day and appointment time.",
-      openConfirmationLink: "Open confirmation link",
+      openConfirmationLink: "Manage appointment",
       dayUnavailable: "This day is unavailable.",
       serviceNotOnSelectedDay: "This service is not available on the selected day.",
       chooseStaffMember: "Choose staff member",
@@ -3327,19 +3344,18 @@ Pozdrawiamy,
       noStaffAssignedToService:
         "This service does not have an assigned staff member yet. Please contact the business.",
       staffMemberLabel: "Staff",
-      privacyNoticePrefix: "By making a booking, please review the",
+      privacyNoticePrefix: "By booking an appointment, please review the",
       privacyNoticeLink: "Privacy Policy",
     },
     confirmPublic: {
-      title: "Appointment confirmation",
-      subtitle:
-        "Review the details and choose what you want to do.",
+      title: "Manage appointment",
+      subtitle: "Review appointment details or cancel.",
       manageAppointmentTitle: "Your appointment",
       manageAppointmentDescription:
         "Review your appointment details. You can cancel if you cannot attend.",
-      pageTitle: "Manage your appointment",
+      pageTitle: "Manage appointment",
       pageDescription:
-        "Review your appointment details. You can cancel if you cannot attend.",
+        "Your appointment is saved and confirmed. Review the details or cancel if you cannot attend.",
       titleManage: "Your appointment is confirmed",
       subtitleManage:
         "Review your appointment details. You can cancel if you cannot attend.",
@@ -3375,21 +3391,21 @@ Pozdrawiamy,
       cancelConfirmPrompt: "Are you sure you want to cancel this appointment?",
       cancelConfirmYes: "Yes, cancel appointment",
       cancelConfirmNo: "No, go back",
-      successConfirmed: "Attendance confirmed. Thank you!",
-      confirmedReminderInfoPrefix: "Thank you for confirming.",
+      successConfirmed: "Your appointment is confirmed. See you soon!",
+      confirmedReminderInfoPrefix: "Thank you.",
       confirmedReminderInfoSuffix: "See you soon!",
       confirmedReminderInfoWithPending:
-        "Thank you for confirming. We'll remind you about your appointment once more. See you soon!",
-      confirmedReminderInfoNoDate: "Thank you for confirming. See you soon!",
+        "We'll remind you about your appointment per business settings. See you soon!",
+      confirmedReminderInfoNoDate: "See you soon!",
       changeOptionsRemovedInfo:
-        "If you want to make changes, cancel the booking and return to the booking page.",
-      backToOnlineBookingSystem: "Back to online booking system",
+        "To change the time, cancel this appointment and book a new one on the booking page.",
+      backToOnlineBookingSystem: "Back to appointment booking page",
       successReschedule: "Your request has been sent.",
       // See PL dictionary above for the same key — variant depends on the booking
       // status BEFORE cancellation (booked/pending vs confirmed).
       successCancelled: "Booking cancelled",
       successCancelledConfirmed: "Appointment cancelled",
-      confirmActionFailed: "Could not confirm attendance. Please try again.",
+      confirmActionFailed: "Could not complete the action. Please try again.",
       cancelActionFailed: "Could not cancel the appointment. Please try again.",
       notFoundTitle: "Booking not found",
       notFoundBody:
@@ -3412,11 +3428,11 @@ Pozdrawiamy,
       successTimeUpdated: "Time updated",
       successServiceUpdated: "Service updated",
       dismissChange: "Close",
-      confirmAttendanceTitle: "Confirm attendance",
-      confirmAttendanceDescription: "Your appointment is booked. Confirm that you are still coming or choose another option.",
-      confirmedTitle: "Your attendance is confirmed",
+      confirmAttendanceTitle: "Manage appointment",
+      confirmAttendanceDescription: "Review your appointment details. You can cancel if you cannot attend.",
+      confirmedTitle: "Your appointment is confirmed",
       confirmedDescription: "You can cancel the appointment if your plans change.",
-      confirmAttendanceAction: "Confirm attendance",
+      confirmAttendanceAction: "Cancel appointment",
       wantChangeTime: "Change time",
       wantChangeService: "Change service",
       wantCancel: "Cancel appointment",
@@ -3467,7 +3483,7 @@ Pozdrawiamy,
       acceptedByLabel: "Accepted by",
       roleBusinessShort: "Business",
       roleClientShort: "Client",
-      statusLineConfirmed: "Status: Confirmed",
+      statusLineConfirmed: "Your appointment is confirmed.",
       statusLineBooked: "Status: Booked",
       statusLinePending: "Status: To confirm",
       lastChangeLabel: "Last update",
