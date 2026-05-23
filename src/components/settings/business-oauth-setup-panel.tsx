@@ -14,12 +14,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { resolvePathAfterBusinessSetup } from "@/lib/auth/post-business-setup-redirect-client"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import {
   ACCOUNT_TYPE_REGISTERED,
   ACCOUNT_TYPE_UNREGISTERED,
 } from "@/lib/billing/account-types"
-import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import {
@@ -28,12 +27,13 @@ import {
 } from "@/lib/validation/international-phone"
 
 type BusinessOAuthSetupPanelProps = {
-  onCompleted?: () => void
+  onProfileSaved?: () => void
 }
 
-export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanelProps) {
+export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPanelProps) {
   const { t } = useTranslations()
   const router = useRouter()
+  const { refresh } = useBusinessAccess()
   const [loadingPrefill, setLoadingPrefill] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -54,9 +54,11 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
     void (async () => {
       const prefill = await loadOAuthSetupPrefillAction()
       if (cancelled) return
-      if (prefill.hasProfile) {
-        setLoadingPrefill(false)
-        onCompleted?.()
+      if (prefill.hasProfile && prefill.redirectTo) {
+        await refresh()
+        onProfileSaved?.()
+        router.replace(prefill.redirectTo)
+        router.refresh()
         return
       }
       setEmail(prefill.email)
@@ -67,7 +69,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
     return () => {
       cancelled = true
     }
-  }, [onCompleted])
+  }, [onProfileSaved, refresh, router])
 
   const nipRequired = accountType === ACCOUNT_TYPE_REGISTERED
 
@@ -131,11 +133,6 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
           setError(t("auth.identityAlreadyExists"))
           return
         }
-        if (result.code === "profile_exists") {
-          onCompleted?.()
-          router.refresh()
-          return
-        }
         if (result.code === "slug_taken") {
           setError(t("auth.slugTaken"))
           return
@@ -148,24 +145,17 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
           setError(t("settings.taxIdInvalidChecksum"))
           return
         }
-        setError(t("common.saveError"))
+        if (process.env.NODE_ENV !== "production" && result.details) {
+          setError(`${t("account.saveError")} (${result.details})`)
+          return
+        }
+        setError(t("account.saveError"))
         return
       }
 
-      let meta: Record<string, unknown> | undefined
-      if (isSupabaseConfigured()) {
-        const client = getBrowserClient()
-        if (client) {
-          const {
-            data: { user },
-          } = await client.auth.getUser()
-          meta = (user?.user_metadata ?? {}) as Record<string, unknown>
-        }
-      }
-
-      const dest = await resolvePathAfterBusinessSetup(meta)
-      onCompleted?.()
-      router.replace(dest)
+      await refresh()
+      onProfileSaved?.()
+      router.replace(result.redirectTo)
       router.refresh()
     } finally {
       setSaving(false)
@@ -228,6 +218,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
                 value={ownerFirstName}
                 onChange={(e) => setOwnerFirstName(e.target.value)}
                 className="h-11 rounded-xl"
+                disabled={saving}
               />
             </div>
             <div className="space-y-2">
@@ -238,6 +229,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
                 value={ownerLastName}
                 onChange={(e) => setOwnerLastName(e.target.value)}
                 className="h-11 rounded-xl"
+                disabled={saving}
               />
             </div>
           </div>
@@ -250,6 +242,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               className="h-11 rounded-xl"
+              disabled={saving}
             />
           </div>
 
@@ -262,6 +255,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-11 rounded-xl"
+              disabled={saving}
             />
           </div>
 
@@ -285,6 +279,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
                 onChange={(e) => setCompanyTaxId(e.target.value)}
                 placeholder={t("settings.taxIdPlaceholder")}
                 className="h-11 rounded-xl"
+                disabled={saving}
               />
               <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdRequiredHint")}</p>
             </div>

@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
+import type { PostgrestError } from "@supabase/supabase-js"
 
 import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import {
@@ -8,16 +9,14 @@ import {
   ACCOUNT_TYPE_UNREGISTERED,
   type BusinessAccountType,
 } from "@/lib/billing/account-types"
+import { logOAuthBusinessSetupError } from "@/lib/auth/oauth-business-setup-log"
 import { parseOwnerNameFromUserMetadata } from "@/lib/auth/oauth-user-prefill"
+import { resolvePostBusinessSetupRedirect } from "@/lib/auth/post-business-setup-redirect-server"
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import { getServerAuthUser } from "@/lib/supabase/auth"
-import {
-  getBusinessProfileByOwnerId,
-  insertBusinessProfile,
-  updateBusinessProfileByOwnerId,
-} from "@/lib/supabase/repositories/business-profile.repository"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { Database } from "@/types/database"
 
 export type OAuthSetupAccountType = BusinessAccountType
 
@@ -32,7 +31,7 @@ export type CompleteOAuthBusinessSetupInput = {
 }
 
 export type CompleteOAuthBusinessSetupResult =
-  | { ok: true }
+  | { ok: true; businessId: string; redirectTo: string }
   | {
       ok: false
       code:
@@ -97,39 +96,82 @@ function getMissingColumn(message: string | undefined): string | null {
   return match?.[1] ?? null
 }
 
+function isProfileSetupComplete(
+  row: Database["public"]["Tables"]["business_profiles"]["Row"] | null,
+): boolean {
+  if (!row?.id) return false
+  const name = typeof row.business_name === "string" ? row.business_name.trim() : ""
+  if (!name) return false
+  const accountType = typeof row.account_type === "string" ? row.account_type.trim() : ""
+  if (accountType !== ACCOUNT_TYPE_REGISTERED && accountType !== ACCOUNT_TYPE_UNREGISTERED) {
+    return false
+  }
+  const phone =
+    (typeof row.contact_phone_normalized === "string" ? row.contact_phone_normalized : "").replace(
+      /\D/g,
+      "",
+    ) ||
+    (typeof row.phone === "string" ? row.phone : "").replace(/\D/g, "")
+  return phone.length >= 9
+}
+
 async function insertWithFallback(
-  client: NonNullable<Awaited<ReturnType<typeof getServerClient>>>,
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
   payload: Record<string, unknown>,
 ) {
   let p = { ...payload }
   for (let i = 0; i < 5; i += 1) {
-    const { error } = await insertBusinessProfile(client, p as never)
-    if (!error) return { error: null as null }
+    const { data, error } = await admin
+      .from("business_profiles")
+      .insert(p as Database["public"]["Tables"]["business_profiles"]["Insert"])
+      .select("id")
+      .single()
+    if (!error && data?.id) return { data, error: null as null }
+    if (!error) return { data: null, error: { message: "insert returned no row" } as PostgrestError }
     const missing = getMissingColumn(error.message)
-    if (!missing || !(missing in p)) return { error }
+    if (!missing || !(missing in p)) {
+      logOAuthBusinessSetupError("insert business_profiles", error)
+      return { data: null, error }
+    }
     p = Object.fromEntries(Object.entries(p).filter(([k]) => k !== missing))
   }
-  return { error: { message: "insert failed" } }
+  return { data: null, error: { message: "insert failed" } as PostgrestError }
 }
 
 async function updateWithFallback(
-  client: NonNullable<Awaited<ReturnType<typeof getServerClient>>>,
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
   ownerId: string,
   payload: Record<string, unknown>,
 ) {
   let p = { ...payload }
   for (let i = 0; i < 5; i += 1) {
-    const { error } = await updateBusinessProfileByOwnerId(client, ownerId, p as never)
-    if (!error) return { error: null as null }
+    const { data, error } = await admin
+      .from("business_profiles")
+      .update(p as Database["public"]["Tables"]["business_profiles"]["Update"])
+      .eq("owner_id", ownerId)
+      .select("*")
+      .single()
+    if (!error && data?.id) return { data, error: null as null }
+    if (!error) return { data: null, error: { message: "update returned no row" } as PostgrestError }
     const missing = getMissingColumn(error.message)
-    if (!missing || !(missing in p)) return { error }
+    if (!missing || !(missing in p)) {
+      logOAuthBusinessSetupError("update business_profiles", error)
+      return { data: null, error }
+    }
     p = Object.fromEntries(Object.entries(p).filter(([k]) => k !== missing))
   }
-  return { error: { message: "update failed" } }
+  return { data: null, error: { message: "update failed" } as PostgrestError }
+}
+
+function revalidateOAuthSetupPaths(): void {
+  revalidatePath("/settings")
+  revalidatePath("/dashboard")
+  revalidatePath("/activate-access")
+  revalidatePath("/start-trial")
 }
 
 /**
- * Pierwsze uzupełnienie firmy po OAuth — profil + user_metadata (account_type itd.).
+ * Pierwsze uzupełnienie firmy po OAuth — profil w business_profiles + user_metadata.
  */
 export async function completeOAuthBusinessSetupAction(
   input: CompleteOAuthBusinessSetupInput,
@@ -139,6 +181,12 @@ export async function completeOAuthBusinessSetupAction(
 
   const client = await getServerClient()
   if (!client) return { ok: false, code: "unknown" }
+
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    logOAuthBusinessSetupError("missing service role", "SUPABASE_SERVICE_ROLE_KEY")
+    return { ok: false, code: "unknown", details: "service_role_unconfigured" }
+  }
 
   const businessName = input.businessName.trim()
   if (!businessName) return { ok: false, code: "missing_business_name" }
@@ -172,25 +220,26 @@ export async function completeOAuthBusinessSetupAction(
   const conflict = await findIdentityConflict(user.id, taxNormalized, phoneNormalized, emailTrimmed)
   if (conflict) return { ok: false, code: "identity_conflict" }
 
-  const { data: existing } = await getBusinessProfileByOwnerId(client, user.id)
-  const { data: existingRaw } = await client
+  const { data: existingRow, error: existingErr } = await admin
     .from("business_profiles")
-    .select("id, slug, account_type")
+    .select("*")
     .eq("owner_id", user.id)
     .maybeSingle()
 
-  if (
-    existingRaw?.id &&
-    existing?.businessName?.trim() &&
-    typeof existingRaw.account_type === "string" &&
-    existingRaw.account_type.trim().length > 0
-  ) {
-    return { ok: false, code: "profile_exists" }
+  if (existingErr) {
+    logOAuthBusinessSetupError("select existing profile", existingErr)
+    return { ok: false, code: "unknown", details: existingErr.message }
+  }
+
+  if (isProfileSetupComplete(existingRow)) {
+    const redirectTo = await resolvePostBusinessSetupRedirect(user, existingRow)
+    revalidateOAuthSetupPaths()
+    return { ok: true, businessId: existingRow!.id, redirectTo }
   }
 
   const ownerNameCombined = [ownerFirst, ownerLast].filter(Boolean).join(" ").trim()
 
-  let slug = existingRaw?.slug?.trim() ?? existing?.slug?.trim() ?? ""
+  let slug = existingRow?.slug?.trim() ?? ""
   if (!slug) {
     const allocated = await allocateSignupBookingSlug(client, businessName)
     if (!allocated.ok) return { ok: false, code: "slug_taken" }
@@ -205,9 +254,6 @@ export async function completeOAuthBusinessSetupAction(
     slug,
     email: emailTrimmed,
     phone: phoneTrimmed,
-    tax_id: taxNormalized,
-    company_tax_id: taxNormalized,
-    company_tax_id_normalized: taxNormalized,
     contact_phone: phoneTrimmed,
     contact_phone_normalized: phoneNormalized,
     account_type: accountType,
@@ -218,35 +264,61 @@ export async function completeOAuthBusinessSetupAction(
     reminder_channel: "both",
   }
 
-  if (existingRaw?.id) {
-    const { error } = await updateWithFallback(client, user.id, profilePatch)
+  if (accountType === ACCOUNT_TYPE_REGISTERED) {
+    profilePatch.tax_id = taxNormalized
+    profilePatch.company_tax_id = taxNormalized
+    profilePatch.company_tax_id_normalized = taxNormalized
+  } else {
+    profilePatch.tax_id = null
+    profilePatch.company_tax_id = null
+    profilePatch.company_tax_id_normalized = null
+  }
+
+  let savedRow: Database["public"]["Tables"]["business_profiles"]["Row"] | null = null
+
+  if (existingRow?.id) {
+    const { data, error } = await updateWithFallback(admin, user.id, profilePatch)
     if (error) {
-      const pgCode = (error as { code?: string }).code
+      const pgCode = error.code
       return {
         ok: false,
         code: pgCode === "23505" ? "slug_taken" : "unknown",
-        details: (error as { message?: string }).message,
+        details: error.message,
       }
     }
+    savedRow = data
   } else {
-    const { error } = await insertWithFallback(client, {
+    const { data, error } = await insertWithFallback(admin, {
       owner_id: user.id,
       ...profilePatch,
     })
     if (error) {
-      const pgCode = (error as { code?: string }).code
+      const pgCode = error.code
       return {
         ok: false,
         code: pgCode === "23505" ? "slug_taken" : "unknown",
-        details: (error as { message?: string }).message,
+        details: error.message,
       }
     }
+    if (!data?.id) {
+      return { ok: false, code: "unknown", details: "insert_missing_id" }
+    }
+    const { data: loaded, error: loadErr } = await admin
+      .from("business_profiles")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle()
+    if (loadErr || !loaded?.id) {
+      logOAuthBusinessSetupError("reload after insert", loadErr ?? "no row")
+      return { ok: false, code: "unknown", details: loadErr?.message ?? "profile_not_found" }
+    }
+    savedRow = loaded
   }
 
   try {
     await client.rpc("ensure_owner_membership")
-  } catch {
-    /* starsze bazy bez RPC */
+  } catch (err) {
+    logOAuthBusinessSetupError("ensure_owner_membership (user client)", err)
   }
 
   const metadataPatch: Record<string, unknown> = {
@@ -266,11 +338,13 @@ export async function completeOAuthBusinessSetupAction(
 
   const { error: metaErr } = await client.auth.updateUser({ data: metadataPatch })
   if (metaErr) {
-    console.error("[oauth-setup] updateUser metadata", metaErr.message)
+    logOAuthBusinessSetupError("updateUser metadata", metaErr)
   }
 
-  revalidatePath("/settings")
-  return { ok: true }
+  revalidateOAuthSetupPaths()
+
+  const redirectTo = await resolvePostBusinessSetupRedirect(user, savedRow)
+  return { ok: true, businessId: savedRow.id, redirectTo }
 }
 
 function taxIdInvalidOrMissing(raw: string): "missing_tax_id" | "tax_id_invalid" {
@@ -284,22 +358,45 @@ export async function loadOAuthSetupPrefillAction(): Promise<{
   firstName: string
   lastName: string
   hasProfile: boolean
+  redirectTo?: string
+  businessId?: string
 }> {
   const user = await getServerAuthUser()
   if (!user) {
     return { email: "", firstName: "", lastName: "", hasProfile: false }
   }
   const names = parseOwnerNameFromUserMetadata(user.user_metadata as Record<string, unknown>)
-  const client = await getServerClient()
-  let hasProfile = false
-  if (client) {
-    const { data } = await getBusinessProfileByOwnerId(client, user.id)
-    hasProfile = Boolean(data?.id && data.businessName?.trim())
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    return {
+      email: user.email?.trim() ?? "",
+      firstName: names.firstName,
+      lastName: names.lastName,
+      hasProfile: false,
+    }
+  }
+  const { data: row } = await admin
+    .from("business_profiles")
+    .select("*")
+    .eq("owner_id", user.id)
+    .maybeSingle()
+
+  const hasProfile = isProfileSetupComplete(row)
+  if (hasProfile && row) {
+    const redirectTo = await resolvePostBusinessSetupRedirect(user, row)
+    return {
+      email: user.email?.trim() ?? "",
+      firstName: names.firstName,
+      lastName: names.lastName,
+      hasProfile: true,
+      redirectTo,
+      businessId: row.id,
+    }
   }
   return {
     email: user.email?.trim() ?? "",
     firstName: names.firstName,
     lastName: names.lastName,
-    hasProfile,
+    hasProfile: false,
   }
 }

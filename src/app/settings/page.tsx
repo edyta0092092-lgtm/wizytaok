@@ -75,7 +75,7 @@ type SettingsForm = {
   depositAmount: string
 }
 
-const defaultSettings: SettingsForm = {
+const demoSettings: SettingsForm = {
   businessName: "Studio WizytaOK",
   publicSlug: "rezerwacje",
   email: "kontakt@example.pl",
@@ -91,12 +91,34 @@ const defaultSettings: SettingsForm = {
   depositAmount: "50",
 }
 
+const emptySettings: SettingsForm = {
+  businessName: "",
+  publicSlug: "",
+  email: "",
+  phoneDialCode: "+48",
+  phoneNational: "",
+  taxId: "",
+  taxIdEntryEnabled: false,
+  reminderLead: "24h",
+  secondReminderLead: "2h",
+  reminderChannel: "both",
+  depositForNewClients: false,
+  depositForAllClients: false,
+  depositAmount: "",
+}
+
+function initialSettingsForm(): SettingsForm {
+  return isSupabaseConfigured() ? { ...emptySettings } : { ...demoSettings }
+}
+
 export default function SettingsPage() {
   const { t } = useTranslations()
   const [showBillingRequiredBanner, setShowBillingRequiredBanner] = React.useState(false)
-  const [oauthBusinessSetup, setOauthBusinessSetup] = React.useState(false)
-  const [oauthSetupDismissed, setOauthSetupDismissed] = React.useState(false)
-  const { ready, businessId, canManageSettings } = useBusinessAccess()
+  const [oauthBusinessSetup, setOauthBusinessSetup] = React.useState(() => {
+    if (typeof window === "undefined") return false
+    return new URLSearchParams(window.location.search).get("setup") === "business"
+  })
+  const { ready, businessId, canManageSettings, refresh } = useBusinessAccess()
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -105,7 +127,7 @@ export default function SettingsPage() {
     setShowBillingRequiredBanner(billing === "required")
     setOauthBusinessSetup(params.get("setup") === "business")
   }, [])
-  const [form, setForm] = React.useState<SettingsForm>(defaultSettings)
+  const [form, setForm] = React.useState<SettingsForm>(initialSettingsForm)
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
@@ -170,6 +192,7 @@ export default function SettingsPage() {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
+    if (oauthBusinessSetup || isSupabaseConfigured()) return
     try {
       const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
       if (raw) {
@@ -198,21 +221,22 @@ export default function SettingsPage() {
     } catch {
       // ignore
     }
-  }, [])
+  }, [oauthBusinessSetup])
 
   React.useEffect(() => {
     if (!isSupabaseConfigured()) return
     const client = getBrowserClient()
     if (!client) return
+    let cancelled = false
     void client.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user || cancelled) return
       void client
         .from("business_profiles")
         .select("*")
         .eq("owner_id", user.id)
         .maybeSingle()
         .then(({ data }) => {
-          if (!data) return
+          if (!data || cancelled) return
           const ch = data.reminder_channel
           const reminderChannel: ReminderChannel =
             ch === "sms" || ch === "email" || ch === "both" ? ch : "both"
@@ -252,7 +276,10 @@ export default function SettingsPage() {
           }))
         })
     })
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [businessId])
 
   React.useEffect(() => {
     if (!showSaved) return
@@ -447,8 +474,7 @@ export default function SettingsPage() {
     )
   }
 
-  const showOAuthSetupOnly =
-    oauthBusinessSetup && ready && !businessId && !oauthSetupDismissed
+  const showOAuthSetupOnly = oauthBusinessSetup && ready && !businessId
 
   if (showOAuthSetupOnly) {
     return (
@@ -457,7 +483,11 @@ export default function SettingsPage() {
         pageDescription={t("auth.completeBusinessSetupToContinue")}
       >
         <PageShell>
-          <BusinessOAuthSetupPanel onCompleted={() => setOauthSetupDismissed(true)} />
+          <BusinessOAuthSetupPanel
+            onProfileSaved={() => {
+              void refresh()
+            }}
+          />
         </PageShell>
       </AppShell>
     )
@@ -482,7 +512,11 @@ export default function SettingsPage() {
       <PageShell
       >
         {oauthBusinessSetup && ready && !businessId ? (
-          <BusinessOAuthSetupPanel onCompleted={() => setOauthSetupDismissed(true)} />
+          <BusinessOAuthSetupPanel
+            onProfileSaved={() => {
+              void refresh()
+            }}
+          />
         ) : null}
         {showBillingRequiredBanner ? <BillingRequiredSettingsBanner /> : null}
         {saveError ? (
