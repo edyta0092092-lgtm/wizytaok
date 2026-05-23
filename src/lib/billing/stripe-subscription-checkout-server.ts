@@ -2,6 +2,10 @@ import type Stripe from "stripe"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 
+import {
+  ACCOUNT_TYPE_REGISTERED,
+  ACCOUNT_TYPE_UNREGISTERED,
+} from "@/lib/billing/account-types"
 import { SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT } from "@/lib/billing/subscription-status"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -9,8 +13,10 @@ import type { Database } from "@/types/database"
 
 export const BLOCKED_SUBSCRIPTION_STATUSES = SUBSCRIPTION_STATUSES_BLOCKING_NEW_CHECKOUT
 
-export const ACCOUNT_TYPE_REGISTERED = "registered_business"
-export const ACCOUNT_TYPE_UNREGISTERED = "unregistered_activity"
+export {
+  ACCOUNT_TYPE_REGISTERED,
+  ACCOUNT_TYPE_UNREGISTERED,
+} from "@/lib/billing/account-types"
 
 export type BusinessProfileRow = Database["public"]["Tables"]["business_profiles"]["Row"]
 

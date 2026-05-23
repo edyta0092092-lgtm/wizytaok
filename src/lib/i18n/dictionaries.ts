@@ -494,6 +494,14 @@ export const dictionaries = {
       oauthCancelled: "Logowanie zostało anulowane.",
       oauthNoEmail:
         "Konto zewnętrzne nie udostępniło adresu e-mail. Użyj logowania e-mail i hasła lub innego konta.",
+      oauthSetupTitle: "Uzupełnij dane firmy",
+      oauthSetupDescription:
+        "Aby korzystać z panelu i okresu próbnego, podaj dane firmy. Adres e-mail możesz potwierdzić poniżej.",
+      oauthSetupSubmit: "Zapisz i kontynuuj",
+      identityAlreadyExists:
+        "Konto lub firma z tymi danymi już istnieje. Zaloguj się używaną wcześniej metodą albo przejdź do płatności.",
+      completeBusinessSetupToContinue:
+        "Uzupełnij dane firmy, aby kontynuować korzystanie z WizytaOK.",
     },
     dashboard: {
       title: "Plan dnia",
@@ -2708,6 +2716,14 @@ Pozdrawiamy,
       oauthCancelled: "Sign-in was cancelled.",
       oauthNoEmail:
         "The external account did not provide an email address. Use email and password or another account.",
+      oauthSetupTitle: "Complete your business details",
+      oauthSetupDescription:
+        "To use the panel and trial period, enter your business details. You can confirm your email below.",
+      oauthSetupSubmit: "Save and continue",
+      identityAlreadyExists:
+        "An account or business with these details already exists. Sign in with your previous method or continue to payment.",
+      completeBusinessSetupToContinue:
+        "Complete your business details to continue using WizytaOK.",
     },
     dashboard: {
       title: "Day plan",

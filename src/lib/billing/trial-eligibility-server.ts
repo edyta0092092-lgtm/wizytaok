@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import {
   ACCOUNT_TYPE_REGISTERED,
   ACCOUNT_TYPE_UNREGISTERED,
+} from "@/lib/billing/account-types"
+import {
   hasBlockedSubscriptionStatus,
   normalizeDigits,
   trialBlockedByIdentityElsewhere,

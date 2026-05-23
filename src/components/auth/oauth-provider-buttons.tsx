@@ -9,6 +9,7 @@ import {
   signInWithOAuthProvider,
   type OAuthProvider,
 } from "@/lib/auth/oauth-sign-in-client"
+import { isFacebookOAuthUiEnabled } from "@/lib/config/oauth-ui"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -29,6 +30,7 @@ export function OAuthProviderButtons({
 }: OAuthProviderButtonsProps) {
   const { t } = useTranslations()
   const [loadingProvider, setLoadingProvider] = React.useState<OAuthProvider | null>(null)
+  const showFacebook = isFacebookOAuthUiEnabled()
 
   const handleOAuth = async (provider: OAuthProvider) => {
     if (!isSupabaseConfigured()) {
@@ -65,7 +67,7 @@ export function OAuthProviderButtons({
           <span className="bg-card px-2 text-muted-foreground">{t("auth.oauthDivider")}</span>
         </div>
       </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
+      <div className={showFacebook ? "flex flex-col gap-2 sm:flex-row sm:gap-3" : "flex flex-col gap-2"}>
         <Button
           type="button"
           variant="outline"
@@ -78,18 +80,20 @@ export function OAuthProviderButtons({
           ) : null}
           {t("auth.continueWithGoogle")}
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="h-11 flex-1 rounded-xl"
-          disabled={loadingProvider !== null}
-          onClick={() => void handleOAuth("facebook")}
-        >
-          {loadingProvider === "facebook" ? (
-            <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
-          ) : null}
-          {t("auth.continueWithFacebook")}
-        </Button>
+        {showFacebook ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 flex-1 rounded-xl"
+            disabled={loadingProvider !== null}
+            onClick={() => void handleOAuth("facebook")}
+          >
+            {loadingProvider === "facebook" ? (
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />
+            ) : null}
+            {t("auth.continueWithFacebook")}
+          </Button>
+        ) : null}
       </div>
     </div>
   )
