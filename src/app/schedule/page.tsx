@@ -559,11 +559,11 @@ export default function SchedulePage() {
           <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
           <DialogPrimitive.Content
             className={cn(
-              "premium-scrollbar fixed top-1/2 left-1/2 z-50 flex max-h-[min(85vh,40rem)] w-[min(calc(100vw-2rem),32rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl",
+              "premium-scrollbar fixed top-1/2 left-1/2 z-50 flex max-h-[min(88vh,44rem)] w-[min(calc(100vw-2rem),56rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl",
               "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
             )}
           >
-            <div className="border-b border-border/70 px-5 py-4 pr-12">
+            <div className="border-b border-border/70 px-6 py-3 pr-12">
               <DialogPrimitive.Title className="font-heading text-lg font-semibold capitalize text-foreground">
                 {detailDate
                   ? formatters.dayLong.format(
@@ -594,9 +594,9 @@ export default function SchedulePage() {
               </Button>
             </DialogPrimitive.Close>
 
-            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+            <div className="flex-1 space-y-1.5 overflow-y-auto px-4 py-3 sm:px-6 sm:py-4">
               {detailRows.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
               ) : (
                 detailRows.map((row) => {
                   const rowStatus = normalizeStatus(row.status)
@@ -606,90 +606,103 @@ export default function SchedulePage() {
                     (row.staff_id ? staffNameById.get(row.staff_id) : "") ||
                     null
                   const isConfirmingCancel = confirmCancelForId === row.id
+                  const visitMeta = staffLabel
+                    ? `${row.service_name} · ${staffLabel}`
+                    : row.service_name
                   return (
                     <article
                       key={row.id}
                       className={cn(
-                        "rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm",
+                        "rounded-lg border border-border/80 bg-card/60",
                         isCancelled && "opacity-75",
                       )}
                     >
-                      <div className="flex gap-3">
-                        <p className="shrink-0 text-2xl font-semibold tabular-nums leading-none text-foreground">
+                      <div
+                        className={cn(
+                          "grid items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:gap-x-4 sm:px-4",
+                          isConfirmingCancel
+                            ? "grid-cols-1"
+                            : "grid-cols-[4.25rem_minmax(0,1fr)_auto] sm:grid-cols-[4.25rem_minmax(0,1fr)_auto_minmax(0,14rem)]",
+                        )}
+                      >
+                        <p className="text-lg font-semibold tabular-nums leading-none text-foreground sm:text-xl">
                           {formatHm(row.appointment_time)}
                         </p>
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <h3 className="text-base font-semibold text-foreground">{row.client_name}</h3>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground sm:text-base">
+                            {row.client_name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground sm:text-sm">{visitMeta}</p>
+                        </div>
+
+                        {!isConfirmingCancel ? (
+                          <div className="flex justify-start sm:justify-center">
                             <StatusBadge status={rowStatus} />
                           </div>
-                          <p className="text-sm text-muted-foreground">{row.service_name}</p>
-                          {staffLabel ? (
-                            <p className="text-sm text-muted-foreground">{staffLabel}</p>
-                          ) : null}
-                        </div>
+                        ) : null}
+
+                        {!isCancelled && !isConfirmingCancel ? (
+                          <div className="col-span-full flex flex-wrap items-center justify-end gap-1 sm:col-span-1 sm:col-start-4 sm:justify-end">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              {STATUS_MENU_ORDER.map((status) => (
+                                <Button
+                                  key={status}
+                                  type="button"
+                                  size="sm"
+                                  variant={rowStatus === status ? "secondary" : "ghost"}
+                                  className={cn(
+                                    "h-7 px-2 text-[11px] font-medium sm:text-xs",
+                                    rowStatus === status && "ring-1 ring-border",
+                                  )}
+                                  onClick={() => changeScheduleBookingStatus(row.id, status)}
+                                >
+                                  {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
+                                </Button>
+                              ))}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive sm:text-xs"
+                              onClick={() => setConfirmCancelForId(row.id)}
+                            >
+                              {t("appointments.cancelVisit")}
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
 
-                      {!isCancelled ? (
-                        <div className="mt-4 border-t border-border/60 pt-3">
-                          {isConfirmingCancel ? (
-                            <div className="space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3">
-                              <p className="text-sm text-muted-foreground">
-                                {t("appointments.cancelVisitConfirmMessage")}
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={cancellingId === row.id}
-                                  onClick={() => setConfirmCancelForId(null)}
-                                >
-                                  {t("appointments.cancelVisitConfirmBack")}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  disabled={cancellingId === row.id}
-                                  onClick={() => cancelScheduleVisit(row)}
-                                >
-                                  {cancellingId === row.id
-                                    ? t("bookings.loading")
-                                    : t("appointments.cancelVisitConfirmAction")}
-                                </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t("appointments.changeStatusAction")}
-                              </p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {STATUS_MENU_ORDER.map((status) => (
-                                  <Button
-                                    key={status}
-                                    type="button"
-                                    size="sm"
-                                    variant={rowStatus === status ? "default" : "outline"}
-                                    className="h-8 text-xs"
-                                    onClick={() => changeScheduleBookingStatus(row.id, status)}
-                                  >
-                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
-                                  </Button>
-                                ))}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="mt-1 h-8 w-full text-xs text-destructive hover:text-destructive sm:w-auto"
-                                onClick={() => setConfirmCancelForId(row.id)}
-                              >
-                                {t("appointments.cancelVisit")}
-                              </Button>
-                            </div>
-                          )}
+                      {isConfirmingCancel ? (
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 bg-muted/25 px-3 py-2 sm:px-4">
+                          <p className="text-xs text-muted-foreground sm:text-sm">
+                            {t("appointments.cancelVisitConfirmMessage")}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              disabled={cancellingId === row.id}
+                              onClick={() => setConfirmCancelForId(null)}
+                            >
+                              {t("appointments.cancelVisitConfirmBack")}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="h-7 text-xs"
+                              disabled={cancellingId === row.id}
+                              onClick={() => cancelScheduleVisit(row)}
+                            >
+                              {cancellingId === row.id
+                                ? t("bookings.loading")
+                                : t("appointments.cancelVisitConfirmAction")}
+                            </Button>
+                          </div>
                         </div>
                       ) : null}
                     </article>
