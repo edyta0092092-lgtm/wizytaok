@@ -15,6 +15,7 @@ import {
 } from "@/lib/billing/business-billing-state"
 import { openCustomerPortal } from "@/lib/billing/customer-portal-client"
 import { hasActiveBusinessAccess, resolveEffectiveSubscriptionStatus } from "@/lib/billing/subscription-status"
+import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { startPaidStripeCheckout } from "@/lib/billing/paid-checkout-client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
@@ -59,6 +60,8 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   const [portalBusy, setPortalBusy] = React.useState(false)
   const [paidError, setPaidError] = React.useState<string | null>(null)
   const [stripeReturnNotice, setStripeReturnNotice] = React.useState<string | null>(null)
+  const [trialGloballyBlocked, setTrialGloballyBlocked] = React.useState(false)
+  const [trialBlockedNotice, setTrialBlockedNotice] = React.useState<string | null>(null)
 
   const refreshBillingRow = React.useCallback(async () => {
     if (!businessId) {
@@ -76,6 +79,32 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     if (variant !== "owner") return
     void refreshBillingRow()
   }, [variant, refreshBillingRow])
+
+  React.useEffect(() => {
+    if (variant !== "owner") return
+    let cancelled = false
+    void (async () => {
+      const result = await fetchTrialStartEligibility()
+      if (cancelled) return
+      setTrialGloballyBlocked(result.blocked)
+      if (result.blocked) {
+        setTrialBlockedNotice(result.message ?? t("access.trialAlreadyUsedPayToContinue"))
+      } else {
+        setTrialBlockedNotice(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [variant, t])
+
+  React.useEffect(() => {
+    if (variant !== "owner") return
+    if (searchParams.get("trial_blocked") === "1") {
+      setTrialGloballyBlocked(true)
+      setTrialBlockedNotice((prev) => prev ?? t("access.trialAlreadyUsedPayToContinue"))
+    }
+  }, [searchParams, variant, t])
 
   React.useEffect(() => {
     if (variant !== "owner") return
@@ -169,11 +198,15 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
       showManagePortal = hasCustomer
       break
     case "trial_never_used":
-      title = t("access.activateTitle")
-      description = t("access.activateDescription")
-      showTrialCta = true
+      title = trialGloballyBlocked
+        ? t("access.activateContinueTitle")
+        : t("access.activateTitle")
+      description = trialGloballyBlocked
+        ? t("access.trialAlreadyUsedPayToContinue")
+        : t("access.activateDescription")
+      showTrialCta = !trialGloballyBlocked
       showPayCta = true
-      showAfterPayNote = false
+      showAfterPayNote = trialGloballyBlocked
       break
     case "trial_consumed":
       title = t("access.activateContinueTitle")
@@ -233,6 +266,14 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
               role="status"
             >
               {stripeReturnNotice}
+            </p>
+          ) : null}
+          {trialBlockedNotice && !panelUnlocked ? (
+            <p
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-foreground"
+              role="status"
+            >
+              {trialBlockedNotice}
             </p>
           ) : null}
           {paidError ? (

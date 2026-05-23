@@ -20,6 +20,7 @@ import {
   OAuthProviderButtons,
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
+import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -115,13 +116,21 @@ export function LoginForm() {
         }
       }
 
-      const dest =
+      let dest =
         postLoginPath ??
-        (shouldStartTrialAfterLogin
-          ? "/start-trial"
-          : profile
-            ? "/dashboard"
-            : "/settings?setup=business")
+        (profile ? "/dashboard" : "/settings?setup=business")
+
+      if (!postLoginPath && shouldStartTrialAfterLogin) {
+        if (!profile?.id) {
+          dest = "/settings?setup=business"
+        } else {
+          const eligibility = await fetchTrialStartEligibility()
+          dest = eligibility.blocked
+            ? "/activate-access?trial_blocked=1"
+            : "/start-trial"
+        }
+      }
+
       router.replace(dest)
       router.refresh()
     } finally {

@@ -13,6 +13,7 @@ import {
 } from "@/lib/billing/business-billing-state"
 import { openCustomerPortal } from "@/lib/billing/customer-portal-client"
 import { hasActiveBusinessAccess, resolveEffectiveSubscriptionStatus } from "@/lib/billing/subscription-status"
+import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { startPaidStripeCheckout } from "@/lib/billing/paid-checkout-client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -47,6 +48,7 @@ export function BillingRequiredSettingsBanner() {
   const [portalBusy, setPortalBusy] = React.useState(false)
   const [paidError, setPaidError] = React.useState<string | null>(null)
   const [portalNotice, setPortalNotice] = React.useState<string | null>(null)
+  const [trialGloballyBlocked, setTrialGloballyBlocked] = React.useState(false)
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -70,6 +72,17 @@ export function BillingRequiredSettingsBanner() {
     }
   }, [businessId])
 
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const result = await fetchTrialStartEligibility()
+      if (!cancelled) setTrialGloballyBlocked(result.blocked)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const scenario = resolveBillingActivationScenario(billingRow, false)
   const hasCustomer = hasStripeCustomerId(billingRow)
   const status = billingRow
@@ -92,7 +105,7 @@ export function BillingRequiredSettingsBanner() {
       scenario === "trial_consumed" ||
       scenario === "subscription_canceled" ||
       (scenario === "payment_past_due" && !hasCustomer))
-  const showTrialLink = scenario === "trial_never_used"
+  const showTrialLink = scenario === "trial_never_used" && !trialGloballyBlocked
 
   const handlePayForAccess = async () => {
     setPaidError(null)

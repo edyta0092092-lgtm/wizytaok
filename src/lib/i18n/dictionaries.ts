@@ -272,6 +272,8 @@ export const dictionaries = {
       activateDescription:
         "Rozpocznij 14-dniowy trial albo wybierz plan, aby korzystać z panelu.",
       activateTrialCta: "Rozpocznij 14-dniowy trial",
+      trialAlreadyUsedPayToContinue:
+        "Trial został już wykorzystany. Możesz przejść do płatności, aby kontynuować.",
       activatePayCta: "Opłać dostęp",
       activatePriceLine: "149 zł / miesiąc",
       activateContinueTitle: "Kontynuuj dostęp do WizytaOK",
@@ -2487,6 +2489,8 @@ Pozdrawiamy,
       activateTitle: "Activate access to WizytaOK",
       activateDescription: "Start a 14-day trial or choose a plan to use the panel.",
       activateTrialCta: "Start 14-day trial",
+      trialAlreadyUsedPayToContinue:
+        "The trial has already been used. You can continue by paying for access.",
       activatePayCta: "Pay for access",
       activatePriceLine: "149 PLN / month",
       activateContinueTitle: "Continue access to WizytaOK",

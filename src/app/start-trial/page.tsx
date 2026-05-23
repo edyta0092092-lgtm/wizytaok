@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
+import { TRIAL_ALREADY_USED_USER_MESSAGE_PL } from "@/lib/billing/trial-eligibility-messages"
 import { subscriptionStatusBlocksNewCheckout } from "@/lib/billing/subscription-status"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -184,6 +186,18 @@ function StartTrialContent() {
       return
     }
 
+    const eligibility = await fetchTrialStartEligibility()
+    if (eligibility.blocked) {
+      setTrialHeadline(eligibility.message ?? TRIAL_ALREADY_USED_USER_MESSAGE_PL)
+      setState("trial_used")
+      setError(null)
+      return
+    }
+    if (!eligibility.hasBusinessProfile) {
+      router.replace("/settings?setup=business")
+      return
+    }
+
     const prepareRes = await fetch("/api/start-trial/prepare-business-profile", {
       method: "POST",
       credentials: "same-origin",
@@ -303,7 +317,7 @@ function StartTrialContent() {
         const headline =
           typeof payload?.message === "string" && payload.message.trim().length > 0
             ? payload.message.trim()
-            : "Darmowy okres próbny został już wykorzystany dla tej firmy."
+            : TRIAL_ALREADY_USED_USER_MESSAGE_PL
         setTrialHeadline(headline)
         setState("trial_used")
         setError(null)
@@ -372,7 +386,7 @@ function StartTrialContent() {
                 : state === "subscription_active"
                   ? "Subskrypcja jest już aktywna."
                   : state === "trial_used"
-                    ? trialHeadline ?? "Darmowy okres próbny został już wykorzystany dla tej firmy."
+                    ? trialHeadline ?? TRIAL_ALREADY_USED_USER_MESSAGE_PL
                     : "Nie udało się rozpocząć okresu próbnego. Spróbuj ponownie."}
           </CardTitle>
           <CardDescription>

@@ -5,7 +5,9 @@ import {
   hasActiveBusinessAccess,
   resolveEffectiveSubscriptionStatus,
 } from "@/lib/billing/subscription-status"
+import { evaluateTrialStartEligibility } from "@/lib/billing/trial-eligibility-server"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Database } from "@/types/database"
 
 const BUSINESS_SETUP_PATH = "/settings?setup=business"
@@ -53,7 +55,25 @@ export async function resolvePostAuthRedirect(
       userWantsTrial(user) ||
       requestedNext === "/start-trial"
     if (wantsTrial && !hasActiveBusinessAccess(status)) {
-      return "/start-trial"
+      const admin = getServiceRoleClient()
+      if (admin) {
+        const { data: fullProfile } = await admin
+          .from("business_profiles")
+          .select("*")
+          .eq("id", owned.id)
+          .maybeSingle()
+        if (fullProfile) {
+          const eligibility = await evaluateTrialStartEligibility(admin, {
+            userId: user.id,
+            userEmail: email,
+            businessProfile: fullProfile,
+          })
+          if (!eligibility.blocked) {
+            return "/start-trial"
+          }
+        }
+      }
+      return "/activate-access?trial_blocked=1"
     }
     if (requestedNext && requestedNext !== "/dashboard") {
       return requestedNext

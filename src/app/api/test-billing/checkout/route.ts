@@ -11,9 +11,12 @@ import {
   hasBlockedSubscriptionStatus,
   loadBusinessProfileForCheckout,
   normalizeDigits,
-  trialBlockedByIdentityElsewhere,
   type TrialBlockContext,
 } from "@/lib/billing/stripe-subscription-checkout-server"
+import {
+  evaluateTrialStartEligibility,
+  type TrialEligibilityBlockReason,
+} from "@/lib/billing/trial-eligibility-server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import { isTrialStripeCheckoutEnvReady, readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -137,11 +140,13 @@ export async function POST(request: Request) {
       : null
   const hasStripeSubscriptionId =
     typeof bp.stripe_subscription_id === "string" && bp.stripe_subscription_id.trim().length > 0
-  const trialAlreadyUsedOnThisRow = Boolean(bp.trial_used_at) || Boolean(bp.trial_started_at)
-
   const admin = getServiceRoleClient()
 
-  const trialBlockPayload = (msg: string, context: TrialBlockContext, bpRow: (typeof bp)) => ({
+  const trialBlockPayload = (
+    msg: string,
+    context: TrialBlockContext | TrialEligibilityBlockReason,
+    bpRow: typeof bp,
+  ) => ({
     ok: false,
     reason: "trial_already_used" as const,
     error: "trial_already_used" as const,
@@ -165,13 +170,26 @@ export async function POST(request: Request) {
     },
   })
 
-  if (trialAlreadyUsedOnThisRow) {
-    const at = bp.account_type?.trim()
-    const msg =
-      at === ACCOUNT_TYPE_UNREGISTERED
-        ? "Darmowy okres próbny został już wykorzystany dla tej osoby."
-        : "Darmowy okres próbny został już wykorzystany dla tej firmy."
-    return NextResponse.json(trialBlockPayload(msg, "own_profile", bp), { status: 409 })
+  if (admin) {
+    const trialEligibility = await evaluateTrialStartEligibility(admin, {
+      userId: res.userId,
+      userEmail: res.userEmail,
+      businessProfile: bp,
+    })
+    if (trialEligibility.blocked) {
+      const ctx =
+        trialEligibility.reason === "subscription_exists"
+          ? "own_profile"
+          : trialEligibility.reason
+      return NextResponse.json(
+        {
+          ...trialBlockPayload(trialEligibility.message, ctx, bp),
+          reason: "trial_already_used" as const,
+          error: "trial_already_used" as const,
+        },
+        { status: 409 },
+      )
+    }
   }
 
   if (
@@ -220,30 +238,6 @@ export async function POST(request: Request) {
   const contactPhoneNormalized = normalizeDigits(
     typeof bp.contact_phone_normalized === "string" ? bp.contact_phone_normalized : null
   )
-
-  if (admin) {
-    const identityBlock = await trialBlockedByIdentityElsewhere(admin, bp, bp.id, accountType)
-    if (identityBlock === "nip_taken") {
-      return NextResponse.json(
-        trialBlockPayload(
-          "Darmowy okres próbny został już wykorzystany dla tej firmy.",
-          "nip_taken",
-          bp
-        ),
-        { status: 409 }
-      )
-    }
-    if (identityBlock === "phone_taken") {
-      return NextResponse.json(
-        trialBlockPayload(
-          "Darmowy okres próbny został już wykorzystany dla tej osoby.",
-          "phone_taken",
-          bp
-        ),
-        { status: 409 }
-      )
-    }
-  }
 
   let source = "wizytaok_test_billing"
   try {
