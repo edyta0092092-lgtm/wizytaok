@@ -167,14 +167,6 @@ export async function completeOAuthBusinessSetupAction(
       return { ok: false, code: taxIdInvalidOrMissing(raw) }
     }
     taxNormalized = raw
-  } else if (input.taxId?.trim()) {
-    const raw = input.taxId.replace(/[\s-]/g, "").trim()
-    if (raw.length > 0) {
-      if (raw.length !== 10 || !isPolishNip10Valid(raw)) {
-        return { ok: false, code: "tax_id_invalid" }
-      }
-      taxNormalized = raw
-    }
   }
 
   const conflict = await findIdentityConflict(user.id, taxNormalized, phoneNormalized, emailTrimmed)
@@ -262,8 +254,9 @@ export async function completeOAuthBusinessSetupAction(
     business_name: businessName,
     owner_name: ownerFirst,
     owner_last_name: ownerLast,
-    company_tax_id: taxNormalized ?? "",
-    company_tax_id_normalized: taxNormalized ?? "",
+    company_tax_id: accountType === ACCOUNT_TYPE_REGISTERED ? (taxNormalized ?? "") : "",
+    company_tax_id_normalized:
+      accountType === ACCOUNT_TYPE_REGISTERED ? (taxNormalized ?? "") : "",
     contact_phone: phoneTrimmed,
     contact_phone_normalized: phoneNormalized,
   }

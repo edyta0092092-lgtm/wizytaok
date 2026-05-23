@@ -71,6 +71,13 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
 
   const nipRequired = accountType === ACCOUNT_TYPE_REGISTERED
 
+  const setAccountTypeChoice = (next: OAuthSetupAccountType) => {
+    setAccountType(next)
+    if (next === ACCOUNT_TYPE_UNREGISTERED) {
+      setCompanyTaxId("")
+    }
+  }
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -114,7 +121,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
         email: email.trim(),
         phone,
         accountType,
-        taxId: nipRequired ? companyTaxId.replace(/[\s-]/g, "").trim() : companyTaxId.trim() || null,
+        taxId: nipRequired ? companyTaxId.replace(/[\s-]/g, "").trim() : null,
         ownerFirstName: ownerFirstName.trim(),
         ownerLastName: ownerLastName.trim(),
       })
@@ -194,7 +201,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
                   type="radio"
                   name="oauth-account-type"
                   checked={accountType === ACCOUNT_TYPE_REGISTERED}
-                  onChange={() => setAccountType(ACCOUNT_TYPE_REGISTERED)}
+                  onChange={() => setAccountTypeChoice(ACCOUNT_TYPE_REGISTERED)}
                   className="size-4 accent-primary"
                 />
                 {t("auth.signupAccountTypeRegistered")}
@@ -204,7 +211,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
                   type="radio"
                   name="oauth-account-type"
                   checked={accountType === ACCOUNT_TYPE_UNREGISTERED}
-                  onChange={() => setAccountType(ACCOUNT_TYPE_UNREGISTERED)}
+                  onChange={() => setAccountTypeChoice(ACCOUNT_TYPE_UNREGISTERED)}
                   className="size-4 accent-primary"
                 />
                 {t("auth.signupAccountTypeUnregistered")}
@@ -281,20 +288,7 @@ export function BusinessOAuthSetupPanel({ onCompleted }: BusinessOAuthSetupPanel
               />
               <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdRequiredHint")}</p>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Label htmlFor="oauth-nip-opt">{t("settings.taxIdLabel")}</Label>
-              <Input
-                id="oauth-nip-opt"
-                autoComplete="off"
-                value={companyTaxId}
-                onChange={(e) => setCompanyTaxId(e.target.value)}
-                placeholder={t("settings.taxIdPlaceholder")}
-                className="h-11 rounded-xl"
-              />
-              <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdOptionalHint")}</p>
-            </div>
-          )}
+          ) : null}
 
           {error ? (
             <p className="text-sm text-destructive" role="alert">
