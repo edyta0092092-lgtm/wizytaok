@@ -270,13 +270,32 @@ export const dictionaries = {
       onlyAdminTeam: "Tylko administrator może zarządzać zespołem.",
       activateTitle: "Aktywuj dostęp do WizytaOK",
       activateDescription:
-        "Aby korzystać z panelu, rozpocznij trial albo wybierz plan. Po aktywacji dostęp do wizyt, grafiku, klientów i ustawień zostanie odblokowany automatycznie.",
-      activateTrialCta: "Rozpocznij trial",
-      activatePaymentCta: "Przejdź do płatności",
+        "Rozpocznij 14-dniowy trial albo wybierz plan, aby korzystać z panelu.",
+      activateTrialCta: "Rozpocznij 14-dniowy trial",
+      activatePayCta: "Opłać dostęp",
+      activatePriceLine: "149 zł / miesiąc",
+      activateContinueTitle: "Kontynuuj dostęp do WizytaOK",
+      activateContinueDescription:
+        "Twój trial dobiegł końca albo subskrypcja nie jest aktywna. Opłać plan, aby dalej korzystać z wizyt, grafiku, klientów i ustawień.",
+      activateAfterPayNote:
+        "Po płatności dostęp zostanie odblokowany automatycznie. Stripe może potrzebować kilkunastu sekund na potwierdzenie.",
+      activatePaymentPastDueTitle: "Wymagana płatność",
+      activatePaymentPastDueDescription:
+        "Nie udało się pobrać płatności za subskrypcję. Opłać dostęp albo zaktualizuj płatność, aby dalej korzystać z panelu.",
+      activatePaymentPastDueHint:
+        "Sprawdź e-mail od Stripe z linkiem do opłacenia faktury. Nową sesję płatności w aplikacji można uruchomić po uregulowaniu zaległości w Stripe.",
+      activateCanceledTitle: "Subskrypcja została anulowana",
+      activateCanceledDescription: "Aby ponownie korzystać z panelu, opłać dostęp.",
+      activateAlreadyActiveTitle: "Subskrypcja jest już aktywna",
+      activateAlreadyActiveDescription: "Możesz przejść do panelu i kontynuować pracę.",
+      activateGoToPanel: "Przejdź do panelu",
+      activateBackToSummary: "Ekran aktywacji",
+      activatePaymentProcessing:
+        "Płatność jest przetwarzana. Jeśli dostęp nie odblokuje się od razu, odśwież stronę za chwilę.",
       activatePaymentPending:
         "Jeśli płatność została już wykonana, odśwież stronę za chwilę — Stripe może potrzebować kilkunastu sekund na potwierdzenie.",
       billingRequiredOnSettingsHint:
-        "Poniżej uruchomisz trial lub opłacisz subskrypcję. Po zapisaniu statusu w Stripe panel odblokuje się automatycznie.",
+        "Uruchom trial lub opłać dostęp poniżej. Po potwierdzeniu w Stripe panel odblokuje się automatycznie.",
       staffInactiveTitle: "Dostęp do panelu jest nieaktywny",
       staffInactiveDescription:
         "Firma nie ma obecnie aktywnego triala ani subskrypcji. Skontaktuj się z właścicielem lub administratorem konta.",
@@ -2451,14 +2470,32 @@ Pozdrawiamy,
       onlyAdminAvailability: "Only an administrator can manage availability.",
       onlyAdminTeam: "Only an administrator can manage the team.",
       activateTitle: "Activate access to WizytaOK",
-      activateDescription:
-        "To use the panel, start a trial or choose a plan. After activation, access to appointments, schedule, clients, and settings will unlock automatically.",
-      activateTrialCta: "Start trial",
-      activatePaymentCta: "Go to payment",
+      activateDescription: "Start a 14-day trial or choose a plan to use the panel.",
+      activateTrialCta: "Start 14-day trial",
+      activatePayCta: "Pay for access",
+      activatePriceLine: "149 PLN / month",
+      activateContinueTitle: "Continue access to WizytaOK",
+      activateContinueDescription:
+        "Your trial has ended or the subscription is not active. Pay for the plan to keep using appointments, schedule, clients, and settings.",
+      activateAfterPayNote:
+        "Access will unlock automatically after payment. Stripe may need a few seconds to confirm.",
+      activatePaymentPastDueTitle: "Payment required",
+      activatePaymentPastDueDescription:
+        "We could not collect payment for your subscription. Pay for access or update your payment method to keep using the panel.",
+      activatePaymentPastDueHint:
+        "Check your email from Stripe for an invoice payment link. A new in-app checkout can be started after the overdue balance is resolved in Stripe.",
+      activateCanceledTitle: "Subscription canceled",
+      activateCanceledDescription: "Pay for access to use the panel again.",
+      activateAlreadyActiveTitle: "Subscription is already active",
+      activateAlreadyActiveDescription: "You can go to the panel and continue working.",
+      activateGoToPanel: "Go to panel",
+      activateBackToSummary: "Activation screen",
+      activatePaymentProcessing:
+        "Payment is being processed. If access does not unlock right away, refresh this page in a moment.",
       activatePaymentPending:
         "If you have already paid, refresh this page in a moment — Stripe may need a few seconds to confirm.",
       billingRequiredOnSettingsHint:
-        "Use the billing section below to start a trial or subscribe. Once Stripe confirms payment, the panel will unlock automatically.",
+        "Start a trial or pay for access below. Once Stripe confirms payment, the panel will unlock automatically.",
       staffInactiveTitle: "Panel access is inactive",
       staffInactiveDescription:
         "This business does not currently have an active trial or subscription. Contact the account owner or administrator.",

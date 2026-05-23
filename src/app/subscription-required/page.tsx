@@ -1,7 +1,7 @@
 "use client"
 
-import { BillingAccessPaywall } from "@/components/billing/billing-access-paywall"
+import { StaffBillingAccessPaywall } from "@/components/billing/staff-billing-access-paywall"
 
 export default function SubscriptionRequiredPage() {
-  return <BillingAccessPaywall variant="staff" />
+  return <StaffBillingAccessPaywall />
 }

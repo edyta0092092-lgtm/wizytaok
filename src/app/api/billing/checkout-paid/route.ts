@@ -6,10 +6,13 @@ import {
   applyCustomerToSession,
   buildSubscriptionMetadata,
   collectStripeCheckoutConfigErrors,
-  hasBlockedSubscriptionStatus,
   loadBusinessProfileForCheckout,
   normalizeDigits,
 } from "@/lib/billing/stripe-subscription-checkout-server"
+import {
+  hasActiveBusinessAccess,
+  resolveEffectiveSubscriptionStatus,
+} from "@/lib/billing/subscription-status"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import { isTrialStripeCheckoutEnvReady, readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
 
@@ -105,20 +108,12 @@ export async function POST() {
 
   const { bp, resolution: res } = loaded
 
-  const status =
-    typeof bp.subscription_status === "string" ? bp.subscription_status.trim().toLowerCase() : null
-  const stripeStatus =
-    typeof bp.stripe_subscription_status === "string"
-      ? bp.stripe_subscription_status.trim().toLowerCase()
-      : null
-  const hasStripeSubscriptionId =
-    typeof bp.stripe_subscription_id === "string" && bp.stripe_subscription_id.trim().length > 0
+  const effectiveStatus = resolveEffectiveSubscriptionStatus(
+    bp.subscription_status,
+    bp.stripe_subscription_status,
+  )
 
-  if (
-    hasBlockedSubscriptionStatus(status) ||
-    hasBlockedSubscriptionStatus(stripeStatus) ||
-    hasStripeSubscriptionId
-  ) {
+  if (hasActiveBusinessAccess(effectiveStatus)) {
     return NextResponse.json(
       {
         ok: false,
@@ -127,9 +122,25 @@ export async function POST() {
         message: "Subskrypcja jest już aktywna.",
         hint: "Subskrypcja jest już aktywna.",
         debug: {
-          subscriptionStatus: status,
-          stripeSubscriptionStatus: stripeStatus,
-          hasStripeSubscriptionId,
+          subscriptionStatus: effectiveStatus,
+          businessId: res.businessId,
+        },
+      },
+      { status: 409 }
+    )
+  }
+
+  if (effectiveStatus === "past_due" || effectiveStatus === "unpaid") {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "subscription_payment_past_due",
+        error: "subscription_payment_past_due",
+        message:
+          "Nie udało się pobrać płatności za subskrypcję. Sprawdź e-mail od Stripe z linkiem do opłacenia faktury lub zaktualizuj metodę płatności w panelu Stripe (jeśli masz do niego dostęp). Nową sesję Checkout można uruchomić dopiero po uregulowaniu zaległości.",
+        hint: "Wymagana aktualizacja płatności w Stripe — skorzystaj z linku w e-mailu od Stripe.",
+        debug: {
+          subscriptionStatus: effectiveStatus,
           businessId: res.businessId,
         },
       },
@@ -175,8 +186,8 @@ export async function POST() {
     subscription_data: {
       metadata: meta,
     },
-    success_url: `${base}/settings?stripe_paid=success`,
-    cancel_url: `${base}/start-trial?stripe_paid=cancel`,
+    success_url: `${base}/activate-access?stripe_paid=success`,
+    cancel_url: `${base}/activate-access?stripe_paid=cancel`,
     client_reference_id: res.businessId,
     metadata: meta,
   }

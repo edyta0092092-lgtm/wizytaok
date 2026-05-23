@@ -109,14 +109,21 @@ export default function SettingsPage() {
   const stripeReturnHandledRef = React.useRef(false)
   React.useEffect(() => {
     if (typeof window === "undefined") return
-    const p = new URLSearchParams(window.location.search).get("stripe_test")
+    const params = new URLSearchParams(window.location.search)
+    const stripeTest = params.get("stripe_test")
+    const stripePaid = params.get("stripe_paid")
+    const p = stripePaid ?? stripeTest
     if (p !== "success" && p !== "cancel") return
     if (stripeReturnHandledRef.current) return
     stripeReturnHandledRef.current = true
     if (p === "success") {
-      toast.success(t("settings.testBillingSuccess"))
+      if (stripePaid === "success") {
+        toast.success(t("access.activatePaymentProcessing"))
+      } else {
+        toast.success(t("settings.testBillingSuccess"))
+      }
     } else {
-      toast(t("settings.testBillingCancel"))
+      toast(stripePaid === "cancel" ? t("settings.testBillingCancel") : t("settings.testBillingCancel"))
     }
   }, [t])
 
