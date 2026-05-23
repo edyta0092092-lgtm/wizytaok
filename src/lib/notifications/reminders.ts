@@ -92,7 +92,7 @@ function buildReminderBodies(input: {
     return { subject, text, html }
   }
   const subject = "Przypomnienie o wizycie"
-  const text = `Cześć ${input.clientName}, przypominamy o wizycie: ${input.serviceName} dnia ${input.dateLabel} o ${input.timeHm}. Jeśli nie możesz przyjść, anuluj wizytę tutaj: ${input.confirmUrl}`
+  const text = `Cześć ${input.clientName}, przypominamy o wizycie: ${input.serviceName} dnia ${input.dateLabel} o ${input.timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${input.confirmUrl}`
   const html = `<p>Cześć ${escapeHtml(input.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(
     input.serviceName
   )}</strong> dnia ${escapeHtml(input.dateLabel)} o ${escapeHtml(input.timeHm)}.</p><p><a href="${escapeHtml(
@@ -113,7 +113,7 @@ function smsBody(lang: "pl" | "en", service: string, dateLabel: string, timeHm: 
   if (lang === "en") {
     return `Reminder: ${service} ${dateLabel} at ${timeHm}. Confirm, reschedule or cancel: ${url}`
   }
-  return `Przypomnienie o wizycie: ${service}, ${dateLabel} o ${timeHm}. Jeśli nie możesz przyjść, anuluj wizytę: ${url}`
+  return `Przypomnienie o wizycie: ${service}, ${dateLabel} o ${timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${url}`
 }
 
 async function insertNotificationLog(

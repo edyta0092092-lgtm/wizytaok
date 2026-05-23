@@ -2,12 +2,14 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 import { TourOverlay, type TourOverlayRect } from "@/components/guide/tour-overlay"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { TOUR_STEPS } from "@/lib/guide/tour-steps"
 import { useTour } from "@/lib/tour/tour-context"
+import { isTourExcludedPublicPath } from "@/lib/tour/tour-path-guard"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 const PADDING = 10
@@ -28,6 +30,7 @@ function clampRect(r: TourOverlayRect): TourOverlayRect {
 }
 
 export function AppTour() {
+  const pathname = usePathname()
   const { t } = useTranslations()
   const {
     welcomeOpen,
@@ -109,6 +112,7 @@ export function AppTour() {
     .replace("{total}", String(total))
 
   if (!tourReady) return null
+  if (isTourExcludedPublicPath(pathname)) return null
 
   return (
     <>

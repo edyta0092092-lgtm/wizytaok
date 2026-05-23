@@ -111,13 +111,13 @@ function buildMessages(
     language === "en"
       ? {
           href: confirmUrl,
-          label: "Cancel booking",
-          hint: "If you cannot attend, cancel your booking as soon as possible.",
+          label: "Manage appointment",
+          hint: "Use this link to view appointment details or cancel if you cannot attend.",
         }
       : {
           href: confirmUrl,
-          label: "Anuluj rezerwację",
-          hint: "Jeśli nie możesz przyjść, anuluj rezerwację jak najwcześniej.",
+          label: "Zarządzaj wizytą",
+          hint: "Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę, jeśli nie możesz przyjść.",
         }
 
   const emailText = buildTransactionalEmailText({
@@ -142,8 +142,8 @@ function buildMessages(
   return {
     sms:
       language === "en"
-        ? `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Cancel if needed: ${confirmUrl}`
-        : `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Anuluj: ${confirmUrl}`,
+        ? `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Manage or cancel: ${confirmUrl}`
+        : `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
     emailSubject,
     emailText,
     emailHtml,

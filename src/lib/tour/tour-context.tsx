@@ -9,6 +9,7 @@ import {
   readTourRuntimeState,
   writeTourRuntimeState,
 } from "@/lib/tour/tour-storage"
+import { isTourExcludedPublicPath } from "@/lib/tour/tour-path-guard"
 
 function getFromStorage(key: string): string | null {
   try {
@@ -64,8 +65,16 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     const dismissed = getFromStorage(TOUR_KEYS.welcomeDismissed)
     const finishedTour = getFromStorage(TOUR_KEYS.tourFinished)
     const runtime = readTourRuntimeState()
+    const onPublicPath = isTourExcludedPublicPath(pathname)
 
     queueMicrotask(() => {
+      if (onPublicPath) {
+        setWelcomeOpen(false)
+        setTourActive(false)
+        setTourReady(true)
+        return
+      }
+
       if (runtime?.active) {
         const idx = Math.min(
           Math.max(0, runtime.stepIndex),
@@ -85,7 +94,16 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       }
       setTourReady(true)
     })
-  }, [])
+  }, [pathname])
+
+  React.useEffect(() => {
+    if (!tourReady || !isTourExcludedPublicPath(pathname)) return
+    setWelcomeOpen(false)
+    if (tourActive) {
+      setTourActive(false)
+      persistStep(false, 0)
+    }
+  }, [pathname, tourReady, tourActive, persistStep])
 
   React.useEffect(() => {
     if (!tourActive) return

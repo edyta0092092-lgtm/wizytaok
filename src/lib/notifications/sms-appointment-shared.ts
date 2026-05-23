@@ -20,10 +20,10 @@ export function buildSmsMessage(input: {
   const confirmUrl = input.manageUrl.trim()
 
   if (input.language === "en") {
-    return `Appointment reminder: ${service}, ${appointmentDateTime}. If you cannot attend, cancel your appointment: ${confirmUrl}`
+    return `Appointment reminder: ${service}, ${appointmentDateTime}. Manage or cancel your appointment: ${confirmUrl}`
   }
 
-  return `Przypomnienie o wizycie: ${service}, ${appointmentDateTime}. Jeśli nie możesz przyjść, anuluj wizytę: ${confirmUrl}`
+  return `Przypomnienie o wizycie: ${service}, ${appointmentDateTime}. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`
 }
 
 /** MSISDN bez „+” (SMSAPI). */

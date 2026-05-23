@@ -80,7 +80,7 @@ const TEMPLATE_DEFAULT_CONTENT: Record<
 > = {
   reminder_24h: {
     smsBody:
-      "Cześć {{imie}}, przypominamy o Twojej wizycie jutro o {{godzina}} ({{usluga}}). Potwierdź lub zarządzaj rezerwacją: {{link_potwierdzenia}}",
+      "Cześć {{imie}}, przypominamy o Twojej wizycie jutro o {{godzina}} ({{usluga}}). Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
     emailSubject: "Przypomnienie o wizycie jutro",
     emailBody: `Cześć {{imie}},
 
@@ -90,7 +90,7 @@ przypominamy o Twojej wizycie:
 - Usługa: {{usluga}}
 - Osoba: {{osoba}}
 
-Potwierdź obecność lub zarządzaj rezerwacją tutaj:
+Zarządzaj wizytą (możesz też anulować wizytę, jeśli nie możesz przyjść):
 {{link_potwierdzenia}}
 
 Pozdrawiamy,
@@ -112,20 +112,21 @@ Do zobaczenia,
   },
   booking_confirmation: {
     smsBody:
-      "Dziękujemy {{imie}}. Twoja wizyta na {{data}} o {{godzina}} została zapisana. Szczegóły: {{link_rezerwacji}}",
-    emailSubject: "Potwierdzenie rezerwacji wizyty",
+      "Wizyta potwierdzona: {{usluga}}, {{data}} o {{godzina}}. Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
+    emailSubject: "Wizyta potwierdzona",
     emailBody: `Cześć {{imie}},
 
-Twoja rezerwacja została potwierdzona.
+Twoja wizyta została potwierdzona.
 
 Szczegóły wizyty:
-- Data: {{data}}
-- Godzina: {{godzina}}
 - Usługa: {{usluga}}
-- Osoba: {{osoba}}
+- Termin: {{data}} o {{godzina}}
+- Klient: {{imie}}
 
-Zarządzaj rezerwacją:
-{{link_rezerwacji}}
+Zarządzaj wizytą:
+{{link_potwierdzenia}}
+
+Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę, jeśli nie możesz przyjść.
 
 Pozdrawiamy,
 {{nazwa_firmy}}`,

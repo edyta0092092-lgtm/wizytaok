@@ -129,7 +129,7 @@ export async function sendAppointmentReminderEmail(
   const hasManageLink = trimmedManageUrl.length > 0
 
   const detailRows: Array<{ label: string; value: string }> = [
-    { label: "UsĹ‚uga", value: trimmedService },
+    { label: "Usługa", value: trimmedService },
     { label: "Termin", value: appointmentDateTime },
   ]
   const trimmedStaff = input.staffName?.trim()
@@ -142,8 +142,8 @@ export async function sendAppointmentReminderEmail(
   const cta = hasManageLink
     ? {
         href: trimmedManageUrl,
-        label: "Anuluj rezerwacjÄ™",
-        hint: "JeĹ›li nie moĹĽesz przyjĹ›Ä‡, anuluj rezerwacjÄ™ jak najwczeĹ›niej.",
+        label: "Zarządzaj wizytą",
+        hint: "Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę, jeśli nie możesz przyjść.",
       }
     : null
 
