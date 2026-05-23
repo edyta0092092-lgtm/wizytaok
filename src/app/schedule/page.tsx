@@ -1,20 +1,14 @@
 "use client"
 
 import * as React from "react"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronLeft, ChevronRight, X } from "lucide-react"
+import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
@@ -468,18 +462,18 @@ export default function SchedulePage() {
           <p className="text-sm text-destructive">Nie udało się załadować danych grafiku.</p>
         ) : (
           <>
-            <div className="mb-1 hidden grid-cols-7 gap-1 text-center text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground md:grid">
+            <div className="mb-1.5 hidden grid-cols-7 gap-1.5 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
               {weekdayHeader.map((w) => (
                 <div key={w}>{w}</div>
               ))}
             </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-7 md:gap-1">
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-7 md:gap-2">
               {weekMondayFirstCells(ym.year, ym.month).map((dayNum, idx) => {
                 if (dayNum == null) {
                   return (
                     <div
                       key={`empty-${idx}`}
-                      className="hidden min-h-[5.5rem] rounded-lg border border-transparent bg-muted/5 md:block"
+                      className="hidden min-h-[6.75rem] rounded-xl border border-transparent bg-muted/5 md:block"
                     />
                   )
                 }
@@ -498,42 +492,42 @@ export default function SchedulePage() {
                     key={key}
                     onClick={() => setDetailDate(key)}
                     className={cn(
-                      "flex min-h-[5.5rem] flex-col rounded-lg border bg-card p-1.5 text-left shadow-sm transition-colors hover:bg-muted/20",
+                      "flex min-h-[6.75rem] flex-col rounded-xl border bg-card p-2 text-left shadow-sm transition-colors hover:bg-muted/25",
                       isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-1">
+                    <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-tight text-foreground">{dayNum}</p>
-                        <p className="text-[10px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
+                        <p className="text-base font-semibold leading-tight text-foreground">{dayNum}</p>
+                        <p className="text-xs text-muted-foreground">{visitCountLabel(rows.length)}</p>
                       </div>
                       {holidayLabel ? (
                         <span
                           title={holidayLabel}
-                          className="max-w-[5.5rem] truncate rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-medium leading-tight text-amber-900 dark:text-amber-100"
+                          className="max-w-[6rem] truncate rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium leading-tight text-amber-900 dark:text-amber-100"
                         >
                           {holidayLabel}
                         </span>
                       ) : null}
                     </div>
-                    <ul className="mt-1 space-y-0.5 overflow-hidden">
+                    <ul className="mt-1.5 space-y-1 overflow-hidden">
                       {preview.length === 0 ? (
-                        <li className="text-[10px] text-muted-foreground">Brak wizyt</li>
+                        <li className="text-xs text-muted-foreground">Brak wizyt</li>
                       ) : (
                         preview.map((row) => (
                           <li
                             key={row.id}
                             className={cn(
-                              "truncate text-[10px] leading-snug",
+                              "rounded-md border border-border/60 bg-muted/20 px-1.5 py-1 text-xs leading-snug",
                               normalizeStatus(row.status) === "cancelled" && "opacity-55 line-through",
                             )}
                           >
-                            <span className="font-medium tabular-nums text-foreground">
+                            <span className="font-semibold tabular-nums text-foreground">
                               {formatHm(row.appointment_time)}
                             </span>{" "}
-                            <span className="text-foreground">{row.client_name}</span>
+                            <span className="font-medium text-foreground">{row.client_name}</span>
                             {row.service_name ? (
-                              <span className="block truncate text-[9px] text-muted-foreground">
+                              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                                 {row.service_name}
                               </span>
                             ) : null}
@@ -541,7 +535,7 @@ export default function SchedulePage() {
                         ))
                       )}
                       {more > 0 ? (
-                        <li className="text-[10px] font-medium text-primary">+{more} więcej</li>
+                        <li className="text-xs font-medium text-primary">+{more} więcej</li>
                       ) : null}
                     </ul>
                   </button>
@@ -552,7 +546,7 @@ export default function SchedulePage() {
         )}
       </PageShell>
 
-      <Sheet
+      <DialogPrimitive.Root
         open={detailDate != null}
         onOpenChange={(open) => {
           if (!open) {
@@ -561,126 +555,151 @@ export default function SchedulePage() {
           }
         }}
       >
-        <SheetContent className="premium-scrollbar flex w-full max-w-md flex-col" showCloseButton>
-          <SheetHeader className="border-b border-border/70 text-left pb-3">
-            <SheetTitle className="text-base">
-              {detailDate
-                ? formatters.dayLong.format(
-                    new Date(
-                      Number(detailDate.slice(0, 4)),
-                      Number(detailDate.slice(5, 7)) - 1,
-                      Number(detailDate.slice(8, 10)),
-                    ),
-                  )
-                : "Szczegóły dnia"}
-            </SheetTitle>
-            {detailDate ? (
-              <p className="text-xs text-muted-foreground">{visitCountLabel(detailRows.length)}</p>
-            ) : null}
-          </SheetHeader>
-          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
-            {detailRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
-            ) : (
-              detailRows.map((row) => {
-                const isCancelled = normalizeStatus(row.status) === "cancelled"
-                const staffLabel =
-                  row.staff_name?.trim() ||
-                  (row.staff_id ? staffNameById.get(row.staff_id) : "") ||
-                  "Nie przypisano osoby"
-                const isConfirmingCancel = confirmCancelForId === row.id
-                return (
-                  <div
-                    key={row.id}
-                    className={cn(
-                      "rounded-lg border border-border/80 px-2.5 py-2",
-                      isCancelled && "opacity-70",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold leading-tight text-foreground">
-                          <span className="tabular-nums">{formatHm(row.appointment_time)}</span>
-                          <span className="text-muted-foreground"> · </span>
-                          {row.client_name}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">{row.service_name}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">{staffLabel}</p>
-                      </div>
-                      <StatusBadge status={normalizeStatus(row.status)} />
-                    </div>
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/45 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+          <DialogPrimitive.Content
+            className={cn(
+              "premium-scrollbar fixed top-1/2 left-1/2 z-50 flex max-h-[min(85vh,40rem)] w-[min(calc(100vw-2rem),32rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl",
+              "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+            )}
+          >
+            <div className="border-b border-border/70 px-5 py-4 pr-12">
+              <DialogPrimitive.Title className="font-heading text-lg font-semibold capitalize text-foreground">
+                {detailDate
+                  ? formatters.dayLong.format(
+                      new Date(
+                        Number(detailDate.slice(0, 4)),
+                        Number(detailDate.slice(5, 7)) - 1,
+                        Number(detailDate.slice(8, 10)),
+                      ),
+                    )
+                  : "Szczegóły dnia"}
+              </DialogPrimitive.Title>
+              {detailDate ? (
+                <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">
+                  {visitCountLabel(detailRows.length)}
+                </DialogPrimitive.Description>
+              ) : null}
+            </div>
 
-                    {!isCancelled ? (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {isConfirmingCancel ? (
-                          <div className="w-full space-y-1.5 rounded-md border border-border/70 bg-muted/30 p-2">
-                            <p className="text-xs text-muted-foreground">
-                              {t("appointments.cancelVisitConfirmMessage")}
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
+            <DialogPrimitive.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-3 right-3 rounded-full"
+                aria-label="Zamknij"
+              >
+                <X className="size-4" />
+              </Button>
+            </DialogPrimitive.Close>
+
+            <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+              {detailRows.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
+              ) : (
+                detailRows.map((row) => {
+                  const rowStatus = normalizeStatus(row.status)
+                  const isCancelled = rowStatus === "cancelled"
+                  const staffLabel =
+                    row.staff_name?.trim() ||
+                    (row.staff_id ? staffNameById.get(row.staff_id) : "") ||
+                    null
+                  const isConfirmingCancel = confirmCancelForId === row.id
+                  return (
+                    <article
+                      key={row.id}
+                      className={cn(
+                        "rounded-xl border border-border/80 bg-card/80 p-4 shadow-sm",
+                        isCancelled && "opacity-75",
+                      )}
+                    >
+                      <div className="flex gap-3">
+                        <p className="shrink-0 text-2xl font-semibold tabular-nums leading-none text-foreground">
+                          {formatHm(row.appointment_time)}
+                        </p>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <h3 className="text-base font-semibold text-foreground">{row.client_name}</h3>
+                            <StatusBadge status={rowStatus} />
+                          </div>
+                          <p className="text-sm text-muted-foreground">{row.service_name}</p>
+                          {staffLabel ? (
+                            <p className="text-sm text-muted-foreground">{staffLabel}</p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {!isCancelled ? (
+                        <div className="mt-4 border-t border-border/60 pt-3">
+                          {isConfirmingCancel ? (
+                            <div className="space-y-2 rounded-lg border border-border/70 bg-muted/30 p-3">
+                              <p className="text-sm text-muted-foreground">
+                                {t("appointments.cancelVisitConfirmMessage")}
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={cancellingId === row.id}
+                                  onClick={() => setConfirmCancelForId(null)}
+                                >
+                                  {t("appointments.cancelVisitConfirmBack")}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={cancellingId === row.id}
+                                  onClick={() => cancelScheduleVisit(row)}
+                                >
+                                  {cancellingId === row.id
+                                    ? t("bookings.loading")
+                                    : t("appointments.cancelVisitConfirmAction")}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {t("appointments.changeStatusAction")}
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {STATUS_MENU_ORDER.map((status) => (
+                                  <Button
+                                    key={status}
+                                    type="button"
+                                    size="sm"
+                                    variant={rowStatus === status ? "default" : "outline"}
+                                    className="h-8 text-xs"
+                                    onClick={() => changeScheduleBookingStatus(row.id, status)}
+                                  >
+                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
+                                  </Button>
+                                ))}
+                              </div>
                               <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="h-7 text-xs"
-                                disabled={cancellingId === row.id}
-                                onClick={() => setConfirmCancelForId(null)}
+                                className="mt-1 h-8 w-full text-xs text-destructive hover:text-destructive sm:w-auto"
+                                onClick={() => setConfirmCancelForId(row.id)}
                               >
-                                {t("appointments.cancelVisitConfirmBack")}
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                className="h-7 text-xs"
-                                disabled={cancellingId === row.id}
-                                onClick={() => cancelScheduleVisit(row)}
-                              >
-                                {cancellingId === row.id
-                                  ? t("bookings.loading")
-                                  : t("appointments.cancelVisitConfirmAction")}
+                                {t("appointments.cancelVisit")}
                               </Button>
                             </div>
-                          </div>
-                        ) : (
-                          <>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
-                                  {t("appointments.changeStatusAction")}
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-52">
-                                {STATUS_MENU_ORDER.map((status) => (
-                                  <DropdownMenuItem
-                                    key={status}
-                                    onClick={() => changeScheduleBookingStatus(row.id, status)}
-                                  >
-                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => setConfirmCancelForId(row.id)}
-                            >
-                              {t("appointments.cancelVisit")}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-                )
-              })
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
+                          )}
+                        </div>
+                      ) : null}
+                    </article>
+                  )
+                })
+              )}
+            </div>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </AppShell>
   )
 }
