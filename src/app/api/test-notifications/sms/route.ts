@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     body: SMS_BODY,
     provider: sent ? result.provider : null,
     provider_message_id: sent && "messageId" in result ? result.messageId ?? null : null,
-    error: sent ? null : failDetail,
+    error_message: sent ? null : failDetail,
     sent_at: sent ? new Date().toISOString() : null,
   }
 

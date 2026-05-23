@@ -764,7 +764,7 @@ export interface Database {
           body: string | null
           provider: string | null
           provider_message_id: string | null
-          error: string | null
+          error_message: string | null
           sent_at: string | null
           created_at: string
         }
@@ -780,7 +780,7 @@ export interface Database {
           body?: string | null
           provider?: string | null
           provider_message_id?: string | null
-          error?: string | null
+          error_message?: string | null
           sent_at?: string | null
           created_at?: string
         }
@@ -796,7 +796,7 @@ export interface Database {
           body?: string | null
           provider?: string | null
           provider_message_id?: string | null
-          error?: string | null
+          error_message?: string | null
           sent_at?: string | null
           created_at?: string
         }

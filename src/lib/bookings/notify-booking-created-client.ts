@@ -1,9 +1,82 @@
-import type { BookingCreatedChannelStatus } from "@/lib/notifications/booking-created-server"
+import type {
+  BookingCreatedChannelDetail,
+  BookingCreatedChannelStatus,
+} from "@/lib/notifications/booking-created-server"
 
 export type BookingCreatedNotifyApiResult = {
   ok: boolean
-  email: BookingCreatedChannelStatus
-  sms: BookingCreatedChannelStatus
+  email: BookingCreatedChannelDetail
+  sms: BookingCreatedChannelDetail
+}
+
+function isChannelStatus(value: unknown): value is BookingCreatedChannelStatus {
+  return (
+    value === "sent" ||
+    value === "failed" ||
+    value === "skipped" ||
+    value === "missing" ||
+    value === "already_sent"
+  )
+}
+
+function parseChannelDetail(raw: unknown, fallback: BookingCreatedChannelStatus): BookingCreatedChannelDetail {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>
+    const status = isChannelStatus(o.status) ? o.status : fallback
+    return {
+      status,
+      error_message:
+        typeof o.error_message === "string"
+          ? o.error_message
+          : typeof o.error === "string"
+            ? o.error
+            : null,
+      code: typeof o.code === "string" ? o.code : null,
+      provider: typeof o.provider === "string" ? o.provider : null,
+    }
+  }
+  if (isChannelStatus(raw)) {
+    return { status: raw }
+  }
+  return { status: fallback }
+}
+
+function parseNotifyResponse(json: Record<string, unknown>): BookingCreatedNotifyApiResult {
+  const emailDetail = parseChannelDetail(
+    json.email_detail ?? json.email,
+    isChannelStatus(json.email) ? json.email : "failed",
+  )
+  const smsDetail = parseChannelDetail(
+    json.sms_detail ?? json.sms,
+    isChannelStatus(json.sms) ? json.sms : "failed",
+  )
+
+  if (typeof json.email_error_message === "string" && json.email_error_message.length > 0) {
+    emailDetail.error_message = json.email_error_message
+  }
+  if (typeof json.sms_error_message === "string" && json.sms_error_message.length > 0) {
+    smsDetail.error_message = json.sms_error_message
+  }
+  if (typeof json.sms_code === "string" && json.sms_code.length > 0) {
+    smsDetail.code = json.sms_code
+  }
+  if (typeof json.sms_provider === "string" && json.sms_provider.length > 0) {
+    smsDetail.provider = json.sms_provider
+  }
+
+  return {
+    ok: json.ok === true,
+    email: emailDetail,
+    sms: smsDetail,
+  }
+}
+
+function channelDone(detail: BookingCreatedChannelDetail): boolean {
+  return detail.status === "sent" || detail.status === "already_sent"
+}
+
+export function isBookingCreatedNotifyComplete(result: BookingCreatedNotifyApiResult): boolean {
+  return channelDone(result.email) && channelDone(result.sms)
 }
 
 export async function notifyBookingCreatedViaApi(
@@ -12,7 +85,11 @@ export async function notifyBookingCreatedViaApi(
 ): Promise<BookingCreatedNotifyApiResult> {
   const trimmed = token.trim()
   if (!trimmed) {
-    return { ok: false, email: "missing", sms: "missing" }
+    return {
+      ok: false,
+      email: { status: "missing" },
+      sms: { status: "missing" },
+    }
   }
   try {
     const res = await fetch("/api/public/notify-booking-created", {
@@ -20,17 +97,22 @@ export async function notifyBookingCreatedViaApi(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: trimmed, language }),
     })
-    const json = (await res.json().catch(() => ({}))) as BookingCreatedNotifyApiResult
+    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
     if (!res.ok) {
-      return { ok: false, email: "failed", sms: "failed" }
+      return {
+        ok: false,
+        email: { status: "failed", error_message: typeof json.error === "string" ? json.error : "http_error" },
+        sms: { status: "failed", error_message: typeof json.error === "string" ? json.error : "http_error" },
+      }
     }
+    return parseNotifyResponse(json)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "network_error"
     return {
-      ok: json.ok === true,
-      email: json.email ?? "failed",
-      sms: json.sms ?? "failed",
+      ok: false,
+      email: { status: "failed", error_message: msg },
+      sms: { status: "failed", error_message: msg },
     }
-  } catch {
-    return { ok: false, email: "failed", sms: "failed" }
   }
 }
 
@@ -45,13 +127,31 @@ export async function fetchBookingCreatedNotifyStatus(
       { cache: "no-store" },
     )
     if (!res.ok) return null
-    const json = (await res.json()) as BookingCreatedNotifyApiResult
-    return {
-      ok: json.ok === true,
-      email: json.email ?? "missing",
-      sms: json.sms ?? "missing",
-    }
+    const json = (await res.json()) as Record<string, unknown>
+    return parseNotifyResponse(json)
   } catch {
     return null
   }
+}
+
+/** Idempotentny fallback: wyślij tylko gdy brak sent w logach (np. po success page). */
+export async function ensureBookingCreatedNotifications(
+  token: string,
+  language: "pl" | "en",
+): Promise<BookingCreatedNotifyApiResult> {
+  const trimmed = token.trim()
+  if (!trimmed) {
+    return {
+      ok: false,
+      email: { status: "missing" },
+      sms: { status: "missing" },
+    }
+  }
+
+  const existing = await fetchBookingCreatedNotifyStatus(trimmed)
+  if (existing && isBookingCreatedNotifyComplete(existing)) {
+    return existing
+  }
+
+  return notifyBookingCreatedViaApi(trimmed, language)
 }

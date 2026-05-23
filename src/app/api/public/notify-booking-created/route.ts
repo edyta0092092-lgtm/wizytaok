@@ -3,11 +3,21 @@ import { NextResponse } from "next/server"
 import {
   getBookingCreatedNotifyStatus,
   sendBookingCreatedNotifications,
+  type BookingCreatedChannelDetail,
 } from "@/lib/notifications/booking-created-server"
 
 type Body = {
   token?: string
   language?: "pl" | "en"
+}
+
+function flattenChannel(detail: BookingCreatedChannelDetail) {
+  return {
+    status: detail.status,
+    error_message: detail.error_message ?? null,
+    code: detail.code ?? null,
+    provider: detail.provider ?? null,
+  }
 }
 
 export async function POST(req: Request) {
@@ -25,7 +35,21 @@ export async function POST(req: Request) {
 
   const language = body.language === "en" ? "en" : "pl"
   const result = await sendBookingCreatedNotifications(token, language)
-  return NextResponse.json({ ok: result.ok, email: result.email, sms: result.sms })
+  const emailFlat = flattenChannel(result.email)
+  const smsFlat = flattenChannel(result.sms)
+
+  return NextResponse.json({
+    ok: result.ok,
+    email: emailFlat.status,
+    sms: smsFlat.status,
+    email_error_message: emailFlat.error_message,
+    sms_error_message: smsFlat.error_message,
+    email_code: emailFlat.code,
+    sms_code: smsFlat.code,
+    sms_provider: smsFlat.provider,
+    email_detail: result.email,
+    sms_detail: result.sms,
+  })
 }
 
 export async function GET(req: Request) {
@@ -51,5 +75,16 @@ export async function GET(req: Request) {
   }
 
   const result = await getBookingCreatedNotifyStatus(bookingId)
-  return NextResponse.json({ ok: result.ok, email: result.email, sms: result.sms })
+  const emailFlat = flattenChannel(result.email)
+  const smsFlat = flattenChannel(result.sms)
+
+  return NextResponse.json({
+    ok: result.ok,
+    email: emailFlat.status,
+    sms: smsFlat.status,
+    email_error_message: emailFlat.error_message,
+    sms_error_message: smsFlat.error_message,
+    email_detail: result.email,
+    sms_detail: result.sms,
+  })
 }

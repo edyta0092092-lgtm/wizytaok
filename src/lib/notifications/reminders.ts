@@ -1,3 +1,4 @@
+import { insertNotificationLog as persistNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { TablesInsert, TablesUpdate } from "@/types/database"
 
@@ -128,25 +129,32 @@ async function insertNotificationLog(
     body: string | null
     provider: string | null
     provider_message_id: string | null
-    error: string | null
+    error?: string | null
+    error_message?: string | null
     sent_at: string | null
   }
 ): Promise<void> {
-  const ins: TablesInsert<"notification_logs"> = {
-    business_id: row.business_id,
-    booking_id: row.booking_id,
-    channel: row.channel,
-    type: "reminder_24h",
-    recipient: row.recipient,
-    status: row.status,
-    subject: row.subject,
-    body: row.body,
-    provider: row.provider,
-    provider_message_id: row.provider_message_id,
-    error: row.error,
-    sent_at: row.sent_at,
+  const result = await persistNotificationLog(
+    admin,
+    {
+      business_id: row.business_id,
+      booking_id: row.booking_id,
+      channel: row.channel,
+      type: "reminder_24h",
+      recipient: row.recipient,
+      status: row.status,
+      subject: row.subject,
+      body: row.body,
+      provider: row.provider,
+      provider_message_id: row.provider_message_id,
+      error_message: row.error_message ?? row.error ?? null,
+      sent_at: row.sent_at,
+    },
+    "[reminders.notify.log]",
+  )
+  if (!result.ok) {
+    console.error("[reminders.notify.log]", result.message)
   }
-  await admin.from("notification_logs").insert(ins)
 }
 
 async function processOneBooking(admin: NonNullable<ReturnType<typeof getServiceRoleClient>>, row: DueBookingRow) {

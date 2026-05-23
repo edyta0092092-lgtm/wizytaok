@@ -6,6 +6,7 @@ import {
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
+import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesInsert } from "@/types/database"
 
@@ -147,9 +148,9 @@ export function buildBookingCancelledMessages(
 async function insertLog(row: TablesInsert<"notification_logs">) {
   const admin = getServiceRoleClient()
   if (!admin) return
-  const { error } = await admin.from("notification_logs").insert(row)
-  if (error && error.code !== "23505") {
-    console.error("[booking-cancelled.notify.log]", error.message)
+  const result = await insertNotificationLog(admin, row, "[booking-cancelled.notify.log]")
+  if (!result.ok) {
+    console.error("[booking-cancelled.notify.log]", result.message)
   }
 }
 
@@ -213,7 +214,7 @@ export async function sendBookingCancelledConfirmation(args: {
       body: messages.sms,
       provider: smsRes.ok ? smsRes.provider : null,
       provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
-      error: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
+      error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
       sent_at: smsRes.ok ? nowIso : null,
     })
   }
@@ -239,7 +240,7 @@ export async function sendBookingCancelledConfirmation(args: {
       body: messages.emailText,
       provider: emailRes.ok ? emailRes.provider : null,
       provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
-      error: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
+      error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
       sent_at: emailRes.ok ? nowIso : null,
     })
   }

@@ -34,7 +34,7 @@ import {
   getServiceAvailabilityForBusinessSlug,
 } from "@/lib/availability/availability-store"
 import { createOnlineBooking } from "@/lib/bookings/bookings-store"
-import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
+import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import {
   fetchBookedSlotsForPublicSlug,
   toBlockedSlotKeySetForStaff,
@@ -840,7 +840,10 @@ export default function PublicBookingPage() {
             createdAt: new Date().toISOString(),
           }
           try {
-            await notifyBookingCreatedAfterOnlineBooking(res.confirmationToken, language)
+            const notifyResult = await notifyBookingCreatedViaApi(res.confirmationToken, language)
+            if (notifyResult.email.status === "failed" || notifyResult.sms.status === "failed") {
+              console.error("[booking.created.notify]", notifyResult)
+            }
           } catch (err) {
             console.error("[booking.created.notify]", err)
           }

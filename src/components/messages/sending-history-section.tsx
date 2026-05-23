@@ -204,7 +204,7 @@ function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean 
   const c = canonicalStatus(entry)
   const isMissingContactSkip = (() => {
     if (entry.kind === "db") {
-      const err = String(entry.row.error ?? "").toLowerCase()
+      const err = String(entry.row.error_message ?? "").toLowerCase()
       return (
         (c === "skipped" || c === "failed") &&
         (err.includes("missing client contact") ||
@@ -394,7 +394,7 @@ function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string
       st === "skipped" ||
       st === "not_configured"
     ) {
-      return entry.row.error?.trim() || null
+      return entry.row.error_message?.trim() || null
     }
     return null
   }

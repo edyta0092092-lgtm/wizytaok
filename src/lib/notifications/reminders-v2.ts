@@ -7,6 +7,7 @@ import {
 } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
+import { insertNotificationLog as persistNotificationLog } from "@/lib/notifications/notification-log-insert"
 import type { TablesInsert, TablesUpdate } from "@/types/database"
 
 type BusinessProfileJoin = {
@@ -122,12 +123,16 @@ async function insertNotificationLog(
     body: string | null
     provider: string | null
     provider_message_id: string | null
-    error: string | null
+    error?: string | null
+    error_message?: string | null
     sent_at: string | null
   }
 ) {
-  const ins: TablesInsert<"notification_logs"> = { ...row }
-  await admin.from("notification_logs").insert(ins)
+  void persistNotificationLog(admin, { ...row, type: row.type }, "[reminders-v2.notify.log]").then((result) => {
+    if (!result.ok) {
+      console.error("[reminders-v2.notify.log]", result.message)
+    }
+  })
 }
 
 async function updateBookingReminderStatus(

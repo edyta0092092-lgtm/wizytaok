@@ -178,7 +178,7 @@ export async function confirmBookingAndNotify(
       body: messages.sms,
       provider: sms.ok ? sms.provider : null,
       provider_message_id: sms.ok ? sms.messageId ?? null : null,
-      error: sms.ok ? null : sms.error ?? sms.code,
+      error_message: sms.ok ? null : sms.error ?? sms.code,
       sent_at: nowIso,
     })
   }
@@ -199,7 +199,7 @@ export async function confirmBookingAndNotify(
       body: messages.emailText,
       provider: email.ok ? email.provider : null,
       provider_message_id: email.ok ? email.messageId ?? null : null,
-      error: email.ok ? null : email.error ?? email.code,
+      error_message: email.ok ? null : email.error ?? email.code,
       sent_at: nowIso,
     })
   }

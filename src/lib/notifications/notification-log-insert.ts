@@ -1,0 +1,47 @@
+import type { SupabaseClient } from "@supabase/supabase-js"
+
+import type { Database, TablesInsert } from "@/types/database"
+
+type NotificationLogInsert = TablesInsert<"notification_logs">
+
+/** Payload z opcjonalnym aliasem `error` (mapowany na `error_message` w DB). */
+export type NotificationLogInsertInput = Omit<NotificationLogInsert, "error_message"> & {
+  error_message?: string | null
+  error?: string | null
+}
+
+export function toNotificationLogInsertRow(
+  row: NotificationLogInsertInput,
+): NotificationLogInsert {
+  const { error, error_message, ...rest } = row
+  return {
+    ...rest,
+    error_message: error_message ?? error ?? null,
+  }
+}
+
+export async function insertNotificationLog(
+  admin: SupabaseClient<Database>,
+  row: NotificationLogInsertInput,
+  logTag = "[notification.log]",
+): Promise<{ ok: true } | { ok: false; message: string; code?: string }> {
+  const payload = toNotificationLogInsertRow(row)
+  const { error } = await admin.from("notification_logs").insert(payload)
+  if (!error) {
+    return { ok: true }
+  }
+  if (error.code === "23505") {
+    return { ok: true }
+  }
+  console.error(logTag, {
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    channel: row.channel,
+    type: row.type,
+    status: row.status,
+    booking_id: row.booking_id,
+  })
+  return { ok: false, message: error.message, code: error.code ?? undefined }
+}

@@ -1,11 +1,12 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
+import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
+import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
 import {
   buildTransactionalEmailHtml,
   buildTransactionalEmailText,
 } from "@/lib/notifications/transactional-email-layout"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
-import type { TablesInsert } from "@/types/database"
 
 export type BookingCreatedChannelStatus =
   | "sent"
@@ -14,10 +15,17 @@ export type BookingCreatedChannelStatus =
   | "missing"
   | "already_sent"
 
+export type BookingCreatedChannelDetail = {
+  status: BookingCreatedChannelStatus
+  error_message?: string | null
+  code?: string | null
+  provider?: string | null
+}
+
 export type BookingCreatedNotifyResult = {
   ok: boolean
-  email: BookingCreatedChannelStatus
-  sms: BookingCreatedChannelStatus
+  email: BookingCreatedChannelDetail
+  sms: BookingCreatedChannelDetail
 }
 
 type BookingRow = {
@@ -75,6 +83,30 @@ function readOptionalString(value: unknown): string | null {
   if (value == null) return null
   const s = String(value).trim()
   return s.length > 0 ? s : null
+}
+
+function formatProviderFailure(code: string, detail?: string): string {
+  const c = code.trim()
+  const d = detail?.trim()
+  if (c && d) return `${c}: ${d}`
+  return d || c || "send_failed"
+}
+
+function smsEnvDiagnostics(): Record<string, unknown> {
+  const provider = getActiveSmsReminderProvider()
+  return {
+    sms_provider: provider,
+    SMS_PROVIDER: process.env.SMS_PROVIDER?.trim() || "(default smsapi)",
+    has_SMSAPI_TOKEN: Boolean(process.env.SMSAPI_TOKEN?.trim()),
+    has_SZYBKISMS_TOKEN: Boolean(process.env.SZYBKISMS_TOKEN?.trim()),
+  }
+}
+
+function channelDetail(
+  status: BookingCreatedChannelStatus,
+  extra?: Partial<BookingCreatedChannelDetail>,
+): BookingCreatedChannelDetail {
+  return { status, ...extra }
 }
 
 function buildMessages(
@@ -167,16 +199,6 @@ async function hasAlreadySentLog(
   return Boolean(data?.id)
 }
 
-async function insertLog(
-  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
-  row: TablesInsert<"notification_logs">,
-) {
-  const { error } = await admin.from("notification_logs").insert(row)
-  if (error && error.code !== "23505") {
-    console.error("[booking-created.notify.log]", error.message)
-  }
-}
-
 function mapLogRowStatus(status: string | null | undefined): BookingCreatedChannelStatus {
   if (status === "sent") return "sent"
   if (status === "failed") return "failed"
@@ -189,16 +211,24 @@ export async function getBookingCreatedNotifyStatus(
 ): Promise<BookingCreatedNotifyResult> {
   const admin = getServiceRoleClient()
   if (!admin) {
-    return { ok: false, email: "failed", sms: "failed" }
+    return {
+      ok: false,
+      email: channelDetail("failed", { error_message: "service_role_missing" }),
+      sms: channelDetail("failed", { error_message: "service_role_missing" }),
+    }
   }
   const id = bookingId.trim()
   if (!id) {
-    return { ok: false, email: "missing", sms: "missing" }
+    return {
+      ok: false,
+      email: channelDetail("missing"),
+      sms: channelDetail("missing"),
+    }
   }
 
   const { data: logs } = await admin
     .from("notification_logs")
-    .select("channel, status")
+    .select("channel, status, error_message")
     .eq("booking_id", id)
     .eq("type", "booking_created")
 
@@ -207,8 +237,16 @@ export async function getBookingCreatedNotifyStatus(
 
   return {
     ok: true,
-    email: emailRow ? mapLogRowStatus(emailRow.status) : "missing",
-    sms: smsRow ? mapLogRowStatus(smsRow.status) : "missing",
+    email: emailRow
+      ? channelDetail(mapLogRowStatus(emailRow.status), {
+          error_message: emailRow.error_message,
+        })
+      : channelDetail("missing"),
+    sms: smsRow
+      ? channelDetail(mapLogRowStatus(smsRow.status), {
+          error_message: smsRow.error_message,
+        })
+      : channelDetail("missing"),
   }
 }
 
@@ -219,12 +257,20 @@ export async function sendBookingCreatedNotifications(
   const admin = getServiceRoleClient()
   if (!admin) {
     console.error("[booking-created.notify] service_role_missing")
-    return { ok: false, email: "failed", sms: "failed" }
+    return {
+      ok: false,
+      email: channelDetail("failed", { error_message: "service_role_missing" }),
+      sms: channelDetail("failed", { error_message: "service_role_missing" }),
+    }
   }
 
   const token = confirmationToken.trim()
   if (!token) {
-    return { ok: false, email: "missing", sms: "missing" }
+    return {
+      ok: false,
+      email: channelDetail("missing"),
+      sms: channelDetail("missing"),
+    }
   }
 
   const { data: bookingRaw, error: bookingErr } = await admin.rpc("get_booking_by_confirmation_token", {
@@ -232,7 +278,11 @@ export async function sendBookingCreatedNotifications(
   })
   if (bookingErr || !bookingRaw || typeof bookingRaw !== "object") {
     console.error("[booking-created.notify] booking_not_found", bookingErr?.message)
-    return { ok: false, email: "failed", sms: "failed" }
+    return {
+      ok: false,
+      email: channelDetail("failed", { error_message: bookingErr?.message ?? "booking_not_found" }),
+      sms: channelDetail("failed", { error_message: bookingErr?.message ?? "booking_not_found" }),
+    }
   }
 
   const o = bookingRaw as Record<string, unknown>
@@ -249,19 +299,23 @@ export async function sendBookingCreatedNotifications(
   }
 
   if (!booking.id || !booking.business_id) {
-    return { ok: false, email: "failed", sms: "failed" }
+    return {
+      ok: false,
+      email: channelDetail("failed", { error_message: "booking_row_invalid" }),
+      sms: channelDetail("failed", { error_message: "booking_row_invalid" }),
+    }
   }
 
   const confirmUrl = buildConfirmUrl(booking.confirmation_token)
   const messages = buildMessages(booking, language, confirmUrl)
   const nowIso = new Date().toISOString()
 
-  let emailStatus: BookingCreatedChannelStatus = "missing"
+  let emailResult: BookingCreatedChannelDetail = channelDetail("missing")
   const email = booking.client_email ?? ""
   if (!email) {
-    emailStatus = "missing"
+    emailResult = channelDetail("missing")
   } else if (await hasAlreadySentLog(admin, booking.id, "email")) {
-    emailStatus = "already_sent"
+    emailResult = channelDetail("already_sent")
   } else {
     try {
       const sent = await sendReminderEmail({
@@ -271,97 +325,154 @@ export async function sendBookingCreatedNotifications(
         htmlBody: messages.emailHtml,
       })
       const logStatus = sent.ok ? "sent" : "failed"
-      emailStatus = sent.ok ? "sent" : "failed"
-      await insertLog(admin, {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "email",
-        type: "booking_created",
-        recipient: email,
-        status: logStatus,
-        subject: messages.emailSubject,
-        body: messages.emailText,
-        provider: sent.ok ? sent.provider : null,
-        provider_message_id: sent.ok ? sent.messageId ?? null : null,
-        error: sent.ok ? null : `${sent.code}${sent.error ? `: ${sent.error}` : ""}`,
-        sent_at: sent.ok ? nowIso : null,
-      })
+      const errorMessage = sent.ok ? null : formatProviderFailure(sent.code, sent.error)
+      emailResult = sent.ok
+        ? channelDetail("sent", { provider: sent.provider })
+        : channelDetail("failed", {
+            error_message: errorMessage,
+            code: sent.code,
+            provider: "resend",
+          })
+
+      const logInsert = await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "email",
+          type: "booking_created",
+          recipient: email,
+          status: logStatus,
+          subject: messages.emailSubject,
+          body: messages.emailText,
+          provider: sent.ok ? sent.provider : null,
+          provider_message_id: sent.ok ? sent.messageId ?? null : null,
+          error_message: errorMessage,
+          sent_at: sent.ok ? nowIso : null,
+        },
+        "[booking-created.notify.log]",
+      )
+      if (!logInsert.ok) {
+        console.error("[booking-created.notify.log] email_log_insert_failed", logInsert.message)
+      }
       if (!sent.ok) {
         console.error("[booking-created.notify.email]", sent.code, sent.error ?? "")
       }
     } catch (err) {
-      emailStatus = "failed"
       const errMsg = err instanceof Error ? err.message : "unknown_error"
       console.error("[booking-created.notify.email]", errMsg)
-      await insertLog(admin, {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "email",
-        type: "booking_created",
-        recipient: email,
-        status: "failed",
-        subject: messages.emailSubject,
-        body: messages.emailText,
-        provider: null,
-        provider_message_id: null,
-        error: errMsg,
-        sent_at: null,
-      })
+      emailResult = channelDetail("failed", { error_message: errMsg })
+      const logInsert = await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "email",
+          type: "booking_created",
+          recipient: email,
+          status: "failed",
+          subject: messages.emailSubject,
+          body: messages.emailText,
+          provider: null,
+          provider_message_id: null,
+          error_message: errMsg,
+          sent_at: null,
+        },
+        "[booking-created.notify.log]",
+      )
+      if (!logInsert.ok) {
+        console.error("[booking-created.notify.log] email_log_insert_failed", logInsert.message)
+      }
     }
   }
 
-  let smsStatus: BookingCreatedChannelStatus = "missing"
+  let smsResult: BookingCreatedChannelDetail = channelDetail("missing")
   const phone = booking.client_phone ?? ""
+  const smsProvider = getActiveSmsReminderProvider()
   if (!phone) {
-    smsStatus = "missing"
+    smsResult = channelDetail("missing")
   } else if (await hasAlreadySentLog(admin, booking.id, "sms")) {
-    smsStatus = "already_sent"
+    smsResult = channelDetail("already_sent", { provider: smsProvider })
   } else {
     try {
       const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
       const logStatus = sent.ok ? "sent" : "failed"
-      smsStatus = sent.ok ? "sent" : "failed"
-      await insertLog(admin, {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "sms",
-        type: "booking_created",
-        recipient: phone,
-        status: logStatus,
-        subject: null,
-        body: messages.sms,
-        provider: sent.ok ? sent.provider : null,
-        provider_message_id: sent.ok ? sent.messageId ?? null : null,
-        error: sent.ok ? null : `${sent.code}${sent.error ? `: ${sent.error}` : ""}`,
-        sent_at: sent.ok ? nowIso : null,
-      })
+      const errorMessage = sent.ok ? null : formatProviderFailure(sent.code, sent.error)
+      smsResult = sent.ok
+        ? channelDetail("sent", { provider: sent.provider })
+        : channelDetail("failed", {
+            error_message: errorMessage,
+            code: sent.code,
+            provider: smsProvider,
+          })
+
+      const logInsert = await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "sms",
+          type: "booking_created",
+          recipient: phone,
+          status: logStatus,
+          subject: null,
+          body: messages.sms,
+          provider: sent.ok ? sent.provider : null,
+          provider_message_id: sent.ok ? sent.messageId ?? null : null,
+          error_message: errorMessage,
+          sent_at: sent.ok ? nowIso : null,
+        },
+        "[booking-created.notify.log]",
+      )
+      if (!logInsert.ok) {
+        console.error("[booking-created.notify.log] sms_log_insert_failed", logInsert.message)
+      }
       if (!sent.ok) {
-        console.error("[booking-created.notify.sms]", sent.code, sent.error ?? "")
+        console.error("[booking-created.notify.sms]", {
+          code: sent.code,
+          error: sent.error,
+          recipient: phone,
+          ...smsEnvDiagnostics(),
+        })
       }
     } catch (err) {
-      smsStatus = "failed"
       const errMsg = err instanceof Error ? err.message : "unknown_error"
-      console.error("[booking-created.notify.sms]", errMsg)
-      await insertLog(admin, {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "sms",
-        type: "booking_created",
-        recipient: phone,
-        status: "failed",
-        subject: null,
-        body: messages.sms,
-        provider: null,
-        provider_message_id: null,
+      console.error("[booking-created.notify.sms]", {
         error: errMsg,
-        sent_at: null,
+        recipient: phone,
+        ...smsEnvDiagnostics(),
       })
+      smsResult = channelDetail("failed", {
+        error_message: errMsg,
+        provider: smsProvider,
+      })
+      const logInsert = await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "sms",
+          type: "booking_created",
+          recipient: phone,
+          status: "failed",
+          subject: null,
+          body: messages.sms,
+          provider: null,
+          provider_message_id: null,
+          error_message: errMsg,
+          sent_at: null,
+        },
+        "[booking-created.notify.log]",
+      )
+      if (!logInsert.ok) {
+        console.error("[booking-created.notify.log] sms_log_insert_failed", logInsert.message)
+      }
     }
   }
 
   return {
     ok: true,
-    email: emailStatus,
-    sms: smsStatus,
+    email: emailResult,
+    sms: smsResult,
   }
 }
