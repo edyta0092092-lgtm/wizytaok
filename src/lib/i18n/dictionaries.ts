@@ -1021,19 +1021,12 @@ export const dictionaries = {
         "Twoja wizyta została zapisana i potwierdzona.",
       statusLabel: "Status",
       statusConfirmed: "Potwierdzona",
-      remindersSectionTitle: "Przypomnienia",
-      whatNextReminderOnly:
-        "Przypomnimy Ci o wizycie zgodnie z ustawieniami gabinetu.",
       whatNextImmediateNotifySent:
         "Wysłaliśmy SMS i e-mail z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySentSmsOnly:
         "Wysłaliśmy SMS z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
       whatNextImmediateNotifySentEmailOnly:
         "Wysłaliśmy e-mail z informacją o potwierdzonej wizycie oraz linkiem do anulowania, jeśli będzie taka potrzeba.",
-      whatNextImmediateNotifySafe:
-        "Jeśli dane kontaktowe są poprawne, otrzymasz SMS lub e-mail z linkiem „Zarządzaj wizytą” (szczegóły wizyty i anulowanie).",
-      successNotifyManageLink:
-        "Wysyłamy wiadomość SMS lub e-mail z linkiem „Zarządzaj wizytą”. Pod linkiem sprawdzisz szczegóły wizyty lub ją anulujesz.",
       fullName: "Imię i nazwisko",
       firstName: "Imię",
       lastName: "Nazwisko",
@@ -1049,8 +1042,6 @@ export const dictionaries = {
         "Twoja wizyta została zapisana i potwierdzona.",
       bookingSavedDescriptionNotifySent:
         "Twoja wizyta została zapisana i potwierdzona. Wysłaliśmy wiadomość z linkiem do zarządzania wizytą.",
-      bookingSavedDescriptionNotifySafe:
-        "Twoja wizyta została zapisana i potwierdzona. Jeśli dane kontaktowe są poprawne, otrzymasz wiadomość z linkiem do zarządzania wizytą.",
       bookingSavedDescriptionNoEmail:
         "Twoja wizyta została zapisana i potwierdzona.",
       panelHintBusiness:
@@ -1072,7 +1063,6 @@ export const dictionaries = {
       whatNextConfirm: "W linku z przypomnienia możesz anulować wizytę, jeśli nie możesz przyjść.",
       whatNextChange: "Jeśli coś się zmieni, możesz poprosić o inny termin albo anulować wizytę.",
       whatNextManageFull: "W linku możesz anulować wizytę, jeśli nie możesz przyjść.",
-      messageStatusTitle: "Powiadomienia",
       messageStatusEmailInfo:
         "Jeśli nie otrzymasz wiadomości z linkiem „Zarządzaj wizytą”, skontaktuj się z gabinetem.",
       messageStatusBookingCreatedSent:
@@ -1093,7 +1083,6 @@ export const dictionaries = {
         "Prowadzisz firmę i chcesz zobaczyć podgląd strony umawiania wizyt — zaloguj się do panelu.",
       fallbackLogin: "Zaloguj się",
       fallbackHome: "Strona główna",
-      bookAnotherAppointment: "Umów kolejną wizytę",
       cancelAppointment: "Anuluj wizytę",
       cancelVisitConfirmTitle: "Czy na pewno chcesz anulować wizytę?",
       cancelVisitConfirmHint: "Po anulowaniu firma zobaczy zmianę statusu w panelu.",
@@ -3249,19 +3238,12 @@ Pozdrawiamy,
         "Your appointment has been saved and confirmed.",
       statusLabel: "Status",
       statusConfirmed: "Confirmed",
-      remindersSectionTitle: "Reminders",
-      whatNextReminderOnly:
-        "We will remind you about your appointment according to the business settings.",
       whatNextImmediateNotifySent:
         "We sent SMS and email with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySentSmsOnly:
         "We sent an SMS with confirmation details and a link to cancel if needed.",
       whatNextImmediateNotifySentEmailOnly:
         "We sent an email with confirmation details and a link to cancel if needed.",
-      whatNextImmediateNotifySafe:
-        "If your contact details are correct, you will receive an SMS or email with a “Manage appointment” link (details and cancellation).",
-      successNotifyManageLink:
-        "We send an SMS or email with a “Manage appointment” link. There you can review details or cancel the appointment.",
       fullName: "Full name",
       firstName: "First name",
       lastName: "Last name",
@@ -3276,8 +3258,6 @@ Pozdrawiamy,
       bookingSavedDescription: "Your appointment has been saved and confirmed.",
       bookingSavedDescriptionNotifySent:
         "Your appointment has been saved and confirmed. We sent a message with a “Manage appointment” link.",
-      bookingSavedDescriptionNotifySafe:
-        "Your appointment has been saved and confirmed. If your contact details are correct, you will receive a message with a “Manage appointment” link.",
       bookingSavedDescriptionNoEmail: "Your appointment has been saved and confirmed.",
       panelHintBusiness:
         "The appointment will appear in the business panel as confirmed.",
@@ -3298,7 +3278,6 @@ Pozdrawiamy,
       whatNextConfirm: "In the reminder link, you can cancel if you cannot attend.",
       whatNextChange: "If anything changes, you can request another time or cancel.",
       whatNextManageFull: "In the link, you can manage your appointment or cancel if you cannot attend.",
-      messageStatusTitle: "Notifications",
       messageStatusEmailInfo:
         "If you do not receive a message with a “Manage appointment” link, contact the business.",
       messageStatusBookingCreatedSent:
@@ -3316,7 +3295,6 @@ Pozdrawiamy,
         "If you run the business and want a preview of the booking page — sign in to the panel.",
       fallbackLogin: "Sign in",
       fallbackHome: "Home",
-      bookAnotherAppointment: "Book another appointment",
       cancelAppointment: "Cancel appointment",
       cancelVisitConfirmTitle: "Are you sure you want to cancel this appointment?",
       cancelVisitConfirmHint: "After cancellation, the business will see the updated status in the panel.",
