@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
@@ -19,14 +18,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { getAvailabilityRules } from "@/lib/availability/availability-store"
+import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
+import { unwrapSupabaseBookingAppointmentId } from "@/lib/bookings/bookings-store"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import {
-  calendarEntriesToBookedSlots,
-  computePanelFreeSlotsForMonth,
-} from "@/lib/schedule/compute-panel-free-slots"
-import { loadPanelFreeSlotsContext } from "@/lib/schedule/load-panel-free-slots-context"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
@@ -51,8 +46,7 @@ type CalendarEntry = {
 
 type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
 
-const DAY_PREVIEW_LIMIT = 4
-const FREE_SLOT_DURATION_MINUTES = 30
+const DAY_PREVIEW_LIMIT = 3
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0")
@@ -116,6 +110,8 @@ function matchesViewFilter(row: CalendarEntry, filter: ViewFilter): boolean {
   return true
 }
 
+const STATUS_MENU_ORDER = APPOINTMENT_ROW_STATUS_ORDER.filter((s) => s !== "cancelled")
+
 export default function SchedulePage() {
   const { t, language } = useTranslations()
   const access = useBusinessAccess()
@@ -133,15 +129,19 @@ export default function SchedulePage() {
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
-  const [freeSlotsContext, setFreeSlotsContext] = React.useState<
-    Awaited<ReturnType<typeof loadPanelFreeSlotsContext>> | null
-  >(null)
+  const [confirmCancelForId, setConfirmCancelForId] = React.useState<string | null>(null)
+  const [cancellingId, setCancellingId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (!statusNotice) return
     const tid = window.setTimeout(() => setStatusNotice(""), 2500)
     return () => window.clearTimeout(tid)
   }, [statusNotice])
+
+  const refreshScheduleData = React.useCallback(() => {
+    setRefreshTick((v) => v + 1)
+    window.dispatchEvent(new Event("pw-bookings"))
+  }, [])
 
   const changeScheduleBookingStatus = React.useCallback(
     (appointmentUiId: string, status: AppointmentStatus) => {
@@ -152,9 +152,47 @@ export default function SchedulePage() {
         })
         if (!ok) return
         setStatusNotice(t("appointments.statusUpdated"))
+        refreshScheduleData()
       })()
     },
-    [t]
+    [t, refreshScheduleData]
+  )
+
+  const cancelScheduleVisit = React.useCallback(
+    (row: CalendarEntry) => {
+      void (async () => {
+        setCancellingId(row.id)
+        try {
+          const uuidSb = unwrapSupabaseBookingAppointmentId(row.id)
+          if (uuidSb) {
+            const cancelRes = await fetchCancelBookingByCompany(
+              row.id,
+              language === "en" ? "en" : "pl",
+              true,
+            )
+            if (!cancelRes.ok) {
+              setStatusNotice(t("appointments.cancelVisitCouldNotComplete"))
+              return
+            }
+          } else {
+            const ok = await updateAppointmentStatus(row.id, "cancelled", {
+              lastUpdatedBy: "business",
+              lastStatusChangeSource: "manual",
+            })
+            if (!ok) {
+              setStatusNotice(t("appointments.cancelVisitCouldNotComplete"))
+              return
+            }
+          }
+          setConfirmCancelForId(null)
+          setStatusNotice(t("appointments.statusUpdated"))
+          refreshScheduleData()
+        } finally {
+          setCancellingId(null)
+        }
+      })()
+    },
+    [language, t, refreshScheduleData],
   )
 
   const mapAppointmentToEntry = React.useCallback((row: Appointment): CalendarEntry | null => {
@@ -236,14 +274,12 @@ export default function SchedulePage() {
     window.addEventListener("pw-bookings", forceReload)
     window.addEventListener("pw-public-bookings", forceReload)
     window.addEventListener("pw-manual-appointments", forceReload)
-    window.addEventListener("pw-availability", forceReload)
     window.addEventListener("pw-staff", forceReload)
     window.addEventListener("focus", forceReload)
     return () => {
       window.removeEventListener("pw-bookings", forceReload)
       window.removeEventListener("pw-public-bookings", forceReload)
       window.removeEventListener("pw-manual-appointments", forceReload)
-      window.removeEventListener("pw-availability", forceReload)
       window.removeEventListener("pw-staff", forceReload)
       window.removeEventListener("focus", forceReload)
     }
@@ -295,41 +331,6 @@ export default function SchedulePage() {
     }
   }, [ym, access.businessId, mapAppointmentToEntry, refreshTick])
 
-  React.useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      try {
-        const client = getBrowserClient()
-        const loaded = await loadPanelFreeSlotsContext(
-          client,
-          access.businessId,
-          staffMembers,
-          ym.year,
-          ym.month,
-        )
-        if (cancelled) return
-        if (loaded) {
-          setFreeSlotsContext(loaded)
-          return
-        }
-        const availability = await getAvailabilityRules(client, access.businessId ?? null)
-        if (!cancelled) {
-          setFreeSlotsContext({
-            businessAvailability: availability,
-            businessExceptionsByDate: new Map(),
-            bookedSlots: [],
-            staffContexts: new Map(),
-          })
-        }
-      } catch {
-        if (!cancelled) setFreeSlotsContext(null)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [ym, access.businessId, staffMembers, refreshTick])
-
   const visibleStaff = React.useMemo(() => {
     if (access.effectiveRole !== "staff") return staffMembers
     if (!linkedStaffId) return []
@@ -362,16 +363,6 @@ export default function SchedulePage() {
     return out
   }, [bookings, viewFilter, effectivePersonFilter])
 
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.info("[schedule.calendar.bookings]", {
-        month: `${ym.year}-${pad2(ym.month)}`,
-        count: filteredBookings.length,
-        filters: { personFilter: effectivePersonFilter || "all", viewFilter },
-      })
-    }
-  }, [ym, filteredBookings.length, effectivePersonFilter, viewFilter])
-
   const bookingsByDate = React.useMemo(() => {
     const map = new Map<string, CalendarEntry[]>()
     for (const row of filteredBookings) {
@@ -385,44 +376,14 @@ export default function SchedulePage() {
 
   const detailRows = React.useMemo(
     () => (detailDate ? bookingsByDate.get(detailDate) ?? [] : []),
-    [detailDate, bookingsByDate]
+    [detailDate, bookingsByDate],
   )
 
-  const freeSlotsDayInput = React.useMemo(() => {
-    if (!freeSlotsContext) return null
-    const booked =
-      freeSlotsContext.bookedSlots.length > 0
-        ? freeSlotsContext.bookedSlots
-        : calendarEntriesToBookedSlots(bookings)
-    return {
-      durationMinutes: FREE_SLOT_DURATION_MINUTES,
-      businessAvailability: freeSlotsContext.businessAvailability,
-      businessExceptionsByDate: freeSlotsContext.businessExceptionsByDate,
-      bookedSlots: booked,
-      staffMembers,
-      staffContexts: freeSlotsContext.staffContexts,
-      personFilterStaffId: effectivePersonFilter || null,
-    }
-  }, [freeSlotsContext, bookings, staffMembers, effectivePersonFilter])
-
-  const freeSlotsList = React.useMemo(() => {
-    if (!freeSlotsDayInput) return []
-    return computePanelFreeSlotsForMonth({
-      year: ym.year,
-      month: ym.month,
-      ...freeSlotsDayInput,
-    })
-  }, [freeSlotsDayInput, ym.year, ym.month])
-
-  const freeSlotsByDate = React.useMemo(() => {
-    const map = new Map<string, string[]>()
-    for (const day of freeSlotsList) map.set(day.date, day.times)
-    return map
-  }, [freeSlotsList])
-
-  const detailFreeTimes = detailDate ? freeSlotsByDate.get(detailDate) ?? [] : []
   React.useEffect(() => {
-    if (!detailDate) return
+    if (!detailDate) {
+      setConfirmCancelForId(null)
+      return
+    }
     if (process.env.NODE_ENV === "development") {
       console.info("[schedule.day.bookings]", { date: detailDate, bookings: detailRows })
     }
@@ -430,6 +391,7 @@ export default function SchedulePage() {
 
   const goPrev = () => setYm((p) => (p.month === 1 ? { year: p.year - 1, month: 12 } : { year: p.year, month: p.month - 1 }))
   const goNext = () => setYm((p) => (p.month === 12 ? { year: p.year + 1, month: 1 } : { year: p.year, month: p.month + 1 }))
+
   if (access.ready && access.effectiveRole === "staff" && linkedStaffId === null && isSupabaseConfigured()) {
     return (
       <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
@@ -494,6 +456,12 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        {statusNotice ? (
+          <p className="mb-3 rounded-lg border border-border/80 bg-muted/40 px-3 py-2 text-sm text-foreground">
+            {statusNotice}
+          </p>
+        ) : null}
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Ładowanie danych...</p>
         ) : loadError ? (
@@ -505,18 +473,22 @@ export default function SchedulePage() {
                 <div key={w}>{w}</div>
               ))}
             </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-7 md:gap-1.5">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-7 md:gap-1">
               {weekMondayFirstCells(ym.year, ym.month).map((dayNum, idx) => {
                 if (dayNum == null) {
-                  return <div key={`empty-${idx}`} className="hidden min-h-[8.5rem] rounded-xl border border-transparent bg-muted/5 md:block" />
+                  return (
+                    <div
+                      key={`empty-${idx}`}
+                      className="hidden min-h-[5.5rem] rounded-lg border border-transparent bg-muted/5 md:block"
+                    />
+                  )
                 }
                 const key = dateKey(ym.year, ym.month, dayNum)
                 const holidayLabel = getPolishHolidayDisplayName(
                   new Date(ym.year, ym.month - 1, dayNum),
-                  language === "en" ? "en" : "pl"
+                  language === "en" ? "en" : "pl",
                 )
                 const rows = bookingsByDate.get(key) ?? []
-                const dayFreeTimes = freeSlotsByDate.get(key)
                 const preview = rows.slice(0, DAY_PREVIEW_LIMIT)
                 const more = Math.max(0, rows.length - DAY_PREVIEW_LIMIT)
                 const isToday = key === todayKey
@@ -526,54 +498,51 @@ export default function SchedulePage() {
                     key={key}
                     onClick={() => setDetailDate(key)}
                     className={cn(
-                      "flex min-h-[8.5rem] flex-col rounded-xl border bg-card p-2 text-left shadow-sm transition-colors hover:bg-muted/20",
-                      isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80"
+                      "flex min-h-[5.5rem] flex-col rounded-lg border bg-card p-1.5 text-left shadow-sm transition-colors hover:bg-muted/20",
+                      isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80",
                     )}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{dayNum}</p>
-                        <p className="text-[11px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
-                        {dayFreeTimes && dayFreeTimes.length > 0 ? (
-                          <p className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
-                            {t("schedule.freeSlotsCount").replace(
-                              "{count}",
-                              String(dayFreeTimes.length),
-                            )}
-                          </p>
-                        ) : null}
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight text-foreground">{dayNum}</p>
+                        <p className="text-[10px] text-muted-foreground">{visitCountLabel(rows.length)}</p>
                       </div>
                       {holidayLabel ? (
                         <span
                           title={holidayLabel}
-                          className="max-w-[10rem] truncate rounded bg-amber-500/15 px-1.5 py-0.5 text-right text-[10px] font-medium leading-tight text-amber-900 dark:text-amber-100"
+                          className="max-w-[5.5rem] truncate rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-medium leading-tight text-amber-900 dark:text-amber-100"
                         >
                           {holidayLabel}
                         </span>
                       ) : null}
                     </div>
-                    <ul className="mt-1.5 space-y-1 overflow-hidden">
+                    <ul className="mt-1 space-y-0.5 overflow-hidden">
                       {preview.length === 0 ? (
-                        <li className="text-xs text-muted-foreground">Brak wizyt</li>
+                        <li className="text-[10px] text-muted-foreground">Brak wizyt</li>
                       ) : (
                         preview.map((row) => (
                           <li
                             key={row.id}
                             className={cn(
-                              "rounded-md border border-border/70 px-1.5 py-1 text-[11px] leading-tight",
-                              normalizeStatus(row.status) === "cancelled" && "opacity-60"
+                              "truncate text-[10px] leading-snug",
+                              normalizeStatus(row.status) === "cancelled" && "opacity-55 line-through",
                             )}
                           >
-                            <p className="truncate font-medium text-foreground">
-                              {formatHm(row.appointment_time)} — {row.client_name}
-                            </p>
-                            <p className="truncate text-muted-foreground">
-                              {row.service_name} / {(row.staff_name?.trim() || (row.staff_id ? staffNameById.get(row.staff_id) : "")) || "Nie przypisano"}
-                            </p>
+                            <span className="font-medium tabular-nums text-foreground">
+                              {formatHm(row.appointment_time)}
+                            </span>{" "}
+                            <span className="text-foreground">{row.client_name}</span>
+                            {row.service_name ? (
+                              <span className="block truncate text-[9px] text-muted-foreground">
+                                {row.service_name}
+                              </span>
+                            ) : null}
                           </li>
                         ))
                       )}
-                      {more > 0 ? <li className="text-[11px] text-primary">+{more} więcej</li> : null}
+                      {more > 0 ? (
+                        <li className="text-[10px] font-medium text-primary">+{more} więcej</li>
+                      ) : null}
                     </ul>
                   </button>
                 )
@@ -583,126 +552,129 @@ export default function SchedulePage() {
         )}
       </PageShell>
 
-      <Sheet open={detailDate != null} onOpenChange={(open) => !open && setDetailDate(null)}>
-        <SheetContent className="premium-scrollbar flex w-full max-w-xl flex-col" showCloseButton>
-          <SheetHeader className="border-b border-border/70 text-left">
-            <SheetTitle>
-              Szczegóły dnia
+      <Sheet
+        open={detailDate != null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailDate(null)
+            setConfirmCancelForId(null)
+          }
+        }}
+      >
+        <SheetContent className="premium-scrollbar flex w-full max-w-md flex-col" showCloseButton>
+          <SheetHeader className="border-b border-border/70 text-left pb-3">
+            <SheetTitle className="text-base">
               {detailDate
-                ? ` — ${formatters.dayLong.format(
+                ? formatters.dayLong.format(
                     new Date(
                       Number(detailDate.slice(0, 4)),
                       Number(detailDate.slice(5, 7)) - 1,
-                      Number(detailDate.slice(8, 10))
-                    )
-                  )}`
-                : ""}
+                      Number(detailDate.slice(8, 10)),
+                    ),
+                  )
+                : "Szczegóły dnia"}
             </SheetTitle>
+            {detailDate ? (
+              <p className="text-xs text-muted-foreground">{visitCountLabel(detailRows.length)}</p>
+            ) : null}
           </SheetHeader>
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-            <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900 dark:text-emerald-100">
-                {t("schedule.freeSlotsDayHeading")}
-              </p>
-              {detailFreeTimes.length > 0 ? (
-                <p className="mt-2 text-sm leading-relaxed tabular-nums text-foreground">
-                  {detailFreeTimes.join(", ")}
-                </p>
-              ) : (
-                <p className="mt-2 text-sm text-muted-foreground">{t("schedule.freeSlotsDayNone")}</p>
-              )}
-            </div>
+          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-3">
             {detailRows.length === 0 ? (
               <p className="text-sm text-muted-foreground">Brak zaplanowanych wizyt</p>
             ) : (
               detailRows.map((row) => {
                 const isCancelled = normalizeStatus(row.status) === "cancelled"
+                const staffLabel =
+                  row.staff_name?.trim() ||
+                  (row.staff_id ? staffNameById.get(row.staff_id) : "") ||
+                  "Nie przypisano osoby"
+                const isConfirmingCancel = confirmCancelForId === row.id
                 return (
-                <div
-                  key={row.id}
-                  className={cn(
-                    "rounded-xl border border-border p-3",
-                    isCancelled && "opacity-70"
-                  )}
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatHm(row.appointment_time)} · {row.client_name}
-                    </p>
-                    <StatusBadge status={normalizeStatus(row.status)} />
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{row.service_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(row.staff_name?.trim() || (row.staff_id ? staffNameById.get(row.staff_id) : "")) || "Nie przypisano osoby"}
-                  </p>
-                  {row.client_phone?.trim() ? (
-                    <p className="mt-1 text-xs text-muted-foreground">Tel: {row.client_phone.trim()}</p>
-                  ) : null}
-                  {(row.customer_note?.trim() || row.internal_note?.trim()) ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Notatka: {row.customer_note?.trim() || row.internal_note?.trim()}
-                    </p>
-                  ) : null}
                   <div
+                    key={row.id}
                     className={cn(
-                      "mt-2 grid w-full gap-1.5",
-                      isCancelled ? "grid-cols-1" : "grid-cols-3"
+                      "rounded-lg border border-border/80 px-2.5 py-2",
+                      isCancelled && "opacity-70",
                     )}
                   >
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
-                      asChild
-                    >
-                      <Link href="/appointments">Otwórz wizytę</Link>
-                    </Button>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold leading-tight text-foreground">
+                          <span className="tabular-nums">{formatHm(row.appointment_time)}</span>
+                          <span className="text-muted-foreground"> · </span>
+                          {row.client_name}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{row.service_name}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">{staffLabel}</p>
+                      </div>
+                      <StatusBadge status={normalizeStatus(row.status)} />
+                    </div>
+
                     {!isCancelled ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
-                          asChild
-                        >
-                          <Link href={`/appointments?edit=${encodeURIComponent(row.id)}`}>
-                            Edytuj wizytę
-                          </Link>
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {isConfirmingCancel ? (
+                          <div className="w-full space-y-1.5 rounded-md border border-border/70 bg-muted/30 p-2">
+                            <p className="text-xs text-muted-foreground">
+                              {t("appointments.cancelVisitConfirmMessage")}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={cancellingId === row.id}
+                                onClick={() => setConfirmCancelForId(null)}
+                              >
+                                {t("appointments.cancelVisitConfirmBack")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-7 text-xs"
+                                disabled={cancellingId === row.id}
+                                onClick={() => cancelScheduleVisit(row)}
+                              >
+                                {cancellingId === row.id
+                                  ? t("bookings.loading")
+                                  : t("appointments.cancelVisitConfirmAction")}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button type="button" variant="outline" size="sm" className="h-7 text-xs">
+                                  {t("appointments.changeStatusAction")}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-52">
+                                {STATUS_MENU_ORDER.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() => changeScheduleBookingStatus(row.id, status)}
+                                  >
+                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                             <Button
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="h-8 w-full min-w-0 whitespace-nowrap px-2 text-xs sm:px-2.5"
+                              className="h-7 text-xs"
+                              onClick={() => setConfirmCancelForId(row.id)}
                             >
-                              {t("appointments.changeStatusAction")}
+                              {t("appointments.cancelVisit")}
                             </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-56">
-                            <div className="px-2 pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                              {t("appointments.manualStatusChange")}
-                            </div>
-                            <div className="px-2 py-1 text-xs text-muted-foreground">
-                              {t("appointments.chooseStatus")}
-                            </div>
-                            {APPOINTMENT_ROW_STATUS_ORDER.map((status) => (
-                              <DropdownMenuItem
-                                key={status}
-                                onClick={() => changeScheduleBookingStatus(row.id, status)}
-                              >
-                                {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </>
+                          </>
+                        )}
+                      </div>
                     ) : null}
                   </div>
-                </div>
                 )
               })
             )}
