@@ -1,7 +1,12 @@
 "use client"
 
 import { AppointmentBlock } from "@/components/schedule/appointment-block"
-import { blockLayout, getScheduleBoardRangeMinutes, staffInitials } from "@/lib/schedule/schedule-day-board"
+import {
+  blockLayout,
+  getScheduleBoardRangeMinutes,
+  scheduleBoardHourHeightPx,
+  staffInitials,
+} from "@/lib/schedule/schedule-day-board"
 import type { ScheduleStaffColumn } from "@/lib/schedule/schedule-day-types"
 import { SCHEDULE_BOARD_PX_PER_MINUTE } from "@/lib/schedule/schedule-day-types"
 import type { AppointmentStatus } from "@/types/domain"
@@ -46,6 +51,7 @@ export function StaffScheduleColumn({
   onConfirmCancel,
 }: StaffScheduleColumnProps) {
   const range = getScheduleBoardRangeMinutes()
+  const hourHeightPx = scheduleBoardHourHeightPx()
 
   return (
     <div className="flex min-w-[11rem] max-w-[13.5rem] flex-1 flex-col overflow-hidden border-r border-border/60 last:border-r-0">
@@ -65,13 +71,12 @@ export function StaffScheduleColumn({
       <div
         className="relative min-w-0 flex-1 overflow-hidden"
         style={{
-          backgroundImage:
-            "repeating-linear-gradient(to bottom, transparent 0, transparent calc(4.375rem - 1px), hsl(var(--border) / 0.35) calc(4.375rem - 1px), hsl(var(--border) / 0.35) 4.375rem)",
-          backgroundSize: "100% 4.375rem",
+          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${hourHeightPx}px - 1px), hsl(var(--border) / 0.35) calc(${hourHeightPx}px - 1px), hsl(var(--border) / 0.35) ${hourHeightPx}px)`,
+          backgroundSize: `100% ${hourHeightPx}px`,
         }}
       >
         <div className="relative min-w-0 overflow-hidden" style={{ height: gridHeightPx }}>
-          {column.entries.map((entry) => {
+          {column.entries.map((entry, index) => {
             const layout = blockLayout(entry, range)
             return (
               <AppointmentBlock
@@ -80,6 +85,7 @@ export function StaffScheduleColumn({
                 topPct={layout.topPct}
                 heightPx={layout.heightPx}
                 clipped={layout.clipped}
+                stackIndex={index}
                 statusMenuOrder={statusMenuOrder}
                 isConfirmingCancel={confirmCancelForId === entry.id}
                 isCancelling={cancellingId === entry.id}
