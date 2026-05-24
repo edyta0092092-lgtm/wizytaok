@@ -1810,6 +1810,55 @@ Pozdrawiamy,
       exceptionEndDateRequired: "Data do jest wymagana.",
       exceptionEndBeforeStart: "Data do nie może być wcześniejsza niż Data od.",
     },
+    onboarding: {
+      welcomeTitle: "Witaj w WizytaOK",
+      welcomeLead: "W kilku krokach uruchomisz rezerwacje online. Zajmie to ok. 3–5 minut.",
+      cardTitle: "Konfiguracja firmy",
+      cardLead: "Dokończ setup, aby przyjmować rezerwacje online.",
+      continueCta: "Kontynuuj konfigurację",
+      progressLabel: "Postęp konfiguracji",
+      loading: "Sprawdzamy postęp…",
+      allDone: "Konfiguracja ukończona",
+      skipWelcome: "Później",
+      skipCard: "Ukryj na teraz",
+      close: "Zamknij",
+      restart: "Uruchom konfigurację ponownie",
+      restartHint: "Przywraca checklistę setupu na planie dnia.",
+      flowBadge: "Konfiguracja",
+      flowNext: "Dalej",
+      steps: {
+        working_hours: {
+          title: "Ustaw godziny pracy",
+          short: "Godziny pracy firmy",
+          hint: "Włącz dni tygodnia i godziny, potem kliknij Zapisz dostępność.",
+        },
+        team_member: {
+          title: "Dodaj członka zespołu",
+          short: "Członek zespołu",
+          hint: "Dodaj osobę wykonującą usługi i zapisz profil.",
+        },
+        service: {
+          title: "Dodaj usługę",
+          short: "Usługa w ofercie",
+          hint: "Utwórz aktywną usługę z czasem trwania i ceną.",
+        },
+        staff_service: {
+          title: "Przypisz usługę do osoby",
+          short: "Usługa przypisana do osoby",
+          hint: "W edycji osoby zaznacz usługi, które wykonuje.",
+        },
+        booking_page: {
+          title: "Otwórz stronę rezerwacji",
+          short: "Strona rezerwacji",
+          hint: "Uzupełnij adres strony w ustawieniach i otwórz link w nowej karcie.",
+        },
+        first_visit: {
+          title: "Wykonaj pierwszą wizytę",
+          short: "Pierwsza wizyta",
+          hint: "Zrób testową rezerwację przez link albo dodaj wizytę ręcznie.",
+        },
+      },
+    },
     tour: {
       welcomeTitle: "Witamy w Potwierdzeniach Wizyt",
       welcomeBody:
@@ -1957,6 +2006,99 @@ Pozdrawiamy,
     },
     guide: {
       title: "Przewodnik WizytaOK",
+      helpCenterTitle: "Centrum pomocy",
+      helpCenterDescription: "Szukaj odpowiedzi o grafiku, wizytach, powiadomieniach i rezerwacjach online.",
+      helpCenterSubtitle: "To dokumentacja produktu — szybki setup znajdziesz na planie dnia.",
+      helpCenterBadge: "Pomoc",
+      helpCenterSetupNote:
+        "Pierwsza konfiguracja (godziny, zespół, usługa, link rezerwacji) to osobny kreator na planie dnia — przycisk „Kontynuuj konfigurację”. Katalog klientów nie jest wymagany na start.",
+      catAll: "Wszystko",
+      catSchedule: "Grafik i dostępność",
+      catScheduleDesc: "Godziny firmy, wyjątki, grafik miesięczny i grafik osób.",
+      catAppointments: "Wizyty",
+      catAppointmentsDesc: "Lista wizyt, statusy, anulowanie i prośby klientów.",
+      catNotifications: "Powiadomienia",
+      catNotificationsDesc: "Przypomnienia SMS/e-mail, szablony i historia wysyłek.",
+      catBooking: "Rezerwacje online",
+      catBookingDesc: "Publiczny link, strona rezerwacji i strona klienta /confirm.",
+      catBilling: "Płatności",
+      catBillingDesc: "Trial, subskrypcja i Stripe.",
+      catTeam: "Zespół i usługi",
+      catTeamDesc: "Osoby, przypisane usługi i zaproszenia do panelu.",
+      catOther: "Pozostałe",
+      catOtherDesc: "Ustawienia firmy, klienci, eksport i pomoc.",
+      hcAvailTitle: "Godziny pracy firmy",
+      hcAvailLead: "Tu ustawiasz standardowy tydzień — które dni firma przyjmuje klientów i w jakich godzinach.",
+      hcAvailSteps:
+        "1. Otwórz Dostępność.\n2. Włącz dni tygodnia.\n3. Ustaw godziny od–do.\n4. Kliknij Zapisz dostępność.",
+      hcAvailExTitle: "Dni wolne i wyjątki",
+      hcAvailExSteps:
+        "1. W sekcji Dni wolne dodaj datę.\n2. Wybierz: cały dzień nieczynny albo specjalne godziny.\n3. Zapisz wyjątek — kalendarz rezerwacji i grafik to uwzględnią.",
+      hcStaffScheduleTitle: "Grafik i wyjątki osoby",
+      hcStaffScheduleLead:
+        "Każda osoba w zespole może mieć własny grafik oraz dni wolne lub specjalne godziny (urlopy, szkolenia).",
+      hcStaffScheduleSteps:
+        "1. Zespół → wybierz osobę.\n2. Zakładka Grafik — godziny lub „jak firma”.\n3. Zakładka Wyjątki — dodaj dzień wolny.\n4. Zapisz.",
+      hcApptListTitle: "Lista wizyt",
+      hcApptListLead:
+        "Wizyty to główne miejsce pracy z terminami. Filtruj po statusie, osobie, kliencie lub usłudze.",
+      hcApptStatuses:
+        "- Potwierdzona — aktywna wizyta (nowe rezerwacje online i ręczne trafiają tutaj).\n- Zrealizowana — wizyta wykonana.\n- Nieobecność klienta — klient nie przyszedł.\n- Anulowana — wizyta odwołana.",
+      hcApptListSteps:
+        "1. Otwórz Wizyty.\n2. Użyj filtrów: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność klienta, Anulowane.\n3. Dodaj wizytę ręcznie przyciskiem u góry.\n4. Odznaka źródła pokazuje rezerwację online lub wpis z panelu.",
+      hcApptStatusMenuTitle: "Zmiana statusu",
+      hcApptStatusMenuLead: "Na karcie wizyty lub w planie dnia użyj menu „Zmień status”.",
+      hcApptStatusMenuBullets:
+        "- Potwierdzona\n- Zrealizowana\n- Nieobecność klienta\n- Anulowana",
+      hcClientChangeTitle: "Prośba klienta o zmianę",
+      hcClientChangeLead:
+        "Gdy klient użyje linku z wiadomości (/confirm/…), może poprosić o inny termin lub usługę. Na karcie wizyty zobaczysz sekcję prośby — nie jest to osobny filtr na liście.",
+      hcClientChangeSteps:
+        "1. Otwórz wizytę z widoczną prośbą klienta.\n2. Zaakceptuj propozycję albo wyślij własną.\n3. Możesz odrzucić prośbę — wizyta wraca do poprzedniego stanu.",
+      hcCancelTitle: "Anulowanie wizyty",
+      hcCancelLead: "Anulowanie możesz zrobić z listy Wizyty lub z grafiku dnia.",
+      hcCancelSteps:
+        "1. Otwórz wizytę.\n2. Wybierz Anuluj wizytę i potwierdź.\n3. Status zmieni się na Anulowana — termin zwalnia się do nowych rezerwacji.",
+      hcDayplanLead:
+        "Plan dnia pokazuje dzisiejsze wizyty i szybkie liczniki (potwierdzone / anulowane). To podgląd dnia, nie pełna lista.",
+      hcDayplanSteps:
+        "1. Otwórz Plan dnia.\n2. Przejrzyj listę na dziś.\n3. Zmień status z menu na karcie, jeśli trzeba.\n4. Pełną listę i filtry znajdziesz w Wizytach.",
+      hcRemindersTitle: "Automatyczne przypomnienia",
+      hcRemindersLead:
+        "Pierwsze przypomnienie (domyślnie 24 h przed wizytą) wysyła link do potwierdzenia lub zmiany. Drugie przypomnienie to krótka informacja — ustawiasz je w Ustawieniach.",
+      hcRemindersBody:
+        "Nie wysyłasz przypomnień ręcznie z panelu — działają automatycznie według ustawień firmy.",
+      hcMsgsLead: "Szablony treści wiadomości automatycznych (SMS i e-mail).",
+      hcMsgsSteps:
+        "1. Wiadomości → szablony.\n2. Edytuj treść pod swój styl.\n3. Zapisz — system użyje ich przy przypomnieniach i powiadomieniach.",
+      hcMsgHistoryTitle: "Historia wysyłek",
+      hcMsgHistoryLead: "Podgląd wysłanych, zaplanowanych i pominiętych wiadomości.",
+      hcMsgHistoryBullets:
+        "- status wysyłki i ewentualny błąd\n- wpisy testowe w trybie developerskim",
+      hcBookingLinkTitle: "Link strony rezerwacji",
+      hcBookingLinkLead:
+        "Adres ustawiasz w Ustawieniach (końcówka URL). Pełny link to /rezerwacje/[twoja-końcówka].",
+      hcBookingLinkSteps:
+        "1. Ustawienia → dane firmy → adres strony rezerwacji.\n2. Zapisz zmiany.\n3. Skopiuj link i udostępnij klientom (strona, SMS, QR).",
+      hcBookingFlowLead: "Klient wybiera usługę, osobę (jeśli dotyczy), termin i podaje kontakt.",
+      hcBillingTitle: "Trial i subskrypcja",
+      hcBillingLead: "Dostęp do panelu wymaga aktywnego triala lub opłaconej subskrypcji (Stripe).",
+      hcBillingBullets:
+        "- 14-dniowy trial po aktywacji\n- po trialu subskrypcja miesięczna\n- zarządzanie płatnością w ustawieniach / portalu Stripe",
+      hcBillingSteps:
+        "1. Po rejestracji uruchom trial lub opłać plan.\n2. W Ustawieniach sprawdź status dostępu.\n3. Przy problemie z płatnością użyj linku do portalu klienta Stripe.",
+      hcClientsTitle: "Katalog klientów",
+      hcClientsLead:
+        "Opcjonalna baza kontaktów z notatkami i historią. Przy rezerwacji online dane i tak zapisują się przy wizycie.",
+      hcClientsTip:
+        "Nie musisz najpierw dodawać klienta ręcznie — to ułatwienie, nie krok obowiązkowy setupu.",
+      hcSlotsLead: "Termin jest zajęty, gdy istnieje aktywna wizyta ze statusem blokującym slot.",
+      hcSlotsBlocking: "Blokują slot: Potwierdzona (w tym nowe rezerwacje w bazie jako booked/pending).",
+      hcSlotsNonBlocking: "Nie blokują: Anulowana, Nieobecność klienta, Zrealizowana.",
+      hcExportTitle: "Eksport CSV",
+      hcExportLead: "Pobierz wizyty lub klientów do pliku CSV z Ustawień.",
+      hcExportSteps:
+        "1. Ustawienia → Eksport danych.\n2. Wybierz wizyty lub klientów.\n3. Otwórz plik w Excelu lub Arkuszach.",
       description:
         "Opis wszystkich modułów panelu: od konfiguracji firmy po grafik, wizyty, wiadomości i pomoc techniczną.",
       heroSub:
@@ -2096,11 +2238,11 @@ Pozdrawiamy,
       modApptBookingSource:
         "Źródło wizyty pokazuje, czy klient zarezerwował termin samodzielnie przez link rezerwacji, czy wizyta została dodana ręcznie w panelu.",
       modApptStatuses:
-        "- Zarezerwowana - klient zapisał termin, ale nie nadszedł jeszcze etap potwierdzania.\n- Do potwierdzenia - system wysłał automatyczne przypomnienie 24h przed wizytą i czeka na odpowiedź klienta.\n- Potwierdzona - klient potwierdził obecność albo firma potwierdziła wizytę.\n- Prośba o zmianę - klient poprosił o zmianę terminu lub usługi.\n- Firma proponuje zmianę - firma wysłała klientowi propozycję zmiany.\n- Anulowana - wizyta została anulowana.\n- Nieobecność klienta - klient nie pojawił się na umówionej wizycie.\n- Zrealizowana - wizyta została wykonana, jeśli taki status istnieje.",
+        "- Potwierdzona — aktywna wizyta.\n- Zrealizowana — wykonana.\n- Nieobecność klienta — klient nie przyszedł.\n- Anulowana — odwołana.",
       modApptStatusNote:
-        "Status mówi, co dzieje się z wizytą. Źródło wizyty mówi, skąd wizyta pochodzi.",
+        "W panelu nie ma osobnych statusów „Zarezerwowana” ani „Do potwierdzenia” — nowe wizyty widać jako Potwierdzone.",
       modApptSteps:
-        "1. Wejdź w Wizyty.\n2. Użyj filtrów: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność klienta, Anulowane lub Wymaga reakcji.\n3. W menu Zmień status ustaw m.in. Zrealizowana lub Nieobecność klienta.\n4. Reaguj na prośby o zmianę terminu lub propozycje firmy.\n5. Automatyczne przypomnienia 24h działają wg ustawień w Ustawieniach.",
+        "1. Wejdź w Wizyty.\n2. Filtry: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność klienta, Anulowane.\n3. Menu „Zmień status” na karcie wizyty.\n4. Prośby klienta o zmianę — na karcie wizyty, gdy klient użyje linku z SMS/e-mail.",
       modScheduleTitle: "Grafik",
       modScheduleLead:
         "Osobna zakładka Grafik pokazuje miesiąc z podświetleniem dni, w których są wizyty. Po kliknięciu dnia otwierasz widok godzinowy z kolumnami osób.",
@@ -2108,11 +2250,11 @@ Pozdrawiamy,
         "- filtr osoby (dla administratora)\n- anulowane wizyty domyślnie nie widać w grafiku\n- w oknie dnia: zmiana statusu, anulowanie wizyty, szczegóły klienta\n- zmiany są widoczne także na liście Wizyty",
       modScheduleSteps:
         "1. Wejdź w Grafik.\n2. Przewijaj miesiące strzałkami.\n3. Kliknij dzień z wizytą (żółte tło).\n4. W terminarzu wybierz wizytę i zmień status lub anuluj.\n5. Sprawdź tę samą wizytę na liście Wizyty.",
-      modChangesTitle: "6. Prośby klienta o zmianę",
+      modChangesTitle: "Prośby klienta o zmianę",
       modChangesLead:
-        "Jeśli klient zmieni termin lub usługę ze strony zarządzania rezerwacją, w panelu zobaczysz status Prośba o zmianę. Możesz zaakceptować propozycję, podać swoją lub odrzucić prośbę.",
+        "Prośba pojawia się na karcie wizyty (nie jako osobny filtr statusu), gdy klient użyje strony /confirm/…",
       modChangesSteps:
-        "1. Wejdź w Wizyty.\n2. Otwórz wizytę ze statusem Prośba o zmianę.\n3. Sprawdź proponowany termin lub usługę.\n4. Kliknij Akceptuj zmianę, jeśli propozycja Ci pasuje.\n5. Wybierz opcję wysłania własnej propozycji, jeśli chcesz zaproponować inny czas lub usługę.\n6. Odrzuć prośbę, jeśli nie jesteś w stanie przyjąć zmiany.",
+        "1. Wizyty → otwórz wizytę z sekcją prośby klienta.\n2. Zaakceptuj lub zaproponuj inny termin.\n3. Odrzuć, jeśli nie możesz przyjąć zmiany.",
       modRemindersTitle: "Automatyczne przypomnienia",
       modRemindersLead:
         "Pierwsze przypomnienie jest wysyłane 24h przed wizytą i zawiera link do potwierdzenia, zmiany lub anulowania.",
@@ -2130,11 +2272,11 @@ Pozdrawiamy,
         "Te informacje są dostępne w Ustawieniach, w sekcji Informacje prawne i techniczne.",
       modDayplanTitle: "Plan dnia",
       modDayplanLead:
-        "Plan dnia to szybkie podsumowanie dziś: liczniki wizyt oraz lista osób, które mogą potrzebować przypomnienia lub reakcji.",
+        "Plan dnia to podgląd dzisiejszych wizyt i liczników — potwierdzone i anulowane na dziś.",
       modDayplanBullets:
-        "- potwierdzone, do potwierdzenia i wymagające reakcji firmy\n- skrócone karty wizyt z szybkimi akcjami",
+        "- lista wizyt na dziś\n- szybka zmiana statusu na karcie",
       modDayplanSteps:
-        "1. Wejdź w Plan dnia.\n2. Sprawdź sekcję Wymaga reakcji.\n3. Obejrzyj powód przy każdej wizycie (zmiana terminu, przypomnienie, brak danych).\n4. Kliknij Zmień status, jeśli potwierdzasz ręcznie.\n5. Otwórz Wizyty z filtrem Wymaga reakcji, jeśli potrzebujesz pełnego widoku.",
+        "1. Wejdź w Plan dnia.\n2. Przejrzyj wizyty na dziś.\n3. Użyj menu Zmień status, gdy trzeba.\n4. Pełne filtry i wyszukiwanie — w zakładce Wizyty.",
       modMsgsTitle: "Wiadomości i historia wysyłek",
       modMsgsLead:
         "Wiadomości zawierają szablony oraz historię wysyłek.",
@@ -2153,9 +2295,9 @@ Pozdrawiamy,
       modSlotsLead:
         "Jeśli termin jest zajęty przez aktywną rezerwację ze statusem blokującym, nie powinien być dostępny dla kolejnej osoby przy rezerwacji online lub przy zmianie terminu przez innego klienta.",
       modSlotsBlocking:
-        "Blokują slot: Zarezerwowana, Do potwierdzenia, Potwierdzona, Prośba o zmianę, Firma proponuje zmianę.",
+        "Blokują slot: Potwierdzona (w bazie także booked/pending przed wyświetleniem).",
       modSlotsNonBlocking:
-        "Nie blokują: Anulowana, Nieobecność klienta, Zrealizowana (jeśli używasz tego statusu).",
+        "Nie blokują: Anulowana, Nieobecność klienta, Zrealizowana.",
       modClientsTitle: "Klienci",
       modClientsLead:
         "Tu zobaczysz dane klienta, notatki, historię wizyt i ryzyko nieobecności.",
@@ -2208,35 +2350,30 @@ Pozdrawiamy,
       faqTitle: "Najczęstsze pytania",
       faqQ1: "Czy klient musi mieć konto?",
       faqA1:
-        "Nie. Klient korzysta z linku rezerwacji albo linku do zarządzania wizytą.",
-      faqQ2: "Czym różni się Zarezerwowana od Do potwierdzenia?",
+        "Nie. Wystarczy link do rezerwacji lub link z wiadomości do zarządzania wizytą (/confirm/…).",
+      faqQ2: "Jakie statusy wizyt widzę w panelu?",
       faqA2:
-        "Zarezerwowana oznacza, że termin został zapisany. Do potwierdzenia oznacza, że system wysłał automatyczne przypomnienie 24h przed wizytą i czeka na odpowiedź klienta.",
+        "Na liście: Potwierdzone, Zrealizowane, Nieobecność klienta i Anulowane. W menu „Zmień status” ustawisz Zrealizowaną, Nieobecność lub Anulowaną.",
       faqQ3: "Czy mogę ręcznie wysłać przypomnienie?",
-      faqA3: "Nie. Przypomnienia są wysyłane automatycznie zgodnie z ustawieniami.",
+      faqA3: "Nie — przypomnienia SMS/e-mail wysyłają się automatycznie według ustawień firmy.",
       faqQ4: "Czy mogę dodać drugie przypomnienie?",
-      faqA4: "Tak. W ustawieniach możesz wybrać drugie przypomnienie przed wizytą, np. 2 godziny wcześniej.",
+      faqA4: "Tak, w Ustawieniach (np. 2 godziny przed wizytą).",
       faqQ5: "Czy anulowana wizyta blokuje termin?",
-      faqA5: "Nie. Anulowana wizyta nie powinna blokować terminu.",
+      faqA5: "Nie — termin wraca do puli wolnych slotów.",
       faqQ6: "Czy Nieobecność klienta blokuje termin?",
-      faqA6:
-        "Nie. To status historyczny i nie powinien blokować nowych rezerwacji.",
-      faqQ7: "Co oznacza Wymaga reakcji?",
+      faqA6: "Nie — to status po wizycie, nie blokuje nowych rezerwacji.",
+      faqQ7: "Gdzie jest grafik, a gdzie lista wizyt?",
       faqA7:
-        "To sprawy, przy których firma musi podjąć decyzję, np. prośba o zmianę terminu, błąd przypomnienia albo brak danych kontaktowych.",
-      faqQ8: "Czy mogę dodać pracownika?",
+        "Grafik — widok miesiąca i terminarz dnia. Wizyty — pełna lista z filtrami i dodawaniem ręcznym.",
+      faqQ8: "Czy muszę najpierw dodać klienta w Katalogu?",
       faqA8:
-        "Tak. W zakładce Zespół dodasz osobę, przypiszesz jej usługi i wybierzesz rolę w panelu.",
-      faqQ9: "Czy pracownik może mieć własne dni wolne?",
-      faqA9: "Tak. Dla każdej osoby możesz dodać dni wolne albo specjalne godziny.",
-      faqQ10: "Czy usługa może mieć własne godziny?",
-      faqA10: "Tak. Usługa może korzystać z godzin firmy albo mieć własne godziny.",
-      faqQ11: "Czy można pisać do obsługi?",
-      faqA11: "Tak. W module Pomoc dostępny jest czat z obsługą serwisu.",
-      faqQ12: "Gdzie jest grafik miesięczny?",
-      faqA12:
-        "W menu bocznym wybierz Grafik (obok Wizyty). To widok miesiąca; lista wszystkich wizyt z filtrami jest w zakładce Wizyty.",
-      chk1: "Pilnuj Wizyty i filtr Wymaga reakcji",
+        "Nie. To opcjonalne. Przy rezerwacji online dane klienta zapisują się przy wizycie.",
+      faqQ9: "Jak dodać osobę do zespołu?",
+      faqA9: "Zespół → dodaj osobę → przypisz usługi → wyślij link zaproszenia do panelu.",
+      faqQ10: "Jak działa trial i płatność?",
+      faqA10:
+        "Po aktywacji uruchamiasz trial lub opłacasz subskrypcję (Stripe). Bez aktywnego dostępu panel jest zablokowany.",
+      chk1: "Pilnuj Wizyty i statusów po wizycie",
       chk5: "Sprawdzaj Grafik przy planowaniu tygodnia",
       chk2: "Sprawdzaj Plan dnia na bieżąco",
       chk3: "Dopasuj szablony wiadomości w Wiadomościach",
@@ -4036,6 +4173,55 @@ Regards,
       exceptionEndDateRequired: "End date is required.",
       exceptionEndBeforeStart: "End date cannot be earlier than start date.",
     },
+    onboarding: {
+      welcomeTitle: "Welcome to WizytaOK",
+      welcomeLead: "Get online booking live in a few steps — about 3–5 minutes.",
+      cardTitle: "Business setup",
+      cardLead: "Finish setup to start accepting online bookings.",
+      continueCta: "Continue setup",
+      progressLabel: "Setup progress",
+      loading: "Checking progress…",
+      allDone: "Setup complete",
+      skipWelcome: "Later",
+      skipCard: "Hide for now",
+      close: "Close",
+      restart: "Run setup again",
+      restartHint: "Brings the setup checklist back on the day plan.",
+      flowBadge: "Setup",
+      flowNext: "Next",
+      steps: {
+        working_hours: {
+          title: "Set working hours",
+          short: "Business working hours",
+          hint: "Enable weekdays and hours, then save availability.",
+        },
+        team_member: {
+          title: "Add a team member",
+          short: "Team member",
+          hint: "Add someone who delivers services and save their profile.",
+        },
+        service: {
+          title: "Add a service",
+          short: "Service in your offer",
+          hint: "Create an active service with duration and price.",
+        },
+        staff_service: {
+          title: "Assign service to staff",
+          short: "Service assigned to staff",
+          hint: "When editing a person, tick the services they perform.",
+        },
+        booking_page: {
+          title: "Open booking page",
+          short: "Booking page",
+          hint: "Set the booking page address in Settings and open the link.",
+        },
+        first_visit: {
+          title: "Create first visit",
+          short: "First visit",
+          hint: "Make a test booking via the link or add a visit manually.",
+        },
+      },
+    },
     tour: {
       welcomeTitle: "Welcome to Appointment Confirmations",
       welcomeBody:
@@ -4179,6 +4365,89 @@ Regards,
     },
     guide: {
       title: "WizytaOK Guide",
+      helpCenterTitle: "Help center",
+      helpCenterDescription: "Find answers about schedule, appointments, notifications and online booking.",
+      helpCenterSubtitle: "Product documentation — quick setup lives on the day plan.",
+      helpCenterBadge: "Help",
+      helpCenterSetupNote:
+        "First-time setup (hours, team, service, booking link) is the separate wizard on the day plan — Continue setup. The client catalog is not required to go live.",
+      catAll: "All",
+      catSchedule: "Schedule & availability",
+      catScheduleDesc: "Business hours, exceptions, month schedule and staff schedules.",
+      catAppointments: "Appointments",
+      catAppointmentsDesc: "List, statuses, cancel and client change requests.",
+      catNotifications: "Notifications",
+      catNotificationsDesc: "SMS/email reminders, templates and sending history.",
+      catBooking: "Online booking",
+      catBookingDesc: "Public link, booking page and client /confirm page.",
+      catBilling: "Billing",
+      catBillingDesc: "Trial, subscription and Stripe.",
+      catTeam: "Team & services",
+      catTeamDesc: "Staff, assigned services and panel invitations.",
+      catOther: "Other",
+      catOtherDesc: "Business settings, clients, export and support.",
+      hcAvailTitle: "Business working hours",
+      hcAvailLead: "Set which weekdays you accept clients and your open hours.",
+      hcAvailSteps:
+        "1. Open Availability.\n2. Enable weekdays.\n3. Set from–to hours.\n4. Save availability.",
+      hcAvailExTitle: "Days off and exceptions",
+      hcAvailExSteps:
+        "1. Add a date under Days off.\n2. Choose closed all day or special hours.\n3. Save — booking and schedule will respect it.",
+      hcStaffScheduleTitle: "Staff schedule and exceptions",
+      hcStaffScheduleLead: "Each team member can have their own hours and days off.",
+      hcStaffScheduleSteps:
+        "1. Team → pick a person.\n2. Schedule tab — custom hours or match business.\n3. Exceptions tab — add time off.\n4. Save.",
+      hcApptListTitle: "Appointments list",
+      hcApptListLead: "Main workspace for visits — filter by status, staff, client or service.",
+      hcApptStatuses:
+        "- Confirmed — active visit (online and manual bookings land here).\n- Completed — visit done.\n- Client did not attend — no-show.\n- Cancelled — visit cancelled.",
+      hcApptListSteps:
+        "1. Open Appointments.\n2. Filters: All, Confirmed, Completed, Client did not attend, Cancelled.\n3. Add manually with the top button.\n4. Source badge shows online vs panel entry.",
+      hcApptStatusMenuTitle: "Change status",
+      hcApptStatusMenuLead: "Use Change status on the row or on the day plan.",
+      hcApptStatusMenuBullets:
+        "- Confirmed\n- Completed\n- Client did not attend\n- Cancelled",
+      hcClientChangeTitle: "Client change request",
+      hcClientChangeLead:
+        "When a client uses the link from a message (/confirm/…), a request section appears on the visit row — not a separate list filter.",
+      hcClientChangeSteps:
+        "1. Open the visit with the client request.\n2. Accept or send your counter-proposal.\n3. Decline to revert the visit.",
+      hcCancelTitle: "Cancel a visit",
+      hcCancelLead: "Cancel from Appointments or from the schedule day board.",
+      hcCancelSteps:
+        "1. Open the visit.\n2. Cancel visit and confirm.\n3. Status becomes Cancelled — the slot opens for new bookings.",
+      hcDayplanLead: "Day plan shows today’s visits and quick counts — confirmed and cancelled today.",
+      hcDayplanSteps:
+        "1. Open Day plan.\n2. Review today’s list.\n3. Change status from the row menu.\n4. Full filters live under Appointments.",
+      hcRemindersTitle: "Automatic reminders",
+      hcRemindersLead:
+        "First reminder (default 24h before) includes a management link. Second reminder is a short heads-up — configured in Settings.",
+      hcRemindersBody: "You cannot send reminders manually from the panel — they run from settings.",
+      hcMsgsLead: "Templates for automated SMS and email.",
+      hcMsgsSteps: "1. Messages → templates.\n2. Edit copy.\n3. Save.",
+      hcMsgHistoryTitle: "Sending history",
+      hcMsgHistoryLead: "See sent, scheduled and skipped messages.",
+      hcMsgHistoryBullets: "- delivery status and errors\n- dev/test entries in development mode",
+      hcBookingLinkTitle: "Booking page link",
+      hcBookingLinkLead: "Set the URL slug in Settings. Full path: /rezerwacje/[your-slug].",
+      hcBookingLinkSteps:
+        "1. Settings → business details → booking page address.\n2. Save changes.\n3. Share the link (site, SMS, QR).",
+      hcBookingFlowLead: "Client picks service, staff (if any), time and contact details.",
+      hcBillingTitle: "Trial and subscription",
+      hcBillingLead: "Panel access requires an active trial or paid subscription (Stripe).",
+      hcBillingBullets:
+        "- 14-day trial after activation\n- monthly subscription after trial\n- manage payment in Settings / Stripe portal",
+      hcBillingSteps:
+        "1. Start trial or pay after signup.\n2. Check access status in Settings.\n3. Use Stripe customer portal if payment fails.",
+      hcClientsTitle: "Client catalog",
+      hcClientsLead: "Optional contacts with notes and history. Online bookings still save client data on the visit.",
+      hcClientsTip: "You do not need to add clients first — optional, not part of required setup.",
+      hcSlotsLead: "A slot is taken when an active visit has a blocking status.",
+      hcSlotsBlocking: "Blocks: Confirmed (stored as booked/pending before display).",
+      hcSlotsNonBlocking: "Does not block: Cancelled, Client did not attend, Completed.",
+      hcExportTitle: "CSV export",
+      hcExportLead: "Download visits or clients from Settings.",
+      hcExportSteps: "1. Settings → Data export.\n2. Pick visits or clients.\n3. Open in Excel or Sheets.",
       description:
         "Overview of every panel module: from business setup to schedule, appointments, messages and support.",
       heroSub:
@@ -4238,7 +4507,7 @@ Regards,
       qs5Where: "Schedule → pick a month → click a day with visits",
       qs6Title: "Manage appointments",
       qs6Desc:
-        "The appointments list has status filters, manual booking, change requests and the Needs action view.",
+        "The appointments list has status filters, manual booking and client change requests on visit rows.",
       qs6Where: "Appointments → status filters → Add appointment",
       qs7Title: "Make a test booking",
       qs7Desc: "Test the public booking link as a client or add an appointment manually in the panel.",
@@ -4311,11 +4580,11 @@ Regards,
       modApptBookingSource:
         "Booking source shows whether the client booked through the public booking link or the appointment was added manually in the panel.",
       modApptStatuses:
-        "- Booked - the client booked the appointment before the confirmation stage.\n- To confirm - the system sent an automatic 24h reminder and waits for the client’s response.\n- Confirmed - the client or business confirmed the appointment.\n- Change request - the client requested a time or service change.\n- Business proposed a change - the business sent an alternative option.\n- Cancelled - the appointment was cancelled.\n- Client did not attend - the client did not attend the scheduled appointment.\n- Completed - the appointment was completed, if this status exists.",
+        "- Confirmed — active visit.\n- Completed — done.\n- Client did not attend — no-show.\n- Cancelled — cancelled.",
       modApptStatusNote:
-        "Status shows what is happening with the appointment. Booking source shows where the appointment came from.",
+        "There is no separate Booked or To confirm label in the panel — new visits show as Confirmed.",
       modApptSteps:
-        "1. Open Appointments.\n2. Use filters: All, Confirmed, Completed, Client did not attend, Cancelled or Needs action.\n3. In Change status set Completed or Client did not attend when needed.\n4. Handle reschedule requests or business counter-proposals.\n5. Automatic 24h reminders follow Settings.",
+        "1. Open Appointments.\n2. Filters: All, Confirmed, Completed, Client did not attend, Cancelled.\n3. Change status from the row menu.\n4. Client change requests appear on the visit card when they use the /confirm link.",
       modScheduleTitle: "Schedule",
       modScheduleLead:
         "The Schedule tab shows a month view with days that have visits highlighted. Click a day to open the hourly board with staff columns.",
@@ -4323,20 +4592,16 @@ Regards,
         "- staff filter (for administrators)\n- cancelled visits are hidden by default in the schedule\n- day modal: change status, cancel visit, client details\n- changes sync with the Appointments list",
       modScheduleSteps:
         "1. Open Schedule.\n2. Move between months with arrows.\n3. Click a highlighted day.\n4. Pick a visit on the board and update status or cancel.\n5. Verify the same row under Appointments.",
-      modChangesTitle: "6. Client change requests",
+      modChangesTitle: "Client change requests",
       modChangesLead:
-        "When guests edit timing from /confirm/[id], the row moves into reschedule mode. Accept, counter or deny from your panel.",
+        "Shown on the visit card (not a status filter) when the client uses /confirm/…",
       modChangesSteps:
-        "1. Open Appointments.\n2. Open the row flagged as reschedule.\n3. Review proposed slots or notes.\n4. Accept when the guest proposal fits.\n5. Send another proposal if your calendar needs a tweak.\n6. Decline if you cannot honour the requested change.",
+        "1. Appointments → open visit with client request.\n2. Accept or counter-propose.\n3. Decline if you cannot accept.",
       modRemindersTitle: "Automatic reminders",
       modRemindersLead:
         "The first reminder is sent 24h before the visit and includes a link to confirm, reschedule or cancel.",
       modRemindersBody:
         "The second reminder (for example 2h before) is a short info message, does not change appointment status, and can be disabled in settings.",
-      modNeedsActionTitle: "Needs action",
-      modNeedsActionLead: "Items that need a business decision.",
-      modNeedsActionBullets:
-        "- client requested a time change\n- reminder was not sent\n- phone and email are missing\n- client has not responded close to the appointment time",
       modSettingsGuideTitle: "Settings",
       modSettingsGuideLead:
         "In Settings you change business data, language, theme, reminders and legal information. Changes are saved only after clicking Save changes.",
@@ -4344,12 +4609,10 @@ Regards,
       modLegalInfoLead:
         "This information is available in Settings under Legal and technical information.",
       modDayplanTitle: "Day plan",
-      modDayplanLead:
-        "Day plan is the morning cockpit: KPI chips plus today’s condensed list.",
-      modDayplanBullets:
-        "- confirmed vs waiting vs items that need action\n- short cards with reasons and quick actions",
+      modDayplanLead: "Day plan shows today’s visits and counts — confirmed and cancelled today.",
+      modDayplanBullets: "- today’s visit list\n- quick Change status on each row",
       modDayplanSteps:
-        "1. Open Day plan.\n2. Check the Needs action section first.\n3. Read the reason line on each row.\n4. Adjust status chips after phone calls.\n5. Open Appointments with the Needs action filter if you need the full list.",
+        "1. Open Day plan.\n2. Review today.\n3. Change status when needed.\n4. Full list and filters under Appointments.",
       modMsgsTitle: "Messages and sending history",
       modMsgsLead:
         "Messages holds templates and sending history.",
@@ -4357,20 +4620,17 @@ Regards,
         "1. Templates power automated message content.\n2. Sending history shows sent, scheduled, failed, skipped and simulation/dev entries.\n3. The preview shows body, recipient, status and any error.",
       modMsgsMvp:
         "During MVP previews, transports may simulate delivery. Connecting a real telecom or ESP is a later integration milestone.",
-      modManageTitle: "9. Booking management page",
+      modManageTitle: "Booking management page",
       modManageLead:
         "Guests use /confirm/[id] or the management token from outbound mail.",
       modManageFlow:
         "- confirm attendance\n- reschedule inside allowed availability\n- change service variant when unlocked\n- cancel outright",
       modManageSteps:
         "1. Open the link emailed or texted earlier.\n2. Review basics about the reservation.\n3. Confirm attendance if still valid.\n4. Attempt reschedule if calendar shows availability.\n5. Swap services if your configuration allows.\n6. Cancel if plans changed.\n7. Mirror every action back in Appointments statuses.",
-      modSlotsTitle: "10. Booked time slots",
-      modSlotsLead:
-        "Anything that occupies a blocking status should quietly remove that slot so another guest cannot double-book.",
-      modSlotsBlocking:
-        "Statuses that normally block slots: Booked, To confirm, Confirmed, Reschedule request, Business proposed a change.",
-      modSlotsNonBlocking:
-        "Statuses that unlock the slot afterwards: Cancelled, Client did not attend, Completed (when you use completion).",
+      modSlotsTitle: "Booked time slots",
+      modSlotsLead: "A slot is taken when an active visit has a blocking status.",
+      modSlotsBlocking: "Blocks: Confirmed (stored as booked/pending before display).",
+      modSlotsNonBlocking: "Does not block: Cancelled, Client did not attend, Completed.",
       modClientsTitle: "Clients",
       modClientsLead:
         "See client details, notes, visit history and attendance risk.",
@@ -4424,33 +4684,34 @@ Regards,
       faqQ1: "Does the client need an account?",
       faqA1:
         "No. The client uses the booking link or the appointment management link.",
-      faqQ2: "How is Booked different from To confirm?",
+      faqQ2: "Which appointment statuses do I see in the panel?",
       faqA2:
-        "Booked means the time is saved. To confirm means the system sent the automatic 24h reminder and is waiting for the client’s answer.",
+        "On the list: Confirmed, Completed, Client did not attend and Cancelled. Use Change status to set Completed, Client did not attend or Cancelled.",
       faqQ3: "Can I send a reminder manually?",
-      faqA3: "No. Reminders are sent automatically according to your settings.",
+      faqA3: "No. SMS/email reminders are sent automatically according to your business settings.",
       faqQ4: "Can I add a second reminder?",
-      faqA4:
-        "Yes. In settings you can pick a second reminder before the visit, for example 2 hours earlier.",
+      faqA4: "Yes, in Settings (for example 2 hours before the visit).",
       faqQ5: "Does a cancelled appointment block a time slot?",
-      faqA5: "No. A cancelled appointment should not block the slot.",
+      faqA5: "No — the slot becomes available again.",
       faqQ6: "Does Client did not attend block a time slot?",
-      faqA6: "No. It is a historical status and should not block new bookings.",
-      faqQ7: "What does Needs action mean?",
+      faqA6: "No — it is a post-visit status and does not block new bookings.",
+      faqQ7: "Where is the schedule vs the appointments list?",
       faqA7:
-        "Cases where the business must decide, for example a reschedule request, a reminder error or missing contact details.",
-      faqQ8: "Can I add a staff member?",
-      faqA8: "Yes. In Team you add a person, assign services and configure schedule.",
-      faqQ9: "Can staff have their own days off?",
-      faqA9: "Yes. Each person can have days off or special hours.",
-      faqQ10: "Can a service have custom hours?",
-      faqA10: "Yes. A service can use business hours or its own hours.",
+        "Schedule — month view and day board. Appointments — full list with filters and manual booking.",
+      faqQ8: "Do I need to add clients in the catalog first?",
+      faqA8:
+        "No. It is optional. Online bookings still save client data on the visit.",
+      faqQ9: "How do I add a team member?",
+      faqA9: "Team → add person → assign services → send the panel invitation link.",
+      faqQ10: "How do trial and billing work?",
+      faqA10:
+        "After activation you start a trial or pay for a subscription (Stripe). Without active access the panel is blocked.",
       faqQ11: "Can I write to support?",
       faqA11: "Yes. Help includes a support chat.",
       faqQ12: "Where is the monthly schedule?",
       faqA12:
         "Choose Schedule in the sidebar (next to Appointments). That is the month view; the full filtered list lives under Appointments.",
-      chk1: "Watch Appointments and the Needs action filter",
+      chk1: "Track appointments and post-visit statuses",
       chk2: "Check Day plan daily",
       chk3: "Tune message templates under Messages",
       chk4: "Handle online bookings in Appointments",

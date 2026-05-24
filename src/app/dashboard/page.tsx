@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react"
 
+import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentStaffCaption } from "@/components/shared/appointment-staff-caption"
@@ -37,7 +38,6 @@ import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboar
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { normalizeBusinessMemberPanelRole } from "@/lib/auth/permissions"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
@@ -108,85 +108,6 @@ function TipCard() {
   )
 }
 
-type OnboardingChecklistState = {
-  visible: boolean
-  loading: boolean
-  completed: boolean
-  hasServices: boolean
-  hasTeam: boolean
-  hasAvailability: boolean
-  bookingUrl: string | null
-}
-
-const EMPTY_ONBOARDING: OnboardingChecklistState = {
-  visible: false,
-  loading: true,
-  completed: false,
-  hasServices: false,
-  hasTeam: false,
-  hasAvailability: false,
-  bookingUrl: null,
-}
-
-function OnboardingChecklistCard({
-  state,
-}: {
-  state: OnboardingChecklistState
-}) {
-  if (!state.visible) return null
-
-  const openBookingHref = state.bookingUrl ?? "/settings"
-
-  return (
-    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Witaj w WizytaOK</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Skonfiguruj system w kilku krokach i zacznij przyjmowac rezerwacje online.
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3 pt-0">
-        {state.loading ? (
-          <p className="text-sm text-muted-foreground">Sprawdzamy konfiguracje Twojej firmy...</p>
-        ) : state.completed ? (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-300">
-            Konfiguracja podstawowa gotowa.
-          </div>
-        ) : null}
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-            <p className="text-sm text-foreground">Dodaj pierwsza usluge</p>
-            <Button size="sm" variant={state.hasServices ? "outline" : "default"} asChild>
-              <Link href="/services">{state.hasServices ? "Edytuj uslugi" : "Dodaj usluge"}</Link>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-            <p className="text-sm text-foreground">Dodaj czlonka zespolu</p>
-            <Button size="sm" variant={state.hasTeam ? "outline" : "default"} asChild>
-              <Link href="/team">{state.hasTeam ? "Edytuj zespol" : "Dodaj osobe"}</Link>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-            <p className="text-sm text-foreground">Ustaw dostepnosc</p>
-            <Button size="sm" variant={state.hasAvailability ? "outline" : "default"} asChild>
-              <Link href="/availability">{state.hasAvailability ? "Edytuj dostepnosc" : "Ustaw dostepnosc"}</Link>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
-            <p className="text-sm text-foreground">Otworz strone rezerwacji</p>
-            <Button size="sm" variant="outline" asChild>
-              <Link href={openBookingHref} target="_blank" rel="noreferrer">
-                Otworz link
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function DashboardPage() {
   const router = useRouter()
   const { t, language } = useTranslations()
@@ -209,8 +130,6 @@ export default function DashboardPage() {
     requiresActionCount: 0,
     reminderErrorsCount: 0,
   })
-  const [onboarding, setOnboarding] = React.useState<OnboardingChecklistState>(EMPTY_ONBOARDING)
-
   const isActiveSubscriptionStatus = React.useCallback((status: string | null | undefined): boolean => {
     const normalized = String(status ?? "").trim().toLowerCase()
     return normalized === "trialing" || normalized === "active"
@@ -300,115 +219,6 @@ export default function DashboardPage() {
       cancelled = true
     }
   }, [isActiveSubscriptionStatus, router])
-
-  React.useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      if (!isSupabaseConfigured()) {
-        if (!cancelled) setOnboarding({ ...EMPTY_ONBOARDING, loading: false })
-        return
-      }
-      const client = getBrowserClient()
-      if (!client) {
-        if (!cancelled) setOnboarding({ ...EMPTY_ONBOARDING, loading: false })
-        return
-      }
-      const {
-        data: { user },
-      } = await client.auth.getUser()
-      if (!user?.id) {
-        if (!cancelled) setOnboarding({ ...EMPTY_ONBOARDING, loading: false })
-        return
-      }
-
-      let businessId: string | null = null
-      let isAdmin = false
-
-      const { data: owned } = await client
-        .from("business_profiles")
-        .select("id")
-        .eq("owner_id", user.id)
-        .maybeSingle()
-      if (owned?.id) {
-        businessId = owned.id
-        isAdmin = true
-      } else {
-        const { data: member } = await client
-          .from("business_members")
-          .select("business_id, role")
-          .eq("user_id", user.id)
-          .eq("is_active", true)
-          .limit(1)
-          .maybeSingle()
-        const panelRole = normalizeBusinessMemberPanelRole(member?.role)
-        if (member?.business_id && panelRole === "admin") {
-          businessId = member.business_id
-          isAdmin = true
-        }
-      }
-
-      if (!isAdmin || !businessId) {
-        if (!cancelled) {
-          setOnboarding({
-            visible: false,
-            loading: false,
-            completed: false,
-            hasServices: false,
-            hasTeam: false,
-            hasAvailability: false,
-            bookingUrl: null,
-          })
-        }
-        return
-      }
-
-      const [{ count: servicesCount }, { count: teamCount }, { data: availabilityRow }, { data: bp }] =
-        await Promise.all([
-          client
-            .from("services")
-            .select("id", { count: "exact", head: true })
-            .eq("business_id", businessId)
-            .eq("is_active", true),
-          client
-            .from("staff_members")
-            .select("id", { count: "exact", head: true })
-            .eq("business_id", businessId)
-            .eq("is_active", true),
-          client
-            .from("availability_rules")
-            .select("id")
-            .eq("business_id", businessId)
-            .eq("is_open", true)
-            .limit(1)
-            .maybeSingle(),
-          client.from("business_profiles").select("slug").eq("id", businessId).maybeSingle(),
-        ])
-
-      const hasServices = (servicesCount ?? 0) > 0
-      const hasTeam = (teamCount ?? 0) > 0
-      const hasAvailability = Boolean(availabilityRow?.id)
-      const slug = typeof bp?.slug === "string" ? bp.slug.trim() : ""
-      const siteBase =
-        (process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-          (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "")
-      const bookingUrl = slug && siteBase ? `${siteBase}/rezerwacje/${encodeURIComponent(slug)}` : null
-
-      if (!cancelled) {
-        setOnboarding({
-          visible: true,
-          loading: false,
-          hasServices,
-          hasTeam,
-          hasAvailability,
-          completed: hasServices && hasTeam && hasAvailability,
-          bookingUrl,
-        })
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   const statsLoadedRef = React.useRef(false)
 
@@ -656,7 +466,7 @@ export default function DashboardPage() {
           </div>
 
           <aside className="min-w-0 space-y-6 lg:sticky lg:top-6">
-            <OnboardingChecklistCard state={onboarding} />
+            <OnboardingDashboardCard />
             <TipCard />
           </aside>
         </div>

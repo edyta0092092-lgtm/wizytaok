@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Check, Download } from "lucide-react"
+import { Check, Download, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import { AppShell } from "@/components/layout/app-shell"
@@ -22,6 +22,7 @@ import { TestBillingSettingsCard } from "@/components/settings/test-billing-sett
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
+import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { loadClientsWorkspace } from "@/lib/clients/clients-store"
 import { bookingSourceCsvLabelKey } from "@/lib/bookings/booking-source"
@@ -109,6 +110,33 @@ const emptySettings: SettingsForm = {
 
 function initialSettingsForm(): SettingsForm {
   return isSupabaseConfigured() ? { ...emptySettings } : { ...demoSettings }
+}
+
+function SettingsOnboardingCard() {
+  const { t } = useTranslations()
+  const { restartOnboarding } = useOnboarding()
+
+  return (
+    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+      <CardHeader className="border-b border-border/70 py-4">
+        <CardTitle className="text-sm font-semibold">{t("onboarding.restart")}</CardTitle>
+        <CardDescription className="text-xs text-muted-foreground">
+          {t("onboarding.restartHint")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-4">
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 w-full gap-2 rounded-xl sm:w-auto"
+          onClick={() => restartOnboarding()}
+        >
+          <RotateCcw className="size-4" />
+          {t("onboarding.restart")}
+        </Button>
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function SettingsPage() {
@@ -880,6 +908,8 @@ export default function SettingsPage() {
           </Card>
 
           <TestBillingSettingsCard />
+
+          <SettingsOnboardingCard />
 
               <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardHeader className="border-b border-border/70 py-4">
