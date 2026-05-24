@@ -1,10 +1,19 @@
 "use client"
 
+import { ChevronDown, MoreVertical } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   accentClassForStatus,
-  accentStripeForService,
   scheduleBlockLayoutTier,
+  statusBadgeClassForStatus,
+  statusStripeColor,
 } from "@/lib/schedule/schedule-day-board"
 import {
   SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX,
@@ -35,66 +44,6 @@ type AppointmentBlockProps = {
   onConfirmCancel: () => void
 }
 
-function StatusActions({
-  entry,
-  statusMenuOrder,
-  statusLabel,
-  changeStatusLabel,
-  cancelLabel,
-  compact,
-  onChangeStatus,
-  onRequestCancel,
-}: {
-  entry: ScheduleDayEntry
-  statusMenuOrder: AppointmentStatus[]
-  statusLabel: (status: AppointmentStatus) => string
-  changeStatusLabel: string
-  cancelLabel: string
-  compact?: boolean
-  onChangeStatus: (id: string, status: AppointmentStatus) => void
-  onRequestCancel: (id: string) => void
-}) {
-  return (
-    <div
-      className={cn(
-        "grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center",
-        compact ? "h-5 gap-0.5" : "h-7 gap-1",
-      )}
-    >
-      <select
-        aria-label={changeStatusLabel}
-        className={cn(
-          "w-full min-w-0 rounded border border-input/80 bg-background/90 px-1 text-[10px] leading-none text-foreground",
-          compact ? "h-5" : "h-7",
-        )}
-        value={entry.status}
-        onChange={(e) => onChangeStatus(entry.id, e.target.value as AppointmentStatus)}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {statusMenuOrder.map((status) => (
-          <option key={status} value={status}>
-            {statusLabel(status)}
-          </option>
-        ))}
-      </select>
-      <button
-        type="button"
-        className={cn(
-          "shrink-0 truncate font-medium text-destructive hover:underline",
-          compact ? "max-w-[3rem] text-[9px] leading-3" : "max-w-[4rem] text-[10px] leading-4",
-        )}
-        title={cancelLabel}
-        onClick={(e) => {
-          e.stopPropagation()
-          onRequestCancel(entry.id)
-        }}
-      >
-        {cancelLabel}
-      </button>
-    </div>
-  )
-}
-
 export function AppointmentBlock({
   entry,
   topPct,
@@ -119,7 +68,7 @@ export function AppointmentBlock({
   const isCancelled = entry.status === "cancelled"
   const hasService = Boolean(entry.service_name?.trim())
   const tier = scheduleBlockLayoutTier(heightPx, { hasService, isCancelled })
-  const showService = tier === "full" && hasService
+  const showService = (tier === "full" || tier === "compact") && hasService && !isConfirmingCancel
   const blockHeightPx = isConfirmingCancel
     ? Math.max(heightPx, SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX)
     : heightPx
@@ -127,105 +76,142 @@ export function AppointmentBlock({
   return (
     <div
       className={cn(
-        "absolute inset-x-1 box-border flex min-w-0 flex-col overflow-hidden rounded-lg border",
-        tier === "minimal" ? "gap-0.5 px-1.5 py-1" : "gap-1 px-2 py-1.5",
+        "absolute inset-x-1.5 box-border flex min-w-0 flex-col overflow-hidden rounded-lg border shadow-sm",
         accentClassForStatus(entry.status),
         clipped && "ring-1 ring-amber-300/60",
-        isConfirmingCancel && "z-30 shadow-md",
+        isConfirmingCancel && "z-30",
       )}
       style={{
         top: `${topPct}%`,
         height: blockHeightPx,
-        maxWidth: "calc(100% - 0.5rem)",
+        maxWidth: "calc(100% - 0.75rem)",
         zIndex: isConfirmingCancel ? 30 : 10 + stackIndex,
-        borderLeftWidth: 3,
-        borderLeftColor: accentStripeForService(entry.service_name),
+        borderLeftWidth: 4,
+        borderLeftColor: statusStripeColor(entry.status),
       }}
     >
-      {isConfirmingCancel ? (
-        <>
-          <div className="h-5 shrink-0 overflow-hidden">
-            <p className="truncate text-sm font-medium leading-5 text-foreground" title={entry.client_name}>
-              {entry.client_name}
-            </p>
-          </div>
-          <div className="min-h-0 flex-1 space-y-1 overflow-hidden rounded-md bg-background/80 p-1">
-            <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{cancelConfirmMessage}</p>
-            <div className="grid grid-cols-2 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-6 min-w-0 truncate px-1 text-[10px]"
-                onClick={onDismissCancel}
-              >
-                {cancelConfirmBack}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                className="h-6 min-w-0 truncate px-1 text-[10px]"
-                disabled={isCancelling}
-                onClick={onConfirmCancel}
-              >
-                {isCancelling ? loadingLabel : cancelConfirmAction}
-              </Button>
-            </div>
-          </div>
-        </>
-      ) : (
-        <>
-          <div
+      <div
+        className={cn(
+          "flex min-h-0 min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5",
+          isConfirmingCancel ? "py-1.5" : "py-2",
+        )}
+      >
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p
             className={cn(
-              "shrink-0 overflow-hidden",
-              tier === "minimal" ? "h-4" : "h-5",
+              "truncate font-medium text-foreground",
+              tier === "minimal" ? "text-xs leading-4" : "text-sm leading-5",
             )}
+            title={entry.client_name}
           >
-            <p
-              className={cn(
-                "truncate font-medium text-foreground",
-                tier === "minimal" ? "text-[11px] leading-4" : "text-sm leading-5",
-              )}
-              title={entry.client_name}
-            >
-              {entry.client_name}
-            </p>
-          </div>
-
+            {entry.client_name}
+          </p>
           {showService ? (
-            <div className="h-4 shrink-0 overflow-hidden">
-              <p className="truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
-                {entry.service_name}
-              </p>
-            </div>
+            <p className="truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
+              {entry.service_name}
+            </p>
           ) : null}
+        </div>
 
-          <div
-            className={cn(
-              "mt-auto shrink-0 overflow-hidden",
-              isCancelled ? "h-4" : tier === "minimal" ? "h-5" : "h-7",
-            )}
-          >
+        {!isConfirmingCancel ? (
+          <div className="flex shrink-0 items-center gap-0.5">
             {isCancelled ? (
-              <p className="truncate text-[10px] leading-4 text-muted-foreground" title={statusLabel(entry.status)}>
+              <span
+                className={cn(
+                  "inline-flex max-w-[5.5rem] items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4",
+                  statusBadgeClassForStatus(entry.status),
+                )}
+                title={statusLabel(entry.status)}
+              >
                 {statusLabel(entry.status)}
-              </p>
+              </span>
             ) : (
-              <StatusActions
-                entry={entry}
-                statusMenuOrder={statusMenuOrder}
-                statusLabel={statusLabel}
-                changeStatusLabel={changeStatusLabel}
-                cancelLabel={cancelLabel}
-                compact={tier === "minimal"}
-                onChangeStatus={onChangeStatus}
-                onRequestCancel={onRequestCancel}
-              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={changeStatusLabel}
+                    className={cn(
+                      "inline-flex max-w-[6.5rem] items-center gap-0.5 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4 outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50",
+                      statusBadgeClassForStatus(entry.status),
+                    )}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="truncate">{statusLabel(entry.status)}</span>
+                    <ChevronDown className="size-3 shrink-0 opacity-70" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[9rem]">
+                  {statusMenuOrder.map((status) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => onChangeStatus(entry.id, status)}
+                    >
+                      {statusLabel(status)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label={changeStatusLabel}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[10rem]">
+                {!isCancelled
+                  ? statusMenuOrder.map((status) => (
+                      <DropdownMenuItem
+                        key={status}
+                        onClick={() => onChangeStatus(entry.id, status)}
+                      >
+                        {statusLabel(status)}
+                      </DropdownMenuItem>
+                    ))
+                  : null}
+                {!isCancelled ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => onRequestCancel(entry.id)}
+                  >
+                    {cancelLabel}
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </>
-      )}
+        ) : null}
+      </div>
+
+      {isConfirmingCancel ? (
+        <div className="space-y-1.5 border-t border-border/60 bg-background/90 px-2.5 py-2">
+          <p className="text-[10px] leading-snug text-muted-foreground">{cancelConfirmMessage}</p>
+          <div className="flex gap-1.5">
+            <Button type="button" variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={onDismissCancel}>
+              {cancelConfirmBack}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="h-7 flex-1 text-xs"
+              disabled={isCancelling}
+              onClick={onConfirmCancel}
+            >
+              {isCancelling ? loadingLabel : cancelConfirmAction}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

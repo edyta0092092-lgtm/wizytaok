@@ -4,11 +4,10 @@ import { AppointmentBlock } from "@/components/schedule/appointment-block"
 import {
   blockLayout,
   getScheduleBoardRangeMinutes,
-  scheduleBoardHourHeightPx,
+  scheduleBoardSlotHeightPx,
   staffInitials,
 } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleStaffColumn } from "@/lib/schedule/schedule-day-types"
-import { SCHEDULE_BOARD_PX_PER_MINUTE } from "@/lib/schedule/schedule-day-types"
 import type { AppointmentStatus } from "@/types/domain"
 
 type StaffScheduleColumnProps = {
@@ -51,31 +50,31 @@ export function StaffScheduleColumn({
   onConfirmCancel,
 }: StaffScheduleColumnProps) {
   const range = getScheduleBoardRangeMinutes()
-  const hourHeightPx = scheduleBoardHourHeightPx()
+  const slotHeightPx = scheduleBoardSlotHeightPx()
 
   return (
-    <div className="flex min-w-[11rem] max-w-[13.5rem] flex-1 flex-col overflow-hidden border-r border-border/60 last:border-r-0">
-      <div className="flex min-w-0 items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2">
+    <div className="flex min-w-[10.5rem] flex-1 flex-col overflow-hidden border-r border-border/60 last:border-r-0">
+      <div className="flex h-[3.25rem] shrink-0 items-center gap-2 border-b border-border/60 bg-muted/15 px-3">
         <span
-          className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary"
           aria-hidden
         >
           {staffInitials(column.name)}
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-foreground">{column.name}</p>
-          <p className="text-xs text-muted-foreground">{visitCountLabel(column.entries.length)}</p>
+          <p className="truncate text-xs text-muted-foreground">{visitCountLabel(column.entries.length)}</p>
         </div>
       </div>
 
       <div
         className="relative min-w-0 flex-1 overflow-hidden"
         style={{
-          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${hourHeightPx}px - 1px), hsl(var(--border) / 0.35) calc(${hourHeightPx}px - 1px), hsl(var(--border) / 0.35) ${hourHeightPx}px)`,
-          backgroundSize: `100% ${hourHeightPx}px`,
+          backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${slotHeightPx}px - 1px), hsl(var(--border) / 0.4) calc(${slotHeightPx}px - 1px), hsl(var(--border) / 0.4) ${slotHeightPx}px)`,
+          backgroundSize: `100% ${slotHeightPx}px`,
         }}
       >
-        <div className="relative min-w-0 overflow-hidden" style={{ height: gridHeightPx }}>
+        <div className="relative min-w-0" style={{ height: gridHeightPx }}>
           {column.entries.map((entry, index) => {
             const layout = blockLayout(entry, range)
             return (
@@ -111,5 +110,5 @@ export function StaffScheduleColumn({
 
 export function scheduleGridHeightPx(): number {
   const { span } = getScheduleBoardRangeMinutes()
-  return Math.round(span * SCHEDULE_BOARD_PX_PER_MINUTE)
+  return Math.round(span * (scheduleBoardSlotHeightPx() / 30))
 }

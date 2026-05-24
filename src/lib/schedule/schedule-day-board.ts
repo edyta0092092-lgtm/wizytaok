@@ -40,6 +40,17 @@ export function buildHourLabels(): string[] {
   return labels
 }
 
+/** Etykiety co 30 min (08:00, 08:30, …) dla osi czasu w modalu dnia. */
+export function buildHalfHourSlotLabels(): string[] {
+  const labels: string[] = []
+  const start = SCHEDULE_BOARD_DAY_START_HOUR * 60
+  const end = SCHEDULE_BOARD_DAY_END_HOUR * 60
+  for (let m = start; m <= end; m += 30) {
+    labels.push(formatHmFromMinutes(m))
+  }
+  return labels
+}
+
 export function staffInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return "?"
@@ -50,13 +61,39 @@ export function staffInitials(name: string): string {
 export function accentClassForStatus(status: AppointmentStatus): string {
   switch (status) {
     case "cancelled":
-      return "border-border/70 bg-muted/50 text-muted-foreground"
+      return "border-border/80 bg-muted/40 text-muted-foreground"
     case "no_show":
-      return "border-amber-200/90 bg-amber-50/95 dark:border-amber-800/60 dark:bg-amber-950/35"
+      return "border-amber-200/90 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/40"
     case "completed":
-      return "border-emerald-200/90 bg-emerald-50/95 dark:border-emerald-800/60 dark:bg-emerald-950/35"
+      return "border-violet-200/90 bg-violet-50/90 dark:border-violet-800/60 dark:bg-violet-950/35"
     default:
-      return "border-sky-200/90 bg-sky-50/95 shadow-sm dark:border-sky-800/50 dark:bg-sky-950/30"
+      return "border-emerald-200/90 bg-emerald-50/90 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/35"
+  }
+}
+
+export function statusBadgeClassForStatus(status: AppointmentStatus): string {
+  switch (status) {
+    case "cancelled":
+      return "border-border/80 bg-muted/60 text-muted-foreground"
+    case "no_show":
+      return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+    case "completed":
+      return "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100"
+    default:
+      return "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
+  }
+}
+
+export function statusStripeColor(status: AppointmentStatus): string {
+  switch (status) {
+    case "cancelled":
+      return "hsl(var(--muted-foreground) / 0.35)"
+    case "no_show":
+      return "hsl(38 92% 50%)"
+    case "completed":
+      return "hsl(270 60% 58%)"
+    default:
+      return "hsl(142 71% 45%)"
   }
 }
 
@@ -116,13 +153,10 @@ export function buildStaffColumns(
 
 export type ScheduleBlockLayoutTier = "full" | "compact" | "minimal"
 
-/** Minimalna wysokość treści (px) — suma stałych slotów + padding bloku. */
+/** Minimalna wysokość bloku (px) — układ poziomy w jednym wierszu. */
 export function blockLayoutContentMinHeightPx(entry: ScheduleDayEntry): number {
-  const hasService = Boolean(entry.service_name?.trim())
-  if (entry.status === "cancelled") {
-    return hasService ? 52 : 36
-  }
-  return hasService ? 76 : 60
+  if (entry.status === "cancelled") return 40
+  return Boolean(entry.service_name?.trim()) ? 44 : 40
 }
 
 export function scheduleBlockLayoutTier(
@@ -130,15 +164,19 @@ export function scheduleBlockLayoutTier(
   opts: { hasService: boolean; isCancelled: boolean },
 ): ScheduleBlockLayoutTier {
   if (opts.isCancelled) {
-    return opts.hasService && heightPx >= 52 ? "full" : "compact"
+    return opts.hasService && heightPx >= 56 ? "full" : "compact"
   }
-  if (heightPx >= 88 && opts.hasService) return "full"
-  if (heightPx >= 56) return "compact"
+  if (heightPx >= 64 && opts.hasService) return "full"
+  if (heightPx >= 48) return "compact"
   return "minimal"
 }
 
+export function scheduleBoardSlotHeightPx(): number {
+  return Math.round(30 * SCHEDULE_BOARD_PX_PER_MINUTE)
+}
+
 export function scheduleBoardHourHeightPx(): number {
-  return Math.round(60 * SCHEDULE_BOARD_PX_PER_MINUTE)
+  return scheduleBoardSlotHeightPx() * 2
 }
 
 export function blockLayout(

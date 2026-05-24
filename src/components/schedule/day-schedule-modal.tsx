@@ -1,12 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { X } from "lucide-react"
+import { CalendarDays, Info, X } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { DayScheduleMobileList } from "@/components/schedule/day-schedule-mobile-list"
 import { scheduleGridHeightPx, StaffScheduleColumn } from "@/components/schedule/staff-schedule-column"
-import { TimeGrid } from "@/components/schedule/time-grid"
+import { TimeGrid, TimeGridHeaderCell } from "@/components/schedule/time-grid"
 import { Button } from "@/components/ui/button"
 import { buildStaffColumns } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
@@ -59,6 +59,14 @@ function useIsNarrowViewport() {
   )
 }
 
+function useDisplayTimezone() {
+  return React.useSyncExternalStore(
+    () => () => {},
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    () => "Europe/Warsaw",
+  )
+}
+
 export function DayScheduleModal({
   open,
   onOpenChange,
@@ -85,6 +93,7 @@ export function DayScheduleModal({
   onConfirmCancel,
 }: DayScheduleModalProps) {
   const isNarrowViewport = useIsNarrowViewport()
+  const timezone = useDisplayTimezone()
   const columns = buildStaffColumns(entries, staffMembers, staffNameById)
   const gridHeightPx = scheduleGridHeightPx()
   const entryById = new Map(entries.map((e) => [e.id, e]))
@@ -95,13 +104,16 @@ export function DayScheduleModal({
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
         <DialogPrimitive.Content
           className={cn(
-            "premium-scrollbar fixed top-1/2 left-1/2 z-50 flex max-h-[min(90vh,52rem)] w-[min(90vw,calc(100vw-1.5rem))] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/70 bg-background text-foreground shadow-2xl",
+            "premium-scrollbar fixed top-1/2 left-1/2 z-50 flex max-h-[min(92vh,54rem)] w-[min(96vw,calc(100vw-1rem))] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/70 bg-background text-foreground shadow-2xl sm:max-w-6xl",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           )}
         >
-          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border/60 px-5 py-3 pr-12">
-            <div>
-              <DialogPrimitive.Title className="font-heading text-lg font-semibold capitalize">
+          <div className="flex shrink-0 items-start gap-3 border-b border-border/60 px-5 py-4 pr-14">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <CalendarDays className="size-5" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <DialogPrimitive.Title className="font-heading text-lg font-bold capitalize text-foreground">
                 {dayTitle}
               </DialogPrimitive.Title>
               <DialogPrimitive.Description className="mt-0.5 text-sm text-muted-foreground">
@@ -109,7 +121,13 @@ export function DayScheduleModal({
               </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="absolute top-3 right-3 rounded-full" aria-label="Zamknij">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-3.5 right-3.5 rounded-full"
+                aria-label="Zamknij"
+              >
                 <X className="size-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -140,14 +158,14 @@ export function DayScheduleModal({
                 }}
               />
             ) : (
-              <div className="flex min-h-[min(58vh,38rem)] flex-1 flex-col">
+              <div className="flex min-h-[min(56vh,36rem)] flex-1 flex-col">
                 <div className="premium-scrollbar min-h-0 flex-1 overflow-auto">
                   <div className="flex min-w-max">
                     <div className="sticky left-0 z-30 flex flex-col bg-background">
-                      <div className="h-[3.25rem] shrink-0 border-b border-r border-border/60 bg-muted/20" />
+                      <TimeGridHeaderCell />
                       <TimeGrid gridHeightPx={gridHeightPx} />
                     </div>
-                    <div className="flex flex-1">
+                    <div className="flex min-w-0 flex-1">
                       {columns.map((column) => (
                         <StaffScheduleColumn
                           key={column.id}
@@ -179,6 +197,20 @@ export function DayScheduleModal({
               </div>
             )}
           </div>
+
+          {!isNarrowViewport && entries.length > 0 ? (
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-muted/10 px-5 py-3">
+              <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Info className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">Godziny są wyświetlane w strefie: {timezone}</span>
+              </p>
+              <DialogPrimitive.Close asChild>
+                <Button type="button" variant="outline" size="sm">
+                  Zamknij
+                </Button>
+              </DialogPrimitive.Close>
+            </div>
+          ) : null}
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

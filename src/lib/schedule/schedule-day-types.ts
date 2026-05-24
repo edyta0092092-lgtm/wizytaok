@@ -21,8 +21,11 @@ export type ScheduleStaffColumn = {
 export const SCHEDULE_BOARD_DAY_START_HOUR = 8
 export const SCHEDULE_BOARD_DAY_END_HOUR = 20
 export const SCHEDULE_BOARD_DEFAULT_DURATION_MINUTES = 30
-/** ~3.2px/min → 30 min ≈ 96px, wystarcza na 3 wiersze treści bez sztucznego min-height. */
-export const SCHEDULE_BOARD_PX_PER_MINUTE = 3.2
+/** Wysokość jednego slotu 30 min (px) — zgodna z siatką w modalu dnia. */
+export const SCHEDULE_BOARD_SLOT_MINUTES = 30
+export const SCHEDULE_BOARD_SLOT_HEIGHT_PX = 48
+export const SCHEDULE_BOARD_PX_PER_MINUTE =
+  SCHEDULE_BOARD_SLOT_HEIGHT_PX / SCHEDULE_BOARD_SLOT_MINUTES
 
 /** Tylko przy potwierdzaniu anulowania — blok może chwilowo wyjść poza slot (wyższy z-index). */
 export const SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX = 112
