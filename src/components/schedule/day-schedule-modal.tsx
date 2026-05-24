@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { X } from "lucide-react"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
@@ -38,6 +39,26 @@ type DayScheduleModalProps = {
   onConfirmCancel: (entry: ScheduleDayEntry) => void
 }
 
+const NARROW_VIEWPORT_QUERY = "(max-width: 639px)"
+
+function subscribeNarrowViewport(onStoreChange: () => void) {
+  const media = window.matchMedia(NARROW_VIEWPORT_QUERY)
+  media.addEventListener("change", onStoreChange)
+  return () => media.removeEventListener("change", onStoreChange)
+}
+
+function getNarrowViewportSnapshot() {
+  return window.matchMedia(NARROW_VIEWPORT_QUERY).matches
+}
+
+function useIsNarrowViewport() {
+  return React.useSyncExternalStore(
+    subscribeNarrowViewport,
+    getNarrowViewportSnapshot,
+    () => false,
+  )
+}
+
 export function DayScheduleModal({
   open,
   onOpenChange,
@@ -63,6 +84,7 @@ export function DayScheduleModal({
   onDismissCancel,
   onConfirmCancel,
 }: DayScheduleModalProps) {
+  const isNarrowViewport = useIsNarrowViewport()
   const columns = buildStaffColumns(entries, staffMembers, staffNameById)
   const gridHeightPx = scheduleGridHeightPx()
   const entryById = new Map(entries.map((e) => [e.id, e]))
@@ -93,72 +115,68 @@ export function DayScheduleModal({
             </DialogPrimitive.Close>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {entries.length === 0 ? (
               <p className="px-5 py-10 text-center text-sm text-muted-foreground">{emptyLabel}</p>
+            ) : isNarrowViewport ? (
+              <DayScheduleMobileList
+                entries={entries}
+                confirmCancelForId={confirmCancelForId}
+                cancellingId={cancellingId}
+                statusMenuOrder={statusMenuOrder}
+                statusLabel={statusLabel}
+                changeStatusLabel={changeStatusLabel}
+                cancelLabel={cancelLabel}
+                cancelConfirmMessage={cancelConfirmMessage}
+                cancelConfirmBack={cancelConfirmBack}
+                cancelConfirmAction={cancelConfirmAction}
+                loadingLabel={loadingLabel}
+                onChangeStatus={onChangeStatus}
+                onRequestCancel={onRequestCancel}
+                onDismissCancel={onDismissCancel}
+                onConfirmCancel={(id) => {
+                  const entry = entryById.get(id)
+                  if (entry) onConfirmCancel(entry)
+                }}
+              />
             ) : (
-              <>
-                <div className="md:hidden">
-                  <DayScheduleMobileList
-                    entries={entries}
-                    confirmCancelForId={confirmCancelForId}
-                    cancellingId={cancellingId}
-                    statusMenuOrder={statusMenuOrder}
-                    statusLabel={statusLabel}
-                    changeStatusLabel={changeStatusLabel}
-                    cancelLabel={cancelLabel}
-                    cancelConfirmMessage={cancelConfirmMessage}
-                    cancelConfirmBack={cancelConfirmBack}
-                    cancelConfirmAction={cancelConfirmAction}
-                    loadingLabel={loadingLabel}
-                    onChangeStatus={onChangeStatus}
-                    onRequestCancel={onRequestCancel}
-                    onDismissCancel={onDismissCancel}
-                    onConfirmCancel={(id) => {
-                      const entry = entryById.get(id)
-                      if (entry) onConfirmCancel(entry)
-                    }}
-                  />
-                </div>
-
-                <div className="hidden min-h-0 flex-1 flex-col md:flex">
-                  <div className="premium-scrollbar min-h-0 flex-1 overflow-auto">
-                    <div className="flex min-w-max">
-                      <div className="sticky left-0 z-30 flex flex-col bg-background">
-                        <div className="h-[3.25rem] shrink-0 border-b border-r border-border/60 bg-muted/20" />
-                        <TimeGrid gridHeightPx={gridHeightPx} />
-                      </div>
-                      <div className="flex flex-1">
-                        {columns.map((column) => (
-                          <StaffScheduleColumn
-                            key={column.id}
-                            column={column}
-                            gridHeightPx={gridHeightPx}
-                            confirmCancelForId={confirmCancelForId}
-                            cancellingId={cancellingId}
-                            statusMenuOrder={statusMenuOrder}
-                            statusLabel={statusLabel}
-                            changeStatusLabel={changeStatusLabel}
-                            cancelLabel={cancelLabel}
-                            cancelConfirmMessage={cancelConfirmMessage}
-                            cancelConfirmBack={cancelConfirmBack}
-                            cancelConfirmAction={cancelConfirmAction}
-                            loadingLabel={loadingLabel}
-                            visitCountLabel={visitCountLabel}
-                            onChangeStatus={onChangeStatus}
-                            onRequestCancel={onRequestCancel}
-                            onDismissCancel={onDismissCancel}
-                            onConfirmCancel={(id) => {
-                              const entry = entryById.get(id)
-                              if (entry) onConfirmCancel(entry)
-                            }}
-                          />
-                        ))}
-                      </div>
+              <div className="flex min-h-[min(58vh,38rem)] flex-1 flex-col">
+                <div className="premium-scrollbar min-h-0 flex-1 overflow-auto">
+                  <div className="flex min-w-max">
+                    <div className="sticky left-0 z-30 flex flex-col bg-background">
+                      <div className="h-[3.25rem] shrink-0 border-b border-r border-border/60 bg-muted/20" />
+                      <TimeGrid gridHeightPx={gridHeightPx} />
+                    </div>
+                    <div className="flex flex-1">
+                      {columns.map((column) => (
+                        <StaffScheduleColumn
+                          key={column.id}
+                          column={column}
+                          gridHeightPx={gridHeightPx}
+                          confirmCancelForId={confirmCancelForId}
+                          cancellingId={cancellingId}
+                          statusMenuOrder={statusMenuOrder}
+                          statusLabel={statusLabel}
+                          changeStatusLabel={changeStatusLabel}
+                          cancelLabel={cancelLabel}
+                          cancelConfirmMessage={cancelConfirmMessage}
+                          cancelConfirmBack={cancelConfirmBack}
+                          cancelConfirmAction={cancelConfirmAction}
+                          loadingLabel={loadingLabel}
+                          visitCountLabel={visitCountLabel}
+                          onChangeStatus={onChangeStatus}
+                          onRequestCancel={onRequestCancel}
+                          onDismissCancel={onDismissCancel}
+                          onConfirmCancel={(id) => {
+                            const entry = entryById.get(id)
+                            if (entry) onConfirmCancel(entry)
+                          }}
+                        />
+                      ))}
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </DialogPrimitive.Content>

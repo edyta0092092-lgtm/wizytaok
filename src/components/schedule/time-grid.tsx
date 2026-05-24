@@ -14,7 +14,7 @@ export function TimeGrid({ gridHeightPx }: TimeGridProps) {
 
   return (
     <div
-      className="sticky left-0 z-20 w-14 shrink-0 border-r border-border/60 bg-background/95 backdrop-blur-sm"
+      className="relative sticky left-0 z-20 w-14 shrink-0 border-r border-border/60 bg-background/95 backdrop-blur-sm"
       style={{ height: gridHeightPx }}
     >
       {labels.map((label, index) => {
