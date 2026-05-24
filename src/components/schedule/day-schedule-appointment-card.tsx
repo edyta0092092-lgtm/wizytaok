@@ -97,7 +97,7 @@ export function DayScheduleAppointmentCard({
               <span className="truncate">{statusLabel(entry.status)}</span>
             </span>
           ) : (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -113,9 +113,9 @@ export function DayScheduleAppointmentCard({
                   <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[9.5rem]">
+              <DropdownMenuContent align="end" className="z-[100] min-w-[9.5rem]">
                 {statusMenuOrder.map((status) => (
-                  <DropdownMenuItem key={status} onClick={() => onChangeStatus(entry.id, status)}>
+                  <DropdownMenuItem key={status} onSelect={() => onChangeStatus(entry.id, status)}>
                     {statusLabel(status)}
                   </DropdownMenuItem>
                 ))}
@@ -124,7 +124,7 @@ export function DayScheduleAppointmentCard({
           )}
 
           {!isCancelled ? (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
@@ -137,11 +137,11 @@ export function DayScheduleAppointmentCard({
                   <MoreVertical className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[10rem]">
+              <DropdownMenuContent align="end" className="z-[100] min-w-[10rem]">
                 <DropdownMenuItem
                   variant="destructive"
                   disabled={isCancelling}
-                  onClick={() => onCancelVisit(entry.id)}
+                  onSelect={() => onCancelVisit(entry.id)}
                 >
                   {cancelLabel}
                 </DropdownMenuItem>

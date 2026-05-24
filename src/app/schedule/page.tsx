@@ -124,6 +124,7 @@ export default function SchedulePage() {
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
   const [cancellingId, setCancellingId] = React.useState<string | null>(null)
+  const cancellingIdRef = React.useRef<string | null>(null)
 
   React.useEffect(() => {
     if (!statusNotice) return
@@ -136,6 +137,12 @@ export default function SchedulePage() {
     window.dispatchEvent(new Event("pw-bookings"))
   }, [])
 
+  const patchScheduleBookingStatus = React.useCallback((appointmentUiId: string, status: AppointmentStatus) => {
+    setBookings((prev) =>
+      prev.map((row) => (row.id === appointmentUiId ? { ...row, status } : row)),
+    )
+  }, [])
+
   const changeScheduleBookingStatus = React.useCallback(
     (appointmentUiId: string, status: AppointmentStatus) => {
       void (async () => {
@@ -144,17 +151,19 @@ export default function SchedulePage() {
           lastStatusChangeSource: "manual",
         })
         if (!ok) return
+        patchScheduleBookingStatus(appointmentUiId, status)
         setStatusNotice(t("appointments.statusUpdated"))
-        refreshScheduleData()
+        window.dispatchEvent(new Event("pw-bookings"))
       })()
     },
-    [t, refreshScheduleData]
+    [patchScheduleBookingStatus, t]
   )
 
   const cancelScheduleVisit = React.useCallback(
     (appointmentUiId: string) => {
-      if (cancellingId === appointmentUiId) return
+      if (cancellingIdRef.current === appointmentUiId) return
       void (async () => {
+        cancellingIdRef.current = appointmentUiId
         setCancellingId(appointmentUiId)
         try {
           const uuidSb = unwrapSupabaseBookingAppointmentId(appointmentUiId)
@@ -178,19 +187,16 @@ export default function SchedulePage() {
               return
             }
           }
-          setBookings((prev) =>
-            prev.map((row) =>
-              row.id === appointmentUiId ? { ...row, status: "cancelled" } : row,
-            ),
-          )
+          patchScheduleBookingStatus(appointmentUiId, "cancelled")
           setStatusNotice(t("appointments.statusUpdated"))
-          refreshScheduleData()
+          window.dispatchEvent(new Event("pw-bookings"))
         } finally {
+          cancellingIdRef.current = null
           setCancellingId(null)
         }
       })()
     },
-    [cancellingId, language, t, refreshScheduleData],
+    [language, patchScheduleBookingStatus, t],
   )
 
   const mapAppointmentToEntry = React.useCallback((row: Appointment): CalendarEntry | null => {
@@ -575,6 +581,7 @@ export default function SchedulePage() {
         changeStatusLabel={t("appointments.changeStatusAction")}
         cancelLabel={t("appointments.cancelVisit")}
         emptyLabel="Brak zaplanowanych wizyt"
+        actionNotice={statusNotice}
         onChangeStatus={changeScheduleBookingStatus}
         onCancelVisit={cancelScheduleVisit}
       />

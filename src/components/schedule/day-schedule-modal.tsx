@@ -8,6 +8,7 @@ import { DayScheduleBoard } from "@/components/schedule/day-schedule-board"
 import { DayScheduleMobileList } from "@/components/schedule/day-schedule-mobile-list"
 import { Button } from "@/components/ui/button"
 import { buildStaffColumns } from "@/lib/schedule/schedule-day-board"
+import { isScheduleDropdownMenuTarget } from "@/lib/schedule/schedule-dialog-dropdown"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
 import type { AppointmentStatus, StaffMember } from "@/types/domain"
@@ -27,6 +28,7 @@ type DayScheduleModalProps = {
   changeStatusLabel: string
   cancelLabel: string
   emptyLabel: string
+  actionNotice?: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
   onCancelVisit: (id: string) => void
 }
@@ -74,6 +76,7 @@ export function DayScheduleModal({
   changeStatusLabel,
   cancelLabel,
   emptyLabel,
+  actionNotice,
   onChangeStatus,
   onCancelVisit,
 }: DayScheduleModalProps) {
@@ -90,6 +93,12 @@ export function DayScheduleModal({
             "fixed top-1/2 left-1/2 z-50 flex max-h-[min(94vh,56rem)] w-[min(98vw,72rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-background text-foreground shadow-2xl",
             "data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
           )}
+          onPointerDownOutside={(event) => {
+            if (isScheduleDropdownMenuTarget(event.target)) event.preventDefault()
+          }}
+          onInteractOutside={(event) => {
+            if (isScheduleDropdownMenuTarget(event.target)) event.preventDefault()
+          }}
         >
           <header className="flex shrink-0 items-start gap-3 border-b border-border/70 px-6 py-4 pr-14">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -115,6 +124,12 @@ export function DayScheduleModal({
               </Button>
             </DialogPrimitive.Close>
           </header>
+
+          {actionNotice ? (
+            <p className="mx-6 mt-3 shrink-0 rounded-lg border border-border/80 bg-muted/40 px-3 py-2 text-sm text-foreground">
+              {actionNotice}
+            </p>
+          ) : null}
 
           <div className="flex min-h-[min(52vh,34rem)] min-w-0 flex-1 flex-col overflow-hidden">
             {entries.length === 0 ? (
