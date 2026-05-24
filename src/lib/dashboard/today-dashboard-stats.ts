@@ -54,17 +54,23 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
   }
 
   const today = toLocalDateOnly(new Date())
-  const { data: todayBookings, error: todayError } = await client
-    .from("bookings")
-    .select("id,status,appointment_date")
-    .eq("business_id", businessId)
-    .eq("appointment_date", today)
+  const [todayRes, upcomingRes] = await Promise.all([
+    client
+      .from("bookings")
+      .select("id,status,appointment_date")
+      .eq("business_id", businessId)
+      .eq("appointment_date", today),
+    client
+      .from("bookings")
+      .select("id,status,appointment_date")
+      .eq("business_id", businessId)
+      .gte("appointment_date", today),
+  ])
 
-  if (todayError) {
-    throw new Error(todayError.message)
-  }
+  if (todayRes.error) throw new Error(todayRes.error.message)
+  if (upcomingRes.error) throw new Error(upcomingRes.error.message)
 
-  const rows = (todayBookings ?? []) as BookingRow[]
+  const rows = (todayRes.data ?? []) as BookingRow[]
 
   const confirmedTodayCount = rows.filter((row) =>
     CONFIRMED_STATUSES.has(normalizeStatus(row.status)),
@@ -78,17 +84,7 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
     PENDING_STATUSES.has(normalizeStatus(row.status)),
   ).length
 
-  const { data: upcomingBookingIds, error: idsError } = await client
-    .from("bookings")
-    .select("id,status,appointment_date")
-    .eq("business_id", businessId)
-    .gte("appointment_date", today)
-
-  if (idsError) {
-    throw new Error(idsError.message)
-  }
-
-  const relevantBookingIds = ((upcomingBookingIds ?? []) as BookingRow[])
+  const relevantBookingIds = ((upcomingRes.data ?? []) as BookingRow[])
     .filter((row) => !CANCELLED_STATUSES.has(normalizeStatus(row.status)))
     .map((row) => row.id)
 

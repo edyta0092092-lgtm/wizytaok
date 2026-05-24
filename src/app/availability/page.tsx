@@ -19,7 +19,6 @@ import {
   saveAvailabilityRules,
 } from "@/lib/availability/availability-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import type { AvailabilityDay } from "@/types/domain"
 
 function toMinutes(time: string): number {
@@ -45,14 +44,11 @@ export default function AvailabilityPage() {
   const [saving, setSaving] = React.useState(false)
 
   const refresh = React.useCallback(async () => {
+    if (!access.ready) return
     const client = getBrowserClient()
-    let profileId: string | null = null
-    if (client && isSupabaseConfigured()) {
-      profileId = await getCurrentBusinessProfileIdForClient(client)
-      setBusinessProfileId(profileId)
-    } else {
-      setBusinessProfileId(null)
-    }
+    const profileId =
+      client && isSupabaseConfigured() ? access.businessId ?? null : null
+    setBusinessProfileId(profileId)
     try {
       const list = await getAvailabilityRules(client, profileId)
       setDays(list)
@@ -61,26 +57,31 @@ export default function AvailabilityPage() {
       setLoadError(true)
       setDays([])
     }
-  }, [])
+  }, [access.ready, access.businessId])
+
+  const availabilityLoadedRef = React.useRef(false)
 
   React.useEffect(() => {
+    if (!access.ready) return
     let cancelled = false
     void (async () => {
-      setLoading(true)
+      const showBlocking = !availabilityLoadedRef.current
+      if (showBlocking) setLoading(true)
       await refresh()
-      if (!cancelled) setLoading(false)
+      if (!cancelled) {
+        availabilityLoadedRef.current = true
+        if (showBlocking) setLoading(false)
+      }
     })()
     const onPw = () => {
       void refresh()
     }
     window.addEventListener("pw-availability", onPw)
-    window.addEventListener("focus", onPw)
     return () => {
       cancelled = true
       window.removeEventListener("pw-availability", onPw)
-      window.removeEventListener("focus", onPw)
     }
-  }, [refresh])
+  }, [access.ready, refresh])
 
   const updateDay = (
     id: string,

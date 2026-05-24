@@ -328,7 +328,7 @@ export default function SettingsPage() {
     void (async () => {
       setExportBusy("appointments")
       try {
-        const rows = await fetchMergedAppointments()
+        const rows = await fetchMergedAppointments({ businessId: businessId ?? undefined })
         const headers: AppointmentCsvHeaders = {
           date: t("settings.csvColDate"),
           time: t("settings.csvColTime"),
@@ -354,7 +354,7 @@ export default function SettingsPage() {
     void (async () => {
       setExportBusy("clients")
       try {
-        const { clients } = await loadClientsWorkspace()
+        const { clients } = await loadClientsWorkspace({ businessId: businessId ?? undefined })
         const headers: ClientCsvHeaders = {
           fullName: t("settings.csvClientsName"),
           phone: t("settings.csvClientsPhone"),

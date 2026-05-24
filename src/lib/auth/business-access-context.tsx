@@ -27,6 +27,10 @@ import {
   normalizeBusinessMemberPanelRole,
   type PanelRole,
 } from "@/lib/auth/permissions"
+import {
+  invalidateCachedBusinessProfileId,
+  setCachedBusinessProfileId,
+} from "@/lib/auth/business-profile-cache"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 export type BusinessAccessState = {
@@ -199,7 +203,9 @@ export function BusinessAccessProvider({ children }: { children: React.ReactNode
   const [state, setState] = React.useState<BusinessAccessState>(defaultState)
 
   const refresh = React.useCallback(async () => {
+    invalidateCachedBusinessProfileId()
     const next = await loadAccessState()
+    setCachedBusinessProfileId(next.businessId)
     setState(next)
   }, [])
 

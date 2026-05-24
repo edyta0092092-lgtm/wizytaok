@@ -53,7 +53,9 @@ import {
   type ClientsLoadMode,
   persistClientsCatalog,
   persistClientUpdates,
+  readStoredClientsCatalogSnapshot,
 } from "@/lib/clients/clients-store"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -182,9 +184,10 @@ type WorkspaceMeta = {
 
 export default function ClientsPage() {
   const { t, language } = useTranslations()
-  const [clients, setClients] = React.useState<Client[]>([])
+  const { ready: accessReady, businessId } = useBusinessAccess()
+  const [clients, setClients] = React.useState<Client[]>(() => readStoredClientsCatalogSnapshot() ?? [])
   const [workspace, setWorkspace] = React.useState<WorkspaceMeta | null>(null)
-  const [catalogLoading, setCatalogLoading] = React.useState(true)
+  const [catalogLoading, setCatalogLoading] = React.useState(() => !readStoredClientsCatalogSnapshot()?.length)
   const [query, setQuery] = React.useState("")
   const [createOpen, setCreateOpen] = React.useState(false)
   const [detailsId, setDetailsId] = React.useState<string | null>(null)
@@ -215,22 +218,21 @@ export default function ClientsPage() {
 
   const reloadCatalog = React.useCallback(() => {
     void (async () => {
-      const w = await loadClientsWorkspace()
-      queueMicrotask(() => {
-        setClients(w.clients)
-        setWorkspace({
-          mode: w.mode,
-          businessProfileId: w.businessProfileId,
-          businessSlug: w.businessSlug,
-        })
-        setCatalogLoading(false)
+      const w = await loadClientsWorkspace({ businessId: businessId ?? undefined })
+      setClients(w.clients)
+      setWorkspace({
+        mode: w.mode,
+        businessProfileId: w.businessProfileId,
+        businessSlug: w.businessSlug,
       })
+      setCatalogLoading(false)
     })()
-  }, [])
+  }, [businessId])
 
   React.useEffect(() => {
+    if (!accessReady) return
     reloadCatalog()
-  }, [reloadCatalog])
+  }, [accessReady, reloadCatalog])
 
   React.useEffect(() => {
     const onBookings = () => {

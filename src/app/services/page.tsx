@@ -75,8 +75,14 @@ export default function ServicesPage() {
   const [confirmDeleteServiceId, setConfirmDeleteServiceId] = React.useState<string | null>(null)
 
   const refreshServices = React.useCallback(async () => {
+    if (!access.ready) return
     const client = getBrowserClient()
-    const profileId = client && isSupabaseConfigured() ? await getCurrentBusinessProfileIdForClient(client) : null
+    const profileId =
+      client && isSupabaseConfigured() && access.businessId
+        ? access.businessId
+        : client && isSupabaseConfigured()
+          ? await getCurrentBusinessProfileIdForClient(client)
+          : null
     setBusinessProfileId(profileId)
 
     try {
@@ -87,14 +93,21 @@ export default function ServicesPage() {
       setServices([])
       setLoadError(true)
     }
-  }, [])
+  }, [access.ready, access.businessId])
+
+  const servicesLoadedRef = React.useRef(false)
 
   React.useEffect(() => {
+    if (!access.ready) return
     let cancelled = false
     const run = async () => {
-      setLoading(true)
+      const showBlocking = !servicesLoadedRef.current
+      if (showBlocking) setLoading(true)
       await refreshServices()
-      if (!cancelled) setLoading(false)
+      if (!cancelled) {
+        servicesLoadedRef.current = true
+        if (showBlocking) setLoading(false)
+      }
     }
     void run()
 
@@ -102,13 +115,11 @@ export default function ServicesPage() {
       void refreshServices()
     }
     window.addEventListener("pw-services", onRefresh)
-    window.addEventListener("focus", onRefresh)
     return () => {
       cancelled = true
       window.removeEventListener("pw-services", onRefresh)
-      window.removeEventListener("focus", onRefresh)
     }
-  }, [refreshServices])
+  }, [access.ready, refreshServices])
 
   React.useEffect(() => {
     if (!actionNotice) return

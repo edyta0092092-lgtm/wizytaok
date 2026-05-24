@@ -38,7 +38,6 @@ import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { normalizeBusinessMemberPanelRole } from "@/lib/auth/permissions"
-import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
@@ -411,11 +410,14 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const statsLoadedRef = React.useRef(false)
+
   React.useEffect(() => {
     let cancelled = false
     void (async () => {
-      if (!appointmentsReady || appointmentsLoadError) return
-      setStatsLoading(true)
+      if (!accessReady || !appointmentsReady || appointmentsLoadError) return
+      const showBlocking = !statsLoadedRef.current
+      if (showBlocking) setStatsLoading(true)
       setStatsError(null)
       setStatsContextState(null)
       try {
@@ -426,25 +428,6 @@ export default function DashboardPage() {
           }
           return
         }
-        const client = getBrowserClient()
-        if (!client) {
-          if (!cancelled) {
-            setStats(fallbackStats)
-            setStatsContextState("login_required")
-          }
-          return
-        }
-        const {
-          data: { user },
-        } = await client.auth.getUser()
-        if (!user?.id) {
-          if (!cancelled) {
-            setStats(fallbackStats)
-            setStatsContextState("login_required")
-          }
-          return
-        }
-        const businessId = await getCurrentBusinessProfileIdForClient(client)
         if (!businessId) {
           if (!cancelled) {
             setStats(fallbackStats)
@@ -476,14 +459,15 @@ export default function DashboardPage() {
         }
       } finally {
         if (!cancelled) {
-          setStatsLoading(false)
+          statsLoadedRef.current = true
+          if (showBlocking) setStatsLoading(false)
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [appointmentsReady, appointmentsLoadError, fallbackStats])
+  }, [accessReady, appointmentsReady, appointmentsLoadError, businessId, fallbackStats])
 
   React.useEffect(() => {
     if (!statusNotice) return

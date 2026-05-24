@@ -27,11 +27,7 @@ import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { applyStaffPanelAccess, syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import {
-  getCurrentBusinessProfileIdForClient,
-  getLocalServices,
-  getServices,
-} from "@/lib/services/services-store"
+import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import {
   addStaffMember,
@@ -537,11 +533,14 @@ export default function TeamPage() {
     [],
   )
 
+  React.useEffect(() => {
+    if (access.businessId) setBusinessProfileId(access.businessId)
+  }, [access.businessId])
+
   const load = React.useCallback(async () => {
     const client = getBrowserClient()
-    const bid =
-      client && isSupabaseConfigured() ? await getCurrentBusinessProfileIdForClient(client) : null
-    setBusinessProfileId(bid)
+    const bid = access.businessId ?? businessProfileId ?? null
+    if (bid) setBusinessProfileId(bid)
     let svc: Service[] = []
     try {
       svc = await getServices(client, bid)
@@ -600,21 +599,32 @@ export default function TeamPage() {
     if (rows.length === 0 && bid) {
       setStaffLoadError(false)
     }
-  }, [access.canManageInvitations, refetchStaffMembers])
+  }, [access.businessId, access.canManageInvitations, businessProfileId, refetchStaffMembers])
+
+  const teamLoadedRef = React.useRef(false)
 
   React.useEffect(() => {
+    if (!access.ready) return
+    let cancelled = false
     void (async () => {
-      setLoading(true)
+      const showBlocking = !teamLoadedRef.current
+      if (showBlocking) setLoading(true)
       try {
         await load()
+        if (!cancelled) teamLoadedRef.current = true
       } catch {
-        setStaffLoadError(true)
-        setNotice(t("team.saveError"))
+        if (!cancelled) {
+          setStaffLoadError(true)
+          setNotice(t("team.saveError"))
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled && showBlocking) setLoading(false)
       }
     })()
-  }, [load, t])
+    return () => {
+      cancelled = true
+    }
+  }, [access.ready, load, t])
 
   React.useEffect(() => {
     if (!notice) return
@@ -685,9 +695,7 @@ export default function TeamPage() {
     setIsExceptionsEditing(false)
     setEditing(staff)
     const client = getBrowserClient()
-    const bid =
-      client && isSupabaseConfigured() ? await getCurrentBusinessProfileIdForClient(client) : null
-    setBusinessProfileId(bid)
+    const bid = businessProfileId ?? access.businessId ?? null
     try {
       setServices(await getServices(client, bid))
     } catch {
@@ -893,9 +901,7 @@ export default function TeamPage() {
 
     if (editing && isSupabaseConfigured()) {
       const client = getBrowserClient()
-      const bid =
-        businessProfileId ??
-        (client ? await getCurrentBusinessProfileIdForClient(client) : null)
+      const bid = businessProfileId ?? access.businessId
       if (!client || !bid) {
         setNotice(language === "en" ? "Business profile was not found." : "Nie znaleziono profilu firmy.")
         setNoticeDetail(null)
@@ -975,9 +981,7 @@ export default function TeamPage() {
         return t("team.scheduleSaveError")
       }
       const client = getBrowserClient()
-      const bid =
-        businessProfileId ??
-        (client && isSupabaseConfigured() ? await getCurrentBusinessProfileIdForClient(client) : null)
+      const bid = businessProfileId ?? access.businessId
       if (!bid) {
         setNotice(language === "en" ? "Business profile was not found." : "Nie znaleziono profilu firmy.")
         setNoticeDetail(null)

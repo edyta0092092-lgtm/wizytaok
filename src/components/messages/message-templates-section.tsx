@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
@@ -266,6 +266,7 @@ export function MessageTemplatesSection({
   readOnly = false,
 }: MessageTemplatesSectionProps) {
   const { t } = useTranslations()
+  const { ready: accessReady, businessId: accessBusinessId } = useBusinessAccess()
   const [templates, setTemplates] = React.useState<GroupedTemplate[]>([])
   const [businessId, setBusinessId] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -290,25 +291,17 @@ export function MessageTemplatesSection({
   }, [onRegisterPrimaryAction, openCreate])
 
   React.useEffect(() => {
+    if (!accessReady) return
     let cancelled = false
     void (async () => {
       setLoading(true)
       const client = getBrowserClient()
-      if (!client || !isSupabaseConfigured()) {
+      const bid = accessBusinessId
+      if (!client || !isSupabaseConfigured() || !bid) {
         if (!cancelled) {
           setTemplates(toGroupedTemplates([]))
           setBusinessId(null)
           setLoadError(null)
-          setLoading(false)
-        }
-        return
-      }
-      const bid = await getCurrentBusinessProfileIdForClient(client)
-      if (!bid) {
-        if (!cancelled) {
-          setTemplates(toGroupedTemplates([]))
-          setBusinessId(null)
-          setLoadError("no_business_id")
           setLoading(false)
         }
         return
@@ -338,7 +331,7 @@ export function MessageTemplatesSection({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accessReady, accessBusinessId])
 
   const openEdit = (tpl: GroupedTemplate) => {
     setEditingType(tpl.type)

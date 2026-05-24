@@ -23,7 +23,7 @@ export function useBusinessReminderSettings(): BusinessReminderPanelSettings {
       return
     }
     void (async () => {
-      const loaded = await loadBusinessReminderPanelSettingsForCurrentBusiness()
+      const loaded = await loadBusinessReminderPanelSettingsForCurrentBusiness(access.businessId)
       if (!cancelled) setSettings(loaded)
     })()
     return () => {

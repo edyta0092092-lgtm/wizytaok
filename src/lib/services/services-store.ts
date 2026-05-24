@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import {
+  peekCachedBusinessProfileId,
+  setCachedBusinessProfileId,
+} from "@/lib/auth/business-profile-cache"
 import { resolvePublicBookingBusinessProfile } from "@/lib/business/public-booking-slug"
 import { DEMO_BOOKING_SLUG } from "@/lib/business/slug"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
@@ -587,12 +591,24 @@ export async function toggleServiceActive(
 
 /** Odczyt id profilu firmy zalogowanego użytkownika (tylko klient). */
 export async function getCurrentBusinessProfileIdForClient(
-  client: ServicesSupabaseClient
+  client: ServicesSupabaseClient,
+  knownBusinessId?: string | null,
 ): Promise<string | null> {
+  const trimmedKnown = knownBusinessId?.trim()
+  if (trimmedKnown) {
+    setCachedBusinessProfileId(trimmedKnown)
+    return trimmedKnown
+  }
+  const cached = peekCachedBusinessProfileId()
+  if (cached !== undefined) return cached
+
   const {
     data: { user },
   } = await client.auth.getUser()
-  if (!user?.id) return null
+  if (!user?.id) {
+    setCachedBusinessProfileId(null)
+    return null
+  }
   const { data: owned, error: ownErr } = await client
     .from("business_profiles")
     .select("id")
@@ -606,18 +622,28 @@ export async function getCurrentBusinessProfileIdForClient(
     .eq("is_active", true)
     .limit(1)
   if (!memErr && memberRows?.length) {
-    return memberRows[0].business_id ?? null
+    const id = memberRows[0].business_id ?? null
+    setCachedBusinessProfileId(id)
+    return id
   }
   const isMissingIsActive =
     typeof memErr?.message === "string" &&
     memErr.message.toLowerCase().includes("is_active") &&
     memErr.message.toLowerCase().includes("does not exist")
-  if (!isMissingIsActive) return null
+  if (!isMissingIsActive) {
+    setCachedBusinessProfileId(null)
+    return null
+  }
   const { data: fallbackMembers, error: fallbackErr } = await client
     .from("business_members")
     .select("business_id")
     .eq("user_id", user.id)
     .limit(1)
-  if (fallbackErr || !fallbackMembers?.length) return null
-  return fallbackMembers[0].business_id ?? null
+  if (fallbackErr || !fallbackMembers?.length) {
+    setCachedBusinessProfileId(null)
+    return null
+  }
+  const id = fallbackMembers[0].business_id ?? null
+  setCachedBusinessProfileId(id)
+  return id
 }

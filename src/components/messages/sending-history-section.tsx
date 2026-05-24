@@ -20,7 +20,6 @@ import {
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
-import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -427,6 +426,7 @@ export function SendingHistorySection() {
     enableTestBilling: boolean
   } | null>(null)
   const [logRefreshTick, setLogRefreshTick] = React.useState(0)
+  const historyLoadedRef = React.useRef(false)
 
   React.useEffect(() => {
     let cancelled = false
@@ -476,8 +476,11 @@ export function SendingHistorySection() {
   }, [])
 
   React.useEffect(() => {
+    if (!access.ready) return
     let cancelled = false
     void (async () => {
+      const showBlocking = !historyLoadedRef.current
+      if (showBlocking) setLoadingDb(true)
       if (!isSupabaseConfigured()) {
         setLoadingDb(false)
         setRows([])
@@ -486,12 +489,12 @@ export function SendingHistorySection() {
         return
       }
       const client = getBrowserClient()
+      const bid = access.businessId
       if (!client) {
         setLoadingDb(false)
         setLoadError("no_client")
         return
       }
-      const bid = await getCurrentBusinessProfileIdForClient(client)
       if (!bid) {
         if (!cancelled) {
           setLoadingDb(false)
@@ -617,12 +620,15 @@ export function SendingHistorySection() {
         })
       }
       setBusinessSlugNorm(slugNorm)
-      setLoadingDb(false)
+      if (!cancelled) {
+        historyLoadedRef.current = true
+        setLoadingDb(false)
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [logRefreshTick])
+  }, [access.ready, access.businessId, logRefreshTick])
 
   React.useEffect(() => {
     if (logFilter !== "needs_attention") return

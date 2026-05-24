@@ -501,9 +501,14 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
   })
 }
 
-export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
-  const mergedAppointments = typeof window !== "undefined" ? await fetchMergedAppointments() : []
+export function readStoredClientsCatalogSnapshot(): Client[] | null {
+  if (typeof window === "undefined") return null
+  return readStoredCatalog()
+}
 
+export async function loadClientsWorkspace(options?: {
+  businessId?: string | null
+}): Promise<ClientsWorkspaceLoad> {
   if (!isSupabaseConfigured()) {
     const snap = readStoredCatalog()
     if (snap && snap.length > 0) {
@@ -531,7 +536,8 @@ export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
     }
   }
 
-  const bid = await getCurrentBusinessProfileIdForClient(sb)
+  const bid =
+    options?.businessId?.trim() || (await getCurrentBusinessProfileIdForClient(sb, options?.businessId))
   if (!bid) {
     const snap = readStoredCatalog()
     if (snap && snap.length > 0) {
@@ -551,7 +557,10 @@ export async function loadClientsWorkspace(): Promise<ClientsWorkspaceLoad> {
 
   const supabaseAppointments = await getBookingsForBusiness(sb, bid, slugNormRaw)
   await ensureClientsFromSupabaseBookings(bid)
-  const appointments = supabaseAppointments.length > 0 ? supabaseAppointments : mergedAppointments
+  let appointments = supabaseAppointments
+  if (appointments.length === 0 && typeof window !== "undefined") {
+    appointments = await fetchMergedAppointments({ businessId: bid })
+  }
 
   const res = await getClients(sb, bid)
   if (!res.error && res.data) {
@@ -632,7 +641,9 @@ async function propagateContactToRelatedBookings(
   businessProfileId: string | null,
   slugNorm: string | null
 ): Promise<void> {
-  const appointments = await fetchMergedAppointments()
+  const appointments = await fetchMergedAppointments({
+    businessId: businessProfileId ?? undefined,
+  })
   const sb = getBrowserClient()
 
   const nameNext = next.fullName.trim()

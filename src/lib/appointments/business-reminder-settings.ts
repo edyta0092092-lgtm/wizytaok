@@ -57,11 +57,14 @@ export async function fetchBusinessReminderPanelSettings(
   return normalizeBusinessReminderPanelSettings(data)
 }
 
-export async function loadBusinessReminderPanelSettingsForCurrentBusiness(): Promise<BusinessReminderPanelSettings> {
+export async function loadBusinessReminderPanelSettingsForCurrentBusiness(
+  knownBusinessId?: string | null,
+): Promise<BusinessReminderPanelSettings> {
   if (!isSupabaseConfigured()) return DEFAULT_BUSINESS_REMINDER_PANEL_SETTINGS
   const client = getBrowserClient()
   if (!client) return DEFAULT_BUSINESS_REMINDER_PANEL_SETTINGS
-  const businessId = await getCurrentBusinessProfileIdForClient(client)
+  const businessId =
+    knownBusinessId?.trim() || (await getCurrentBusinessProfileIdForClient(client, knownBusinessId))
   if (!businessId) return DEFAULT_BUSINESS_REMINDER_PANEL_SETTINGS
   return fetchBusinessReminderPanelSettings(businessId)
 }
