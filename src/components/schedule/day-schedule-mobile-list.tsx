@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { accentClassForStatus, formatHm } from "@/lib/schedule/schedule-day-board"
+import { formatHm, scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
 import type { AppointmentStatus } from "@/types/domain"
@@ -48,7 +48,7 @@ export function DayScheduleMobileList({
         const isConfirmingCancel = confirmCancelForId === row.id
         const staff = row.staff_name?.trim()
         return (
-          <div key={row.id} className={cn("py-3", accentClassForStatus(row.status), "rounded-lg border px-3 my-2")}>
+          <div key={row.id} className={cn("my-2 rounded-lg border px-3 py-3", scheduleCardTheme(row).cardClass)}>
             <div className="flex gap-3">
               <p className="w-12 shrink-0 text-sm font-semibold tabular-nums">{formatHm(row.appointment_time)}</p>
               <div className="min-w-0 flex-1">

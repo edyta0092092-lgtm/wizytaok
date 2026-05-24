@@ -1,8 +1,10 @@
 import type { ScheduleDayEntry, ScheduleStaffColumn } from "@/lib/schedule/schedule-day-types"
 import {
+  SCHEDULE_BOARD_CARD_GAP_PX,
   SCHEDULE_BOARD_DAY_END_HOUR,
   SCHEDULE_BOARD_DAY_START_HOUR,
   SCHEDULE_BOARD_PX_PER_MINUTE,
+  SCHEDULE_BOARD_SLOT_HEIGHT_PX,
 } from "@/lib/schedule/schedule-day-types"
 import type { AppointmentStatus, StaffMember } from "@/types/domain"
 
@@ -32,15 +34,6 @@ export function getScheduleBoardRangeMinutes(): { start: number; end: number; sp
   return { start, end, span: end - start }
 }
 
-export function buildHourLabels(): string[] {
-  const labels: string[] = []
-  for (let h = SCHEDULE_BOARD_DAY_START_HOUR; h <= SCHEDULE_BOARD_DAY_END_HOUR; h += 1) {
-    labels.push(`${String(h).padStart(2, "0")}:00`)
-  }
-  return labels
-}
-
-/** Etykiety co 30 min (08:00, 08:30, …) dla osi czasu w modalu dnia. */
 export function buildHalfHourSlotLabels(): string[] {
   const labels: string[] = []
   const start = SCHEDULE_BOARD_DAY_START_HOUR * 60
@@ -58,53 +51,80 @@ export function staffInitials(name: string): string {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
 }
 
-export function accentClassForStatus(status: AppointmentStatus): string {
-  switch (status) {
-    case "cancelled":
-      return "border-border/80 bg-muted text-muted-foreground"
-    case "no_show":
-      return "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
-    case "completed":
-      return "border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950"
-    default:
-      return "border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-800 dark:bg-emerald-950"
+export type ScheduleCardTheme = {
+  cardClass: string
+  stripeColor: string
+  badgeClass: string
+  dotClass: string
+}
+
+export function scheduleCardTheme(entry: ScheduleDayEntry): ScheduleCardTheme {
+  if (entry.status === "cancelled") {
+    return {
+      cardClass: "border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/80",
+      stripeColor: "#94a3b8",
+      badgeClass:
+        "border-slate-200 bg-white text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300",
+      dotClass: "bg-slate-400",
+    }
+  }
+  if (entry.status === "no_show") {
+    return {
+      cardClass: "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/80",
+      stripeColor: "#f59e0b",
+      badgeClass:
+        "border-amber-200 bg-white text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100",
+      dotClass: "bg-amber-500",
+    }
+  }
+  if (entry.status === "completed") {
+    return {
+      cardClass: "border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950/80",
+      stripeColor: "#8b5cf6",
+      badgeClass:
+        "border-violet-200 bg-white text-violet-800 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100",
+      dotClass: "bg-violet-500",
+    }
+  }
+
+  const hue = serviceAccentHue(entry.service_name)
+  if (hue === "orange") {
+    return {
+      cardClass: "border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/80",
+      stripeColor: "#f97316",
+      badgeClass:
+        "border-orange-200 bg-white text-orange-800 dark:border-orange-700 dark:bg-orange-950 dark:text-orange-100",
+      dotClass: "bg-orange-500",
+    }
+  }
+  if (hue === "purple") {
+    return {
+      cardClass: "border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950/80",
+      stripeColor: "#8b5cf6",
+      badgeClass:
+        "border-violet-200 bg-white text-violet-800 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-100",
+      dotClass: "bg-violet-500",
+    }
+  }
+
+  return {
+    cardClass: "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/80",
+    stripeColor: "#22c55e",
+    badgeClass:
+      "border-emerald-200 bg-white text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100",
+    dotClass: "bg-emerald-500",
   }
 }
 
-export function statusBadgeClassForStatus(status: AppointmentStatus): string {
-  switch (status) {
-    case "cancelled":
-      return "border-border/80 bg-muted/60 text-muted-foreground"
-    case "no_show":
-      return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
-    case "completed":
-      return "border-violet-200 bg-violet-50 text-violet-900 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100"
-    default:
-      return "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
-  }
-}
-
-export function statusStripeColor(status: AppointmentStatus): string {
-  switch (status) {
-    case "cancelled":
-      return "hsl(var(--muted-foreground) / 0.35)"
-    case "no_show":
-      return "hsl(38 92% 50%)"
-    case "completed":
-      return "hsl(270 60% 58%)"
-    default:
-      return "hsl(142 71% 45%)"
-  }
-}
-
-export function accentStripeForService(serviceName: string): string {
+function serviceAccentHue(serviceName: string): "green" | "orange" | "purple" {
   let hash = 0
   for (let i = 0; i < serviceName.length; i += 1) {
     hash = (hash + serviceName.charCodeAt(i) * (i + 1)) % 360
   }
-  const hues = [210, 250, 190, 280, 340, 160]
-  const hue = hues[hash % hues.length]
-  return `hsl(${hue} 55% 88%)`
+  const bucket = hash % 3
+  if (bucket === 1) return "orange"
+  if (bucket === 2) return "purple"
+  return "green"
 }
 
 export function buildStaffColumns(
@@ -133,44 +153,41 @@ export function buildStaffColumns(
   const columns: ScheduleStaffColumn[] = orderedStaff.map((staff) => ({
     id: staff.id,
     name: staff.name,
-    entries: entries.filter((e) => (e.staff_id ?? "") === staff.id),
+    entries: entries
+      .filter((e) => (e.staff_id ?? "") === staff.id)
+      .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)),
   }))
 
   if (hasUnassigned) {
     columns.push({
       id: UNASSIGNED_STAFF_ID,
       name: "Nie przypisano",
-      entries: entries.filter((e) => !e.staff_id?.trim()),
+      entries: entries
+        .filter((e) => !e.staff_id?.trim())
+        .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)),
     })
   }
 
   if (columns.length === 0 && entries.length > 0) {
-    return [{ id: UNASSIGNED_STAFF_ID, name: "Wizyty", entries }]
+    return [
+      {
+        id: UNASSIGNED_STAFF_ID,
+        name: "Wizyty",
+        entries: [...entries].sort((a, b) => a.appointment_time.localeCompare(b.appointment_time)),
+      },
+    ]
   }
 
   return columns
 }
 
-export type ScheduleBlockLayoutTier = "full" | "compact" | "minimal"
-
-export function scheduleBlockLayoutTier(
-  heightPx: number,
-  opts: { hasService: boolean; isCancelled: boolean },
-): ScheduleBlockLayoutTier {
-  if (opts.isCancelled) {
-    return opts.hasService && heightPx >= 56 ? "full" : "compact"
-  }
-  if (heightPx >= 64 && opts.hasService) return "full"
-  if (heightPx >= 48) return "compact"
-  return "minimal"
+export function scheduleBoardGridHeightPx(): number {
+  const { span } = getScheduleBoardRangeMinutes()
+  return Math.round(span * SCHEDULE_BOARD_PX_PER_MINUTE)
 }
 
 export function scheduleBoardSlotHeightPx(): number {
-  return Math.round(30 * SCHEDULE_BOARD_PX_PER_MINUTE)
-}
-
-export function scheduleBoardHourHeightPx(): number {
-  return scheduleBoardSlotHeightPx() * 2
+  return SCHEDULE_BOARD_SLOT_HEIGHT_PX
 }
 
 export type ScheduleBlockLayout = {
@@ -181,21 +198,33 @@ export type ScheduleBlockLayout = {
   laneCount: number
 }
 
-export function blockLayout(
+function blockGeometry(
   entry: ScheduleDayEntry,
-  range: { start: number; end: number; span: number },
-): Omit<ScheduleBlockLayout, "laneIndex" | "laneCount"> {
+  range: { start: number; end: number },
+): { topPx: number; heightPx: number; clipped: boolean } {
   const startMin = parseTimeToMinutes(entry.appointment_time)
   const duration = Math.max(15, entry.duration_minutes)
   const endMin = startMin + duration
   const visibleStart = Math.max(startMin, range.start)
   const visibleEnd = Math.min(endMin, range.end)
+
   if (visibleEnd <= range.start || visibleStart >= range.end) {
-    return { topPx: 0, heightPx: scheduleBoardSlotHeightPx(), clipped: true }
+    return {
+      topPx: 0,
+      heightPx: SCHEDULE_BOARD_SLOT_HEIGHT_PX - SCHEDULE_BOARD_CARD_GAP_PX,
+      clipped: true,
+    }
   }
-  const topPx = Math.round((visibleStart - range.start) * SCHEDULE_BOARD_PX_PER_MINUTE)
-  const heightPx = Math.max(1, Math.round((visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE))
-  return { topPx, heightPx, clipped: startMin < range.start || endMin > range.end }
+
+  const rawTop = (visibleStart - range.start) * SCHEDULE_BOARD_PX_PER_MINUTE
+  const rawHeight = (visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE
+  const gap = SCHEDULE_BOARD_CARD_GAP_PX
+
+  return {
+    topPx: Math.round(rawTop + gap / 2),
+    heightPx: Math.max(28, Math.round(rawHeight - gap)),
+    clipped: startMin < range.start || endMin > range.end,
+  }
 }
 
 function intervalsOverlapPx(
@@ -205,14 +234,13 @@ function intervalsOverlapPx(
   return a.topPx < b.topPx + b.heightPx && b.topPx < a.topPx + a.heightPx
 }
 
-/** Rozmieszcza nakładające się wizyty obok siebie (jak w kalendarzu). */
 export function layoutColumnBlocks(
   entries: ScheduleDayEntry[],
   range: { start: number; end: number; span: number },
 ): Map<string, ScheduleBlockLayout> {
   const base = entries.map((entry) => ({
     entry,
-    ...blockLayout(entry, range),
+    ...blockGeometry(entry, range),
   }))
   const result = new Map<string, ScheduleBlockLayout>()
 
