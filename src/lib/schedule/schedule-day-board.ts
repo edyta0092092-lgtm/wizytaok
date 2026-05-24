@@ -3,6 +3,8 @@ import {
   SCHEDULE_BOARD_DAY_END_HOUR,
   SCHEDULE_BOARD_DAY_START_HOUR,
   SCHEDULE_BOARD_PX_PER_MINUTE,
+  SCHEDULE_BLOCK_MIN_HEIGHT_ACTIVE_PX,
+  SCHEDULE_BLOCK_MIN_HEIGHT_CANCELLED_PX,
 } from "@/lib/schedule/schedule-day-types"
 import type { AppointmentStatus, StaffMember } from "@/types/domain"
 
@@ -124,9 +126,12 @@ export function blockLayout(
   const visibleStart = Math.max(startMin, range.start)
   const visibleEnd = Math.min(endMin, range.end)
   if (visibleEnd <= range.start || visibleStart >= range.end) {
-    return { topPct: 0, heightPx: 48, clipped: true }
+    return { topPct: 0, heightPx: SCHEDULE_BLOCK_MIN_HEIGHT_ACTIVE_PX, clipped: true }
   }
   const topPct = ((visibleStart - range.start) / range.span) * 100
-  const heightPx = Math.max(52, (visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE)
+  const durationHeightPx = (visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE
+  const minHeightPx =
+    entry.status === "cancelled" ? SCHEDULE_BLOCK_MIN_HEIGHT_CANCELLED_PX : SCHEDULE_BLOCK_MIN_HEIGHT_ACTIVE_PX
+  const heightPx = Math.max(minHeightPx, Math.round(durationHeightPx))
   return { topPct, heightPx, clipped: startMin < range.start || endMin > range.end }
 }

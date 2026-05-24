@@ -22,3 +22,8 @@ export const SCHEDULE_BOARD_DAY_START_HOUR = 8
 export const SCHEDULE_BOARD_DAY_END_HOUR = 20
 export const SCHEDULE_BOARD_DEFAULT_DURATION_MINUTES = 30
 export const SCHEDULE_BOARD_PX_PER_MINUTE = 1.75
+
+/** Minimalna wysokość bloku wizyty (px) — mieści klient + usługę + status bez nakładania. */
+export const SCHEDULE_BLOCK_MIN_HEIGHT_ACTIVE_PX = 96
+export const SCHEDULE_BLOCK_MIN_HEIGHT_CANCELLED_PX = 56
+export const SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX = 116
