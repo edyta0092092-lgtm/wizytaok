@@ -456,7 +456,7 @@ export default function SchedulePage() {
                 <div key={w}>{w}</div>
               ))}
             </div>
-            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-7 md:gap-2">
+            <div className="grid grid-cols-1 gap-2.5 md:grid-cols-7 md:gap-2" data-tour="schedule-month">
               {weekMondayFirstCells(ym.year, ym.month).map((dayNum, idx) => {
                 if (dayNum == null) {
                   return (

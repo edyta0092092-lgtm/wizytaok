@@ -144,6 +144,7 @@ function MessagesPageContent() {
       }
     >
       <PageShell>
+        <div data-tour="messages-list" className="flex flex-col gap-6">
         {canOpenMessages ? (
           <MessageTemplatesSection
             onRegisterPrimaryAction={registerOpen}
@@ -153,6 +154,7 @@ function MessagesPageContent() {
           <p className="mb-4 text-sm text-muted-foreground">{t("messages.staffHistoryIntro")}</p>
         )}
         <SendingHistorySection />
+        </div>
       </PageShell>
     </AppShell>
   )

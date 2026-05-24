@@ -2,16 +2,43 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Building2, CalendarClock, CalendarDays, ClipboardList, Link2, type LucideIcon, Users } from "lucide-react"
+import {
+  Building2,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ClipboardList,
+  Link2,
+  type LucideIcon,
+  Users,
+} from "lucide-react"
 
+import { GuideFinalChecklist } from "@/components/guide/guide-final-checklist"
 import { GuideHero } from "@/components/guide/guide-hero"
 import { GuideQuickStartCard } from "@/components/guide/guide-quick-start-card"
+import { GuideReferencePanel } from "@/components/guide/guide-reference-panel"
+import { GuideSetupProgress } from "@/components/guide/guide-setup-progress"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import {
+  fetchGuideSetupAutoProgress,
+  GUIDE_SETUP_STEP_IDS,
+  type GuideSetupAutoProgress,
+  type GuideSetupStepId,
+} from "@/lib/guide/fetch-guide-setup"
+import { GUIDE_FAQ_KEYS, GUIDE_PLAYBOOK_MODULES } from "@/lib/guide/guide-reference"
+import {
+  parseGuideSetupManual,
+  writeGuideSetupManual,
+  type GuideSetupManual,
+} from "@/lib/guide/guide-setup-storage"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useTour } from "@/lib/tour/tour-context"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+
 type QuickRow = {
   id: string
   href: string
@@ -61,124 +88,164 @@ const quickRows: QuickRow[] = [
   },
   {
     id: "qs5",
-    href: "/appointments",
+    href: "/schedule",
     titleKey: "guide.qs5Title",
     descriptionKey: "guide.qs5Desc",
     whereKey: "guide.qs5Where",
     actionKey: "guide.navCalendar",
-    icon: Link2,
+    icon: CalendarRange,
   },
   {
     id: "qs6",
-    href: "/settings",
+    href: "/appointments",
     titleKey: "guide.qs6Title",
     descriptionKey: "guide.qs6Desc",
     whereKey: "guide.qs6Where",
-    actionKey: "guide.navBooking",
+    actionKey: "guide.navAppointments",
     icon: CalendarDays,
   },
+  {
+    id: "qs7",
+    href: "/settings",
+    titleKey: "guide.qs7Title",
+    descriptionKey: "guide.qs7Desc",
+    whereKey: "guide.qs7Where",
+    actionKey: "guide.navBooking",
+    icon: Link2,
+  },
 ]
+
+const SETUP_HREF: Record<GuideSetupStepId, string> = {
+  business: "/settings",
+  services: "/services",
+  availability: "/availability",
+  team: "/team",
+  public_page: "/settings",
+  test_booking: "/settings",
+}
 
 export default function GuidePage() {
   const { t } = useTranslations()
   const { startTour } = useTour()
+  const access = useBusinessAccess()
 
   const [bookingSlug, setBookingSlug] = React.useState("")
+  const [setupAuto, setSetupAuto] = React.useState<GuideSetupAutoProgress>(() =>
+    Object.fromEntries(GUIDE_SETUP_STEP_IDS.map((id) => [id, false])) as GuideSetupAutoProgress,
+  )
+  const [setupManual, setSetupManual] = React.useState<GuideSetupManual>({})
+
+  React.useEffect(() => {
+    queueMicrotask(() => setSetupManual(parseGuideSetupManual(window.localStorage.getItem("wizytaok-guide-setup-progress"))))
+  }, [])
 
   React.useEffect(() => {
     let cancelled = false
-    const run = async () => {
+    void (async () => {
       try {
-        const { getBrowserClient, isSupabaseConfigured } = await import("@/lib/supabase/client")
         if (!isSupabaseConfigured()) return
         const client = getBrowserClient()
         if (!client) return
+
+        if (access.businessId) {
+          const { data } = await client
+            .from("business_profiles")
+            .select("slug")
+            .eq("id", access.businessId)
+            .maybeSingle()
+          if (!cancelled && typeof data?.slug === "string" && data.slug.trim()) {
+            setBookingSlug(data.slug.trim())
+          }
+        }
+
         const {
           data: { user },
         } = await client.auth.getUser()
         if (!user?.id) return
-        const { data } = await client
-          .from("business_profiles")
-          .select("slug")
-          .eq("owner_id", user.id)
-          .maybeSingle()
-        if (!cancelled && typeof data?.slug === "string" && data.slug.trim()) {
-          queueMicrotask(() => setBookingSlug(data.slug.trim()))
+        const progress = await fetchGuideSetupAutoProgress(client, user.id)
+        if (!cancelled) {
+          setSetupAuto(progress.auto)
+          if (progress.slug) setBookingSlug((prev) => prev || progress.slug || "")
         }
       } catch {
         /* ignore */
       }
-    }
-    void run()
+    })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [access.businessId])
 
   const bookingPath = bookingSlug ? `/rezerwacje/${bookingSlug}` : "/settings"
 
   const quickRowsResolved = React.useMemo(() => {
     return quickRows.map((row) => {
-      if (row.id === "qs6" && bookingSlug) {
-        return { ...row, href: bookingPath }
-      }
+      if (row.id === "qs7") return { ...row, href: bookingPath }
       return row
     })
-  }, [bookingPath, bookingSlug])
+  }, [bookingPath])
 
-  const faqKeys = [
-    { q: "guide.faqQ1", a: "guide.faqA1" },
-    { q: "guide.faqQ2", a: "guide.faqA2" },
-    { q: "guide.faqQ3", a: "guide.faqA3" },
-    { q: "guide.faqQ4", a: "guide.faqA4" },
-    { q: "guide.faqQ5", a: "guide.faqA5" },
-    { q: "guide.faqQ6", a: "guide.faqA6" },
-  ] as const
+  const setupLabels = React.useMemo(
+    () =>
+      Object.fromEntries(
+        GUIDE_SETUP_STEP_IDS.map((id) => [id, t(`guide.setupStep${id.charAt(0).toUpperCase()}${id.slice(1).replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}` as never)]),
+      ) as Record<GuideSetupStepId, string>,
+    [t],
+  )
 
-  const playbook = [
-    {
-      id: "pb1",
-      title: t("guide.modBusinessTitle"),
-      body: t("guide.modBusinessLead"),
-      href: "/settings",
-      cta: t("guide.navSettings"),
+  const setupLabelsFixed = React.useMemo(
+    (): Record<GuideSetupStepId, string> => ({
+      business: t("guide.setupStepBusiness"),
+      services: t("guide.setupStepServices"),
+      availability: t("guide.setupStepAvailability"),
+      team: t("guide.setupStepTeam"),
+      public_page: t("guide.setupStepPublic"),
+      test_booking: t("guide.setupStepTest"),
+    }),
+    [t],
+  )
+
+  const hrefForSetupStep = React.useCallback(
+    (id: GuideSetupStepId) => {
+      if (id === "public_page" || id === "test_booking") return bookingPath
+      return SETUP_HREF[id]
     },
-    {
-      id: "pb2",
-      title: t("guide.modServicesTitle"),
-      body: t("guide.modServicesLead"),
-      href: "/services",
-      cta: t("guide.navServices"),
-    },
-    {
-      id: "pb3",
-      title: t("guide.modAvailTitle"),
-      body: t("guide.modAvailLead"),
-      href: "/availability",
-      cta: t("guide.navAvailability"),
-    },
-    {
-      id: "pb4",
-      title: t("guide.modTeamTitle"),
-      body: t("guide.modTeamLead"),
-      href: "/team",
-      cta: t("guide.navTeam"),
-    },
-    {
-      id: "pb5",
-      title: t("guide.modBookingTitle"),
-      body: t("guide.modBookingLead"),
-      href: bookingPath,
-      cta: t("guide.navBooking"),
-    },
-    {
-      id: "pb6",
-      title: t("guide.modMsgsTitle"),
-      body: t("guide.modMsgsLead"),
-      href: "/messages",
-      cta: t("guide.navMessages"),
-    },
-  ]
+    [bookingPath],
+  )
+
+  const setManualOverride = React.useCallback((id: GuideSetupStepId, value: boolean | null) => {
+    setSetupManual((prev) => {
+      const next = { ...prev }
+      if (value === null) {
+        delete next[id]
+      } else {
+        next[id] = value
+      }
+      writeGuideSetupManual(next)
+      return next
+    })
+  }, [])
+
+  const playbookResolved = React.useMemo(() => {
+    return GUIDE_PLAYBOOK_MODULES.map((item) => ({
+      ...item,
+      href: item.href === "booking" ? bookingPath : item.href,
+      title: t(item.titleKey),
+      body: t(item.leadKey),
+      cta: t(item.ctaKey),
+    }))
+  }, [bookingPath, t])
+
+  const whatsNextItems = React.useMemo(
+    () => [
+      { id: "chk1", label: t("guide.chk1") },
+      { id: "chk2", label: t("guide.chk2") },
+      { id: "chk3", label: t("guide.chk3") },
+      { id: "chk4", label: t("guide.chk4") },
+      { id: "chk5", label: t("guide.chk5") },
+    ],
+    [t],
+  )
 
   return (
     <AppShell title={t("guide.title")} pageDescription={t("guide.description")}>
@@ -193,6 +260,29 @@ export default function GuidePage() {
             onStartTour={() => startTour(0)}
           />
 
+          <GuideSetupProgress
+            title={t("guide.sectionSetupProgress")}
+            hint={t("guide.setupProgressHint")}
+            labels={setupLabelsFixed}
+            auto={setupAuto}
+            manual={setupManual}
+            hrefForStep={hrefForSetupStep}
+            onSetManualOverride={setManualOverride}
+            statusDetectedAutoLabel={t("guide.detectedAutomatically")}
+            statusMarkedManualLabel={t("guide.markedManually")}
+            statusUncheckedManualLabel={t("guide.uncheckedManually")}
+            statusNotCompletedLabel={t("guide.notCompleted")}
+            markDoneLabel={t("guide.markStepDone")}
+            undoLabel={t("guide.undoMarkedStep")}
+            useAutomaticStatusLabel={t("guide.useAutomaticStatus")}
+            stepAriaLabel={(id, checked) =>
+              checked ? t("guide.setupStepDoneAria").replace("{step}", setupLabelsFixed[id]) : setupLabelsFixed[id]
+            }
+            stepNoteForStep={() => null}
+            goLabel={t("guide.setupGo")}
+            percentLabel={(n) => t("guide.setupPercent").replace("{n}", String(n))}
+          />
+
           <section className="space-y-4">
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
@@ -201,20 +291,18 @@ export default function GuidePage() {
               <p className="text-sm text-muted-foreground">{t("guide.tipInteractiveChecklist")}</p>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {quickRowsResolved.map((row, idx) => {
-                return (
-                  <GuideQuickStartCard
-                    key={row.id}
-                    index={idx + 1}
-                    title={t(row.titleKey)}
-                    description={t(row.descriptionKey)}
-                    whereToClick={t(row.whereKey)}
-                    actionLabel={t(row.actionKey)}
-                    href={row.href}
-                    icon={row.icon}
-                  />
-                )
-              })}
+              {quickRowsResolved.map((row, idx) => (
+                <GuideQuickStartCard
+                  key={row.id}
+                  index={idx + 1}
+                  title={t(row.titleKey)}
+                  description={t(row.descriptionKey)}
+                  whereToClick={t(row.whereKey)}
+                  actionLabel={t(row.actionKey)}
+                  href={row.href}
+                  icon={row.icon}
+                />
+              ))}
             </div>
           </section>
 
@@ -223,7 +311,7 @@ export default function GuidePage() {
               {t("guide.sectionCoreModules")}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {playbook.map((item, idx) => (
+              {playbookResolved.map((item, idx) => (
                 <Card
                   key={item.id}
                   className="flex h-full flex-col rounded-2xl border border-border/70 bg-card/95 shadow-sm shadow-slate-900/5"
@@ -244,10 +332,19 @@ export default function GuidePage() {
             </div>
           </section>
 
+          <GuideReferencePanel
+            searchPlaceholder={t("guide.moduleSearchPlaceholder")}
+            labelBullets={t("guide.labelBullets")}
+            labelSteps={t("guide.labelSteps")}
+            labelTip={t("guide.labelTip")}
+            t={t}
+            bookingPath={bookingPath}
+          />
+
           <section className="space-y-3">
             <h2 className="text-lg font-semibold tracking-tight text-foreground">{t("guide.faqTitle")}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
-              {faqKeys.map((faq) => (
+              {GUIDE_FAQ_KEYS.map((faq) => (
                 <details
                   key={faq.q}
                   className="group rounded-2xl border border-border/60 bg-muted/20 p-4 dark:bg-muted/10"
@@ -261,6 +358,17 @@ export default function GuidePage() {
             </div>
           </section>
 
+          <GuideFinalChecklist
+            title={t("guide.sectionWhatsNext")}
+            subtitle={t("guide.whatsNextSubtitle")}
+            items={whatsNextItems}
+          />
+
+          <div className="flex justify-center pb-4">
+            <Button type="button" variant="outline" className="rounded-xl" onClick={() => startTour(0)}>
+              {t("guide.restartTour")}
+            </Button>
+          </div>
         </div>
       </PageShell>
     </AppShell>
