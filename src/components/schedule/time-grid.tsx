@@ -14,7 +14,7 @@ export function TimeGrid({ gridHeightPx }: TimeGridProps) {
 
   return (
     <div
-      className="relative w-[4.25rem] shrink-0 border-r border-border/60 bg-background"
+      className="relative w-[4.25rem] shrink-0 overflow-hidden border-r border-border/60 bg-background"
       style={{ height: gridHeightPx }}
     >
       {labels.map((label) => {
@@ -23,7 +23,7 @@ export function TimeGrid({ gridHeightPx }: TimeGridProps) {
         return (
           <span
             key={label}
-            className="absolute left-0 right-0 px-2 text-[11px] font-medium leading-none tabular-nums text-muted-foreground"
+            className="pointer-events-none absolute left-0 right-0 z-0 px-2 text-[11px] font-medium leading-none tabular-nums text-muted-foreground"
             style={{ top: topPx }}
           >
             {label}

@@ -153,12 +153,6 @@ export function buildStaffColumns(
 
 export type ScheduleBlockLayoutTier = "full" | "compact" | "minimal"
 
-/** Minimalna wysokość bloku (px) — układ poziomy w jednym wierszu. */
-export function blockLayoutContentMinHeightPx(entry: ScheduleDayEntry): number {
-  if (entry.status === "cancelled") return 40
-  return Boolean(entry.service_name?.trim()) ? 44 : 40
-}
-
 export function scheduleBlockLayoutTier(
   heightPx: number,
   opts: { hasService: boolean; isCancelled: boolean },
@@ -182,17 +176,16 @@ export function scheduleBoardHourHeightPx(): number {
 export function blockLayout(
   entry: ScheduleDayEntry,
   range: { start: number; end: number; span: number },
-): { topPct: number; heightPx: number; clipped: boolean } {
+): { topPx: number; heightPx: number; clipped: boolean } {
   const startMin = parseTimeToMinutes(entry.appointment_time)
   const duration = Math.max(15, entry.duration_minutes)
   const endMin = startMin + duration
   const visibleStart = Math.max(startMin, range.start)
   const visibleEnd = Math.min(endMin, range.end)
   if (visibleEnd <= range.start || visibleStart >= range.end) {
-    return { topPct: 0, heightPx: 48, clipped: true }
+    return { topPx: 0, heightPx: scheduleBoardSlotHeightPx(), clipped: true }
   }
-  const topPct = ((visibleStart - range.start) / range.span) * 100
-  const durationHeightPx = (visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE
-  const heightPx = Math.max(blockLayoutContentMinHeightPx(entry), Math.round(durationHeightPx))
-  return { topPct, heightPx, clipped: startMin < range.start || endMin > range.end }
+  const topPx = Math.round((visibleStart - range.start) * SCHEDULE_BOARD_PX_PER_MINUTE)
+  const heightPx = Math.max(1, Math.round((visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE))
+  return { topPx, heightPx, clipped: startMin < range.start || endMin > range.end }
 }

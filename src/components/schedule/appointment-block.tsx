@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   accentClassForStatus,
-  scheduleBlockLayoutTier,
   statusBadgeClassForStatus,
   statusStripeColor,
 } from "@/lib/schedule/schedule-day-board"
@@ -24,7 +23,7 @@ import type { AppointmentStatus } from "@/types/domain"
 
 type AppointmentBlockProps = {
   entry: ScheduleDayEntry
-  topPct: number
+  topPx: number
   heightPx: number
   clipped?: boolean
   stackIndex?: number
@@ -44,9 +43,12 @@ type AppointmentBlockProps = {
   onConfirmCancel: () => void
 }
 
+/** Dwie linie tekstu + padding mieszczą się od ~52px wysokości bloku. */
+const TWO_LINE_MIN_HEIGHT_PX = 52
+
 export function AppointmentBlock({
   entry,
-  topPct,
+  topPx,
   heightPx,
   clipped,
   stackIndex = 0,
@@ -67,11 +69,12 @@ export function AppointmentBlock({
 }: AppointmentBlockProps) {
   const isCancelled = entry.status === "cancelled"
   const hasService = Boolean(entry.service_name?.trim())
-  const tier = scheduleBlockLayoutTier(heightPx, { hasService, isCancelled })
-  const showService = (tier === "full" || tier === "compact") && hasService && !isConfirmingCancel
   const blockHeightPx = isConfirmingCancel
     ? Math.max(heightPx, SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX)
     : heightPx
+  const showService =
+    !isConfirmingCancel && hasService && blockHeightPx >= TWO_LINE_MIN_HEIGHT_PX
+  const compactControls = blockHeightPx < TWO_LINE_MIN_HEIGHT_PX
 
   return (
     <div
@@ -82,7 +85,7 @@ export function AppointmentBlock({
         isConfirmingCancel && "z-30",
       )}
       style={{
-        top: `${topPct}%`,
+        top: topPx,
         height: blockHeightPx,
         maxWidth: "calc(100% - 0.75rem)",
         zIndex: isConfirmingCancel ? 30 : 10 + stackIndex,
@@ -92,34 +95,38 @@ export function AppointmentBlock({
     >
       <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5",
-          isConfirmingCancel ? "py-1.5" : "py-2",
+          "flex min-h-0 min-w-0 flex-1 gap-1.5 overflow-hidden px-2",
+          showService ? "items-start py-1.5" : "items-center py-1",
         )}
       >
-        <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <p
             className={cn(
-              "truncate font-medium text-foreground",
-              tier === "minimal" ? "text-xs leading-4" : "text-sm leading-5",
+              "truncate font-medium leading-4 text-foreground",
+              showService ? "text-sm leading-5" : "text-xs",
             )}
             title={entry.client_name}
           >
             {entry.client_name}
           </p>
           {showService ? (
-            <p className="truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
+            <p
+              className="mt-0.5 truncate text-xs leading-4 text-muted-foreground"
+              title={entry.service_name}
+            >
               {entry.service_name}
             </p>
           ) : null}
         </div>
 
         {!isConfirmingCancel ? (
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5 self-center">
             {isCancelled ? (
               <span
                 className={cn(
-                  "inline-flex max-w-[5.5rem] items-center truncate rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4",
+                  "inline-flex max-w-[4.75rem] items-center truncate rounded-full border px-1.5 py-px text-[9px] font-medium leading-4",
                   statusBadgeClassForStatus(entry.status),
+                  compactControls && "max-w-[3.75rem]",
                 )}
                 title={statusLabel(entry.status)}
               >
@@ -132,13 +139,14 @@ export function AppointmentBlock({
                     type="button"
                     aria-label={changeStatusLabel}
                     className={cn(
-                      "inline-flex max-w-[6.5rem] items-center gap-0.5 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4 outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50",
+                      "inline-flex max-w-[5.5rem] shrink-0 items-center gap-0.5 truncate rounded-full border px-1.5 py-px text-[9px] font-medium leading-4 outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring/50",
                       statusBadgeClassForStatus(entry.status),
+                      compactControls && "max-w-[4.25rem]",
                     )}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <span className="truncate">{statusLabel(entry.status)}</span>
-                    <ChevronDown className="size-3 shrink-0 opacity-70" aria-hidden />
+                    <ChevronDown className="size-2.5 shrink-0 opacity-70" aria-hidden />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[9rem]">
@@ -160,11 +168,14 @@ export function AppointmentBlock({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  className={cn(
+                    "shrink-0 text-muted-foreground hover:text-foreground",
+                    compactControls ? "size-6" : "size-7",
+                  )}
                   aria-label={changeStatusLabel}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreVertical className="size-4" />
+                  <MoreVertical className={compactControls ? "size-3.5" : "size-4"} />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[10rem]">
@@ -193,7 +204,7 @@ export function AppointmentBlock({
       </div>
 
       {isConfirmingCancel ? (
-        <div className="space-y-1.5 border-t border-border/60 bg-background/90 px-2.5 py-2">
+        <div className="shrink-0 space-y-1.5 border-t border-border/60 bg-background/95 px-2 py-1.5">
           <p className="text-[10px] leading-snug text-muted-foreground">{cancelConfirmMessage}</p>
           <div className="flex gap-1.5">
             <Button type="button" variant="outline" size="sm" className="h-7 flex-1 text-xs" onClick={onDismissCancel}>

@@ -74,14 +74,14 @@ export function StaffScheduleColumn({
           backgroundSize: `100% ${slotHeightPx}px`,
         }}
       >
-        <div className="relative min-w-0" style={{ height: gridHeightPx }}>
+        <div className="relative isolate min-w-0 bg-background" style={{ height: gridHeightPx }}>
           {column.entries.map((entry, index) => {
             const layout = blockLayout(entry, range)
             return (
               <AppointmentBlock
                 key={entry.id}
                 entry={entry}
-                topPct={layout.topPct}
+                topPx={layout.topPx}
                 heightPx={layout.heightPx}
                 clipped={layout.clipped}
                 stackIndex={index}
