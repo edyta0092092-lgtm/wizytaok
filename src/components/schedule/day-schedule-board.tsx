@@ -21,20 +21,13 @@ import { DayScheduleAppointmentCard } from "@/components/schedule/day-schedule-a
 type DayScheduleBoardProps = {
   columns: ScheduleStaffColumn[]
   visitCountLabel: (count: number) => string
-  confirmCancelForId: string | null
   cancellingId: string | null
   statusMenuOrder: AppointmentStatus[]
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
-  cancelConfirmMessage: string
-  cancelConfirmBack: string
-  cancelConfirmAction: string
-  loadingLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
-  onRequestCancel: (id: string) => void
-  onDismissCancel: () => void
-  onConfirmCancel: (id: string) => void
+  onCancelVisit: (id: string) => void
 }
 
 function TimeAxisColumn({ gridHeightPx }: { gridHeightPx: number }) {
@@ -77,39 +70,25 @@ function StaffColumn({
   gridHeightPx,
   visitCountLabel,
   blockLayouts,
-  confirmCancelForId,
   cancellingId,
   statusMenuOrder,
   statusLabel,
   changeStatusLabel,
   cancelLabel,
-  cancelConfirmMessage,
-  cancelConfirmBack,
-  cancelConfirmAction,
-  loadingLabel,
   onChangeStatus,
-  onRequestCancel,
-  onDismissCancel,
-  onConfirmCancel,
+  onCancelVisit,
 }: {
   column: ScheduleStaffColumn
   gridHeightPx: number
   visitCountLabel: (count: number) => string
   blockLayouts: ReturnType<typeof layoutColumnBlocks>
-  confirmCancelForId: string | null
   cancellingId: string | null
   statusMenuOrder: AppointmentStatus[]
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
-  cancelConfirmMessage: string
-  cancelConfirmBack: string
-  cancelConfirmAction: string
-  loadingLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
-  onRequestCancel: (id: string) => void
-  onDismissCancel: () => void
-  onConfirmCancel: (id: string) => void
+  onCancelVisit: (id: string) => void
 }) {
   const slotHeightPx = scheduleBoardSlotHeightPx()
 
@@ -151,20 +130,13 @@ function StaffColumn({
               laneIndex={layout.laneIndex}
               laneCount={layout.laneCount}
               clipped={layout.clipped}
-              isConfirmingCancel={confirmCancelForId === entry.id}
               isCancelling={cancellingId === entry.id}
               statusMenuOrder={statusMenuOrder}
               statusLabel={statusLabel}
               changeStatusLabel={changeStatusLabel}
               cancelLabel={cancelLabel}
-              cancelConfirmMessage={cancelConfirmMessage}
-              cancelConfirmBack={cancelConfirmBack}
-              cancelConfirmAction={cancelConfirmAction}
-              loadingLabel={loadingLabel}
               onChangeStatus={onChangeStatus}
-              onRequestCancel={onRequestCancel}
-              onDismissCancel={onDismissCancel}
-              onConfirmCancel={() => onConfirmCancel(entry.id)}
+              onCancelVisit={onCancelVisit}
             />
           )
         })}
@@ -176,20 +148,13 @@ function StaffColumn({
 export function DayScheduleBoard({
   columns,
   visitCountLabel,
-  confirmCancelForId,
   cancellingId,
   statusMenuOrder,
   statusLabel,
   changeStatusLabel,
   cancelLabel,
-  cancelConfirmMessage,
-  cancelConfirmBack,
-  cancelConfirmAction,
-  loadingLabel,
   onChangeStatus,
-  onRequestCancel,
-  onDismissCancel,
-  onConfirmCancel,
+  onCancelVisit,
 }: DayScheduleBoardProps) {
   const range = getScheduleBoardRangeMinutes()
   const gridHeightPx = scheduleBoardGridHeightPx()
@@ -206,20 +171,13 @@ export function DayScheduleBoard({
               gridHeightPx={gridHeightPx}
               visitCountLabel={visitCountLabel}
               blockLayouts={layoutColumnBlocks(column.entries, range)}
-              confirmCancelForId={confirmCancelForId}
               cancellingId={cancellingId}
               statusMenuOrder={statusMenuOrder}
               statusLabel={statusLabel}
               changeStatusLabel={changeStatusLabel}
               cancelLabel={cancelLabel}
-              cancelConfirmMessage={cancelConfirmMessage}
-              cancelConfirmBack={cancelConfirmBack}
-              cancelConfirmAction={cancelConfirmAction}
-              loadingLabel={loadingLabel}
               onChangeStatus={onChangeStatus}
-              onRequestCancel={onRequestCancel}
-              onDismissCancel={onDismissCancel}
-              onConfirmCancel={onConfirmCancel}
+              onCancelVisit={onCancelVisit}
             />
           ))}
         </div>

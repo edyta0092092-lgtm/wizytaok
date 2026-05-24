@@ -20,22 +20,15 @@ type DayScheduleModalProps = {
   entries: ScheduleDayEntry[]
   staffMembers: StaffMember[]
   staffNameById: Map<string, string>
-  confirmCancelForId: string | null
   cancellingId: string | null
   statusMenuOrder: AppointmentStatus[]
   visitCountLabel: (count: number) => string
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
-  cancelConfirmMessage: string
-  cancelConfirmBack: string
-  cancelConfirmAction: string
-  loadingLabel: string
   emptyLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
-  onRequestCancel: (id: string) => void
-  onDismissCancel: () => void
-  onConfirmCancel: (entry: ScheduleDayEntry) => void
+  onCancelVisit: (id: string) => void
 }
 
 const NARROW_VIEWPORT_QUERY = "(max-width: 639px)"
@@ -74,27 +67,19 @@ export function DayScheduleModal({
   entries,
   staffMembers,
   staffNameById,
-  confirmCancelForId,
   cancellingId,
   statusMenuOrder,
   visitCountLabel,
   statusLabel,
   changeStatusLabel,
   cancelLabel,
-  cancelConfirmMessage,
-  cancelConfirmBack,
-  cancelConfirmAction,
-  loadingLabel,
   emptyLabel,
   onChangeStatus,
-  onRequestCancel,
-  onDismissCancel,
-  onConfirmCancel,
+  onCancelVisit,
 }: DayScheduleModalProps) {
   const isNarrowViewport = useIsNarrowViewport()
   const timezone = useDisplayTimezone()
   const columns = buildStaffColumns(entries, staffMembers, staffNameById)
-  const entryById = new Map(entries.map((e) => [e.id, e]))
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -137,45 +122,25 @@ export function DayScheduleModal({
             ) : isNarrowViewport ? (
               <DayScheduleMobileList
                 entries={entries}
-                confirmCancelForId={confirmCancelForId}
                 cancellingId={cancellingId}
                 statusMenuOrder={statusMenuOrder}
                 statusLabel={statusLabel}
                 changeStatusLabel={changeStatusLabel}
                 cancelLabel={cancelLabel}
-                cancelConfirmMessage={cancelConfirmMessage}
-                cancelConfirmBack={cancelConfirmBack}
-                cancelConfirmAction={cancelConfirmAction}
-                loadingLabel={loadingLabel}
                 onChangeStatus={onChangeStatus}
-                onRequestCancel={onRequestCancel}
-                onDismissCancel={onDismissCancel}
-                onConfirmCancel={(id) => {
-                  const entry = entryById.get(id)
-                  if (entry) onConfirmCancel(entry)
-                }}
+                onCancelVisit={onCancelVisit}
               />
             ) : (
               <DayScheduleBoard
                 columns={columns}
                 visitCountLabel={visitCountLabel}
-                confirmCancelForId={confirmCancelForId}
                 cancellingId={cancellingId}
                 statusMenuOrder={statusMenuOrder}
                 statusLabel={statusLabel}
                 changeStatusLabel={changeStatusLabel}
                 cancelLabel={cancelLabel}
-                cancelConfirmMessage={cancelConfirmMessage}
-                cancelConfirmBack={cancelConfirmBack}
-                cancelConfirmAction={cancelConfirmAction}
-                loadingLabel={loadingLabel}
                 onChangeStatus={onChangeStatus}
-                onRequestCancel={onRequestCancel}
-                onDismissCancel={onDismissCancel}
-                onConfirmCancel={(id) => {
-                  const entry = entryById.get(id)
-                  if (entry) onConfirmCancel(entry)
-                }}
+                onCancelVisit={onCancelVisit}
               />
             )}
           </div>

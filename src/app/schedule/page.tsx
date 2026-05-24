@@ -123,7 +123,6 @@ export default function SchedulePage() {
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
-  const [confirmCancelForId, setConfirmCancelForId] = React.useState<string | null>(null)
   const [cancellingId, setCancellingId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -153,14 +152,15 @@ export default function SchedulePage() {
   )
 
   const cancelScheduleVisit = React.useCallback(
-    (row: ScheduleDayEntry) => {
+    (appointmentUiId: string) => {
+      if (cancellingId === appointmentUiId) return
       void (async () => {
-        setCancellingId(row.id)
+        setCancellingId(appointmentUiId)
         try {
-          const uuidSb = unwrapSupabaseBookingAppointmentId(row.id)
+          const uuidSb = unwrapSupabaseBookingAppointmentId(appointmentUiId)
           if (uuidSb) {
             const cancelRes = await fetchCancelBookingByCompany(
-              row.id,
+              appointmentUiId,
               language === "en" ? "en" : "pl",
               true,
             )
@@ -169,7 +169,7 @@ export default function SchedulePage() {
               return
             }
           } else {
-            const ok = await updateAppointmentStatus(row.id, "cancelled", {
+            const ok = await updateAppointmentStatus(appointmentUiId, "cancelled", {
               lastUpdatedBy: "business",
               lastStatusChangeSource: "manual",
             })
@@ -178,7 +178,11 @@ export default function SchedulePage() {
               return
             }
           }
-          setConfirmCancelForId(null)
+          setBookings((prev) =>
+            prev.map((row) =>
+              row.id === appointmentUiId ? { ...row, status: "cancelled" } : row,
+            ),
+          )
           setStatusNotice(t("appointments.statusUpdated"))
           refreshScheduleData()
         } finally {
@@ -186,7 +190,7 @@ export default function SchedulePage() {
         }
       })()
     },
-    [language, t, refreshScheduleData],
+    [cancellingId, language, t, refreshScheduleData],
   )
 
   const mapAppointmentToEntry = React.useCallback((row: Appointment): CalendarEntry | null => {
@@ -375,13 +379,8 @@ export default function SchedulePage() {
   )
 
   React.useEffect(() => {
-    if (!detailDate) {
-      setConfirmCancelForId(null)
-      return
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.info("[schedule.day.bookings]", { date: detailDate, bookings: detailRows })
-    }
+    if (!detailDate || process.env.NODE_ENV !== "development") return
+    console.info("[schedule.day.bookings]", { date: detailDate, bookings: detailRows })
   }, [detailDate, detailRows])
 
   const goPrev = () => setYm((p) => (p.month === 1 ? { year: p.year - 1, month: 12 } : { year: p.year, month: p.month - 1 }))
@@ -550,10 +549,7 @@ export default function SchedulePage() {
       <DayScheduleModal
         open={detailDate != null}
         onOpenChange={(open) => {
-          if (!open) {
-            setDetailDate(null)
-            setConfirmCancelForId(null)
-          }
+          if (!open) setDetailDate(null)
         }}
         dayTitle={
           detailDate
@@ -570,7 +566,6 @@ export default function SchedulePage() {
         entries={detailRows}
         staffMembers={visibleStaff.length > 0 ? visibleStaff : staffMembers}
         staffNameById={staffNameById}
-        confirmCancelForId={confirmCancelForId}
         cancellingId={cancellingId}
         statusMenuOrder={STATUS_MENU_ORDER}
         visitCountLabel={visitCountLabel}
@@ -579,15 +574,9 @@ export default function SchedulePage() {
         }
         changeStatusLabel={t("appointments.changeStatusAction")}
         cancelLabel={t("appointments.cancelVisit")}
-        cancelConfirmMessage={t("appointments.cancelVisitConfirmMessage")}
-        cancelConfirmBack={t("appointments.cancelVisitConfirmBack")}
-        cancelConfirmAction={t("appointments.cancelVisitConfirmAction")}
-        loadingLabel={t("bookings.loading")}
         emptyLabel="Brak zaplanowanych wizyt"
         onChangeStatus={changeScheduleBookingStatus}
-        onRequestCancel={setConfirmCancelForId}
-        onDismissCancel={() => setConfirmCancelForId(null)}
-        onConfirmCancel={cancelScheduleVisit}
+        onCancelVisit={cancelScheduleVisit}
       />
     </AppShell>
   )
