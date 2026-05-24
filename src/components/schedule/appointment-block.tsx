@@ -57,7 +57,7 @@ function StatusActions({
   return (
     <div
       className={cn(
-        "grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center",
+        "grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center",
         compact ? "h-5 gap-0.5" : "h-7 gap-1",
       )}
     >
@@ -117,23 +117,18 @@ export function AppointmentBlock({
   onConfirmCancel,
 }: AppointmentBlockProps) {
   const isCancelled = entry.status === "cancelled"
-  const tier = scheduleBlockLayoutTier(heightPx)
+  const hasService = Boolean(entry.service_name?.trim())
+  const tier = scheduleBlockLayoutTier(heightPx, { hasService, isCancelled })
+  const showService = tier === "full" && hasService
   const blockHeightPx = isConfirmingCancel
     ? Math.max(heightPx, SCHEDULE_BLOCK_MIN_HEIGHT_CONFIRM_PX)
     : heightPx
 
-  const gridRows =
-    tier === "full"
-      ? "1.25rem 1rem 1.75rem"
-      : tier === "compact"
-        ? "1.25rem 1.75rem"
-        : "1rem 1.25rem"
-
   return (
     <div
       className={cn(
-        "absolute inset-x-1 box-border grid min-w-0 content-start overflow-hidden rounded-lg border",
-        tier === "minimal" ? "gap-0.5 px-1.5 py-0.5" : "gap-1 px-2 py-1.5",
+        "absolute inset-x-1 box-border flex min-w-0 flex-col overflow-hidden rounded-lg border",
+        tier === "minimal" ? "gap-0.5 px-1.5 py-1" : "gap-1 px-2 py-1.5",
         accentClassForStatus(entry.status),
         clipped && "ring-1 ring-amber-300/60",
         isConfirmingCancel && "z-30 shadow-md",
@@ -141,7 +136,6 @@ export function AppointmentBlock({
       style={{
         top: `${topPct}%`,
         height: blockHeightPx,
-        gridTemplateRows: isConfirmingCancel ? undefined : gridRows,
         maxWidth: "calc(100% - 0.5rem)",
         zIndex: isConfirmingCancel ? 30 : 10 + stackIndex,
         borderLeftWidth: 3,
@@ -150,10 +144,12 @@ export function AppointmentBlock({
     >
       {isConfirmingCancel ? (
         <>
-          <p className="truncate text-xs font-medium leading-4 text-foreground" title={entry.client_name}>
-            {entry.client_name}
-          </p>
-          <div className="space-y-1 overflow-hidden rounded-md bg-background/80 p-1">
+          <div className="h-5 shrink-0 overflow-hidden">
+            <p className="truncate text-sm font-medium leading-5 text-foreground" title={entry.client_name}>
+              {entry.client_name}
+            </p>
+          </div>
+          <div className="min-h-0 flex-1 space-y-1 overflow-hidden rounded-md bg-background/80 p-1">
             <p className="line-clamp-2 text-[10px] leading-snug text-muted-foreground">{cancelConfirmMessage}</p>
             <div className="grid grid-cols-2 gap-1">
               <Button
@@ -180,38 +176,54 @@ export function AppointmentBlock({
         </>
       ) : (
         <>
-          <p
+          <div
             className={cn(
-              "min-w-0 truncate font-medium text-foreground",
-              tier === "minimal" ? "text-[11px] leading-4" : "text-sm leading-5",
+              "shrink-0 overflow-hidden",
+              tier === "minimal" ? "h-4" : "h-5",
             )}
-            title={entry.client_name}
           >
-            {entry.client_name}
-          </p>
-
-          {tier === "full" && entry.service_name?.trim() ? (
-            <p className="min-w-0 truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
-              {entry.service_name}
+            <p
+              className={cn(
+                "truncate font-medium text-foreground",
+                tier === "minimal" ? "text-[11px] leading-4" : "text-sm leading-5",
+              )}
+              title={entry.client_name}
+            >
+              {entry.client_name}
             </p>
+          </div>
+
+          {showService ? (
+            <div className="h-4 shrink-0 overflow-hidden">
+              <p className="truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
+                {entry.service_name}
+              </p>
+            </div>
           ) : null}
 
-          {isCancelled ? (
-            <p className="min-w-0 truncate text-[10px] leading-4 text-muted-foreground" title={statusLabel(entry.status)}>
-              {statusLabel(entry.status)}
-            </p>
-          ) : (
-            <StatusActions
-              entry={entry}
-              statusMenuOrder={statusMenuOrder}
-              statusLabel={statusLabel}
-              changeStatusLabel={changeStatusLabel}
-              cancelLabel={cancelLabel}
-              compact={tier === "minimal"}
-              onChangeStatus={onChangeStatus}
-              onRequestCancel={onRequestCancel}
-            />
-          )}
+          <div
+            className={cn(
+              "mt-auto shrink-0 overflow-hidden",
+              isCancelled ? "h-4" : tier === "minimal" ? "h-5" : "h-7",
+            )}
+          >
+            {isCancelled ? (
+              <p className="truncate text-[10px] leading-4 text-muted-foreground" title={statusLabel(entry.status)}>
+                {statusLabel(entry.status)}
+              </p>
+            ) : (
+              <StatusActions
+                entry={entry}
+                statusMenuOrder={statusMenuOrder}
+                statusLabel={statusLabel}
+                changeStatusLabel={changeStatusLabel}
+                cancelLabel={cancelLabel}
+                compact={tier === "minimal"}
+                onChangeStatus={onChangeStatus}
+                onRequestCancel={onRequestCancel}
+              />
+            )}
+          </div>
         </>
       )}
     </div>

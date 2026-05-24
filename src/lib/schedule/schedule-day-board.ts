@@ -116,9 +116,24 @@ export function buildStaffColumns(
 
 export type ScheduleBlockLayoutTier = "full" | "compact" | "minimal"
 
-export function scheduleBlockLayoutTier(heightPx: number): ScheduleBlockLayoutTier {
-  if (heightPx >= 88) return "full"
-  if (heightPx >= 52) return "compact"
+/** Minimalna wysokość treści (px) — suma stałych slotów + padding bloku. */
+export function blockLayoutContentMinHeightPx(entry: ScheduleDayEntry): number {
+  const hasService = Boolean(entry.service_name?.trim())
+  if (entry.status === "cancelled") {
+    return hasService ? 52 : 36
+  }
+  return hasService ? 76 : 60
+}
+
+export function scheduleBlockLayoutTier(
+  heightPx: number,
+  opts: { hasService: boolean; isCancelled: boolean },
+): ScheduleBlockLayoutTier {
+  if (opts.isCancelled) {
+    return opts.hasService && heightPx >= 52 ? "full" : "compact"
+  }
+  if (heightPx >= 88 && opts.hasService) return "full"
+  if (heightPx >= 56) return "compact"
   return "minimal"
 }
 
@@ -140,6 +155,6 @@ export function blockLayout(
   }
   const topPct = ((visibleStart - range.start) / range.span) * 100
   const durationHeightPx = (visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE
-  const heightPx = Math.max(entry.status === "cancelled" ? 40 : 44, Math.round(durationHeightPx))
+  const heightPx = Math.max(blockLayoutContentMinHeightPx(entry), Math.round(durationHeightPx))
   return { topPct, heightPx, clipped: startMin < range.start || endMin > range.end }
 }
