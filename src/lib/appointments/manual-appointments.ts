@@ -17,6 +17,7 @@ export type ManualAppointment = {
     | "pending"
     | "cancelled"
     | "no_show"
+    | "completed"
   note?: string
   /** Tekst zapisywanej przez firmę propozycji alternatywnego terminu dla klienta (MVP localStorage). */
   businessNote?: string
@@ -73,7 +74,8 @@ function normalizeManual(raw: unknown): ManualAppointment | null {
       status !== "confirmed" &&
       status !== "pending" &&
       status !== "cancelled" &&
-      status !== "no_show")
+      status !== "no_show" &&
+      status !== "completed")
   ) {
     return null
   }

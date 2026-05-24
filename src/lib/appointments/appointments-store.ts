@@ -263,7 +263,8 @@ function mapAppointmentStatusToPublicStatus(status: AppointmentStatus): PublicBo
     status === "pending" ||
     status === "confirmed" ||
     status === "cancelled" ||
-    status === "no_show"
+    status === "no_show" ||
+    status === "completed"
   ) {
     return status
   }
@@ -277,6 +278,7 @@ function mapAppointmentStatusToManualStatus(
   | "confirmed"
   | "cancelled"
   | "no_show"
+  | "completed"
   | "pending"
   | null {
   if (
@@ -284,7 +286,8 @@ function mapAppointmentStatusToManualStatus(
     status === "pending" ||
     status === "confirmed" ||
     status === "cancelled" ||
-    status === "no_show"
+    status === "no_show" ||
+    status === "completed"
   ) {
     return status
   }

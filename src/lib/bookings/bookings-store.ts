@@ -77,6 +77,8 @@ function mapDbStatusToAppointmentStatus(s: string): AppointmentStatus {
       return "cancelled"
     case "no_show":
       return "no_show"
+    case "completed":
+      return "completed"
     case "reschedule_requested":
     case "business_reschedule_proposed":
     case "booked":
@@ -86,7 +88,6 @@ function mapDbStatusToAppointmentStatus(s: string): AppointmentStatus {
 }
 
 function mapAppointmentStatusToDb(s: AppointmentStatus): string {
-  if (s === "completed") return "cancelled"
   return s
 }
 

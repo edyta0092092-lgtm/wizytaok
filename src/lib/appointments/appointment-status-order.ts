@@ -1,4 +1,9 @@
 import type { AppointmentStatus } from "@/types/domain"
 
 /** Kolejność statusów w menu „Zmień status” na liście wizyt. */
-export const APPOINTMENT_ROW_STATUS_ORDER: AppointmentStatus[] = ["confirmed", "cancelled"]
+export const APPOINTMENT_ROW_STATUS_ORDER: AppointmentStatus[] = [
+  "confirmed",
+  "completed",
+  "no_show",
+  "cancelled",
+]

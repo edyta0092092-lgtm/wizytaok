@@ -9,6 +9,7 @@ export type PublicBookingStatus =
   | "confirmed"
   | "cancelled"
   | "no_show"
+  | "completed"
 
 export type PublicBooking = {
   id: string
@@ -128,6 +129,7 @@ function parseStoredBookingStatus(raw: unknown): PublicBookingStatus {
   if (raw === "confirmed") return "confirmed"
   if (raw === "cancelled") return "cancelled"
   if (raw === "no_show") return "no_show"
+  if (raw === "completed") return "completed"
   if (
     raw === "reschedule_requested" ||
     raw === "change_requested" ||
@@ -576,6 +578,8 @@ function mapPublicStatusToAppointmentStatus(s: PublicBookingStatus): Appointment
       return "cancelled"
     case "no_show":
       return "no_show"
+    case "completed":
+      return "completed"
     default:
       return "booked"
   }

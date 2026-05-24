@@ -62,11 +62,13 @@ export function AppointmentRowActions({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            {statusOrder.map((s) => (
-              <DropdownMenuItem key={s} onClick={() => onChangeStatus(s)}>
-                {t(`labels.appointmentStatus.${s}` as "labels.appointmentStatus.booked")}
-              </DropdownMenuItem>
-            ))}
+            {statusOrder
+              .filter((s) => s !== status)
+              .map((s) => (
+                <DropdownMenuItem key={s} onClick={() => onChangeStatus(s)}>
+                  {t(`labels.appointmentStatus.${s}` as "labels.appointmentStatus.booked")}
+                </DropdownMenuItem>
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
