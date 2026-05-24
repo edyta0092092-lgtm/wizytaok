@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
+import { getBookingsForBusinessMonth } from "@/lib/bookings/bookings-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getPublicBookings } from "@/lib/bookings/public-bookings"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
@@ -111,6 +112,7 @@ export default function SchedulePage() {
   const [statusNotice, setStatusNotice] = React.useState("")
   const [cancellingId, setCancellingId] = React.useState<string | null>(null)
   const cancellingIdRef = React.useRef<string | null>(null)
+  const scheduleBookingsLoadedRef = React.useRef(false)
 
   React.useEffect(() => {
     if (!statusNotice) return
@@ -253,46 +255,69 @@ export default function SchedulePage() {
     window.addEventListener("pw-bookings", forceReload)
     window.addEventListener("pw-public-bookings", forceReload)
     window.addEventListener("pw-manual-appointments", forceReload)
-    window.addEventListener("pw-staff", forceReload)
-    window.addEventListener("focus", forceReload)
     return () => {
       window.removeEventListener("pw-bookings", forceReload)
       window.removeEventListener("pw-public-bookings", forceReload)
       window.removeEventListener("pw-manual-appointments", forceReload)
-      window.removeEventListener("pw-staff", forceReload)
-      window.removeEventListener("focus", forceReload)
     }
   }, [])
 
   React.useEffect(() => {
+    if (!access.ready) return
     let cancelled = false
     void (async () => {
-      setLoading(true)
-      setLoadError(false)
+      const client = getBrowserClient()
+      if (!client || !isSupabaseConfigured() || !access.businessId) {
+        if (!cancelled) setStaffMembers([])
+        return
+      }
+      try {
+        const staff = await getStaffForBusiness(client, access.businessId)
+        if (!cancelled) setStaffMembers(staff)
+      } catch {
+        if (!cancelled) setStaffMembers([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [access.ready, access.businessId])
+
+  React.useEffect(() => {
+    if (!access.ready) return
+    let cancelled = false
+    const showBlockingLoader = !scheduleBookingsLoadedRef.current
+    if (showBlockingLoader) setLoading(true)
+    setLoadError(false)
+    void (async () => {
       try {
         const client = getBrowserClient()
         if (!client || !isSupabaseConfigured()) {
-          if (!cancelled) {
-            setBookings([])
-            setStaffMembers([])
-          }
+          if (!cancelled) setBookings([])
           return
         }
-        const [mergedAppointments, staff] = await Promise.all([
-          fetchMergedAppointments(),
-          access.businessId ? getStaffForBusiness(client, access.businessId) : Promise.resolve([]),
-        ])
-        const monthEntries = mergedAppointments
+        let monthAppointments: Awaited<ReturnType<typeof fetchMergedAppointments>> = []
+        if (access.businessId) {
+          monthAppointments = await getBookingsForBusinessMonth(
+            client,
+            access.businessId,
+            ym.year,
+            ym.month,
+          )
+        } else {
+          const merged = await fetchMergedAppointments({ businessId: access.businessId })
+          monthAppointments = merged.filter((row) => {
+            const dt = new Date(row.startsAt)
+            if (Number.isNaN(dt.getTime())) return false
+            return dt.getFullYear() === ym.year && dt.getMonth() + 1 === ym.month
+          })
+        }
+        const monthEntries = monthAppointments
           .map(mapAppointmentToEntry)
           .filter((row): row is CalendarEntry => row != null)
-          .filter((row) => {
-            const year = Number(row.appointment_date.slice(0, 4))
-            const month = Number(row.appointment_date.slice(5, 7))
-            return year === ym.year && month === ym.month
-          })
         if (!cancelled) {
           setBookings(monthEntries)
-          setStaffMembers(staff)
+          scheduleBookingsLoadedRef.current = true
         }
       } catch (error) {
         if (process.env.NODE_ENV === "development") {
@@ -302,13 +327,13 @@ export default function SchedulePage() {
         }
         if (!cancelled) setLoadError(true)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && showBlockingLoader) setLoading(false)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [ym, access.businessId, mapAppointmentToEntry, refreshTick])
+  }, [ym, access.ready, access.businessId, mapAppointmentToEntry, refreshTick])
 
   const visibleStaff = React.useMemo(() => {
     if (access.effectiveRole !== "staff") return staffMembers

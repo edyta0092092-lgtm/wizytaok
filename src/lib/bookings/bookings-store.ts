@@ -42,6 +42,9 @@ export function resolveSupabaseBookingRowUuidFromUiId(uiId: string): string | nu
 
 function dispatchBookingsUpdated() {
   if (typeof window === "undefined") return
+  void import("@/lib/appointments/merged-appointments-cache").then((m) => {
+    m.invalidateMergedAppointmentsCache()
+  })
   window.dispatchEvent(new Event("pw-bookings"))
 }
 
@@ -349,6 +352,20 @@ export function publicBookingPatchToDbUpdate(patch: Partial<PublicBooking>): Tab
   return out
 }
 
+const businessSlugById = new Map<string, string>()
+
+async function resolveBusinessSlug(
+  client: BookingsStoreClient,
+  businessId: string,
+): Promise<string> {
+  const cached = businessSlugById.get(businessId)
+  if (cached !== undefined) return cached
+  const { data: bp } = await client.from("business_profiles").select("slug").eq("id", businessId).maybeSingle()
+  const slug = bp?.slug?.trim() ?? ""
+  businessSlugById.set(businessId, slug)
+  return slug
+}
+
 export async function getBookingsForBusiness(
   client: BookingsStoreClient | null,
   businessId: string | null,
@@ -365,12 +382,49 @@ export async function getBookingsForBusiness(
   return data.map((row) => mapBookingRowToAppointment(row as Tables<"bookings">, businessSlug))
 }
 
-export async function getBookingsForCurrentBusiness(client: BookingsStoreClient | null): Promise<Appointment[]> {
+export async function getBookingsForBusinessBetweenDates(
+  client: BookingsStoreClient | null,
+  businessId: string,
+  businessSlug: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Appointment[]> {
+  if (!isSupabaseBookingsPath(client, businessId)) return []
+  const { data, error } = await client!
+    .from("bookings")
+    .select("*")
+    .eq("business_id", businessId)
+    .gte("appointment_date", fromDate)
+    .lte("appointment_date", toDate)
+    .order("appointment_date", { ascending: true })
+    .order("appointment_time", { ascending: true })
+  if (error || !data) return []
+  return data.map((row) => mapBookingRowToAppointment(row as Tables<"bookings">, businessSlug))
+}
+
+export async function getBookingsForBusinessMonth(
+  client: BookingsStoreClient | null,
+  businessId: string,
+  year: number,
+  month: number,
+): Promise<Appointment[]> {
+  if (!client || !isSupabaseConfigured()) return []
+  const slug = await resolveBusinessSlug(client, businessId)
+  const lastDay = new Date(year, month, 0).getDate()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const fromDate = `${year}-${pad(month)}-01`
+  const toDate = `${year}-${pad(month)}-${pad(lastDay)}`
+  return getBookingsForBusinessBetweenDates(client, businessId, slug, fromDate, toDate)
+}
+
+export async function getBookingsForCurrentBusiness(
+  client: BookingsStoreClient | null,
+  knownBusinessId?: string | null,
+): Promise<Appointment[]> {
   if (!isSupabaseConfigured() || !client) return []
-  const bid = await getCurrentBusinessProfileIdForClient(client)
+  const bid = knownBusinessId?.trim() || (await getCurrentBusinessProfileIdForClient(client))
   if (!bid) return []
-  const { data: bp } = await client.from("business_profiles").select("slug").eq("id", bid).maybeSingle()
-  const slug = bp?.slug?.trim() ?? ""
+  const slug = await resolveBusinessSlug(client, bid)
   return getBookingsForBusiness(client, bid, slug)
 }
 

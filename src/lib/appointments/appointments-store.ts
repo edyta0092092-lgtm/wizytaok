@@ -17,6 +17,12 @@ import {
   unwrapPublicAppointmentId,
 } from "@/lib/bookings/public-bookings"
 import {
+  getCachedMergedAppointments,
+  invalidateMergedAppointmentsCache,
+  mergedAppointmentsCacheKey,
+  setCachedMergedAppointments,
+} from "@/lib/appointments/merged-appointments-cache"
+import {
   getBookingsForCurrentBusiness,
   SB_BOOKING_PREFIX,
   unwrapSupabaseBookingAppointmentId,
@@ -154,7 +160,20 @@ function applyStatusOverrides(rows: Appointment[]): Appointment[] {
   })
 }
 
-export async function fetchMergedAppointments(): Promise<Appointment[]> {
+export type FetchMergedAppointmentsOptions = {
+  businessId?: string | null
+  force?: boolean
+}
+
+export async function fetchMergedAppointments(
+  options: FetchMergedAppointmentsOptions = {},
+): Promise<Appointment[]> {
+  const cacheKey = mergedAppointmentsCacheKey(options.businessId)
+  if (!options.force) {
+    const cached = getCachedMergedAppointments(cacheKey)
+    if (cached) return cached
+  }
+
   const fromManual = getManualAppointments().map(mapManualToAppointment)
   let fromPublicBooks = getPublicBookings()
   let fromSupabase: Appointment[] = []
@@ -163,10 +182,11 @@ export async function fetchMergedAppointments(): Promise<Appointment[]> {
   if (typeof window !== "undefined" && isSupabaseConfigured()) {
     const client = getBrowserClient()
     if (client) {
-      const bid = await getCurrentBusinessProfileIdForClient(client)
+      const bid =
+        options.businessId?.trim() || (await getCurrentBusinessProfileIdForClient(client))
       if (bid) {
         seedAppointments = []
-        fromSupabase = await getBookingsForCurrentBusiness(client)
+        fromSupabase = await getBookingsForCurrentBusiness(client, bid)
         fromPublicBooks = fromPublicBooks.filter(
           (b) => normalizePublicSlug(b.businessSlug) === DEMO_BOOKING_SLUG
         )
@@ -177,8 +197,12 @@ export async function fetchMergedAppointments(): Promise<Appointment[]> {
   const merged = dedupeAppointments([...seedAppointments, ...fromManual, ...fromSupabase, ...fromPublic]).sort(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
   )
-  return applyStatusOverrides(merged)
+  const withOverrides = applyStatusOverrides(merged)
+  setCachedMergedAppointments(cacheKey, withOverrides)
+  return withOverrides
 }
+
+export { invalidateMergedAppointmentsCache }
 
 /** @deprecated Użyj fetchMergedAppointments - zostawione dla krótkich sync odświeżeń tylko lokalnych. */
 export function getAllAppointments(): Appointment[] {
@@ -207,43 +231,67 @@ export type AppointmentsStoreSnapshot = {
   loadError: boolean
 }
 
-export function useAppointmentsStore(): AppointmentsStoreSnapshot {
+export function useAppointmentsStore(businessId?: string | null): AppointmentsStoreSnapshot {
   const [appointments, setAppointments] = React.useState<Appointment[]>([])
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState(false)
 
   React.useEffect(() => {
-    const sync = () => {
+    let debounceId: ReturnType<typeof setTimeout> | null = null
+    let cancelled = false
+
+    const runSync = (force = false) => {
       void (async () => {
         try {
-          const next = await fetchMergedAppointments()
-          queueMicrotask(() => {
-            setAppointments(next)
-            setLoadError(false)
-            setReady(true)
-          })
+          const next = await fetchMergedAppointments({ businessId, force })
+          if (cancelled) return
+          setAppointments(next)
+          setLoadError(false)
+          setReady(true)
         } catch {
-          queueMicrotask(() => {
-            setLoadError(true)
-            setReady(true)
-          })
+          if (cancelled) return
+          setLoadError(true)
+          setReady(true)
         }
       })()
     }
-    sync()
-    window.addEventListener("pw-public-bookings", sync)
-    window.addEventListener("pw-manual-appointments", sync)
-    window.addEventListener("pw-appointments-overrides", sync)
-    window.addEventListener("pw-bookings", sync)
-    window.addEventListener("focus", sync)
-    return () => {
-      window.removeEventListener("pw-public-bookings", sync)
-      window.removeEventListener("pw-manual-appointments", sync)
-      window.removeEventListener("pw-appointments-overrides", sync)
-      window.removeEventListener("pw-bookings", sync)
-      window.removeEventListener("focus", sync)
+
+    const scheduleSync = (force = false) => {
+      if (debounceId) clearTimeout(debounceId)
+      debounceId = setTimeout(() => runSync(force), 120)
     }
-  }, [])
+
+    const cached = getCachedMergedAppointments(mergedAppointmentsCacheKey(businessId))
+    if (cached) {
+      setAppointments(cached)
+      setReady(true)
+      setLoadError(false)
+    }
+
+    if (isSupabaseConfigured() && !businessId?.trim()) {
+      return () => {
+        cancelled = true
+        if (debounceId) clearTimeout(debounceId)
+      }
+    }
+
+    runSync(Boolean(cached))
+
+    const onBookings = () => scheduleSync(true)
+    const onLocal = () => scheduleSync(true)
+    window.addEventListener("pw-public-bookings", onLocal)
+    window.addEventListener("pw-manual-appointments", onLocal)
+    window.addEventListener("pw-appointments-overrides", onLocal)
+    window.addEventListener("pw-bookings", onBookings)
+    return () => {
+      cancelled = true
+      if (debounceId) clearTimeout(debounceId)
+      window.removeEventListener("pw-public-bookings", onLocal)
+      window.removeEventListener("pw-manual-appointments", onLocal)
+      window.removeEventListener("pw-appointments-overrides", onLocal)
+      window.removeEventListener("pw-bookings", onBookings)
+    }
+  }, [businessId])
 
   return { appointments, ready, loadError }
 }

@@ -25,7 +25,7 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 export function AppointmentsPageInner() {
   const { ready: accessReady, canDeleteBookings, businessId } = useBusinessAccess()
   const { t, language } = useTranslations()
-  const { appointments } = useAppointmentsStore()
+  const { appointments } = useAppointmentsStore(accessReady ? businessId : undefined)
   const { filter, setFilter, staffFilter, restrictToToday, setStaffFilterAndUrl } =
     useAppointmentsUrlSyncedFilters()
   const { allStaffMembers, staffLoading, staffLoadError, staffSelectOptions } =

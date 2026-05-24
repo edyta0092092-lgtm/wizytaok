@@ -36,6 +36,7 @@ import {
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { normalizeBusinessMemberPanelRole } from "@/lib/auth/permissions"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -190,11 +191,12 @@ function OnboardingChecklistCard({
 export default function DashboardPage() {
   const router = useRouter()
   const { t, language } = useTranslations()
+  const { ready: accessReady, businessId } = useBusinessAccess()
   const {
     appointments: allAppointments,
     ready: appointmentsReady,
     loadError: appointmentsLoadError,
-  } = useAppointmentsStore()
+  } = useAppointmentsStore(accessReady ? businessId : undefined)
   const appToday = React.useMemo(() => getAppToday(), [])
   const [statusNotice, setStatusNotice] = React.useState("")
   const [statsLoading, setStatsLoading] = React.useState(true)

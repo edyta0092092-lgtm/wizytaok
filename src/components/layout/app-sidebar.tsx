@@ -24,13 +24,13 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { t, language, setLanguage, theme, setTheme } = useTranslations()
-  const { ready, effectiveRole } = useBusinessAccess()
+  const { ready, effectiveRole, businessId } = useBusinessAccess()
   const [showLogout, setShowLogout] = React.useState(false)
   const {
     appointments: allAppointments,
     ready: appointmentsReady,
     loadError: appointmentsLoadError,
-  } = useAppointmentsStore()
+  } = useAppointmentsStore(ready ? businessId : undefined)
   const appToday = React.useMemo(() => getAppToday(), [])
 
   React.useEffect(() => {
