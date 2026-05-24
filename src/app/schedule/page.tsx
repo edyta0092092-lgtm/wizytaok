@@ -31,8 +31,6 @@ type CalendarEntry = ScheduleDayEntry & {
   reminder_sent_at: string | null
 }
 
-type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
-
 const DAY_PREVIEW_LIMIT = 3
 
 function pad2(n: number): string {
@@ -93,16 +91,6 @@ function visitCountLabel(count: number): string {
   return `${count} wizyt`
 }
 
-function matchesViewFilter(row: CalendarEntry, filter: ViewFilter): boolean {
-  const status = normalizeStatus(row.status)
-  if (filter === "cancelled") return status === "cancelled"
-  if (status === "cancelled") return false
-  if (filter === "active") return true
-  if (filter === "pending") return status === "confirmed"
-  if (filter === "confirmed") return status === "confirmed"
-  return true
-}
-
 const STATUS_MENU_ORDER: AppointmentStatus[] = ["confirmed", "no_show", "completed"]
 
 export default function SchedulePage() {
@@ -118,7 +106,6 @@ export default function SchedulePage() {
   const [loadError, setLoadError] = React.useState(false)
   const [linkedStaffId, setLinkedStaffId] = React.useState<string | null | undefined>(undefined)
   const [personFilter, setPersonFilter] = React.useState("")
-  const [viewFilter, setViewFilter] = React.useState<ViewFilter>("all")
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
@@ -342,7 +329,7 @@ export default function SchedulePage() {
 
   const filteredBookings = React.useMemo(() => {
     const out = bookings
-      .filter((row) => matchesViewFilter(row, viewFilter))
+      .filter((row) => normalizeStatus(row.status) !== "cancelled")
       .filter((row) => {
         if (!effectivePersonFilter) return true
         return (row.staff_id ?? "") === effectivePersonFilter
@@ -353,7 +340,7 @@ export default function SchedulePage() {
       return compareBookings(a, b)
     })
     return out
-  }, [bookings, viewFilter, effectivePersonFilter])
+  }, [bookings, effectivePersonFilter])
 
   const bookingsByDate = React.useMemo(() => {
     const map = new Map<string, CalendarEntry[]>()
@@ -422,22 +409,6 @@ export default function SchedulePage() {
                     {row.name}
                   </option>
                 ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="sch-view" className="text-xs text-muted-foreground">
-                Widok
-              </Label>
-              <select
-                id="sch-view"
-                className="h-9 min-w-[12rem] rounded-md border border-input bg-background px-2 text-sm"
-                value={viewFilter}
-                onChange={(e) => setViewFilter(e.target.value as ViewFilter)}
-              >
-                <option value="all">Wszyscy</option>
-                <option value="active">Tylko aktywne</option>
-                <option value="cancelled">Tylko anulowane</option>
-                <option value="confirmed">Tylko potwierdzone</option>
               </select>
             </div>
           </div>
