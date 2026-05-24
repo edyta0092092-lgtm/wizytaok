@@ -450,14 +450,19 @@ export default function SchedulePage() {
                 const preview = rows.slice(0, DAY_PREVIEW_LIMIT)
                 const more = Math.max(0, rows.length - DAY_PREVIEW_LIMIT)
                 const isToday = key === todayKey
+                const hasVisits = rows.length > 0
                 return (
                   <button
                     type="button"
                     key={key}
                     onClick={() => setDetailDate(key)}
                     className={cn(
-                      "flex min-h-[6.75rem] flex-col rounded-xl border bg-card p-2 text-left shadow-sm transition-colors hover:bg-muted/25",
-                      isToday ? "border-primary/40 ring-1 ring-primary/20" : "border-border/80",
+                      "flex min-h-[6.75rem] flex-col rounded-xl border p-2 text-left shadow-sm transition-colors",
+                      hasVisits
+                        ? "border-yellow-300/90 bg-yellow-50 hover:bg-yellow-100/90 dark:border-yellow-700 dark:bg-yellow-950/50 dark:hover:bg-yellow-950/70"
+                        : "border-border/80 bg-card hover:bg-muted/25",
+                      isToday && "ring-1 ring-primary/20",
+                      isToday && (hasVisits ? "border-primary/35" : "border-primary/40"),
                     )}
                   >
                     <div className="flex items-start justify-between gap-1.5">
