@@ -61,13 +61,13 @@ export function staffInitials(name: string): string {
 export function accentClassForStatus(status: AppointmentStatus): string {
   switch (status) {
     case "cancelled":
-      return "border-border/80 bg-muted/40 text-muted-foreground"
+      return "border-border/80 bg-muted text-muted-foreground"
     case "no_show":
-      return "border-amber-200/90 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/40"
+      return "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950"
     case "completed":
-      return "border-violet-200/90 bg-violet-50/90 dark:border-violet-800/60 dark:bg-violet-950/35"
+      return "border-violet-200 bg-violet-50 dark:border-violet-800 dark:bg-violet-950"
     default:
-      return "border-emerald-200/90 bg-emerald-50/90 shadow-sm dark:border-emerald-800/50 dark:bg-emerald-950/35"
+      return "border-emerald-200 bg-emerald-50 shadow-sm dark:border-emerald-800 dark:bg-emerald-950"
   }
 }
 
@@ -173,10 +173,18 @@ export function scheduleBoardHourHeightPx(): number {
   return scheduleBoardSlotHeightPx() * 2
 }
 
+export type ScheduleBlockLayout = {
+  topPx: number
+  heightPx: number
+  clipped: boolean
+  laneIndex: number
+  laneCount: number
+}
+
 export function blockLayout(
   entry: ScheduleDayEntry,
   range: { start: number; end: number; span: number },
-): { topPx: number; heightPx: number; clipped: boolean } {
+): Omit<ScheduleBlockLayout, "laneIndex" | "laneCount"> {
   const startMin = parseTimeToMinutes(entry.appointment_time)
   const duration = Math.max(15, entry.duration_minutes)
   const endMin = startMin + duration
@@ -188,4 +196,41 @@ export function blockLayout(
   const topPx = Math.round((visibleStart - range.start) * SCHEDULE_BOARD_PX_PER_MINUTE)
   const heightPx = Math.max(1, Math.round((visibleEnd - visibleStart) * SCHEDULE_BOARD_PX_PER_MINUTE))
   return { topPx, heightPx, clipped: startMin < range.start || endMin > range.end }
+}
+
+function intervalsOverlapPx(
+  a: { topPx: number; heightPx: number },
+  b: { topPx: number; heightPx: number },
+): boolean {
+  return a.topPx < b.topPx + b.heightPx && b.topPx < a.topPx + a.heightPx
+}
+
+/** Rozmieszcza nakładające się wizyty obok siebie (jak w kalendarzu). */
+export function layoutColumnBlocks(
+  entries: ScheduleDayEntry[],
+  range: { start: number; end: number; span: number },
+): Map<string, ScheduleBlockLayout> {
+  const base = entries.map((entry) => ({
+    entry,
+    ...blockLayout(entry, range),
+  }))
+  const result = new Map<string, ScheduleBlockLayout>()
+
+  for (let i = 0; i < base.length; i += 1) {
+    const current = base[i]
+    const group = base
+      .filter((other) => intervalsOverlapPx(current, other))
+      .sort((a, b) => a.entry.id.localeCompare(b.entry.id))
+    const laneCount = group.length
+    const laneIndex = group.findIndex((item) => item.entry.id === current.entry.id)
+    result.set(current.entry.id, {
+      topPx: current.topPx,
+      heightPx: current.heightPx,
+      clipped: current.clipped,
+      laneIndex: Math.max(0, laneIndex),
+      laneCount: Math.max(1, laneCount),
+    })
+  }
+
+  return result
 }

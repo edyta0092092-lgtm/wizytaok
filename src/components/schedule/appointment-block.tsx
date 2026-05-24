@@ -26,6 +26,8 @@ type AppointmentBlockProps = {
   topPx: number
   heightPx: number
   clipped?: boolean
+  laneIndex?: number
+  laneCount?: number
   stackIndex?: number
   statusMenuOrder: AppointmentStatus[]
   isConfirmingCancel: boolean
@@ -51,6 +53,8 @@ export function AppointmentBlock({
   topPx,
   heightPx,
   clipped,
+  laneIndex = 0,
+  laneCount = 1,
   stackIndex = 0,
   statusMenuOrder,
   isConfirmingCancel,
@@ -75,11 +79,13 @@ export function AppointmentBlock({
   const showService =
     !isConfirmingCancel && hasService && blockHeightPx >= TWO_LINE_MIN_HEIGHT_PX
   const compactControls = blockHeightPx < TWO_LINE_MIN_HEIGHT_PX
+  const laneWidthPct = 100 / laneCount
+  const laneLeftPct = laneIndex * laneWidthPct
 
   return (
     <div
       className={cn(
-        "absolute inset-x-1.5 box-border flex min-w-0 flex-col overflow-hidden rounded-lg border shadow-sm",
+        "absolute box-border flex min-w-0 flex-col overflow-hidden rounded-lg border shadow-sm",
         accentClassForStatus(entry.status),
         clipped && "ring-1 ring-amber-300/60",
         isConfirmingCancel && "z-30",
@@ -87,7 +93,8 @@ export function AppointmentBlock({
       style={{
         top: topPx,
         height: blockHeightPx,
-        maxWidth: "calc(100% - 0.75rem)",
+        left: `calc(${laneLeftPct}% + 4px)`,
+        width: `calc(${laneWidthPct}% - 8px)`,
         zIndex: isConfirmingCancel ? 30 : 10 + stackIndex,
         borderLeftWidth: 4,
         borderLeftColor: statusStripeColor(entry.status),

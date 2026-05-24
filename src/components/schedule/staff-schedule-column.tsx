@@ -2,8 +2,8 @@
 
 import { AppointmentBlock } from "@/components/schedule/appointment-block"
 import {
-  blockLayout,
   getScheduleBoardRangeMinutes,
+  layoutColumnBlocks,
   scheduleBoardSlotHeightPx,
   staffInitials,
 } from "@/lib/schedule/schedule-day-board"
@@ -51,6 +51,7 @@ export function StaffScheduleColumn({
 }: StaffScheduleColumnProps) {
   const range = getScheduleBoardRangeMinutes()
   const slotHeightPx = scheduleBoardSlotHeightPx()
+  const blockLayouts = layoutColumnBlocks(column.entries, range)
 
   return (
     <div className="flex min-w-[10.5rem] flex-1 flex-col overflow-hidden border-r border-border/60 last:border-r-0">
@@ -76,7 +77,8 @@ export function StaffScheduleColumn({
       >
         <div className="relative isolate min-w-0 bg-background" style={{ height: gridHeightPx }}>
           {column.entries.map((entry, index) => {
-            const layout = blockLayout(entry, range)
+            const layout = blockLayouts.get(entry.id)
+            if (!layout) return null
             return (
               <AppointmentBlock
                 key={entry.id}
@@ -84,6 +86,8 @@ export function StaffScheduleColumn({
                 topPx={layout.topPx}
                 heightPx={layout.heightPx}
                 clipped={layout.clipped}
+                laneIndex={layout.laneIndex}
+                laneCount={layout.laneCount}
                 stackIndex={index}
                 statusMenuOrder={statusMenuOrder}
                 isConfirmingCancel={confirmCancelForId === entry.id}
