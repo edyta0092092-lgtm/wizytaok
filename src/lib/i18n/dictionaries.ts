@@ -607,6 +607,7 @@ export const dictionaries = {
       changeRequested: "Prośba o zmianę",
       businessProposed: "Firma proponuje zmianę",
       noShow: "Nieobecność klienta",
+      completed: "Zrealizowane",
       cancelled: "Anulowane",
       emptyFilter: "Brak wizyt w tym statusie.",
       emptyFilterNeedsAction: "Brak wizyt wymagających reakcji firmy.",
@@ -821,6 +822,7 @@ export const dictionaries = {
       filterHintBusinessProposed:
         "Wysłałeś klientowi propozycję nowego terminu - klient może ją zaakceptować lub odpowiedzieć.",
       filterHintNoShow: "Wizyta oznaczona jako nieobecność klienta.",
+      filterHintCompleted: "Wizyta została zrealizowana.",
       filterHintCancelled: "Wizyta została anulowana.",
       filterHintNeedsAction:
         "Wizyty, przy których firma powinna zareagować: problem z przypomnieniem, brak telefonu i e-maila albo brak odpowiedzi tuż przed wizytą.",
@@ -2826,6 +2828,7 @@ Pozdrawiamy,
       changeRequested: "Reschedule request",
       businessProposed: "Business proposed a change",
       noShow: "Client did not attend",
+      completed: "Completed",
       cancelled: "Cancelled",
       emptyFilter: "No appointments for this status.",
       emptyFilterNeedsAction: "No appointments need a business decision.",
@@ -3039,6 +3042,7 @@ Pozdrawiamy,
       filterHintBusinessProposed:
         "You sent the client a new time proposal - they can accept it or respond.",
       filterHintNoShow: "Visit marked as client did not attend.",
+      filterHintCompleted: "The appointment was completed.",
       filterHintCancelled: "The appointment was cancelled.",
       filterHintNeedsAction:
         "Appointments where the business should act: reminder issue, missing phone and email, or no reply shortly before the visit.",

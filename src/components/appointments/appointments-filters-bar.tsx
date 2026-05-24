@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
   APPOINTMENTS_STATUS_FILTERS,
+  appointmentsStatusFilterLabel,
   type AppointmentsListFilter,
 } from "@/lib/appointments/appointments-list-filters"
 import { type StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
@@ -138,11 +139,7 @@ export function AppointmentsFiltersBar({
             )}
             onClick={() => onFilterChange(value)}
           >
-            {value === "all"
-              ? t("appointments.all")
-              : value === "confirmed"
-                ? t("appointments.confirmed")
-                : t("appointments.cancelled")}
+            {appointmentsStatusFilterLabel(value, t)}
           </Button>
         ))}
       </div>
@@ -152,7 +149,11 @@ export function AppointmentsFiltersBar({
             ? restrictToToday
               ? t("appointments.filterHintConfirmedToday")
               : t("appointments.filterHintConfirmed")
-            : t("appointments.filterHintCancelled")}
+            : filter === "completed"
+              ? t("appointments.filterHintCompleted")
+              : filter === "no_show"
+                ? t("appointments.filterHintNoShow")
+                : t("appointments.filterHintCancelled")}
         </p>
       ) : null}
       {staffFilter !== "all" ? (
