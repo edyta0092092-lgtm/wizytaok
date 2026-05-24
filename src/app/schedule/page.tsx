@@ -32,7 +32,7 @@ type CalendarEntry = ScheduleDayEntry & {
   reminder_sent_at: string | null
 }
 
-type ViewFilter = "all" | "active" | "cancelled" | "pending" | "confirmed"
+type ViewFilter = "all" | "active" | "pending" | "confirmed"
 
 const DAY_PREVIEW_LIMIT = 3
 
@@ -94,10 +94,13 @@ function visitCountLabel(count: number): string {
   return `${count} wizyt`
 }
 
+function isVisibleInScheduleGraph(row: CalendarEntry): boolean {
+  return normalizeStatus(row.status) !== "cancelled"
+}
+
 function matchesViewFilter(row: CalendarEntry, filter: ViewFilter): boolean {
   const status = normalizeStatus(row.status)
   if (filter === "active") return status !== "cancelled"
-  if (filter === "cancelled") return status === "cancelled"
   if (filter === "pending") return status === "confirmed"
   if (filter === "confirmed") return status === "confirmed"
   return true
@@ -344,6 +347,7 @@ export default function SchedulePage() {
 
   const filteredBookings = React.useMemo(() => {
     const out = bookings
+      .filter((row) => isVisibleInScheduleGraph(row))
       .filter((row) => matchesViewFilter(row, viewFilter))
       .filter((row) => {
         if (!effectivePersonFilter) return true
@@ -443,7 +447,6 @@ export default function SchedulePage() {
               >
                 <option value="all">Wszyscy</option>
                 <option value="active">Tylko aktywne</option>
-                <option value="cancelled">Tylko anulowane</option>
                 <option value="confirmed">Tylko potwierdzone</option>
               </select>
             </div>
@@ -519,7 +522,6 @@ export default function SchedulePage() {
                             key={row.id}
                             className={cn(
                               "rounded-md border border-border/60 bg-muted/20 px-1.5 py-1 text-xs leading-snug",
-                              normalizeStatus(row.status) === "cancelled" && "opacity-55 line-through",
                             )}
                           >
                             <span className="font-semibold tabular-nums text-foreground">
