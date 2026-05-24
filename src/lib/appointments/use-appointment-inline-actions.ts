@@ -5,7 +5,6 @@ import * as React from "react"
 import { updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appointments/manual-appointments"
-import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
   applyPublicBookingPatchToSupabase,
   unwrapSupabaseBookingAppointmentId,
@@ -355,37 +354,14 @@ export function useAppointmentInlineActions(args: {
   const executeCancelVisit = React.useCallback(
     (row: Appointment) => {
       void (async () => {
-        const uuidSb = unwrapSupabaseBookingAppointmentId(row.id)
         setIsCancellingVisit(true)
         try {
-          if (uuidSb) {
-            const cancelRes = await fetchCancelBookingByCompany(
-              row.id,
-              language === "en" ? "en" : "pl",
-              true,
-            )
-            if (!cancelRes.ok) {
-              setActionNotice(labels.cancelVisitCouldNotComplete)
-              return
-            }
-            window.dispatchEvent(new Event("pw-bookings"))
-            setProposeForId(null)
-            setProposeValidationError("")
-            setProposeResolvedServiceId("")
-            setProposeStaffListForService(null)
-            setConfirmCancelVisitForId(null)
-            setActionNotice(
-              cancelRes.notice === "sent"
-                ? labels.visitCancelledNotifySent
-                : labels.visitCancelledNotifyQueued,
-            )
-            return
-          }
-          const ok = await updateAppointmentStatus(row.id, "cancelled", {
-            lastUpdatedBy: "business",
-            lastStatusChangeSource: "manual",
-          })
-          if (!ok) {
+          const cancelResult = await cancelAppointmentFromRemove(
+            row.id,
+            language === "en" ? "en" : "pl",
+            true,
+          )
+          if (!cancelResult.ok) {
             setActionNotice(labels.cancelVisitCouldNotComplete)
             return
           }
@@ -394,7 +370,14 @@ export function useAppointmentInlineActions(args: {
           setProposeResolvedServiceId("")
           setProposeStaffListForService(null)
           setConfirmCancelVisitForId(null)
-          setActionNotice(labels.visitCancelledLocal)
+          const notice = cancelResult.notice
+          setActionNotice(
+            notice === "sent"
+              ? labels.visitCancelledNotifySent
+              : notice === "queued"
+                ? labels.visitCancelledNotifyQueued
+                : labels.visitCancelledLocal,
+          )
         } finally {
           setIsCancellingVisit(false)
         }

@@ -8,10 +8,9 @@ import { PageShell } from "@/components/layout/page-shell"
 import { DayScheduleModal } from "@/components/schedule/day-schedule-modal"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
+import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
-import { unwrapSupabaseBookingAppointmentId } from "@/lib/bookings/bookings-store"
 import { getPublicBookings } from "@/lib/bookings/public-bookings"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -166,26 +165,14 @@ export default function SchedulePage() {
         cancellingIdRef.current = appointmentUiId
         setCancellingId(appointmentUiId)
         try {
-          const uuidSb = unwrapSupabaseBookingAppointmentId(appointmentUiId)
-          if (uuidSb) {
-            const cancelRes = await fetchCancelBookingByCompany(
-              appointmentUiId,
-              language === "en" ? "en" : "pl",
-              true,
-            )
-            if (!cancelRes.ok) {
-              setStatusNotice(t("appointments.cancelVisitCouldNotComplete"))
-              return
-            }
-          } else {
-            const ok = await updateAppointmentStatus(appointmentUiId, "cancelled", {
-              lastUpdatedBy: "business",
-              lastStatusChangeSource: "manual",
-            })
-            if (!ok) {
-              setStatusNotice(t("appointments.cancelVisitCouldNotComplete"))
-              return
-            }
+          const cancelResult = await cancelAppointmentFromRemove(
+            appointmentUiId,
+            language === "en" ? "en" : "pl",
+            true,
+          )
+          if (!cancelResult.ok) {
+            setStatusNotice(t("appointments.cancelVisitCouldNotComplete"))
+            return
           }
           patchScheduleBookingStatus(appointmentUiId, "cancelled")
           setStatusNotice(t("appointments.statusUpdated"))

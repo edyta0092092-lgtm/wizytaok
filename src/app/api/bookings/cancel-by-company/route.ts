@@ -112,7 +112,11 @@ export async function POST(req: Request) {
     .maybeSingle()
 
   if (profErr || !profile) {
-    return NextResponse.json({ ok: false, error: "business_not_found" }, { status: 400 })
+    return NextResponse.json({
+      ok: true,
+      notice: "saved" as const,
+      notificationSkipped: true,
+    })
   }
 
   const language: CancelNotifyLanguage = body.language === "en" ? "en" : "pl"
@@ -124,13 +128,20 @@ export async function POST(req: Request) {
     status: "cancelled",
   }
 
-  const messagesOn = inferMessagesEffectivelySent()
-  const { notice } = await notifyBookingCancelledByCompany({
-    booking: updatedBooking,
-    business: profile,
-    language,
-    messagesEffectivelySent: messagesOn,
-  })
-
-  return NextResponse.json({ ok: true, notice })
+  try {
+    const messagesOn = inferMessagesEffectivelySent()
+    const { notice } = await notifyBookingCancelledByCompany({
+      booking: updatedBooking,
+      business: profile,
+      language,
+      messagesEffectivelySent: messagesOn,
+    })
+    return NextResponse.json({ ok: true, notice })
+  } catch {
+    return NextResponse.json({
+      ok: true,
+      notice: "saved" as const,
+      notificationSkipped: true,
+    })
+  }
 }
