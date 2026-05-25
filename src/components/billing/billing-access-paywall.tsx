@@ -62,7 +62,6 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   const [stripeReturnNotice, setStripeReturnNotice] = React.useState<string | null>(null)
   const [trialGloballyBlocked, setTrialGloballyBlocked] = React.useState(false)
   const [trialBlockedNotice, setTrialBlockedNotice] = React.useState<string | null>(null)
-  const autoPaidStartedRef = React.useRef(false)
   const stripeOnboardingRedirectedRef = React.useRef(false)
 
   const refreshBillingRow = React.useCallback(async () => {
@@ -177,19 +176,6 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     !ready || billingLoading
       ? "loading"
       : resolveBillingActivationScenario(billingRow, billingLoading)
-
-  React.useEffect(() => {
-    if (variant !== "owner") return
-    if (searchParams.get("auto") !== "paid") return
-    if (searchParams.get("stripe_paid") || searchParams.get("stripe_test") || searchParams.get("portal")) return
-    if (autoPaidStartedRef.current) return
-    if (scenario === "loading" || scenario === "subscription_active") return
-
-    autoPaidStartedRef.current = true
-    queueMicrotask(() => {
-      void handlePayForAccess()
-    })
-  }, [handlePayForAccess, scenario, searchParams, variant])
 
   const effectiveStatus = billingRow
     ? resolveEffectiveSubscriptionStatus(

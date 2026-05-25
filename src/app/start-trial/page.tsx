@@ -188,7 +188,8 @@ function StartTrialContent() {
 
     const eligibility = await fetchTrialStartEligibility()
     if (eligibility.blocked) {
-      await beginPaidCheckout()
+      setState("trial_used")
+      setTrialHeadline(eligibility.message ?? TRIAL_ALREADY_USED_USER_MESSAGE_PL)
       return
     }
     if (!eligibility.hasBusinessProfile) {
@@ -312,7 +313,9 @@ function StartTrialContent() {
       }
 
       if (reason === "trial_already_used") {
-        await beginPaidCheckout()
+        setState("trial_used")
+        setTrialHeadline(TRIAL_ALREADY_USED_USER_MESSAGE_PL)
+        setError(null)
         return
       }
 
@@ -353,7 +356,7 @@ function StartTrialContent() {
     }
 
     window.location.href = payload.url
-  }, [beginPaidCheckout, router, searchParams])
+  }, [router, searchParams])
 
   React.useEffect(() => {
     queueMicrotask(() => {

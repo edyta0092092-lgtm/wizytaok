@@ -1,4 +1,3 @@
-import { cookies } from "next/headers"
 import type { User } from "@supabase/supabase-js"
 
 import {
@@ -9,22 +8,9 @@ import { evaluateTrialStartEligibility } from "@/lib/billing/trial-eligibility-s
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Database } from "@/types/database"
 
-function userWantsTrial(user: User): boolean {
-  const raw = user.user_metadata?.trial_intent
-  return raw === true || raw === "true" || raw === 1 || raw === "1"
-}
-
-async function readTrialIntentFromCookies(): Promise<boolean> {
-  try {
-    const store = await cookies()
-    return store.get("wizytaok_trial_intent")?.value === "1"
-  } catch {
-    return false
-  }
-}
-
-function paidCheckoutPath(params?: Record<string, string>): string {
-  const qs = new URLSearchParams({ auto: "paid", ...(params ?? {}) })
+function billingChoicePath(params?: Record<string, string>): string {
+  const qs = new URLSearchParams(params ?? {})
+  if (qs.size === 0) return "/activate-access"
   return `/activate-access?${qs.toString()}`
 }
 
@@ -46,7 +32,7 @@ export async function resolvePostBusinessSetupRedirect(
 
   const admin = getServiceRoleClient()
   if (!admin) {
-    return paidCheckoutPath()
+    return billingChoicePath()
   }
 
   const row =
@@ -60,10 +46,9 @@ export async function resolvePostBusinessSetupRedirect(
     ).data
 
   if (!row?.id) {
-    return paidCheckoutPath()
+    return billingChoicePath()
   }
 
-  const wantsTrial = (await readTrialIntentFromCookies()) || userWantsTrial(user)
   const eligibility = await evaluateTrialStartEligibility(admin, {
     userId: user.id,
     userEmail: user.email,
@@ -71,8 +56,8 @@ export async function resolvePostBusinessSetupRedirect(
   })
 
   if (eligibility.blocked) {
-    return paidCheckoutPath({ trial_blocked: "1" })
+    return billingChoicePath({ trial_blocked: "1" })
   }
 
-  return wantsTrial ? "/start-trial" : paidCheckoutPath()
+  return billingChoicePath()
 }

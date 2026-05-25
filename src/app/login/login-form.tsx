@@ -67,11 +67,9 @@ export function LoginForm() {
     return normalized === "trialing" || normalized === "active"
   }, [])
 
-  const resolveBillingRedirect = React.useCallback(async () => {
+  const resolveBillingChoiceRedirect = React.useCallback(async () => {
     const eligibility = await fetchTrialStartEligibility()
-    return eligibility.blocked
-      ? "/activate-access?trial_blocked=1&auto=paid"
-      : "/start-trial"
+    return eligibility.blocked ? "/activate-access?trial_blocked=1" : "/activate-access"
   }, [])
 
   React.useEffect(() => {
@@ -168,7 +166,7 @@ export function LoginForm() {
         if (!profile?.id) {
           dest = "/settings?setup=business"
         } else {
-          dest = await resolveBillingRedirect()
+          dest = await resolveBillingChoiceRedirect()
         }
       } else if (
         !postLoginPath &&
@@ -176,7 +174,7 @@ export function LoginForm() {
         !isActiveSubscriptionStatus(profile.subscription_status) &&
         !isActiveSubscriptionStatus(profile.stripe_subscription_status)
       ) {
-        dest = await resolveBillingRedirect()
+        dest = await resolveBillingChoiceRedirect()
       }
 
       router.replace(dest)

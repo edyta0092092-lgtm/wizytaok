@@ -69,15 +69,10 @@ export async function resolvePathAfterBusinessSetup(
     return "/dashboard"
   }
 
-  const wantsTrial = readTrialIntentFromBrowser(userMetadata ?? user.user_metadata ?? undefined)
-  if (wantsTrial) {
-    const eligibility = await fetchTrialStartEligibility()
+  if (readTrialIntentFromBrowser(userMetadata ?? user.user_metadata ?? undefined)) {
     clearTrialIntentMarkers()
-    if (eligibility.blocked) {
-      return "/activate-access?trial_blocked=1"
-    }
-    return "/start-trial"
   }
 
-  return "/activate-access"
+  const eligibility = await fetchTrialStartEligibility()
+  return eligibility.blocked ? "/activate-access?trial_blocked=1" : "/activate-access"
 }
