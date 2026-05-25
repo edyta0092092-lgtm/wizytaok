@@ -452,6 +452,8 @@ export const dictionaries = {
         "Konto zostało utworzone, ale nie udało się zapisać profilu firmy. Sprawdź konfigurację Supabase.",
       signupSuccessCheckEmail:
         "Konto zostało utworzone. Sprawdź e-mail i potwierdź konto.",
+      confirmationEmailSendFailed:
+        "Konto zostało utworzone, ale nie udało się wysłać maila potwierdzającego. Spróbuj wysłać link ponownie za chwilę.",
       logOut: "Wyloguj",
       forgotPassword: "Zapomniałem hasła",
       emailNotConfirmed:
@@ -2851,6 +2853,8 @@ Pozdrawiamy,
         "Account was created, but the business profile could not be saved. Check Supabase configuration.",
       signupSuccessCheckEmail:
         "Account created. Check your email and confirm your account.",
+      confirmationEmailSendFailed:
+        "Account was created, but the confirmation email could not be sent. Try resending the link in a moment.",
       logOut: "Log out",
       forgotPassword: "Forgot password?",
       emailNotConfirmed:

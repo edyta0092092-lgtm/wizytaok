@@ -20,7 +20,10 @@ import {
   OAuthProviderButtons,
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
-import { buildSignupConfirmationRedirectUrl } from "@/lib/auth/signup-confirmation-client"
+import {
+  buildSignupConfirmationRedirectUrl,
+  requestSignupConfirmationEmail,
+} from "@/lib/auth/signup-confirmation-client"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -162,7 +165,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         return
       }
 
+      const confirmationEmail = await requestSignupConfirmationEmail(email.trim(), afterConfirmPath)
       await client.auth.signOut()
+      if (!confirmationEmail.ok) {
+        setError(t("auth.confirmationEmailSendFailed"))
+        return
+      }
       setInfo(t("auth.signupSuccessCheckEmail"))
     } finally {
       setLoading(false)
@@ -181,22 +189,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setError(t("auth.enterEmailForConfirmation"))
       return
     }
-    const client = getBrowserClient()
-    if (!client) {
-      setError(t("auth.resendConfirmationError"))
-      return
-    }
     setSendingConfirmation(true)
     try {
-      const { error: resendError } = await client.auth.resend({
-        type: "signup",
-        email: trimmedEmail,
-        options: {
-          emailRedirectTo: buildSignupConfirmationRedirectUrl(afterConfirmPath, window.location.origin),
-        },
-      })
-      if (resendError) {
-        setError(resendError.message?.trim() || t("auth.resendConfirmationError"))
+      const sent = await requestSignupConfirmationEmail(trimmedEmail, afterConfirmPath)
+      if (!sent.ok) {
+        setError(t("auth.resendConfirmationError"))
         return
       }
       setInfo(t("auth.resendConfirmationSent"))

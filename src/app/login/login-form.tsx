@@ -21,8 +21,8 @@ import {
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
 import {
-  buildSignupConfirmationRedirectUrl,
   isEmailNotConfirmedAuthError,
+  requestSignupConfirmationEmail,
 } from "@/lib/auth/signup-confirmation-client"
 import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
@@ -233,25 +233,14 @@ export function LoginForm() {
       setError(t("auth.enterEmailForConfirmation"))
       return
     }
-    const client = getBrowserClient()
-    if (!client) {
-      setError(t("auth.resendConfirmationError"))
-      return
-    }
     setSendingConfirmation(true)
     try {
-      const { error: resendError } = await client.auth.resend({
-        type: "signup",
-        email: trimmedEmail,
-        options: {
-          emailRedirectTo: buildSignupConfirmationRedirectUrl(
-            postLoginPath ?? "/start-trial",
-            window.location.origin,
-          ),
-        },
-      })
-      if (resendError) {
-        setError(resendError.message?.trim() || t("auth.resendConfirmationError"))
+      const sent = await requestSignupConfirmationEmail(
+        trimmedEmail,
+        postLoginPath ?? "/settings?setup=business",
+      )
+      if (!sent.ok) {
+        setError(t("auth.resendConfirmationError"))
         return
       }
       setInfo(t("auth.resendConfirmationSent"))
