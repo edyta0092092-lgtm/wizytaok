@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 
-import { mapAuthCallbackExchangeError } from "@/lib/auth/oauth-sign-in-client"
 import {
   oauthErrorReturnPath,
   resolvePostAuthRedirect,
@@ -49,12 +48,10 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       const dest = new URL(oauthErrorReturnPath(requestedNext), origin)
-      const mappedError = mapAuthCallbackExchangeError(error.message)
-      if (mappedError === "email_confirmation_session_missing") {
-        dest.searchParams.set("confirmed", "1")
-      } else {
-        dest.searchParams.set("oauth_error", mappedError)
-      }
+      // Supabase verifies the email before redirecting here with `code`.
+      // Session exchange can still fail without the original browser PKCE state;
+      // in that case the account is already confirmed, so ask the user to log in.
+      dest.searchParams.set("confirmed", "1")
       dest.searchParams.set("next", requestedNext)
       return NextResponse.redirect(dest)
     }

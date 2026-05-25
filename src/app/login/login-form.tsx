@@ -69,6 +69,12 @@ export function LoginForm() {
       : "/start-trial"
   }, [])
 
+  React.useEffect(() => {
+    queueMicrotask(() => {
+      setOauthError(oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null)
+    })
+  }, [oauthErrorCode, t])
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -165,6 +171,7 @@ export function LoginForm() {
   const handleResetPassword = async () => {
     setError(null)
     setInfo(null)
+    setOauthError(null)
     if (!isSupabaseConfigured()) {
       setError(t("auth.supabaseNotConfigured"))
       return
@@ -198,6 +205,7 @@ export function LoginForm() {
   const handleResendConfirmation = async () => {
     setError(null)
     setInfo(null)
+    setOauthError(null)
     if (!isSupabaseConfigured()) {
       setError(t("auth.supabaseNotConfigured"))
       return

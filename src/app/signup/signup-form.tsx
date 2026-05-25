@@ -55,6 +55,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const loginHref = startTrial ? "/login?next=%2Fstart-trial" : "/login"
 
   React.useEffect(() => {
+    queueMicrotask(() => {
+      setOauthError(oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null)
+    })
+  }, [oauthErrorCode, t])
+
+  React.useEffect(() => {
     if (!startTrial) return
     if (!isSupabaseConfigured()) return
     const client = getBrowserClient()
@@ -165,6 +171,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
   const handleResendConfirmation = async () => {
     setError(null)
+    setOauthError(null)
     if (!isSupabaseConfigured()) {
       setError(t("auth.supabaseNotConfigured"))
       return
