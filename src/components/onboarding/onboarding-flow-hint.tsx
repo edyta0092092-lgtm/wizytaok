@@ -29,16 +29,35 @@ export function OnboardingFlowHint() {
     if (!pathname.startsWith(stepPath) || snapshot.progress[activeStepId]) return
 
     const step = getStepConfig(activeStepId)
-    const target = document.querySelector<HTMLElement>(step.targetSelector)
-    if (!target) return
+    let target: HTMLElement | null = null
+    let scrollTimer: number | null = null
 
-    target.setAttribute("data-onboarding-highlight", "true")
-    window.setTimeout(() => {
-      target.scrollIntoView({ behavior: "smooth", block: "center" })
-    }, 120)
+    const applyTarget = () => {
+      const nextTarget = document.querySelector<HTMLElement>(step.targetSelector)
+      if (nextTarget === target) return
+      target?.removeAttribute("data-onboarding-highlight")
+      target = nextTarget
+      if (!target) return
+      target.setAttribute("data-onboarding-highlight", "true")
+      if (scrollTimer) window.clearTimeout(scrollTimer)
+      scrollTimer = window.setTimeout(() => {
+        target?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }, 120)
+    }
+
+    applyTarget()
+    const observer = new MutationObserver(applyTarget)
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ["data-tour"],
+      childList: true,
+      subtree: true,
+    })
 
     return () => {
-      target.removeAttribute("data-onboarding-highlight")
+      observer.disconnect()
+      if (scrollTimer) window.clearTimeout(scrollTimer)
+      target?.removeAttribute("data-onboarding-highlight")
     }
   }, [activeStepId, flowActive, pathname, snapshot])
 

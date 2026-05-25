@@ -50,7 +50,7 @@ export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   {
     id: "staff_service",
     path: "/team",
-    targetSelector: '[data-tour="team-services-tab"]',
+    targetSelector: '[data-tour="team-staff-service-target"]',
     titleKey: "onboarding.steps.staff_service.title",
     shortKey: "onboarding.steps.staff_service.short",
     hintKey: "onboarding.steps.staff_service.hint",

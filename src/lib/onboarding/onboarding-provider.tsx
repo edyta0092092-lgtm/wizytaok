@@ -140,7 +140,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       }
       queueMicrotask(() => setActiveStepId(next))
       const step = getStepConfig(next)
-      const href = next === "staff_service" ? "/team?onboarding_tab=services" : step.path
+      const href = step.path
       const needsNavigation = pathname !== step.path || href !== step.path
       if (next === "booking_page" && snapshot.bookingPath) {
         window.open(snapshot.bookingPath, "_blank", "noopener,noreferrer")
@@ -219,7 +219,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const navigateToStep = React.useCallback(
     (stepId: OnboardingStepId) => {
       const step = getStepConfig(stepId)
-      const href = stepId === "staff_service" ? "/team?onboarding_tab=services" : step.path
+      const href = step.path
       const needsNavigation = pathname !== step.path || href !== step.path
       setActiveStepId(stepId)
       setFlowActive(true)

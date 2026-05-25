@@ -1864,9 +1864,9 @@ Pozdrawiamy,
           hint: "Utwórz aktywną usługę z czasem trwania i ceną.",
         },
         staff_service: {
-          title: "Przypisz usługę do osoby",
+          title: "Wybierz osobę i przypisz usługę",
           short: "Usługa przypisana do osoby",
-          hint: "W edycji osoby zaznacz usługi, które wykonuje.",
+          hint: "Najpierw wybierz osobę z listy zespołu. Potem w zakładce usług zaznacz usługę, którą wykonuje.",
         },
         booking_page: {
           title: "Otwórz stronę rezerwacji",
@@ -4248,9 +4248,9 @@ Regards,
           hint: "Create an active service with duration and price.",
         },
         staff_service: {
-          title: "Assign service to staff",
+          title: "Choose staff and assign a service",
           short: "Service assigned to staff",
-          hint: "When editing a person, tick the services they perform.",
+          hint: "First choose a person from the team list. Then tick the service they perform in the services tab.",
         },
         booking_page: {
           title: "Open booking page",

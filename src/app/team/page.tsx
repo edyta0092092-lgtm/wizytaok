@@ -25,6 +25,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { applyStaffPanelAccess, syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getLocalServices, getServices } from "@/lib/services/services-store"
@@ -390,6 +391,7 @@ type PanelInviteRow = {
 export default function TeamPage() {
   const { t, language } = useTranslations()
   const access = useBusinessAccess()
+  const { flowActive, activeStepId } = useOnboarding()
   const [items, setItems] = React.useState<StaffMember[]>([])
   const [services, setServices] = React.useState<Service[]>([])
   const [businessProfileId, setBusinessProfileId] = React.useState<string | null>(null)
@@ -430,6 +432,7 @@ export default function TeamPage() {
     "profile" | "panel" | "services" | "schedule" | "exceptions"
   >("profile")
   const [staffQuery, setStaffQuery] = React.useState("")
+  const isStaffServiceOnboarding = flowActive && activeStepId === "staff_service"
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -438,6 +441,11 @@ export default function TeamPage() {
       queueMicrotask(() => setFormTab("services"))
     }
   }, [])
+
+  React.useEffect(() => {
+    if (!isStaffServiceOnboarding || !editing) return
+    queueMicrotask(() => setFormTab("services"))
+  }, [editing, isStaffServiceOnboarding])
 
   const dateTimeFmt = React.useMemo(
     () =>
@@ -1510,7 +1518,10 @@ export default function TeamPage() {
 
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
-            <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
+            <Card
+              data-tour={isStaffServiceOnboarding && !editing ? "team-staff-service-target" : undefined}
+              className="min-w-0 overflow-hidden rounded-2xl border border-border"
+            >
               <CardHeader className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-lg">{t("navigation.team")}</CardTitle>
@@ -1837,7 +1848,11 @@ export default function TeamPage() {
                     </TabsContent>
                   ) : null}
 
-                  <TabsContent value="services" className="mt-5 space-y-3">
+                  <TabsContent
+                    value="services"
+                    className="mt-5 space-y-3"
+                    data-tour={isStaffServiceOnboarding && editing ? "team-staff-service-target" : undefined}
+                  >
                     <div className="min-w-0 space-y-2">
                       {services.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
