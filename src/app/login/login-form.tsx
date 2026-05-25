@@ -39,6 +39,7 @@ export function LoginForm() {
   const resetStatus = searchParams.get("reset")
   const confirmedStatus = searchParams.get("confirmed")
   const oauthErrorCode = searchParams.get("oauth_error")
+  const hasRecoverableConfirmationLinkError = oauthErrorCode === "auth_link_invalid_or_expired"
 
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -46,12 +47,16 @@ export function LoginForm() {
   const [info, setInfo] = React.useState<string | null>(
     confirmedStatus === "1"
       ? t("auth.emailConfirmedLogin")
-      : resetStatus === "success"
-        ? t("auth.resetPasswordSuccess")
-        : null,
+      : hasRecoverableConfirmationLinkError
+        ? t("auth.emailConfirmationMaybeConfirmed")
+        : resetStatus === "success"
+          ? t("auth.resetPasswordSuccess")
+          : null,
   )
   const [oauthError, setOauthError] = React.useState<string | null>(() =>
-    oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null,
+    oauthErrorCode && !hasRecoverableConfirmationLinkError
+      ? oauthErrorMessageFromCode(oauthErrorCode, t)
+      : null,
   )
   const [loading, setLoading] = React.useState(false)
   const [sendingReset, setSendingReset] = React.useState(false)
@@ -71,9 +76,22 @@ export function LoginForm() {
 
   React.useEffect(() => {
     queueMicrotask(() => {
+      if (confirmedStatus === "1") {
+        setOauthError(null)
+        setInfo(t("auth.emailConfirmedLogin"))
+        return
+      }
+      if (oauthErrorCode === "auth_link_invalid_or_expired") {
+        setOauthError(null)
+        setInfo(t("auth.emailConfirmationMaybeConfirmed"))
+        return
+      }
       setOauthError(oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null)
+      if (resetStatus === "success") {
+        setInfo(t("auth.resetPasswordSuccess"))
+      }
     })
-  }, [oauthErrorCode, t])
+  }, [confirmedStatus, oauthErrorCode, resetStatus, t])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

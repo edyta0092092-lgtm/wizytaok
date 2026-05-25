@@ -458,6 +458,8 @@ export const dictionaries = {
         "Konto nie jest jeszcze potwierdzone. Sprawdź e-mail albo wyślij link potwierdzający ponownie.",
       emailConfirmedLogin:
         "Adres e-mail został potwierdzony. Zaloguj się, aby przejść dalej.",
+      emailConfirmationMaybeConfirmed:
+        "Jeśli kliknięto link z najnowszego maila, adres e-mail mógł już zostać potwierdzony. Spróbuj się zalogować albo wyślij link potwierdzający ponownie.",
       enterEmailForConfirmation: "Wpisz e-mail, aby wysłać link potwierdzający.",
       resendConfirmation: "Wyślij ponownie link potwierdzający",
       resendConfirmationSent:
@@ -2853,6 +2855,8 @@ Pozdrawiamy,
         "This account is not confirmed yet. Check your email or resend the confirmation link.",
       emailConfirmedLogin:
         "Your email address has been confirmed. Sign in to continue.",
+      emailConfirmationMaybeConfirmed:
+        "If you clicked the link from the newest email, your email address may already be confirmed. Try signing in or resend the confirmation link.",
       enterEmailForConfirmation: "Enter your email to send the confirmation link.",
       resendConfirmation: "Resend confirmation link",
       resendConfirmationSent:
