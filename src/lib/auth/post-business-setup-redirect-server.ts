@@ -23,6 +23,11 @@ async function readTrialIntentFromCookies(): Promise<boolean> {
   }
 }
 
+function paidCheckoutPath(params?: Record<string, string>): string {
+  const qs = new URLSearchParams({ auto: "paid", ...(params ?? {}) })
+  return `/activate-access?${qs.toString()}`
+}
+
 /**
  * Po zapisie profilu firmy (OAuth setup): trial / paywall / panel — wyłącznie server.
  */
@@ -39,14 +44,9 @@ export async function resolvePostBusinessSetupRedirect(
     return "/dashboard"
   }
 
-  const wantsTrial = (await readTrialIntentFromCookies()) || userWantsTrial(user)
-  if (!wantsTrial) {
-    return "/activate-access"
-  }
-
   const admin = getServiceRoleClient()
   if (!admin) {
-    return "/activate-access"
+    return paidCheckoutPath()
   }
 
   const row =
@@ -60,9 +60,10 @@ export async function resolvePostBusinessSetupRedirect(
     ).data
 
   if (!row?.id) {
-    return "/activate-access"
+    return paidCheckoutPath()
   }
 
+  const wantsTrial = (await readTrialIntentFromCookies()) || userWantsTrial(user)
   const eligibility = await evaluateTrialStartEligibility(admin, {
     userId: user.id,
     userEmail: user.email,
@@ -70,8 +71,8 @@ export async function resolvePostBusinessSetupRedirect(
   })
 
   if (eligibility.blocked) {
-    return "/activate-access?trial_blocked=1"
+    return paidCheckoutPath({ trial_blocked: "1" })
   }
 
-  return "/start-trial"
+  return wantsTrial ? "/start-trial" : paidCheckoutPath()
 }

@@ -62,6 +62,13 @@ export function LoginForm() {
     return normalized === "trialing" || normalized === "active"
   }, [])
 
+  const resolveBillingRedirect = React.useCallback(async () => {
+    const eligibility = await fetchTrialStartEligibility()
+    return eligibility.blocked
+      ? "/activate-access?trial_blocked=1&auto=paid"
+      : "/start-trial"
+  }, [])
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -97,7 +104,7 @@ export function LoginForm() {
       }
       const { data: profile } = await client
         .from("business_profiles")
-        .select("id, subscription_status")
+        .select("id, subscription_status, stripe_subscription_status")
         .eq("owner_id", user.id)
         .maybeSingle()
 
@@ -120,7 +127,8 @@ export function LoginForm() {
       const shouldStartTrialAfterLogin =
         !postLoginPath &&
         (wantsTrial || wantsTrialFromCookie || wantsTrialFromStorage) &&
-        !isActiveSubscriptionStatus(profile?.subscription_status)
+        !isActiveSubscriptionStatus(profile?.subscription_status) &&
+        !isActiveSubscriptionStatus(profile?.stripe_subscription_status)
 
       if (shouldStartTrialAfterLogin) {
         try {
@@ -130,19 +138,21 @@ export function LoginForm() {
         }
       }
 
-      let dest =
-        postLoginPath ??
-        (profile ? "/dashboard" : "/settings?setup=business")
+      let dest = postLoginPath ?? (profile ? "/dashboard" : "/settings?setup=business")
 
       if (!postLoginPath && shouldStartTrialAfterLogin) {
         if (!profile?.id) {
           dest = "/settings?setup=business"
         } else {
-          const eligibility = await fetchTrialStartEligibility()
-          dest = eligibility.blocked
-            ? "/activate-access?trial_blocked=1"
-            : "/start-trial"
+          dest = await resolveBillingRedirect()
         }
+      } else if (
+        !postLoginPath &&
+        profile?.id &&
+        !isActiveSubscriptionStatus(profile.subscription_status) &&
+        !isActiveSubscriptionStatus(profile.stripe_subscription_status)
+      ) {
+        dest = await resolveBillingRedirect()
       }
 
       router.replace(dest)

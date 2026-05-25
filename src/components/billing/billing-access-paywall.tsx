@@ -62,6 +62,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   const [stripeReturnNotice, setStripeReturnNotice] = React.useState<string | null>(null)
   const [trialGloballyBlocked, setTrialGloballyBlocked] = React.useState(false)
   const [trialBlockedNotice, setTrialBlockedNotice] = React.useState<string | null>(null)
+  const autoPaidStartedRef = React.useRef(false)
 
   const refreshBillingRow = React.useCallback(async () => {
     if (!businessId) {
@@ -77,7 +78,9 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
 
   React.useEffect(() => {
     if (variant !== "owner") return
-    void refreshBillingRow()
+    queueMicrotask(() => {
+      void refreshBillingRow()
+    })
   }, [variant, refreshBillingRow])
 
   React.useEffect(() => {
@@ -101,8 +104,10 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   React.useEffect(() => {
     if (variant !== "owner") return
     if (searchParams.get("trial_blocked") === "1") {
-      setTrialGloballyBlocked(true)
-      setTrialBlockedNotice((prev) => prev ?? t("access.trialAlreadyUsedPayToContinue"))
+      queueMicrotask(() => {
+        setTrialGloballyBlocked(true)
+        setTrialBlockedNotice((prev) => prev ?? t("access.trialAlreadyUsedPayToContinue"))
+      })
     }
   }, [searchParams, variant, t])
 
@@ -112,16 +117,22 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     const test = searchParams.get("stripe_test")
     const portal = searchParams.get("portal")
     if (portal === "return") {
-      setStripeReturnNotice(t("access.portalReturnNotice"))
-      void refreshBillingRow()
+      queueMicrotask(() => {
+        setStripeReturnNotice(t("access.portalReturnNotice"))
+        void refreshBillingRow()
+      })
     } else if (paid === "success" || test === "success") {
-      setStripeReturnNotice(t("access.activatePaymentProcessing"))
-      if (businessId) {
-        markPanelAccessJustActivated(businessId)
-      }
-      void refreshBillingRow()
+      queueMicrotask(() => {
+        setStripeReturnNotice(t("access.activatePaymentProcessing"))
+        if (businessId) {
+          markPanelAccessJustActivated(businessId)
+        }
+        void refreshBillingRow()
+      })
     } else if (paid === "cancel" || test === "cancel") {
-      setStripeReturnNotice(null)
+      queueMicrotask(() => {
+        setStripeReturnNotice(null)
+      })
     }
   }, [searchParams, refreshBillingRow, t, variant, businessId])
 
@@ -161,14 +172,27 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     }
   }, [])
 
-  if (variant === "staff") {
-    return <StaffBillingAccessPaywall />
-  }
-
   const scenario =
     !ready || billingLoading
       ? "loading"
       : resolveBillingActivationScenario(billingRow, billingLoading)
+
+  React.useEffect(() => {
+    if (variant !== "owner") return
+    if (searchParams.get("auto") !== "paid") return
+    if (searchParams.get("stripe_paid") || searchParams.get("stripe_test") || searchParams.get("portal")) return
+    if (autoPaidStartedRef.current) return
+    if (scenario === "loading" || scenario === "subscription_active") return
+
+    autoPaidStartedRef.current = true
+    queueMicrotask(() => {
+      void handlePayForAccess()
+    })
+  }, [handlePayForAccess, scenario, searchParams, variant])
+
+  if (variant === "staff") {
+    return <StaffBillingAccessPaywall />
+  }
 
   const effectiveStatus = billingRow
     ? resolveEffectiveSubscriptionStatus(
