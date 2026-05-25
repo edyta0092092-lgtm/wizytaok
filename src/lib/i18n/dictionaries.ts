@@ -419,11 +419,11 @@ export const dictionaries = {
       logIn: "Zaloguj się",
       noAccount: "Nie masz konta?",
       loginSignupCta: "Utwórz konto",
-      signupTitle: "Utwórz konto firmy",
+      signupTitle: "Utwórz konto",
       signupDescription:
-        "Załóż konto dla swojej firmy. Link do publicznej rezerwacji utworzymy automatycznie z nazwy — adres strony rezerwacji możesz w każdej chwili zmienić w ustawieniach.",
+        "Podaj e-mail i hasło. Dane firmy uzupełnisz po potwierdzeniu adresu e-mail.",
       signupTrialStripeLead:
-        "Utwórz konto, a następnie przejdziesz do bezpiecznego podpięcia karty w Stripe.",
+        "Po potwierdzeniu e-maila uzupełnisz dane firmy i przejdziesz do bezpiecznego podpięcia karty w Stripe.",
       signupAccountTypeLabel: "Typ działalności",
       signupAccountTypeRegistered: "Firma z NIP",
       signupAccountTypeUnregistered:
@@ -440,6 +440,8 @@ export const dictionaries = {
       signupTaxIdOptionalHint:
         "Możesz podać numer NIP (np. przyszłej firmy) — wtedy sprawdzimy format. Pole nie jest wymagane.",
       signupSubmit: "Utwórz konto",
+      passwordRepeatLabel: "Powtórz hasło",
+      passwordRepeatMismatch: "Hasła nie są takie same.",
       hasAccount: "Masz już konto?",
       loginFromSignupCta: "Zaloguj się",
       supabaseNotConfigured:
@@ -2813,11 +2815,11 @@ Pozdrawiamy,
       logIn: "Log in",
       noAccount: "No account?",
       loginSignupCta: "Create one",
-      signupTitle: "Create business account",
+      signupTitle: "Create account",
       signupDescription:
-        "Create an account for your business. We will create your public booking link automatically from the name — you can change the booking page address anytime in Settings.",
+        "Enter your email and password. You will complete business details after confirming your email address.",
       signupTrialStripeLead:
-        "After you register, you will continue to securely add your payment card with Stripe.",
+        "After confirming your email, you will complete business details and securely add your payment card with Stripe.",
       signupAccountTypeLabel: "Type of activity",
       signupAccountTypeRegistered: "Business with tax ID",
       signupAccountTypeUnregistered: "Unregistered activity / person without tax ID",
@@ -2833,6 +2835,8 @@ Pozdrawiamy,
       signupTaxIdOptionalHint:
         "You may enter a tax ID (e.g. for a future business): we validate the format when filled. Field is optional.",
       signupSubmit: "Create account",
+      passwordRepeatLabel: "Repeat password",
+      passwordRepeatMismatch: "Passwords do not match.",
       hasAccount: "Already have an account?",
       loginFromSignupCta: "Log in",
       supabaseNotConfigured:

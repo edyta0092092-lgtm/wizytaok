@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
-import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,16 +21,9 @@ import {
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
 import { buildSignupConfirmationRedirectUrl } from "@/lib/auth/signup-confirmation-client"
-import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
-import {
-  buildStoredInternationalPhone,
-  validateNationalPhoneLength,
-} from "@/lib/validation/international-phone"
-import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import {
   assertPasswordPolicy,
   getPasswordPolicyLiveHint,
@@ -42,46 +34,25 @@ type SignupFormProps = {
   startTrial?: boolean
 }
 
-type SignupAccountKind = "registered_business" | "unregistered_activity"
-
-function normalizeDigits(raw: string): string {
-  return raw.replace(/\D/g, "")
-}
-
 export function SignupForm({ startTrial = false }: SignupFormProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { t } = useTranslations()
   const oauthErrorCode = searchParams.get("oauth_error")
 
-  const [businessName, setBusinessName] = React.useState("")
-  const [ownerFirstName, setOwnerFirstName] = React.useState("")
-  const [ownerLastName, setOwnerLastName] = React.useState("")
-  const [companyTaxId, setCompanyTaxId] = React.useState("")
-  const [accountKind, setAccountKind] = React.useState<SignupAccountKind>(() =>
-    startTrial ? "registered_business" : "unregistered_activity",
-  )
-  const [phoneDialCode, setPhoneDialCode] = React.useState("+48")
-  const [phoneNational, setPhoneNational] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
+  const [confirmPassword, setConfirmPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [oauthError, setOauthError] = React.useState<string | null>(() =>
     oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null,
   )
   const [info, setInfo] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
-  /** Blokada przed signUp: NIP, telefon lub e-mail już w business_profiles (preflight API). */
-  const [identityBlock, setIdentityBlock] = React.useState<"tax_id" | "phone" | "email" | null>(null)
-  /** Live‑check NIP w trakcie wpisywania (debounce). */
-  const [nipChecking, setNipChecking] = React.useState(false)
-  /** Live‑check telefonu w trakcie wpisywania (debounce). */
-  const [phoneChecking, setPhoneChecking] = React.useState(false)
-  /** Live‑check adresu e-mail w trakcie wpisywania (debounce). */
-  const [emailChecking, setEmailChecking] = React.useState(false)
   const [sendingConfirmation, setSendingConfirmation] = React.useState(false)
 
-  const afterConfirmPath = "/start-trial"
+  const afterConfirmPath = startTrial ? "/start-trial" : "/settings?setup=business"
+  const loginHref = startTrial ? "/login?next=%2Fstart-trial" : "/login"
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -119,190 +90,15 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
   }, [router, startTrial])
 
-  const nipRelevant = accountKind === "registered_business"
-  const nipFieldHint = React.useMemo(() => {
-    if (!nipRelevant) return null
-    const digits = normalizeDigits(companyTaxId)
-    if (digits.length === 0) return null
-    if (digits.length !== 10) return t("settings.taxIdDigitsHint")
-    if (!isPolishNip10Valid(digits)) return t("settings.taxIdInvalidChecksum")
-    return null
-  }, [nipRelevant, companyTaxId, t])
-
-  /** Przy „firma z NIP” pole jest obowiązkowe — pusty NIP blokuje wysłanie. */
-  const nipEmptyBlocksSubmit = nipRelevant && normalizeDigits(companyTaxId).length === 0
-  const nipBlocksSubmit = Boolean(nipFieldHint) || nipEmptyBlocksSubmit
-
-  // Live‑check: po wpisaniu poprawnego NIP odpytaj API i ustaw identityBlock,
-  // jeśli na ten NIP istnieje już profil firmowy. Debounce, aby nie spamować
-  // requestami przy każdym znaku.
-  React.useEffect(() => {
-    if (!nipRelevant) {
-      return
+  const persistTrialIntent = React.useCallback(() => {
+    if (!startTrial) return
+    try {
+      document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
+      window.localStorage.setItem("wizytaok_trial_intent", "1")
+    } catch {
+      /* ignore */
     }
-    const digits = normalizeDigits(companyTaxId)
-    if (digits.length !== 10 || !isPolishNip10Valid(digits)) {
-      return
-    }
-
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      if (controller.signal.aborted) return
-      setNipChecking(true)
-      void (async () => {
-        try {
-          const res = await fetch("/api/signup/check-business-identity", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              account_type: "registered_business",
-              company_tax_id: digits,
-              contact_phone: "",
-            }),
-            signal: controller.signal,
-          })
-          if (controller.signal.aborted) return
-          if (!res.ok) return
-          const json = (await res.json().catch(() => null)) as {
-            exists?: boolean
-            reason?: string
-          } | null
-          if (controller.signal.aborted) return
-          if (json?.exists === true && json.reason === "tax_id_already_registered") {
-            setIdentityBlock("tax_id")
-          }
-        } catch {
-          // brak sieci / przerwany request — submit zrobi pełną weryfikację
-        } finally {
-          if (!controller.signal.aborted) setNipChecking(false)
-        }
-      })()
-    }, 400)
-
-    return () => {
-      controller.abort()
-      window.clearTimeout(timer)
-      setNipChecking(false)
-    }
-  }, [nipRelevant, companyTaxId])
-
-  /** Inline hint długości krajowego numeru telefonu (np. PL → wymagane 9 cyfr). */
-  const phoneLengthHint = React.useMemo(() => {
-    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
-    if (v.ok) return null
-    if (phoneNational.replace(/\D/g, "").length === 0) return null
-    if (v.min === v.max) {
-      return t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(v.min))
-    }
-    return t("settings.phoneInvalidNationalLength")
-      .replace("{min}", String(v.min))
-      .replace("{max}", String(v.max))
-  }, [phoneDialCode, phoneNational, t])
-
-  // Live‑check: po wpisaniu poprawnego (długością) numeru telefonu odpytaj API
-  // i ustaw identityBlock="phone", jeśli numer jest już użyty w istniejącym profilu.
-  React.useEffect(() => {
-    const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
-    if (!v.ok || phoneNational.replace(/\D/g, "").length === 0) {
-      return
-    }
-    const stored = buildStoredInternationalPhone(phoneDialCode, phoneNational)
-    if (!stored) {
-      return
-    }
-
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      if (controller.signal.aborted) return
-      setPhoneChecking(true)
-      void (async () => {
-        try {
-          const res = await fetch("/api/signup/check-business-identity", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              // wymuszamy gałąź telefonu w API niezależnie od wybranego typu konta
-              account_type: "unregistered_activity",
-              company_tax_id: "",
-              contact_phone: stored,
-            }),
-            signal: controller.signal,
-          })
-          if (controller.signal.aborted) return
-          if (!res.ok) return
-          const json = (await res.json().catch(() => null)) as {
-            exists?: boolean
-            reason?: string
-          } | null
-          if (controller.signal.aborted) return
-          if (json?.exists === true && json.reason === "phone_already_registered") {
-            setIdentityBlock("phone")
-          }
-        } catch {
-          // brak sieci / przerwany request — submit zrobi pełną weryfikację
-        } finally {
-          if (!controller.signal.aborted) setPhoneChecking(false)
-        }
-      })()
-    }, 400)
-
-    return () => {
-      controller.abort()
-      window.clearTimeout(timer)
-      setPhoneChecking(false)
-    }
-  }, [phoneDialCode, phoneNational])
-
-  // Live‑check: czy podany e-mail został już użyty do założenia konta.
-  React.useEffect(() => {
-    const trimmed = email.trim()
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
-    if (!valid) {
-      return
-    }
-
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => {
-      if (controller.signal.aborted) return
-      setEmailChecking(true)
-      void (async () => {
-        try {
-          const res = await fetch("/api/signup/check-email", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ email: trimmed }),
-            signal: controller.signal,
-          })
-          if (controller.signal.aborted) return
-          if (!res.ok) return
-          const json = (await res.json().catch(() => null)) as {
-            exists?: boolean
-            reason?: string
-          } | null
-          if (controller.signal.aborted) return
-          if (json?.exists === true && json.reason === "email_already_registered") {
-            setIdentityBlock("email")
-          }
-        } catch {
-          // brak sieci / przerwany request — submit i tak zwróci błąd Supabase
-        } finally {
-          if (!controller.signal.aborted) setEmailChecking(false)
-        }
-      })()
-    }, 400)
-
-    return () => {
-      controller.abort()
-      window.clearTimeout(timer)
-      setEmailChecking(false)
-    }
-  }, [email])
-
-  function setAccountKindChoice(next: SignupAccountKind) {
-    setIdentityBlock(null)
-    setAccountKind(next)
-    if (next === "unregistered_activity") setCompanyTaxId("")
-  }
+  }, [startTrial])
 
   const passwordLiveHint = React.useMemo(() => {
     const v = getPasswordPolicyLiveHint(password)
@@ -310,6 +106,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   }, [password, t])
 
   const passwordBlocksSubmit = Boolean(passwordLiveHint)
+  const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -326,158 +123,25 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       return
     }
 
-    if (!businessName.trim()) {
-      setError(t("auth.signupBusinessNameRequired"))
-      return
-    }
-    if (!ownerFirstName.trim()) {
-      setError(t("auth.signupOwnerFirstRequired"))
-      return
-    }
-    if (!ownerLastName.trim()) {
-      setError(t("auth.signupOwnerLastRequired"))
-      return
-    }
-
-    const nationalPhone = phoneNational.replace(/\D/g, "")
-    if (nationalPhone.length === 0) {
-      setError(t("clients.validationPhoneRequired"))
-      return
-    }
-    const phoneLen = validateNationalPhoneLength(phoneDialCode, phoneNational)
-    if (!phoneLen.ok) {
-      setError(
-        phoneLen.min === phoneLen.max
-          ? t("settings.phoneInvalidNationalLengthExact").replace("{n}", String(phoneLen.min))
-          : t("settings.phoneInvalidNationalLength")
-              .replace("{min}", String(phoneLen.min))
-              .replace("{max}", String(phoneLen.max)),
-      )
-      return
-    }
-    const contactPhoneStored = buildStoredInternationalPhone(phoneDialCode, phoneNational)
-    const contactPhoneNormalized = normalizeDigits(contactPhoneStored)
-
-    const taxIdNormalized = normalizeDigits(companyTaxId)
-    let companyTaxIdForSignup: string | undefined
-    let companyTaxIdNormalizedForSignup: string | undefined
-
-    if (accountKind === "registered_business") {
-      if (taxIdNormalized.length !== 10) {
-        setError(t("settings.taxIdDigitsHint"))
-        return
-      }
-      if (!isPolishNip10Valid(taxIdNormalized)) {
-        setError(t("settings.taxIdInvalidChecksum"))
-        return
-      }
-      companyTaxIdForSignup = companyTaxId.trim() || undefined
-      companyTaxIdNormalizedForSignup = taxIdNormalized
-    }
-
     const pwdViol = assertPasswordPolicy(password)
     if (pwdViol) {
       setError(t(PASSWORD_POLICY_I18N[pwdViol]))
       return
     }
+    if (password !== confirmPassword) {
+      setError(t("auth.passwordRepeatMismatch"))
+      return
+    }
 
     setLoading(true)
-    setIdentityBlock(null)
     try {
-      const checkPayload = {
-        account_type: accountKind,
-        company_tax_id: accountKind === "registered_business" ? companyTaxId.trim() : "",
-        contact_phone: contactPhoneStored,
-      }
-      const identityRes = await fetch("/api/signup/check-business-identity", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(checkPayload),
-      })
-
-      const identityJson = (await identityRes.json().catch(() => null)) as {
-        ok?: boolean
-        exists?: boolean
-        reason?: string
-        error?: string
-      } | null
-
-      if (!identityRes.ok) {
-        if (identityRes.status === 503) {
-          setError(
-            "Sprawdzanie konta jest chwilowo niedostępne. Spróbuj ponownie lub skontaktuj się z pomocą."
-          )
-        } else if (identityJson?.error === "lookup_failed") {
-          setError("Nie udało się sprawdzić NIP/telefonu. Spróbuj ponownie za chwilę.")
-        } else {
-          setError("Nie udało się zweryfikować danych. Sprawdź NIP lub telefon i spróbuj ponownie.")
-        }
-        setLoading(false)
-        return
-      }
-
-      if (identityJson?.exists === true) {
-        if (identityJson.reason === "phone_already_registered") {
-          setIdentityBlock("phone")
-        } else {
-          setIdentityBlock("tax_id")
-        }
-        setError(null)
-        setInfo(null)
-        setLoading(false)
-        return
-      }
-    } catch {
-      setError("Brak połączenia z serwerem. Sprawdź sieć i spróbuj ponownie.")
-      setLoading(false)
-      return
-    }
-
-    const slugPick = await allocateSignupBookingSlug(client, businessName.trim())
-    if (!slugPick.ok) {
-      setError(
-        slugPick.code === "check_failed" ? t("auth.slugCheckError") : t("auth.signupSlugReserveFailed"),
-      )
-      setLoading(false)
-      return
-    }
-    const normalized = slugPick.slug
-
-    if (process.env.NODE_ENV === "development") {
-      console.info("[signup.slug]", {
-        normalizedSlug: normalized,
-        mode: "allocated_from_business_name",
-        slugColumn: BUSINESS_PUBLIC_SLUG_COLUMN,
-      })
-    }
-
-    try {
-      if (startTrial && typeof document !== "undefined") {
-        document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
-        try {
-          window.localStorage.setItem("wizytaok_trial_intent", "1")
-        } catch {
-          // ignore storage failures (private mode, restricted browser settings)
-        }
-      }
-
+      persistTrialIntent()
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
         options: {
           emailRedirectTo: buildSignupConfirmationRedirectUrl(afterConfirmPath, window.location.origin),
-          data: {
-            business_name: businessName.trim(),
-            slug: normalized,
-            owner_name: ownerFirstName.trim(),
-            owner_last_name: ownerLastName.trim(),
-            trial_intent: true,
-            account_type: accountKind,
-            company_tax_id: companyTaxIdForSignup,
-            company_tax_id_normalized: companyTaxIdNormalizedForSignup,
-            contact_phone: contactPhoneStored || undefined,
-            contact_phone_normalized: contactPhoneNormalized || undefined,
-          },
+          data: startTrial ? { trial_intent: true } : undefined,
         },
       })
 
@@ -487,23 +151,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         return
       }
 
-      const authUser = authData.user
-      if (!authUser?.id) {
+      if (!authData.user?.id) {
         setError(t("auth.signupUserCreateFailed"))
         return
       }
 
-      if (process.env.NODE_ENV === "development") {
-        console.info("[signup.profile.insert]", {
-          mode: "deferred_to_auth_callback",
-          reason: authData.session ? "session_present_but_confirmation_required_flow" : "no_session_after_signup",
-          userId: authUser.id,
-          slug: normalized,
-        })
-      }
-
-      // Zawsze wymagamy flow z potwierdzeniem e-mail.
-      // Profil firmy tworzymy dopiero po kliknięciu linku (auth callback).
       await client.auth.signOut()
       setInfo(t("auth.signupSuccessCheckEmail"))
     } finally {
@@ -546,18 +198,6 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
   }
 
-  const loginHrefDup = startTrial ? "/login?next=%2Fdashboard" : "/login"
-
-  const persistTrialIntentForOAuth = React.useCallback(() => {
-    if (!startTrial) return
-    try {
-      document.cookie = "wizytaok_trial_intent=1; Max-Age=86400; Path=/; SameSite=Lax"
-      window.localStorage.setItem("wizytaok_trial_intent", "1")
-    } catch {
-      /* ignore */
-    }
-  }, [startTrial])
-
   const handleOAuthError = React.useCallback(
     (code: string) => {
       setOauthError(oauthErrorMessageFromCode(code, t))
@@ -585,152 +225,12 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
           </CardHeader>
           <CardContent className="space-y-5">
             <OAuthProviderButtons
-              next="/settings?setup=business"
+              next={startTrial ? "/start-trial" : "/settings?setup=business"}
               trialIntent={startTrial}
-              onBeforeSignIn={persistTrialIntentForOAuth}
+              onBeforeSignIn={persistTrialIntent}
               onError={handleOAuthError}
             />
             <form className="space-y-4" onSubmit={onSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="signup-business">{t("auth.businessName")}</Label>
-                <Input
-                  id="signup-business"
-                  autoComplete="organization"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  className="h-11 rounded-xl"
-                  required
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="signup-owner-first">{t("bookingPublic.firstName")}</Label>
-                  <Input
-                    id="signup-owner-first"
-                    autoComplete="given-name"
-                    value={ownerFirstName}
-                    onChange={(e) => setOwnerFirstName(e.target.value)}
-                    className="h-11 rounded-xl"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="signup-owner-last">{t("bookingPublic.lastName")}</Label>
-                  <Input
-                    id="signup-owner-last"
-                    autoComplete="family-name"
-                    value={ownerLastName}
-                    onChange={(e) => setOwnerLastName(e.target.value)}
-                    className="h-11 rounded-xl"
-                    required
-                  />
-                </div>
-              </div>
-
-              <fieldset className="space-y-4 rounded-xl border border-border/70 bg-muted/15 p-4">
-                <legend className="px-1 text-sm font-medium text-foreground">
-                  {t("auth.signupAccountTypeLabel")}
-                </legend>
-                <div className="space-y-2">
-                  <label className="flex cursor-pointer items-start gap-2 text-sm leading-snug">
-                    <input
-                      type="radio"
-                      name="signup-account-kind"
-                      className="mt-0.5 size-4 shrink-0 rounded-full border border-input bg-background accent-primary"
-                      checked={accountKind === "registered_business"}
-                      onChange={() => setAccountKindChoice("registered_business")}
-                    />
-                    <span>{t("auth.signupAccountTypeRegistered")}</span>
-                  </label>
-                  <label className="flex cursor-pointer items-start gap-2 text-sm leading-snug">
-                    <input
-                      type="radio"
-                      name="signup-account-kind"
-                      className="mt-0.5 size-4 shrink-0 rounded-full border border-input bg-background accent-primary"
-                      checked={accountKind === "unregistered_activity"}
-                      onChange={() => setAccountKindChoice("unregistered_activity")}
-                    />
-                    <span>{t("auth.signupAccountTypeUnregistered")}</span>
-                  </label>
-                </div>
-                {accountKind === "registered_business" ? (
-                  <div className="space-y-2">
-                    {!startTrial ? (
-                      <p className="text-xs text-muted-foreground">{t("auth.signupTaxIdRequiredHint")}</p>
-                    ) : null}
-                    <Label htmlFor="signup-tax-id">{t("settings.taxIdLabel")}</Label>
-                    <Input
-                      id="signup-tax-id"
-                      autoComplete="off"
-                      value={companyTaxId}
-                      onChange={(e) => {
-                        setIdentityBlock(null)
-                        setCompanyTaxId(e.target.value)
-                      }}
-                      placeholder={t("settings.taxIdPlaceholder")}
-                      aria-invalid={Boolean(nipFieldHint)}
-                      required
-                      className={cn(
-                        "h-11 rounded-xl",
-                        nipFieldHint ? "border-destructive focus-visible:ring-destructive/30" : null,
-                      )}
-                    />
-                    {nipFieldHint ? (
-                      <p className="text-xs text-destructive" role="alert">
-                        {nipFieldHint}
-                      </p>
-                    ) : null}
-                    {!nipFieldHint && identityBlock === "tax_id" ? (
-                      <p className="text-xs text-destructive" role="alert">
-                        Ten NIP został już użyty do założenia konta w WizytaOK.
-                      </p>
-                    ) : null}
-                    {!nipFieldHint && identityBlock !== "tax_id" && nipChecking ? (
-                      <p className="text-xs text-muted-foreground" aria-live="polite">
-                        Sprawdzanie NIP-u…
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {startTrial && accountKind === "registered_business" ? (
-                  <p className="text-xs text-muted-foreground">{t("auth.trialOnePerBusinessFootnote")}</p>
-                ) : null}
-              </fieldset>
-
-              <div className="space-y-1.5">
-                <InternationalPhoneFieldGroup
-                  label={t("settings.phoneLabel")}
-                  dialCode={phoneDialCode}
-                  nationalDigits={phoneNational}
-                  onDialCodeChange={(v) => {
-                    setIdentityBlock(null)
-                    setPhoneDialCode(v)
-                  }}
-                  onNationalChange={(v) => {
-                    setIdentityBlock(null)
-                    setPhoneNational(v)
-                  }}
-                  dialSelectId="signup-phone-dial"
-                  nationalInputId="signup-phone-national"
-                  showInlineError={false}
-                />
-                {phoneLengthHint ? (
-                  <p className="text-xs text-destructive" role="alert">
-                    {phoneLengthHint}
-                  </p>
-                ) : null}
-                {!phoneLengthHint && identityBlock === "phone" ? (
-                  <p className="text-xs text-destructive" role="alert">
-                    Ten numer telefonu został już użyty do założenia konta w WizytaOK.
-                  </p>
-                ) : null}
-                {!phoneLengthHint && identityBlock !== "phone" && phoneChecking ? (
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    Sprawdzanie numeru telefonu…
-                  </p>
-                ) : null}
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="signup-email">{t("auth.email")}</Label>
                 <Input
@@ -738,29 +238,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => {
-                    if (identityBlock === "email") setIdentityBlock(null)
-                    setEmail(e.target.value)
-                  }}
-                  aria-invalid={identityBlock === "email"}
-                  className={cn(
-                    "h-11 rounded-xl",
-                    identityBlock === "email"
-                      ? "border-destructive focus-visible:ring-destructive/30"
-                      : null,
-                  )}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 rounded-xl"
                   required
                 />
-                {identityBlock === "email" ? (
-                  <p className="text-xs text-destructive" role="alert">
-                    Ten adres e-mail został już użyty do założenia konta w WizytaOK.
-                  </p>
-                ) : null}
-                {identityBlock !== "email" && emailChecking ? (
-                  <p className="text-xs text-muted-foreground" aria-live="polite">
-                    Sprawdzanie adresu e-mail…
-                  </p>
-                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">{t("auth.password")}</Label>
@@ -785,56 +266,28 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                   </p>
                 ) : null}
               </div>
-              {identityBlock === "tax_id" ? (
-                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
-                  <p className="font-medium text-foreground">Firma z tym NIP już istnieje w WizytaOK.</p>
-                  <p className="text-muted-foreground">
-                    Zaloguj się na konto właściciela lub poproś o dostęp do tej firmy.
+              <div className="space-y-2">
+                <Label htmlFor="signup-password-repeat">{t("auth.passwordRepeatLabel")}</Label>
+                <Input
+                  id="signup-password-repeat"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  aria-invalid={passwordMismatch}
+                  className={cn(
+                    "h-11 rounded-xl",
+                    passwordMismatch ? "border-destructive focus-visible:ring-destructive/30" : null,
+                  )}
+                  minLength={8}
+                  required
+                />
+                {passwordMismatch ? (
+                  <p className="text-xs text-destructive" role="alert">
+                    {t("auth.passwordRepeatMismatch")}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button className="h-9 rounded-lg" asChild>
-                      <Link href={loginHrefDup}>Zaloguj się</Link>
-                    </Button>
-                    <Button variant="outline" className="h-9 rounded-lg" asChild>
-                      <Link href="/help">Poproś o dostęp</Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {identityBlock === "phone" ? (
-                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
-                  <p className="font-medium text-foreground">Ten numer telefonu jest już zarejestrowany w WizytaOK.</p>
-                  <p className="text-muted-foreground">
-                    Zaloguj się na istniejące konto lub poproś o dostęp — nie można utworzyć drugiego profilu z tym
-                    samym numerem.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button className="h-9 rounded-lg" asChild>
-                      <Link href={loginHrefDup}>Zaloguj się</Link>
-                    </Button>
-                    <Button variant="outline" className="h-9 rounded-lg" asChild>
-                      <Link href="/help">Poproś o dostęp</Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {identityBlock === "email" ? (
-                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/50 dark:bg-amber-950/40">
-                  <p className="font-medium text-foreground">Ten adres e-mail jest już zarejestrowany w WizytaOK.</p>
-                  <p className="text-muted-foreground">
-                    Zaloguj się na istniejące konto lub odzyskaj hasło — nie można utworzyć drugiego profilu na ten
-                    sam adres.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button className="h-9 rounded-lg" asChild>
-                      <Link href={loginHrefDup}>Zaloguj się</Link>
-                    </Button>
-                    <Button variant="outline" className="h-9 rounded-lg" asChild>
-                      <Link href="/reset-password">Nie pamiętam hasła</Link>
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
               {oauthError ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {oauthError}
@@ -855,7 +308,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                     onClick={() => void handleResendConfirmation()}
                     disabled={sendingConfirmation}
                   >
-                    {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
+                    {sendingConfirmation ? "..." : t("auth.resendConfirmation")}
                   </Button>
                 </div>
               ) : null}
@@ -873,16 +326,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
               <Button
                 type="submit"
                 className="h-11 w-full rounded-xl"
-                disabled={
-                  loading ||
-                  sendingConfirmation ||
-                  nipBlocksSubmit ||
-                  passwordBlocksSubmit ||
-                  Boolean(phoneLengthHint) ||
-                  identityBlock !== null
-                }
+                disabled={loading || sendingConfirmation || passwordBlocksSubmit || passwordMismatch}
               >
-                {loading ? "…" : t("auth.signupSubmit")}
+                {loading ? "..." : t("auth.signupSubmit")}
               </Button>
             </form>
           </CardContent>
@@ -890,7 +336,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             <p>
               {t("auth.hasAccount")}{" "}
               <Link
-                href={startTrial ? "/login?next=%2Fstart-trial" : "/login"}
+                href={loginHref}
                 className="font-medium text-foreground underline-offset-4 hover:underline"
               >
                 {t("auth.loginFromSignupCta")}
