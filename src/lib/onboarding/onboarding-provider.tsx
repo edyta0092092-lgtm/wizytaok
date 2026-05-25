@@ -151,11 +151,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }
   }, [flowActive, snapshot, activeStepId, pathname, router])
 
-  /** ?onboarding=welcome po aktywacji dostępu */
+  /** ?onboarding=welcome/start po aktywacji dostępu */
   React.useEffect(() => {
     if (typeof window === "undefined" || !access.ready || !businessId) return
     const params = new URLSearchParams(window.location.search)
-    if (params.get("onboarding") !== "welcome") return
+    const requestedOnboarding = params.get("onboarding")
+    if (requestedOnboarding !== "welcome" && requestedOnboarding !== "start") return
     markPanelAccessJustActivated(businessId)
     params.delete("onboarding")
     const qs = params.toString()
@@ -165,11 +166,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   React.useEffect(() => {
     if (!ready || !eligibilityReady || !eligible || !businessId) return
     if (welcomeOpen || flowActive) return
-    if (!isPanelWelcomePopupPath(pathname)) return
+    const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
+    const workingHoursPath = getStepConfig("working_hours").path
+    const canHandleActivationOnPath =
+      pendingActivation && (pathname === workingHoursPath || isPanelWelcomePopupPath(pathname))
+    if (!canHandleActivationOnPath && !isPanelWelcomePopupPath(pathname)) return
     if (loading) return
 
     const restart = consumeOnboardingRestart(businessId)
-    const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
     const markedComplete = isOnboardingMarkedComplete(businessId)
     const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
 
@@ -191,12 +195,12 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       queueMicrotask(() => {
         clearPanelAccessJustActivated()
         markOnboardingWelcomeDismissed(businessId)
-        setFreshChecklistOpen(false)
+        setFreshChecklistOpen(true)
         setWelcomeOpen(false)
         setActiveStepId("working_hours")
         setFlowActive(true)
       })
-      if (pathname !== "/availability") router.push("/availability")
+      if (pathname !== workingHoursPath) router.push(workingHoursPath)
       return
     }
 

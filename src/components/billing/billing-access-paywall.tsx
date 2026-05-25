@@ -194,7 +194,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
 
     stripeOnboardingRedirectedRef.current = true
     markPanelAccessJustActivated(businessId)
-    window.location.replace("/dashboard?onboarding=welcome")
+    window.location.replace("/availability?onboarding=start")
   }, [businessId, panelUnlocked, returnedFromStripeSuccess, variant])
 
   React.useEffect(() => {
@@ -333,7 +333,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
           {scenario === "subscription_active" || panelUnlocked ? (
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button type="button" className="h-11 rounded-xl" asChild>
-                <Link href="/dashboard?onboarding=welcome">{t("access.activateGoToPanel")}</Link>
+                <Link href="/availability?onboarding=start">{t("access.activateGoToPanel")}</Link>
               </Button>
               {showManagePortal ? (
                 <Button

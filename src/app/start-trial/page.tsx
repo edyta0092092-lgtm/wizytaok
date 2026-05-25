@@ -437,7 +437,7 @@ function StartTrialContent() {
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                onClick={() => router.push("/dashboard?onboarding=welcome")}
+                onClick={() => router.push("/availability?onboarding=start")}
               >
                 Przejdź do panelu
               </Button>
