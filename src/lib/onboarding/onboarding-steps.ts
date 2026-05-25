@@ -2,8 +2,8 @@
 
 export const ONBOARDING_STEP_IDS = [
   "working_hours",
-  "team_member",
   "service",
+  "team_member",
   "staff_service",
   "booking_page",
   "first_visit",
@@ -32,20 +32,20 @@ export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
     hintKey: "onboarding.steps.working_hours.hint",
   },
   {
-    id: "team_member",
-    path: "/team",
-    targetSelector: '[data-tour="team-person-form"]',
-    titleKey: "onboarding.steps.team_member.title",
-    shortKey: "onboarding.steps.team_member.short",
-    hintKey: "onboarding.steps.team_member.hint",
-  },
-  {
     id: "service",
     path: "/services",
     targetSelector: '[data-tour="services-form"]',
     titleKey: "onboarding.steps.service.title",
     shortKey: "onboarding.steps.service.short",
     hintKey: "onboarding.steps.service.hint",
+  },
+  {
+    id: "team_member",
+    path: "/team",
+    targetSelector: '[data-tour="team-person-form"]',
+    titleKey: "onboarding.steps.team_member.title",
+    shortKey: "onboarding.steps.team_member.short",
+    hintKey: "onboarding.steps.team_member.hint",
   },
   {
     id: "staff_service",
