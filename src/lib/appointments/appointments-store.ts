@@ -240,8 +240,6 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
   React.useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | null = null
     let fallbackPollId: ReturnType<typeof setInterval> | null = null
-    let realtimeClient: ReturnType<typeof getBrowserClient> | null = null
-    let realtimeChannel: ReturnType<NonNullable<ReturnType<typeof getBrowserClient>>["channel"]> | null = null
     let cancelled = false
 
     const runSync = (force = false) => {
@@ -293,23 +291,6 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
 
     const bid = businessId?.trim()
     if (bid && isSupabaseConfigured()) {
-      realtimeClient = getBrowserClient()
-      if (realtimeClient) {
-        realtimeChannel = realtimeClient
-          .channel(`appointments-bookings-${bid}`)
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "bookings",
-              filter: `business_id=eq.${bid}`,
-            },
-            () => scheduleSync(true),
-          )
-          .subscribe()
-      }
-
       fallbackPollId = setInterval(() => scheduleSync(true), BOOKINGS_REALTIME_FALLBACK_POLL_MS)
     }
 
@@ -317,9 +298,6 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
       cancelled = true
       if (debounceId) clearTimeout(debounceId)
       if (fallbackPollId) clearInterval(fallbackPollId)
-      if (realtimeClient && realtimeChannel) {
-        void realtimeClient.removeChannel(realtimeChannel)
-      }
       window.removeEventListener("pw-public-bookings", onLocal)
       window.removeEventListener("pw-manual-appointments", onLocal)
       window.removeEventListener("pw-appointments-overrides", onLocal)

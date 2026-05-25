@@ -160,12 +160,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }
   }, [flowActive, snapshot, activeStepId, pathname, router])
 
-  /** ?onboarding=welcome/start po aktywacji dostępu */
+  /** ?onboarding=welcome po aktywacji dostępu */
   React.useEffect(() => {
     if (typeof window === "undefined" || !access.ready || !businessId) return
     const params = new URLSearchParams(window.location.search)
-    const requestedOnboarding = params.get("onboarding")
-    if (requestedOnboarding !== "welcome" && requestedOnboarding !== "start") return
+    if (params.get("onboarding") !== "welcome") return
     markPanelAccessJustActivated(businessId)
     params.delete("onboarding")
     const qs = params.toString()
@@ -175,41 +174,25 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   React.useEffect(() => {
     if (!ready || !eligibilityReady || !eligible || !businessId) return
     if (welcomeOpen || flowActive) return
-    const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
-    const workingHoursPath = getStepConfig("working_hours").path
-    const canHandleActivationOnPath =
-      pendingActivation && (pathname === workingHoursPath || isPanelWelcomePopupPath(pathname))
-    if (!canHandleActivationOnPath && !isPanelWelcomePopupPath(pathname)) return
+    if (!isPanelWelcomePopupPath(pathname)) return
     if (loading) return
 
     const restart = consumeOnboardingRestart(businessId)
+    const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
     const markedComplete = isOnboardingMarkedComplete(businessId)
     const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
 
-    if (restart) {
-      queueMicrotask(() => {
-        clearPanelAccessJustActivated()
-        setFreshChecklistOpen(true)
-        setWelcomeOpen(true)
-      })
-      return
-    }
-
-    if (pendingActivation) {
-      if (dataComplete || markedComplete) {
+    if (restart || pendingActivation) {
+      if (pendingActivation && (dataComplete || markedComplete)) {
         markWelcomeHandledForBusiness(businessId)
         return
       }
 
       queueMicrotask(() => {
         clearPanelAccessJustActivated()
-        markOnboardingWelcomeDismissed(businessId)
         setFreshChecklistOpen(true)
-        setWelcomeOpen(false)
-        setActiveStepId("working_hours")
-        setFlowActive(true)
+        setWelcomeOpen(true)
       })
-      if (pathname !== workingHoursPath) router.push(workingHoursPath)
       return
     }
 
