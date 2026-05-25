@@ -293,7 +293,7 @@ export default function ServicesPage() {
               <p className="mt-1.5 text-xl font-semibold tabular-nums">{totalCount}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card data-tour="services-form">
             <CardContent className="px-4 py-3.5">
               <p className="text-xs text-muted-foreground">{t("services.activeTitle")}</p>
               <p className="mt-1.5 text-xl font-semibold tabular-nums">{activeCount}</p>

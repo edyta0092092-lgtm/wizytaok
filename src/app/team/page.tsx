@@ -431,6 +431,14 @@ export default function TeamPage() {
   >("profile")
   const [staffQuery, setStaffQuery] = React.useState("")
 
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("onboarding_tab") === "services") {
+      queueMicrotask(() => setFormTab("services"))
+    }
+  }, [])
+
   const dateTimeFmt = React.useMemo(
     () =>
       new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
@@ -534,7 +542,9 @@ export default function TeamPage() {
   )
 
   React.useEffect(() => {
-    if (access.businessId) setBusinessProfileId(access.businessId)
+    if (access.businessId) {
+      queueMicrotask(() => setBusinessProfileId(access.businessId))
+    }
   }, [access.businessId])
 
   const load = React.useCallback(async () => {
@@ -1672,7 +1682,10 @@ export default function TeamPage() {
             </Card>
           </div>
 
-          <Card className="min-w-0 overflow-hidden rounded-2xl border border-border">
+          <Card
+            data-tour="team-person-form"
+            className="min-w-0 overflow-hidden rounded-2xl border border-border"
+          >
             <CardHeader>
               <CardTitle className="text-lg">{formCardTitle}</CardTitle>
               {editing ? (
@@ -1725,7 +1738,9 @@ export default function TeamPage() {
                     {access.canManageInvitations ? (
                       <TabsTrigger value="panel">{t("team.panelAccessSection")}</TabsTrigger>
                     ) : null}
-                    <TabsTrigger value="services">{t("team.servicesForStaff")}</TabsTrigger>
+                    <TabsTrigger value="services" data-tour="team-services-tab">
+                      {t("team.servicesForStaff")}
+                    </TabsTrigger>
                     <TabsTrigger value="schedule">{t("team.schedule")}</TabsTrigger>
                     <TabsTrigger value="exceptions">{t("team.scheduleExceptionsTitle")}</TabsTrigger>
                   </TabsList>

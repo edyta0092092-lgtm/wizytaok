@@ -63,6 +63,7 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
   const [trialGloballyBlocked, setTrialGloballyBlocked] = React.useState(false)
   const [trialBlockedNotice, setTrialBlockedNotice] = React.useState<string | null>(null)
   const autoPaidStartedRef = React.useRef(false)
+  const stripeOnboardingRedirectedRef = React.useRef(false)
 
   const refreshBillingRow = React.useCallback(async () => {
     if (!businessId) {
@@ -190,10 +191,6 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     })
   }, [handlePayForAccess, scenario, searchParams, variant])
 
-  if (variant === "staff") {
-    return <StaffBillingAccessPaywall />
-  }
-
   const effectiveStatus = billingRow
     ? resolveEffectiveSubscriptionStatus(
         billingRow.subscription_status,
@@ -201,6 +198,22 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
       )
     : null
   const panelUnlocked = hasActiveBusinessAccess(effectiveStatus)
+  const returnedFromStripeSuccess =
+    searchParams.get("stripe_paid") === "success" || searchParams.get("stripe_test") === "success"
+
+  React.useEffect(() => {
+    if (variant !== "owner") return
+    if (!returnedFromStripeSuccess || !panelUnlocked || !businessId) return
+    if (stripeOnboardingRedirectedRef.current) return
+
+    stripeOnboardingRedirectedRef.current = true
+    markPanelAccessJustActivated(businessId)
+    window.location.replace("/dashboard?onboarding=welcome")
+  }, [businessId, panelUnlocked, returnedFromStripeSuccess, variant])
+
+  if (variant === "staff") {
+    return <StaffBillingAccessPaywall />
+  }
 
   let title = t("access.activateTitle")
   let description = t("access.activateDescription")

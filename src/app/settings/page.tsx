@@ -114,14 +114,16 @@ function initialSettingsForm(): SettingsForm {
 
 function SettingsOnboardingCard() {
   const { t } = useTranslations()
-  const { restartOnboarding } = useOnboarding()
+  const { restartOnboarding, setupComplete } = useOnboarding()
+  const title = setupComplete ? t("onboarding.reconfigure") : t("onboarding.restart")
+  const hint = setupComplete ? t("onboarding.reconfigureHint") : t("onboarding.restartHint")
 
   return (
     <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
       <CardHeader className="border-b border-border/70 py-4">
-        <CardTitle className="text-sm font-semibold">{t("onboarding.restart")}</CardTitle>
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
         <CardDescription className="text-xs text-muted-foreground">
-          {t("onboarding.restartHint")}
+          {hint}
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-4">
@@ -132,7 +134,7 @@ function SettingsOnboardingCard() {
           onClick={() => restartOnboarding()}
         >
           <RotateCcw className="size-4" />
-          {t("onboarding.restart")}
+          {title}
         </Button>
       </CardContent>
     </Card>
@@ -152,8 +154,10 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return
     const params = new URLSearchParams(window.location.search)
     const billing = params.get("billing")
-    setShowBillingRequiredBanner(billing === "required")
-    setOauthBusinessSetup(params.get("setup") === "business")
+    queueMicrotask(() => {
+      setShowBillingRequiredBanner(billing === "required")
+      setOauthBusinessSetup(params.get("setup") === "business")
+    })
   }, [])
   const [form, setForm] = React.useState<SettingsForm>(initialSettingsForm)
   const [showSaved, setShowSaved] = React.useState(false)
