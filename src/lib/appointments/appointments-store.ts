@@ -36,6 +36,7 @@ import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-st
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
 const APPOINTMENT_STATUS_OVERRIDES_STORAGE_KEY = "appointment-status-overrides"
+const BOOKINGS_REALTIME_FALLBACK_POLL_MS = 15000
 
 type AppointmentStatusOverride = {
   status: AppointmentStatus
@@ -238,6 +239,9 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
 
   React.useEffect(() => {
     let debounceId: ReturnType<typeof setTimeout> | null = null
+    let fallbackPollId: ReturnType<typeof setInterval> | null = null
+    let realtimeClient: ReturnType<typeof getBrowserClient> | null = null
+    let realtimeChannel: ReturnType<NonNullable<ReturnType<typeof getBrowserClient>>["channel"]> | null = null
     let cancelled = false
 
     const runSync = (force = false) => {
@@ -263,9 +267,12 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
 
     const cached = getCachedMergedAppointments(mergedAppointmentsCacheKey(businessId))
     if (cached) {
-      setAppointments(cached)
-      setReady(true)
-      setLoadError(false)
+      queueMicrotask(() => {
+        if (cancelled) return
+        setAppointments(cached)
+        setReady(true)
+        setLoadError(false)
+      })
     }
 
     if (isSupabaseConfigured() && !businessId?.trim()) {
@@ -283,9 +290,36 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
     window.addEventListener("pw-manual-appointments", onLocal)
     window.addEventListener("pw-appointments-overrides", onLocal)
     window.addEventListener("pw-bookings", onBookings)
+
+    const bid = businessId?.trim()
+    if (bid && isSupabaseConfigured()) {
+      realtimeClient = getBrowserClient()
+      if (realtimeClient) {
+        realtimeChannel = realtimeClient
+          .channel(`appointments-bookings-${bid}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "bookings",
+              filter: `business_id=eq.${bid}`,
+            },
+            () => scheduleSync(true),
+          )
+          .subscribe()
+      }
+
+      fallbackPollId = setInterval(() => scheduleSync(true), BOOKINGS_REALTIME_FALLBACK_POLL_MS)
+    }
+
     return () => {
       cancelled = true
       if (debounceId) clearTimeout(debounceId)
+      if (fallbackPollId) clearInterval(fallbackPollId)
+      if (realtimeClient && realtimeChannel) {
+        void realtimeClient.removeChannel(realtimeChannel)
+      }
       window.removeEventListener("pw-public-bookings", onLocal)
       window.removeEventListener("pw-manual-appointments", onLocal)
       window.removeEventListener("pw-appointments-overrides", onLocal)
