@@ -433,19 +433,11 @@ export default function TeamPage() {
   >("profile")
   const [staffQuery, setStaffQuery] = React.useState("")
   const isStaffServiceOnboarding = flowActive && activeStepId === "staff_service"
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("onboarding_tab") === "services") {
-      queueMicrotask(() => setFormTab("services"))
-    }
-  }, [])
-
-  React.useEffect(() => {
-    if (!isStaffServiceOnboarding || !editing) return
-    queueMicrotask(() => setFormTab("services"))
-  }, [editing, isStaffServiceOnboarding])
+  const staffServiceTourNeedsPerson = isStaffServiceOnboarding && !editing
+  const staffServiceTourNeedsServicesTab =
+    isStaffServiceOnboarding && Boolean(editing) && formTab !== "services"
+  const staffServiceTourNeedsServiceChoice =
+    isStaffServiceOnboarding && Boolean(editing) && formTab === "services"
 
   const dateTimeFmt = React.useMemo(
     () =>
@@ -791,6 +783,9 @@ export default function TeamPage() {
   }
 
   const beginEdit = (staff: StaffMember) => {
+    if (isStaffServiceOnboarding) {
+      setFormTab("profile")
+    }
     void loadStaffMemberIntoForm(staff, true)
   }
 
@@ -1519,7 +1514,7 @@ export default function TeamPage() {
         <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
           <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
             <Card
-              data-tour={isStaffServiceOnboarding && !editing ? "team-staff-service-target" : undefined}
+              data-tour={staffServiceTourNeedsPerson ? "team-staff-service-target" : undefined}
               className="min-w-0 overflow-hidden rounded-2xl border border-border"
             >
               <CardHeader className="space-y-3">
@@ -1749,7 +1744,14 @@ export default function TeamPage() {
                     {access.canManageInvitations ? (
                       <TabsTrigger value="panel">{t("team.panelAccessSection")}</TabsTrigger>
                     ) : null}
-                    <TabsTrigger value="services" data-tour="team-services-tab">
+                    <TabsTrigger
+                      value="services"
+                      data-tour={
+                        staffServiceTourNeedsServicesTab
+                          ? "team-staff-service-target"
+                          : "team-services-tab"
+                      }
+                    >
                       {t("team.servicesForStaff")}
                     </TabsTrigger>
                     <TabsTrigger value="schedule">{t("team.schedule")}</TabsTrigger>
@@ -1851,7 +1853,7 @@ export default function TeamPage() {
                   <TabsContent
                     value="services"
                     className="mt-5 space-y-3"
-                    data-tour={isStaffServiceOnboarding && editing ? "team-staff-service-target" : undefined}
+                    data-tour={staffServiceTourNeedsServiceChoice ? "team-staff-service-target" : undefined}
                   >
                     <div className="min-w-0 space-y-2">
                       {services.length === 0 ? (
