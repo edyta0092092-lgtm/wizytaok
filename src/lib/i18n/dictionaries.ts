@@ -454,6 +454,8 @@ export const dictionaries = {
       forgotPassword: "Zapomniałem hasła",
       emailNotConfirmed:
         "Konto nie jest jeszcze potwierdzone. Sprawdź e-mail albo wyślij link potwierdzający ponownie.",
+      emailConfirmedLogin:
+        "Adres e-mail został potwierdzony. Zaloguj się, aby przejść dalej.",
       enterEmailForConfirmation: "Wpisz e-mail, aby wysłać link potwierdzający.",
       resendConfirmation: "Wyślij ponownie link potwierdzający",
       resendConfirmationSent:
@@ -2845,6 +2847,8 @@ Pozdrawiamy,
       forgotPassword: "Forgot password?",
       emailNotConfirmed:
         "This account is not confirmed yet. Check your email or resend the confirmation link.",
+      emailConfirmedLogin:
+        "Your email address has been confirmed. Sign in to continue.",
       enterEmailForConfirmation: "Enter your email to send the confirmation link.",
       resendConfirmation: "Resend confirmation link",
       resendConfirmationSent:

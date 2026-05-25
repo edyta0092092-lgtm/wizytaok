@@ -104,6 +104,8 @@ export function oauthErrorMessageFromCode(
   t: (key: string) => string,
 ): string {
   switch (code) {
+    case "email_confirmation_session_missing":
+      return t("auth.emailConfirmedLogin")
     case "auth_link_invalid_or_expired":
       return t("auth.emailConfirmationLinkInvalid")
     case "auth_callback_failed":

@@ -15,5 +15,5 @@ export function isEmailNotConfirmedAuthError(error: AuthErrorLike | null | undef
 export function buildSignupConfirmationRedirectUrl(nextPath: string, origin: string): string {
   const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
   const siteBase = (configuredSiteUrl && configuredSiteUrl.length > 0 ? configuredSiteUrl : origin).replace(/\/$/, "")
-  return `${siteBase}/auth/callback?next=${encodeURIComponent(nextPath)}`
+  return `${siteBase}/auth/confirm?next=${encodeURIComponent(nextPath)}`
 }

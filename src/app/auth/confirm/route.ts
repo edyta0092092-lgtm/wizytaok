@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 
+import { mapAuthCallbackExchangeError } from "@/lib/auth/oauth-sign-in-client"
 import {
   oauthErrorReturnPath,
   resolvePostAuthRedirect,
@@ -37,17 +38,43 @@ export async function GET(request: Request) {
   )
   const tokenHash = requestUrl.searchParams.get("token_hash")
   const type = parseEmailOtpType(requestUrl.searchParams.get("type"))
+  const code = requestUrl.searchParams.get("code")
+
+  const supabase = await getServerClient()
+  if (!supabase) {
+    return NextResponse.redirect(new URL("/login", origin))
+  }
+
+  if (code && !tokenHash) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    if (error) {
+      const dest = new URL(oauthErrorReturnPath(requestedNext), origin)
+      const mappedError = mapAuthCallbackExchangeError(error.message)
+      if (mappedError === "email_confirmation_session_missing") {
+        dest.searchParams.set("confirmed", "1")
+      } else {
+        dest.searchParams.set("oauth_error", mappedError)
+      }
+      dest.searchParams.set("next", requestedNext)
+      return NextResponse.redirect(dest)
+    }
+
+    const prepare = await prepareBusinessProfileForStartTrial()
+    if (prepare.ok === false && prepare.error === "missing_account_type") {
+      /* OAuth / brak metadanych z formularza - profil uzupelnia sie w /settings?setup=business */
+    }
+
+    const next = await resolvePostAuthRedirect(supabase, requestedNext, {
+      trialFromCookie: requestedNext === "/start-trial",
+    })
+    return NextResponse.redirect(new URL(next, origin))
+  }
 
   if (!tokenHash || !type) {
     const dest = new URL(oauthErrorReturnPath(requestedNext), origin)
     dest.searchParams.set("oauth_error", "auth_link_invalid_or_expired")
     dest.searchParams.set("next", requestedNext)
     return NextResponse.redirect(dest)
-  }
-
-  const supabase = await getServerClient()
-  if (!supabase) {
-    return NextResponse.redirect(new URL("/login", origin))
   }
 
   const { error } = await supabase.auth.verifyOtp({

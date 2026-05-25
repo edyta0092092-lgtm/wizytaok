@@ -64,10 +64,15 @@ export function mapOAuthCallbackQueryError(
 export function mapAuthCallbackExchangeError(message: string | undefined): string {
   const m = (message ?? "").trim().toLowerCase()
   if (
-    m.includes("expired") ||
-    m.includes("invalid") ||
     m.includes("code verifier") ||
-    m.includes("flow state")
+    m.includes("flow state") ||
+    m.includes("pkce")
+  ) {
+    return "email_confirmation_session_missing"
+  }
+  if (
+    m.includes("expired") ||
+    m.includes("invalid")
   ) {
     return "auth_link_invalid_or_expired"
   }

@@ -77,7 +77,12 @@ export async function GET(request: Request) {
     if (exchangeError) {
       const returnPath = oauthErrorReturnPath(requestedNext)
       const dest = new URL(returnPath, origin)
-      dest.searchParams.set("oauth_error", mapAuthCallbackExchangeError(exchangeError.message))
+      const mappedError = mapAuthCallbackExchangeError(exchangeError.message)
+      if (mappedError === "email_confirmation_session_missing") {
+        dest.searchParams.set("confirmed", "1")
+      } else {
+        dest.searchParams.set("oauth_error", mappedError)
+      }
       const nextPreserve = requestUrl.searchParams.get("next")
       if (nextPreserve) dest.searchParams.set("next", nextPreserve)
       return NextResponse.redirect(dest)

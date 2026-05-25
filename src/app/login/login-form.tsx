@@ -37,13 +37,18 @@ export function LoginForm() {
     searchParams.get("next") ?? searchParams.get("redirectTo")
   )
   const resetStatus = searchParams.get("reset")
+  const confirmedStatus = searchParams.get("confirmed")
   const oauthErrorCode = searchParams.get("oauth_error")
 
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(
-    resetStatus === "success" ? t("auth.resetPasswordSuccess") : null,
+    confirmedStatus === "1"
+      ? t("auth.emailConfirmedLogin")
+      : resetStatus === "success"
+        ? t("auth.resetPasswordSuccess")
+        : null,
   )
   const [oauthError, setOauthError] = React.useState<string | null>(() =>
     oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null,
@@ -263,22 +268,24 @@ export function LoginForm() {
                   className="h-11 rounded-xl"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => void handleResetPassword()}
-                  disabled={sendingReset || sendingConfirmation}
-                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
-                >
-                  {t("auth.forgotPassword")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleResendConfirmation()}
-                  disabled={sendingReset || sendingConfirmation}
-                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
-                >
-                  {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
-                </button>
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleResetPassword()}
+                    disabled={sendingReset || sendingConfirmation}
+                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
+                  >
+                    {t("auth.forgotPassword")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleResendConfirmation()}
+                    disabled={sendingReset || sendingConfirmation}
+                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
+                  >
+                    {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
+                  </button>
+                </div>
               </div>
               {oauthError ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
