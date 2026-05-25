@@ -21,6 +21,7 @@ import {
   OAuthProviderButtons,
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
+import { buildSignupConfirmationRedirectUrl } from "@/lib/auth/signup-confirmation-client"
 import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { BUSINESS_PUBLIC_SLUG_COLUMN } from "@/lib/supabase/repositories/business-profile.repository"
@@ -78,6 +79,9 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const [phoneChecking, setPhoneChecking] = React.useState(false)
   /** Live‑check adresu e-mail w trakcie wpisywania (debounce). */
   const [emailChecking, setEmailChecking] = React.useState(false)
+  const [sendingConfirmation, setSendingConfirmation] = React.useState(false)
+
+  const afterConfirmPath = "/start-trial"
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -134,18 +138,17 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   // requestami przy każdym znaku.
   React.useEffect(() => {
     if (!nipRelevant) {
-      setNipChecking(false)
       return
     }
     const digits = normalizeDigits(companyTaxId)
     if (digits.length !== 10 || !isPolishNip10Valid(digits)) {
-      setNipChecking(false)
       return
     }
 
     const controller = new AbortController()
-    setNipChecking(true)
     const timer = window.setTimeout(() => {
+      if (controller.signal.aborted) return
+      setNipChecking(true)
       void (async () => {
         try {
           const res = await fetch("/api/signup/check-business-identity", {
@@ -201,18 +204,17 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   React.useEffect(() => {
     const v = validateNationalPhoneLength(phoneDialCode, phoneNational)
     if (!v.ok || phoneNational.replace(/\D/g, "").length === 0) {
-      setPhoneChecking(false)
       return
     }
     const stored = buildStoredInternationalPhone(phoneDialCode, phoneNational)
     if (!stored) {
-      setPhoneChecking(false)
       return
     }
 
     const controller = new AbortController()
-    setPhoneChecking(true)
     const timer = window.setTimeout(() => {
+      if (controller.signal.aborted) return
+      setPhoneChecking(true)
       void (async () => {
         try {
           const res = await fetch("/api/signup/check-business-identity", {
@@ -256,13 +258,13 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     const trimmed = email.trim()
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
     if (!valid) {
-      setEmailChecking(false)
       return
     }
 
     const controller = new AbortController()
-    setEmailChecking(true)
     const timer = window.setTimeout(() => {
+      if (controller.signal.aborted) return
+      setEmailChecking(true)
       void (async () => {
         try {
           const res = await fetch("/api/signup/check-email", {
@@ -459,14 +461,11 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         }
       }
 
-      const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
-      const siteBase = (configuredSiteUrl && configuredSiteUrl.length > 0 ? configuredSiteUrl : window.location.origin).replace(/\/$/, "")
-      const afterConfirmPath = "/start-trial"
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          emailRedirectTo: `${siteBase}/auth/callback?next=${encodeURIComponent(afterConfirmPath)}`,
+          emailRedirectTo: buildSignupConfirmationRedirectUrl(afterConfirmPath, window.location.origin),
           data: {
             business_name: businessName.trim(),
             slug: normalized,
@@ -509,6 +508,41 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setInfo(t("auth.signupSuccessCheckEmail"))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    setError(null)
+    if (!isSupabaseConfigured()) {
+      setError(t("auth.supabaseNotConfigured"))
+      return
+    }
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError(t("auth.enterEmailForConfirmation"))
+      return
+    }
+    const client = getBrowserClient()
+    if (!client) {
+      setError(t("auth.resendConfirmationError"))
+      return
+    }
+    setSendingConfirmation(true)
+    try {
+      const { error: resendError } = await client.auth.resend({
+        type: "signup",
+        email: trimmedEmail,
+        options: {
+          emailRedirectTo: buildSignupConfirmationRedirectUrl(afterConfirmPath, window.location.origin),
+        },
+      })
+      if (resendError) {
+        setError(resendError.message?.trim() || t("auth.resendConfirmationError"))
+        return
+      }
+      setInfo(t("auth.resendConfirmationSent"))
+    } finally {
+      setSendingConfirmation(false)
     }
   }
 
@@ -812,9 +846,18 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 </p>
               ) : null}
               {info ? (
-                <p className="text-sm text-muted-foreground" role="status">
-                  {info}
-                </p>
+                <div className="space-y-2" role="status">
+                  <p className="text-sm text-muted-foreground">{info}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 rounded-lg"
+                    onClick={() => void handleResendConfirmation()}
+                    disabled={sendingConfirmation}
+                  >
+                    {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
+                  </Button>
+                </div>
               ) : null}
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {t("auth.signupLegalPrefix")}{" "}
@@ -832,6 +875,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
                 className="h-11 w-full rounded-xl"
                 disabled={
                   loading ||
+                  sendingConfirmation ||
                   nipBlocksSubmit ||
                   passwordBlocksSubmit ||
                   Boolean(phoneLengthHint) ||

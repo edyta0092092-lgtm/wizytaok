@@ -452,6 +452,13 @@ export const dictionaries = {
         "Konto zostało utworzone. Sprawdź e-mail i potwierdź konto.",
       logOut: "Wyloguj",
       forgotPassword: "Zapomniałem hasła",
+      emailNotConfirmed:
+        "Konto nie jest jeszcze potwierdzone. Sprawdź e-mail albo wyślij link potwierdzający ponownie.",
+      enterEmailForConfirmation: "Wpisz e-mail, aby wysłać link potwierdzający.",
+      resendConfirmation: "Wyślij ponownie link potwierdzający",
+      resendConfirmationSent:
+        "Wysłaliśmy ponownie link potwierdzający. Sprawdź skrzynkę oraz folder spam.",
+      resendConfirmationError: "Nie udało się wysłać linku potwierdzającego.",
       enterEmailForReset: "Wpisz e-mail, aby wysłać link do resetu hasła.",
       resetPasswordEmailSent:
         "Wysłaliśmy link do resetu hasła na podany adres e-mail. Sprawdź skrzynkę.",
@@ -2832,6 +2839,13 @@ Pozdrawiamy,
         "Account created. Check your email and confirm your account.",
       logOut: "Log out",
       forgotPassword: "Forgot password?",
+      emailNotConfirmed:
+        "This account is not confirmed yet. Check your email or resend the confirmation link.",
+      enterEmailForConfirmation: "Enter your email to send the confirmation link.",
+      resendConfirmation: "Resend confirmation link",
+      resendConfirmationSent:
+        "We sent the confirmation link again. Check your inbox and spam folder.",
+      resendConfirmationError: "Could not send the confirmation link.",
       enterEmailForReset: "Enter your email to send a password reset link.",
       resetPasswordEmailSent:
         "We sent a password reset link to your email address. Please check your inbox.",

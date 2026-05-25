@@ -20,6 +20,10 @@ import {
   OAuthProviderButtons,
   oauthErrorMessageFromCode,
 } from "@/components/auth/oauth-provider-buttons"
+import {
+  buildSignupConfirmationRedirectUrl,
+  isEmailNotConfirmedAuthError,
+} from "@/lib/auth/signup-confirmation-client"
 import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -46,6 +50,7 @@ export function LoginForm() {
   )
   const [loading, setLoading] = React.useState(false)
   const [sendingReset, setSendingReset] = React.useState(false)
+  const [sendingConfirmation, setSendingConfirmation] = React.useState(false)
 
   const isActiveSubscriptionStatus = React.useCallback((status: string | null | undefined) => {
     const normalized = String(status ?? "").trim().toLowerCase()
@@ -71,6 +76,10 @@ export function LoginForm() {
         password,
       })
       if (signError) {
+        if (isEmailNotConfirmedAuthError(signError)) {
+          setError(t("auth.emailNotConfirmed"))
+          return
+        }
         setError(t("auth.authError"))
         return
       }
@@ -171,6 +180,45 @@ export function LoginForm() {
     }
   }
 
+  const handleResendConfirmation = async () => {
+    setError(null)
+    setInfo(null)
+    if (!isSupabaseConfigured()) {
+      setError(t("auth.supabaseNotConfigured"))
+      return
+    }
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setError(t("auth.enterEmailForConfirmation"))
+      return
+    }
+    const client = getBrowserClient()
+    if (!client) {
+      setError(t("auth.resendConfirmationError"))
+      return
+    }
+    setSendingConfirmation(true)
+    try {
+      const { error: resendError } = await client.auth.resend({
+        type: "signup",
+        email: trimmedEmail,
+        options: {
+          emailRedirectTo: buildSignupConfirmationRedirectUrl(
+            postLoginPath ?? "/start-trial",
+            window.location.origin,
+          ),
+        },
+      })
+      if (resendError) {
+        setError(resendError.message?.trim() || t("auth.resendConfirmationError"))
+        return
+      }
+      setInfo(t("auth.resendConfirmationSent"))
+    } finally {
+      setSendingConfirmation(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/80 bg-card/80 px-4 py-3 sm:px-5">
@@ -218,10 +266,18 @@ export function LoginForm() {
                 <button
                   type="button"
                   onClick={() => void handleResetPassword()}
-                  disabled={sendingReset}
+                  disabled={sendingReset || sendingConfirmation}
                   className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
                 >
                   {t("auth.forgotPassword")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleResendConfirmation()}
+                  disabled={sendingReset || sendingConfirmation}
+                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
+                >
+                  {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
                 </button>
               </div>
               {oauthError ? (
@@ -239,7 +295,7 @@ export function LoginForm() {
                   {info}
                 </p>
               ) : null}
-              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
+              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading || sendingConfirmation}>
                 {loading ? "…" : t("auth.logIn")}
               </Button>
             </form>
