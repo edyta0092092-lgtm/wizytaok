@@ -30,11 +30,19 @@ export function OnboardingFlowHint() {
   const pathname = usePathname()
   const { flowActive, activeStepId, snapshot, continueSetup, skipForNow } = useOnboarding()
   const [highlightRect, setHighlightRect] = React.useState<HighlightRect | null>(null)
+  const stepPath = activeStepId ? STEP_PATHS[activeStepId] : null
+  const stepProgressDone = activeStepId && snapshot ? snapshot.progress[activeStepId] : false
+  const canShowStep =
+    Boolean(flowActive && activeStepId && snapshot && stepPath && pathname.startsWith(stepPath)) &&
+    !stepProgressDone
 
   React.useEffect(() => {
-    if (!flowActive || !activeStepId || !snapshot) return
-    const stepPath = STEP_PATHS[activeStepId]
-    if (!pathname.startsWith(stepPath) || snapshot.progress[activeStepId]) return
+    if (canShowStep) return
+    queueMicrotask(() => setHighlightRect(null))
+  }, [canShowStep])
+
+  React.useEffect(() => {
+    if (!canShowStep || !activeStepId) return
 
     const step = getStepConfig(activeStepId)
     let target: HTMLElement | null = null
@@ -60,7 +68,10 @@ export function OnboardingFlowHint() {
 
     const applyTarget = () => {
       const nextTarget = document.querySelector<HTMLElement>(step.targetSelector)
-      if (nextTarget === target) return
+      if (nextTarget === target) {
+        updateRect()
+        return
+      }
       target?.removeAttribute("data-onboarding-highlight")
       target = nextTarget
       if (!target) {
@@ -95,12 +106,9 @@ export function OnboardingFlowHint() {
       window.removeEventListener("scroll", updateRect, true)
       target?.removeAttribute("data-onboarding-highlight")
     }
-  }, [activeStepId, flowActive, pathname, snapshot])
+  }, [activeStepId, canShowStep])
 
-  if (!flowActive || !activeStepId || !snapshot) return null
-  const stepPath = STEP_PATHS[activeStepId]
-  if (!pathname.startsWith(stepPath)) return null
-  if (snapshot.progress[activeStepId]) return null
+  if (!canShowStep || !activeStepId) return null
 
   const step = getStepConfig(activeStepId)
 
