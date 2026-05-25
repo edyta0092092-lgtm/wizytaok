@@ -39,7 +39,7 @@ import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import type { Appointment, AppointmentStatus } from "@/types/domain"
+import type { AppointmentStatus } from "@/types/domain"
 
 const DASHBOARD_TIP_COUNT = 16
 

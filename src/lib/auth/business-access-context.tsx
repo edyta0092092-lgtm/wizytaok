@@ -99,7 +99,11 @@ async function loadAccessState(): Promise<BusinessAccessState> {
   if (!user) {
     return { ...defaultState, ready: true }
   }
-  await client.rpc("ensure_owner_membership")
+  try {
+    await client.rpc("ensure_owner_membership")
+  } catch {
+    // Starsze bazy lub chwilowe błędy RPC nie powinny wyłączać całego panelu.
+  }
   const { data: owned } = await client
     .from("business_profiles")
     .select("id, business_name, owner_name")
@@ -204,9 +208,14 @@ export function BusinessAccessProvider({ children }: { children: React.ReactNode
 
   const refresh = React.useCallback(async () => {
     invalidateCachedBusinessProfileId()
-    const next = await loadAccessState()
-    setCachedBusinessProfileId(next.businessId)
-    setState(next)
+    try {
+      const next = await loadAccessState()
+      setCachedBusinessProfileId(next.businessId)
+      setState(next)
+    } catch {
+      setCachedBusinessProfileId(null)
+      setState({ ...defaultState, ready: true })
+    }
   }, [])
 
   React.useEffect(() => {

@@ -85,15 +85,24 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setLoading(false)
       return
     }
-    const next = await fetchOnboardingProgress(client, businessId)
-    setSnapshot(next)
-    setLoading(false)
-    if (flowActive && !freshChecklistOpen && isOnboardingFullyComplete(next.progress) && businessId) {
-      markOnboardingComplete(businessId)
-      markWelcomeHandledForBusiness(businessId)
-      setFlowActive(false)
-      setActiveStepId(null)
-      setWelcomeOpen(false)
+    try {
+      const next = await fetchOnboardingProgress(client, businessId)
+      setSnapshot(next)
+      setLoading(false)
+      if (flowActive && !freshChecklistOpen && isOnboardingFullyComplete(next.progress) && businessId) {
+        markOnboardingComplete(businessId)
+        markWelcomeHandledForBusiness(businessId)
+        setFlowActive(false)
+        setActiveStepId(null)
+        setWelcomeOpen(false)
+      }
+    } catch {
+      setSnapshot({
+        progress: emptyOnboardingProgress(),
+        slug: null,
+        bookingPath: null,
+      })
+      setLoading(false)
     }
   }, [businessId, flowActive, freshChecklistOpen])
 
