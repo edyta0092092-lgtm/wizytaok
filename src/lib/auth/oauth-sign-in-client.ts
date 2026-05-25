@@ -38,9 +38,20 @@ export function mapSignInWithOAuthError(message: string | undefined): string {
 export function mapOAuthCallbackQueryError(
   error: string | null | undefined,
   description: string | null | undefined,
+  errorCode?: string | null | undefined,
 ): string {
   const e = (error ?? "").trim().toLowerCase()
   const d = (description ?? "").trim().toLowerCase()
+  const c = (errorCode ?? "").trim().toLowerCase()
+  const text = `${e} ${d} ${c}`
+  if (
+    c === "otp_expired" ||
+    text.includes("otp_expired") ||
+    text.includes("email link is invalid") ||
+    (text.includes("link") && text.includes("expired"))
+  ) {
+    return "auth_link_invalid_or_expired"
+  }
   if (e === "access_denied" || e.includes("cancel") || d.includes("cancel")) {
     return "cancelled"
   }
@@ -48,6 +59,19 @@ export function mapOAuthCallbackQueryError(
     return "provider_not_enabled"
   }
   return "oauth_failed"
+}
+
+export function mapAuthCallbackExchangeError(message: string | undefined): string {
+  const m = (message ?? "").trim().toLowerCase()
+  if (
+    m.includes("expired") ||
+    m.includes("invalid") ||
+    m.includes("code verifier") ||
+    m.includes("flow state")
+  ) {
+    return "auth_link_invalid_or_expired"
+  }
+  return "auth_callback_failed"
 }
 
 /**

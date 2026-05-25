@@ -3,7 +3,10 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { mapOAuthCallbackQueryError } from "@/lib/auth/oauth-sign-in-client"
+import {
+  mapAuthCallbackExchangeError,
+  mapOAuthCallbackQueryError,
+} from "@/lib/auth/oauth-sign-in-client"
 import {
   oauthErrorReturnPath,
   resolvePostAuthRedirect,
@@ -37,6 +40,7 @@ export async function GET(request: Request) {
     const code = mapOAuthCallbackQueryError(
       oauthError,
       requestUrl.searchParams.get("error_description"),
+      requestUrl.searchParams.get("error_code"),
     )
     const returnPath = oauthErrorReturnPath(requestedNext)
     const dest = new URL(returnPath, origin)
@@ -73,7 +77,9 @@ export async function GET(request: Request) {
     if (exchangeError) {
       const returnPath = oauthErrorReturnPath(requestedNext)
       const dest = new URL(returnPath, origin)
-      dest.searchParams.set("oauth_error", "oauth_failed")
+      dest.searchParams.set("oauth_error", mapAuthCallbackExchangeError(exchangeError.message))
+      const nextPreserve = requestUrl.searchParams.get("next")
+      if (nextPreserve) dest.searchParams.set("next", nextPreserve)
       return NextResponse.redirect(dest)
     }
 

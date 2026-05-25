@@ -7,7 +7,8 @@
   - Body: wklej poniższy HTML (bez tego komentarza).
 
   ZMIENNE Supabase (nie zamieniaj ręcznie):
-  {{ .ConfirmationURL }} — pełny link potwierdzający
+  {{ .SiteURL }} — adres aplikacji ustawiony w Supabase Auth
+  {{ .TokenHash }} — token do potwierdzenia po stronie aplikacji
 
   Opcjonalnie: Authentication → SMTP Settings — własny nadawca (np. noreply@twojadomena.pl).
   Dokumentacja: https://supabase.com/docs/guides/auth/auth-email-templates
@@ -38,7 +39,7 @@
                 <table role="presentation" cellspacing="0" cellpadding="0" style="margin:24px 0;">
                   <tr>
                     <td style="border-radius:10px;background-color:#0d9488;">
-                      <a href="{{ .ConfirmationURL }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Potwierdź adres e-mail</a>
+                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/start-trial" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:14px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Potwierdź adres e-mail</a>
                     </td>
                   </tr>
                 </table>
@@ -46,7 +47,7 @@
                   Jeśli przycisk nie działa, skopiuj i wklej ten link w przeglądarce:
                 </p>
                 <p style="margin:0;font-size:12px;line-height:1.5;word-break:break-all;color:#0d9488;">
-                  {{ .ConfirmationURL }}
+                  {{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/start-trial
                 </p>
               </td>
             </tr>

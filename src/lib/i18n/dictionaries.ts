@@ -459,6 +459,10 @@ export const dictionaries = {
       resendConfirmationSent:
         "Wysłaliśmy ponownie link potwierdzający. Sprawdź skrzynkę oraz folder spam.",
       resendConfirmationError: "Nie udało się wysłać linku potwierdzającego.",
+      emailConfirmationLinkInvalid:
+        "Link potwierdzający jest nieprawidłowy albo wygasł. Wpisz e-mail i wyślij link potwierdzający ponownie.",
+      emailConfirmationFailed:
+        "Nie udało się potwierdzić konta. Wyślij link potwierdzający ponownie albo spróbuj za chwilę.",
       enterEmailForReset: "Wpisz e-mail, aby wysłać link do resetu hasła.",
       resetPasswordEmailSent:
         "Wysłaliśmy link do resetu hasła na podany adres e-mail. Sprawdź skrzynkę.",
@@ -2846,6 +2850,10 @@ Pozdrawiamy,
       resendConfirmationSent:
         "We sent the confirmation link again. Check your inbox and spam folder.",
       resendConfirmationError: "Could not send the confirmation link.",
+      emailConfirmationLinkInvalid:
+        "The confirmation link is invalid or expired. Enter your email and resend the confirmation link.",
+      emailConfirmationFailed:
+        "Could not confirm the account. Resend the confirmation link or try again in a moment.",
       enterEmailForReset: "Enter your email to send a password reset link.",
       resetPasswordEmailSent:
         "We sent a password reset link to your email address. Please check your inbox.",
