@@ -18,10 +18,18 @@ const STEP_PATHS: Record<OnboardingStepId, string> = {
   first_visit: "/appointments",
 }
 
+type HighlightRect = {
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
 export function OnboardingFlowHint() {
   const { t } = useTranslations()
   const pathname = usePathname()
   const { flowActive, activeStepId, snapshot, continueSetup, skipForNow } = useOnboarding()
+  const [highlightRect, setHighlightRect] = React.useState<HighlightRect | null>(null)
 
   React.useEffect(() => {
     if (!flowActive || !activeStepId || !snapshot) return
@@ -31,17 +39,40 @@ export function OnboardingFlowHint() {
     const step = getStepConfig(activeStepId)
     let target: HTMLElement | null = null
     let scrollTimer: number | null = null
+    let rectFrame: number | null = null
+
+    const updateRect = () => {
+      if (rectFrame) window.cancelAnimationFrame(rectFrame)
+      rectFrame = window.requestAnimationFrame(() => {
+        if (!target) {
+          setHighlightRect(null)
+          return
+        }
+        const rect = target.getBoundingClientRect()
+        setHighlightRect({
+          top: rect.top - 6,
+          left: rect.left - 6,
+          width: rect.width + 12,
+          height: rect.height + 12,
+        })
+      })
+    }
 
     const applyTarget = () => {
       const nextTarget = document.querySelector<HTMLElement>(step.targetSelector)
       if (nextTarget === target) return
       target?.removeAttribute("data-onboarding-highlight")
       target = nextTarget
-      if (!target) return
+      if (!target) {
+        updateRect()
+        return
+      }
       target.setAttribute("data-onboarding-highlight", "true")
+      updateRect()
       if (scrollTimer) window.clearTimeout(scrollTimer)
       scrollTimer = window.setTimeout(() => {
         target?.scrollIntoView({ behavior: "smooth", block: "center" })
+        updateRect()
       }, 120)
     }
 
@@ -53,10 +84,15 @@ export function OnboardingFlowHint() {
       childList: true,
       subtree: true,
     })
+    window.addEventListener("resize", updateRect)
+    window.addEventListener("scroll", updateRect, true)
 
     return () => {
       observer.disconnect()
       if (scrollTimer) window.clearTimeout(scrollTimer)
+      if (rectFrame) window.cancelAnimationFrame(rectFrame)
+      window.removeEventListener("resize", updateRect)
+      window.removeEventListener("scroll", updateRect, true)
       target?.removeAttribute("data-onboarding-highlight")
     }
   }, [activeStepId, flowActive, pathname, snapshot])
@@ -73,14 +109,23 @@ export function OnboardingFlowHint() {
       <style>
         {`
           [data-onboarding-highlight="true"] {
-            outline: 3px solid var(--primary);
-            outline-offset: 4px;
-            box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 14%, transparent);
-            border-radius: 1rem;
-            transition: outline-color 160ms ease, box-shadow 160ms ease;
+            scroll-margin: 7rem;
           }
         `}
       </style>
+      {highlightRect ? (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed z-[149] rounded-2xl border-[3px] border-primary transition-[top,left,width,height] duration-150"
+          style={{
+            top: highlightRect.top,
+            left: highlightRect.left,
+            width: highlightRect.width,
+            height: highlightRect.height,
+            boxShadow: "0 0 0 8px color-mix(in srgb, var(--primary) 14%, transparent)",
+          }}
+        />
+      ) : null}
       <div
         className={cn(
           "fixed bottom-4 left-4 right-4 z-[150] mx-auto max-w-md sm:left-auto sm:right-6",
