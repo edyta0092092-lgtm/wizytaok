@@ -153,6 +153,11 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
         return
       }
 
+      if (result.redirectTo.startsWith("/start-trial") || result.redirectTo.startsWith("/activate-access")) {
+        window.location.assign(result.redirectTo)
+        return
+      }
+
       await refresh()
       onProfileSaved?.()
       router.replace(result.redirectTo)
