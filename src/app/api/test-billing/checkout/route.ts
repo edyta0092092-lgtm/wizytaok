@@ -267,8 +267,8 @@ export async function POST(request: Request) {
       trial_period_days: TRIAL_PERIOD_DAYS,
       metadata: meta,
     },
-    success_url: `${base}/settings?stripe_test=success`,
-    cancel_url: `${base}/settings?stripe_test=cancel`,
+    success_url: `${base}/activate-access?stripe_test=success`,
+    cancel_url: `${base}/activate-access?stripe_test=cancel`,
     client_reference_id: res.businessId,
     metadata: meta,
   }

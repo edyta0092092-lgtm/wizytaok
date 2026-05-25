@@ -197,6 +197,23 @@ export function BillingAccessPaywall({ variant }: BillingAccessPaywallProps) {
     window.location.replace("/dashboard?onboarding=welcome")
   }, [businessId, panelUnlocked, returnedFromStripeSuccess, variant])
 
+  React.useEffect(() => {
+    if (variant !== "owner") return
+    if (!returnedFromStripeSuccess || panelUnlocked) return
+
+    const intervalId = window.setInterval(() => {
+      void refreshBillingRow()
+    }, 2500)
+    const timeoutId = window.setTimeout(() => {
+      window.clearInterval(intervalId)
+    }, 45000)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.clearTimeout(timeoutId)
+    }
+  }, [panelUnlocked, refreshBillingRow, returnedFromStripeSuccess, variant])
+
   if (variant === "staff") {
     return <StaffBillingAccessPaywall />
   }

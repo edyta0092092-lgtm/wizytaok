@@ -166,10 +166,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     if (!ready || !eligibilityReady || !eligible || !businessId) return
     if (welcomeOpen || flowActive) return
     if (!isPanelWelcomePopupPath(pathname)) return
+    if (loading) return
 
     const restart = consumeOnboardingRestart(businessId)
     const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
-    if (restart || pendingActivation) {
+    const markedComplete = isOnboardingMarkedComplete(businessId)
+    const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
+
+    if (restart) {
       queueMicrotask(() => {
         clearPanelAccessJustActivated()
         setFreshChecklistOpen(true)
@@ -178,9 +182,25 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return
     }
 
-    const markedComplete = isOnboardingMarkedComplete(businessId)
+    if (pendingActivation) {
+      if (dataComplete || markedComplete) {
+        markWelcomeHandledForBusiness(businessId)
+        return
+      }
+
+      queueMicrotask(() => {
+        clearPanelAccessJustActivated()
+        markOnboardingWelcomeDismissed(businessId)
+        setFreshChecklistOpen(false)
+        setWelcomeOpen(false)
+        setActiveStepId("working_hours")
+        setFlowActive(true)
+      })
+      if (pathname !== "/availability") router.push("/availability")
+      return
+    }
+
     const dismissed = isOnboardingWelcomeDismissed(businessId)
-    const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
 
     if (dataComplete || markedComplete) return
 
@@ -197,7 +217,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     businessId,
     welcomeOpen,
     flowActive,
+    loading,
     pathname,
+    router,
     snapshot,
   ])
 
