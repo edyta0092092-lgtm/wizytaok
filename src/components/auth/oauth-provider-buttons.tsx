@@ -12,6 +12,7 @@ import {
 import { isFacebookOAuthUiEnabled } from "@/lib/config/oauth-ui"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
 
 export type OAuthProviderButtonsProps = {
   next?: string | null
@@ -81,7 +82,7 @@ export function OAuthProviderButtons({
   }
 
   return (
-    <div className={className}>
+    <div className={cn("w-full", className)}>
       <div className="relative py-1">
         <div className="absolute inset-0 flex items-center">
           <Separator className="w-full" />
@@ -90,11 +91,11 @@ export function OAuthProviderButtons({
           <span className="bg-card px-2 text-muted-foreground">{t("auth.oauthDivider")}</span>
         </div>
       </div>
-      <div className={showFacebook ? "flex flex-col gap-2 sm:flex-row sm:gap-3" : "flex flex-col gap-2"}>
+      <div className={showFacebook ? "flex w-full flex-col gap-2 sm:flex-row sm:gap-3" : "flex w-full flex-col gap-2"}>
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full flex-1 gap-3 rounded-xl border-border/80 bg-background px-4 text-sm font-semibold shadow-sm hover:border-primary/30 hover:bg-muted/40"
+          className="h-12 min-h-12 w-full min-w-full flex-1 gap-3 rounded-xl border-border/80 bg-background px-6 text-sm font-semibold shadow-sm hover:border-primary/30 hover:bg-muted/40"
           disabled={loadingProvider !== null}
           onClick={() => void handleOAuth("google")}
         >
