@@ -25,6 +25,7 @@ export const initialClientsList: Client[] = [
         startsAt: "2026-04-06T14:30:00.000Z",
         serviceLabel: "Przegląd",
         status: "completed",
+        notes: "Klientka przyszła punktualnie. Ustalono kolejny przegląd za miesiąc.",
       },
       {
         id: "h-3",
@@ -58,6 +59,7 @@ export const initialClientsList: Client[] = [
         startsAt: "2026-04-10T11:30:00.000Z",
         serviceLabel: "Zabieg podstawowy",
         status: "no_show",
+        notes: "Klient nie pojawił się na wizycie i nie odebrał telefonu.",
       },
     ],
   },

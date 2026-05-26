@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   Check,
   Eye,
+  History,
   MoreHorizontal,
   Plus,
   Search,
@@ -196,6 +197,7 @@ export default function ClientsPage() {
   const [query, setQuery] = React.useState("")
   const [createOpen, setCreateOpen] = React.useState(false)
   const [detailsId, setDetailsId] = React.useState<string | null>(null)
+  const [historyId, setHistoryId] = React.useState<string | null>(null)
   const [form, setForm] = React.useState<FormState>(emptyForm)
   const [showSaved, setShowSaved] = React.useState<SaveBanner>(null)
   const [detailsEditing, setDetailsEditing] = React.useState(false)
@@ -273,6 +275,10 @@ export default function ClientsPage() {
   const detailsClient = React.useMemo(
     () => (detailsId ? uniqueClients.find((c) => c.id === detailsId) ?? null : null),
     [uniqueClients, detailsId]
+  )
+  const historyClient = React.useMemo(
+    () => (historyId ? uniqueClients.find((c) => c.id === historyId) ?? null : null),
+    [uniqueClients, historyId]
   )
 
   const openCreate = () => {
@@ -363,6 +369,7 @@ export default function ClientsPage() {
         })
       })
       if (detailsId === id) setDetailsId(null)
+      if (historyId === id) setHistoryId(null)
       return
     }
 
@@ -372,6 +379,7 @@ export default function ClientsPage() {
       persistClientsCatalog(merged)
     }
     if (detailsId === id) setDetailsId(null)
+    if (historyId === id) setHistoryId(null)
   }
 
   const startDetailsEdit = () => {
@@ -650,6 +658,16 @@ export default function ClientsPage() {
                                 <span className="hidden xl:inline">{t("common.details")}</span>
                                 <span className="xl:hidden">{t("clients.moreButton")}</span>
                               </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 shrink-0 rounded-lg border-border/60 bg-background/80 px-2.5 text-foreground hover:bg-muted/80"
+                                onClick={() => setHistoryId(row.id)}
+                              >
+                                <History className="size-3.5" />
+                                <span className="hidden xl:inline">{t("clients.history")}</span>
+                              </Button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <Button
@@ -666,6 +684,10 @@ export default function ClientsPage() {
                                   <DropdownMenuItem onClick={() => setDetailsId(row.id)}>
                                     <Eye className="size-4" />
                                     {t("common.details")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setHistoryId(row.id)}>
+                                    <History className="size-4" />
+                                    {t("clients.history")}
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem
@@ -741,6 +763,16 @@ export default function ClientsPage() {
                             >
                               <Eye className="size-3.5" />
                               {t("common.details")}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-9 rounded-xl"
+                              onClick={() => setHistoryId(row.id)}
+                            >
+                              <History className="size-3.5" />
+                              {t("clients.history")}
                             </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -1168,6 +1200,92 @@ export default function ClientsPage() {
               </SheetFooter>
             </div>
           ) : null}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
+
+      <DialogPrimitive.Root
+        open={Boolean(historyClient)}
+        onOpenChange={(open) => {
+          if (!open) setHistoryId(null)
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(92vh,50rem)] w-[min(96vw,60rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+            <DialogPrimitive.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-4 top-4 z-10"
+                aria-label={language === "en" ? "Close" : "Zamknij"}
+              >
+                <X className="size-4" />
+              </Button>
+            </DialogPrimitive.Close>
+            {historyClient ? (
+              <>
+                <header className="border-b border-border/70 px-6 py-6 pr-14">
+                  <DialogPrimitive.Title className="font-heading text-xl font-semibold leading-snug text-foreground">
+                    {t("clients.historyTitle").replace("{name}", historyClient.fullName)}
+                  </DialogPrimitive.Title>
+                  <DialogPrimitive.Description className="mt-1 text-sm text-muted-foreground">
+                    {t("clients.historySubtitle")}
+                  </DialogPrimitive.Description>
+                </header>
+                <div className="premium-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                  {historyClient.visitHistory.length === 0 ? (
+                    <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                      {t("clients.noVisitHistoryUi")}
+                    </p>
+                  ) : (
+                    <ol className="space-y-3">
+                      {[...historyClient.visitHistory]
+                        .sort(
+                          (a, b) =>
+                            new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
+                        )
+                        .map((visit) => (
+                          <li
+                            key={visit.id}
+                            className="rounded-2xl border border-border/80 bg-muted/15 px-4 py-4"
+                          >
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                  {dateTimeFmt.format(new Date(visit.startsAt))}
+                                </p>
+                                <p className="mt-1 text-base font-semibold text-foreground">
+                                  {visit.serviceLabel}
+                                </p>
+                              </div>
+                              <StatusBadge status={visit.status} />
+                            </div>
+                            {visit.notes?.trim() ? (
+                              <div className="mt-3 rounded-xl border border-border/70 bg-card px-3 py-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {t("clients.historyVisitNotes")}
+                                </p>
+                                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                                  {visit.notes}
+                                </p>
+                              </div>
+                            ) : null}
+                          </li>
+                        ))}
+                    </ol>
+                  )}
+                </div>
+                <footer className="flex justify-end border-t border-border/70 bg-muted/20 px-6 py-4">
+                  <DialogPrimitive.Close asChild>
+                    <Button type="button" variant="outline" className="h-10 rounded-xl">
+                      {language === "en" ? "Close" : "Zamknij"}
+                    </Button>
+                  </DialogPrimitive.Close>
+                </footer>
+              </>
+            ) : null}
           </DialogPrimitive.Content>
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>

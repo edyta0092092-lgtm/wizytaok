@@ -104,6 +104,7 @@ export type ClientVisitHistoryItem = {
   startsAt: string
   serviceLabel: string
   status: AppointmentStatus
+  notes?: string
 }
 
 export type Client = {

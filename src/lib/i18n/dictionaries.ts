@@ -907,6 +907,11 @@ export const dictionaries = {
       saveClientSubmit: "Zapisz klienta",
       detailsSubtitle:
         "Podgląd klienta i ostatnie wizyty.",
+      history: "Historia",
+      historyTitle: "Historia klienta: {name}",
+      historySubtitle:
+        "Pełna lista wizyt klienta z datą, usługą, statusem i notatkami zapisanymi przy wizycie.",
+      historyVisitNotes: "Notatki z wizyty",
       sectionContactHead: "Dane kontaktowe",
       sectionRiskHead: "Ryzyko nieobecności",
       riskBasedOnHistory: "Na podstawie historii wizyt klienta.",
@@ -3310,6 +3315,11 @@ Pozdrawiamy,
         "Preferred contact channel or other notes.",
       saveClientSubmit: "Save client",
       detailsSubtitle: "Preview and recent visits.",
+      history: "History",
+      historyTitle: "Client history: {name}",
+      historySubtitle:
+        "Full appointment list with date, service, status and notes saved on the appointment.",
+      historyVisitNotes: "Appointment notes",
       sectionContactHead: "Contact details",
       sectionRiskHead: "Attendance risk",
       riskBasedOnHistory: "Based on the client's appointment history.",

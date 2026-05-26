@@ -119,6 +119,7 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
             startsAt: x.startsAt,
             serviceLabel: x.serviceLabel,
             status: st,
+            notes: typeof x.notes === "string" && x.notes.trim() ? x.notes.trim() : undefined,
           })
         }
       }
@@ -276,11 +277,21 @@ function appointmentsMatchPrior(a: Appointment, prior: PriorClientIdentity): boo
 function enrichVisitHistories(rows: Appointment[]): ClientVisitHistoryItem[] {
   const list: ClientVisitHistoryItem[] = []
   rows.forEach((a) => {
+    const noteParts = [
+      a.notes,
+      a.customerNote,
+      a.businessNote,
+      a.internalNote,
+    ]
+      .map((note) => (typeof note === "string" ? note.trim() : ""))
+      .filter(Boolean)
+    const notes = Array.from(new Set(noteParts)).join("\n\n")
     list.push({
       id: `vh-${a.id}`,
       startsAt: a.startsAt,
       serviceLabel: a.serviceLabel,
       status: a.status === "completed" ? "completed" : a.status,
+      notes: notes || undefined,
     })
   })
   return list.sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime())
