@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  BadgeCheck,
   Ban,
   CheckCircle2,
   CalendarDays,
@@ -31,10 +32,10 @@ import {
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
 import {
-  isConfirmedVisitStatus,
   isPlannedVisitForDashboardStats,
 } from "@/lib/appointments/stats-rules"
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
+import { formatTodayAppointmentsLabel } from "@/lib/dashboard/today-appointments-label"
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
@@ -43,7 +44,13 @@ import type { AppointmentStatus } from "@/types/domain"
 
 const DASHBOARD_TIP_COUNT = 16
 
-const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = ["confirmed", "cancelled"]
+const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = [
+  "pending",
+  "confirmed",
+  "completed",
+  "no_show",
+  "cancelled",
+]
 
 function MiniStat({
   label,
@@ -70,6 +77,14 @@ function MiniStat({
       <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">{value}</p>
     </Link>
   )
+}
+
+function dashboardStatusOptionLabel(
+  status: AppointmentStatus,
+  t: (key: string) => string
+): string {
+  if (status === "pending") return t("appointments.filterNeedsAction")
+  return t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")
 }
 
 
@@ -122,10 +137,12 @@ export default function DashboardPage() {
   const [statsLoading, setStatsLoading] = React.useState(true)
   const [statsError, setStatsError] = React.useState<string | null>(null)
   const [statsContextState, setStatsContextState] = React.useState<"login_required" | "no_data" | null>(null)
+  const [currentTime, setCurrentTime] = React.useState(() => new Date())
   const [stats, setStats] = React.useState<TodayDashboardStats>({
     todayAppointmentsCount: 0,
     confirmedTodayCount: 0,
     cancelledTodayCount: 0,
+    completedTodayCount: 0,
     pendingTodayCount: 0,
     requiresActionCount: 0,
     reminderErrorsCount: 0,
@@ -155,24 +172,27 @@ export default function DashboardPage() {
     [allAppointments, appToday]
   )
   const plannedToday = React.useMemo(
-    () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a)),
-    [todaysList]
+    () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a, currentTime)),
+    [currentTime, todaysList]
   )
   const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
-    const confirmedTodayCount = todaysList.filter((a) => isConfirmedVisitStatus(a.status)).length
+    const confirmedTodayCount = plannedToday.length
     const cancelledTodayCount = todaysList.filter((a) => a.status === "cancelled").length
+    const completedTodayCount = todaysList.filter((a) => a.status === "completed").length
     return {
-      todayAppointmentsCount: confirmedTodayCount + cancelledTodayCount,
+      todayAppointmentsCount: confirmedTodayCount,
       confirmedTodayCount,
       cancelledTodayCount,
+      completedTodayCount,
       pendingTodayCount: 0,
       requiresActionCount: 0,
       reminderErrorsCount: 0,
     }
-  }, [todaysList])
-  const visitsTodayComputed = stats.todayAppointmentsCount
-  const confirmedToday = stats.confirmedTodayCount
+  }, [plannedToday.length, todaysList])
+  const visitsTodayComputed = plannedToday.length
+  const confirmedToday = plannedToday.length
   const cancelledToday = stats.cancelledTodayCount
+  const completedToday = todaysList.filter((a) => a.status === "completed").length
 
   const timeFmt = React.useMemo(
     () =>
@@ -182,6 +202,13 @@ export default function DashboardPage() {
       }),
     [language]
   )
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   React.useEffect(() => {
     let cancelled = false
@@ -333,7 +360,7 @@ export default function DashboardPage() {
                 ) : visitsTodayComputed === 0 ? (
                   t("dashboard.noAppointmentsTodayLong")
                 ) : (
-                  t("dashboard.youHaveToday").replace("{count}", String(visitsTodayComputed))
+                  formatTodayAppointmentsLabel(visitsTodayComputed, language)
                 )}
               </h2>
               {statsContextState || !statsReady || statsError ? (
@@ -346,15 +373,15 @@ export default function DashboardPage() {
                 </p>
               ) : null}
             </div>
-            <div className="grid min-h-[5.25rem] grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid min-h-[5.25rem] grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
               {statsContextState ? (
-                <div className="col-span-2 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                <div className="sm:col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                   {statsContextState === "login_required"
                     ? t("dashboard.signInToSeePlan")
                     : t("dashboard.noDataInBrowser")}
                 </div>
               ) : !statsReady ? (
-                <div className="col-span-2 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
+                <div className="sm:col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
                   {statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")}
                 </div>
               ) : (
@@ -370,6 +397,12 @@ export default function DashboardPage() {
                     value={cancelledToday}
                     icon={Ban}
                     href="/appointments?status=cancelled&date=today"
+                  />
+                  <MiniStat
+                    label={t("dashboard.completed")}
+                    value={completedToday}
+                    icon={BadgeCheck}
+                    href="/appointments?status=completed&date=today"
                   />
                 </>
               )}
@@ -448,9 +481,7 @@ export default function DashboardPage() {
                                   key={status}
                                   onClick={() => changeStatusFromDashboard(row.id, status)}
                                 >
-                                  {t(
-                                    `labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked"
-                                  )}
+                                  {dashboardStatusOptionLabel(status, t)}
                                 </DropdownMenuItem>
                               ))}
                             </DropdownMenuContent>

@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BriefcaseBusiness,
   Calendar,
   CalendarClock,
@@ -20,11 +21,12 @@ export type NavItem = {
   labelKey: string
 }
 
-/** Kolejność: Plan dnia → Wizyty → Grafik → Klienci → Usługi → Zespół → Dostępność → Wiadomości → Ustawienia → Pomoc. Przewodnik: link z Pozycji Pomocy (`/guide`). */
+/** Kolejność: Plan dnia → Wizyty → Grafik → Statystyki → Klienci → Usługi → Zespół → Dostępność → Wiadomości → Ustawienia → Pomoc. Przewodnik: link z Pozycji Pomocy (`/guide`). */
 const adminNav: NavItem[] = [
   { href: "/dashboard", icon: Calendar, labelKey: "navigation.dashboard" },
   { href: "/appointments", icon: CalendarDays, labelKey: "navigation.appointments" },
   { href: "/schedule", icon: CalendarRange, labelKey: "navigation.schedule" },
+  { href: "/statystyki", icon: BarChart3, labelKey: "navigation.statistics" },
   { href: "/clients", icon: Users, labelKey: "navigation.clients" },
   { href: "/services", icon: ClipboardList, labelKey: "navigation.services" },
   { href: "/team", icon: BriefcaseBusiness, labelKey: "navigation.team" },

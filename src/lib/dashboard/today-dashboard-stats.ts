@@ -2,14 +2,16 @@ import { getBrowserClient } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
 type ReminderLogRow = Pick<Tables<"notification_logs">, "booking_id" | "status" | "type">
-type BookingRow = Pick<Tables<"bookings">, "id" | "status" | "appointment_date">
+type BookingRow = Pick<Tables<"bookings">, "id" | "status" | "appointment_date" | "appointment_time">
 
 export type TodayDashboardStats = {
-  /** Potwierdzone wizyty z terminem na dziś. */
+  /** Potwierdzone wizyty z terminem na dziś, których godzina jeszcze nie minęła. */
   confirmedTodayCount: number
   /** Anulowane wizyty z terminem na dziś. */
   cancelledTodayCount: number
-  /** Suma kafelków dnia (potwierdzone + anulowane). */
+  /** Zrealizowane wizyty z terminem na dziś. */
+  completedTodayCount: number
+  /** Główny licznik dnia: aktywne potwierdzone wizyty. */
   todayAppointmentsCount: number
   pendingTodayCount: number
   requiresActionCount: number
@@ -17,14 +19,11 @@ export type TodayDashboardStats = {
 }
 
 const CANCELLED_STATUSES = new Set(["cancelled", "anulowana", "anulowane"])
+const COMPLETED_STATUSES = new Set(["completed", "zrealizowana", "zrealizowane"])
 const CONFIRMED_STATUSES = new Set([
   "confirmed",
   "potwierdzona",
   "potwierdzone",
-  "booked",
-  "pending",
-  "zarezerwowana",
-  "do_potwierdzenia",
 ])
 const PENDING_STATUSES = new Set(["pending", "to_confirm", "do_potwierdzenia", "do potwierdzenia"])
 const REMINDER_TYPES = new Set([
@@ -47,22 +46,34 @@ function normalizeStatus(raw: string | null | undefined): string {
   return String(raw ?? "").trim().toLowerCase()
 }
 
+function toLocalTimeOnly(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+}
+
+function normalizeTime(raw: string | null | undefined): string {
+  const match = String(raw ?? "").trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return "00:00"
+  return `${String(Number(match[1])).padStart(2, "0")}:${match[2]}`
+}
+
 export async function getTodayDashboardStats(businessId: string): Promise<TodayDashboardStats> {
   const client = getBrowserClient()
   if (!client) {
     throw new Error("no_client")
   }
 
-  const today = toLocalDateOnly(new Date())
+  const now = new Date()
+  const today = toLocalDateOnly(now)
+  const nowTime = toLocalTimeOnly(now)
   const [todayRes, upcomingRes] = await Promise.all([
     client
       .from("bookings")
-      .select("id,status,appointment_date")
+      .select("id,status,appointment_date,appointment_time")
       .eq("business_id", businessId)
       .eq("appointment_date", today),
     client
       .from("bookings")
-      .select("id,status,appointment_date")
+      .select("id,status,appointment_date,appointment_time")
       .eq("business_id", businessId)
       .gte("appointment_date", today),
   ])
@@ -73,12 +84,16 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
   const rows = (todayRes.data ?? []) as BookingRow[]
 
   const confirmedTodayCount = rows.filter((row) =>
-    CONFIRMED_STATUSES.has(normalizeStatus(row.status)),
+    CONFIRMED_STATUSES.has(normalizeStatus(row.status)) &&
+    normalizeTime(row.appointment_time) > nowTime,
   ).length
   const cancelledTodayCount = rows.filter((row) =>
     CANCELLED_STATUSES.has(normalizeStatus(row.status)),
   ).length
-  const todayAppointmentsCount = confirmedTodayCount + cancelledTodayCount
+  const completedTodayCount = rows.filter((row) =>
+    COMPLETED_STATUSES.has(normalizeStatus(row.status)),
+  ).length
+  const todayAppointmentsCount = confirmedTodayCount
 
   const pendingTodayCount = rows.filter((row) =>
     PENDING_STATUSES.has(normalizeStatus(row.status)),
@@ -111,6 +126,7 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
   return {
     confirmedTodayCount,
     cancelledTodayCount,
+    completedTodayCount,
     todayAppointmentsCount,
     pendingTodayCount,
     requiresActionCount,

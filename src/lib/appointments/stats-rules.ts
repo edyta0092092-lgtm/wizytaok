@@ -4,20 +4,21 @@ import {
 } from "@/lib/bookings/booking-needs-action"
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
-const EXCLUDED_FROM_PLANNED: AppointmentStatus[] = ["cancelled", "no_show", "completed"]
-
-/** Statusy traktowane jako potwierdzona wizyta w statystykach i UI. */
+/** Status traktowany jako potwierdzona wizyta w licznikach dzisiejszego planu. */
 export function isConfirmedVisitStatus(status: AppointmentStatus | string): boolean {
   const s = String(status)
-  return s === "confirmed" || s === "booked" || s === "pending"
+  return s === "confirmed"
 }
 
 /**
- * "Zaplanowane wizyty" w statystykach dnia: aktywne terminy, bez anulacji i zakończonych.
+ * "Zaplanowane wizyty" w statystykach dnia: wyłącznie potwierdzone terminy, które jeszcze się nie rozpoczęły.
  * Spójne z /dashboard i paskiem bocznym.
  */
-export function isPlannedVisitForDashboardStats(a: Appointment): boolean {
-  return !EXCLUDED_FROM_PLANNED.includes(a.status)
+export function isPlannedVisitForDashboardStats(a: Appointment, at: Date = new Date()): boolean {
+  if (!isConfirmedVisitStatus(a.status)) return false
+  const startsAt = new Date(a.startsAt)
+  if (Number.isNaN(startsAt.getTime())) return false
+  return startsAt.getTime() > at.getTime()
 }
 
 /**

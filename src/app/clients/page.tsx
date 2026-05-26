@@ -1201,12 +1201,6 @@ export default function ClientsPage() {
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {t("clients.sectionVisitsHead")}
                         </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {detailsClient.visitHistory.length}{" "}
-                          {detailsClient.visitHistory.length === 1
-                            ? t("clients.visitsEntryOne")
-                            : t("clients.visitsEntryMany")}
-                        </span>
                       </div>
                       {detailsClient.visitHistory.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("clients.noVisitHistoryUi")}</p>
@@ -1330,12 +1324,6 @@ export default function ClientsPage() {
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {t("clients.sectionVisitsHead")}
                         </h3>
-                        <span className="text-xs text-muted-foreground">
-                          {detailsClient.visitHistory.length}{" "}
-                          {detailsClient.visitHistory.length === 1
-                            ? t("clients.visitsEntryOne")
-                            : t("clients.visitsEntryMany")}
-                        </span>
                       </div>
                       {detailsClient.visitHistory.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("clients.noVisitHistoryUi")}</p>

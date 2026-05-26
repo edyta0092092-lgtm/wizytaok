@@ -11,6 +11,7 @@ import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getAppointmentsForToday, useAppointmentsStore } from "@/lib/appointments/appointments-store"
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import { getAppToday } from "@/lib/date/current-date"
+import { formatTodayAppointmentsLabel } from "@/lib/dashboard/today-appointments-label"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -26,12 +27,20 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
   const { t, language, setLanguage, theme, setTheme } = useTranslations()
   const { ready, effectiveRole, businessId } = useBusinessAccess()
   const [showLogout, setShowLogout] = React.useState(false)
+  const [currentTime, setCurrentTime] = React.useState(() => new Date())
   const {
     appointments: allAppointments,
     ready: appointmentsReady,
     loadError: appointmentsLoadError,
   } = useAppointmentsStore(ready ? businessId : undefined)
   const appToday = React.useMemo(() => getAppToday(), [])
+
+  React.useEffect(() => {
+    const interval = window.setInterval(() => {
+      setCurrentTime(new Date())
+    }, 60_000)
+    return () => window.clearInterval(interval)
+  }, [])
 
   React.useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -76,7 +85,9 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
     () => getAppointmentsForToday(allAppointments, appToday),
     [allAppointments, appToday]
   )
-  const totalToday = todayAppointments.filter((a) => isPlannedVisitForDashboardStats(a)).length
+  const totalToday = todayAppointments.filter((a) =>
+    isPlannedVisitForDashboardStats(a, currentTime)
+  ).length
 
   const statsReady = appointmentsReady && !appointmentsLoadError
 
@@ -113,7 +124,7 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
             appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")
           ) : totalToday === 0
             ? t("dashboard.noAppointmentsTodayLong")
-            : t("dashboard.youHaveToday").replace("{count}", String(totalToday))}
+            : formatTodayAppointmentsLabel(totalToday, language)}
         </p>
       </div>
 
