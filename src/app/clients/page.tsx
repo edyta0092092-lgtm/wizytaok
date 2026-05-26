@@ -9,7 +9,9 @@ import {
   Search,
   Trash2,
   Users,
+  X,
 } from "lucide-react"
+import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
@@ -28,7 +30,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
@@ -125,6 +126,10 @@ function stableClientRenderId(c: Client): string {
   const phone = c.phone.replace(/\s+/g, "")
   const name = c.fullName.trim().toLowerCase().replace(/\s+/g, "-")
   return `client-${email || phone || name || "unknown"}`
+}
+
+function countCompletedClientVisits(c: Client): number {
+  return c.visitHistory.filter((v) => v.status === "completed").length
 }
 
 function dedupeClientsForRender(rows: Client[]): Client[] {
@@ -478,8 +483,8 @@ export default function ClientsPage() {
 
   const totalClients = uniqueClients.length
   const noShowTotal = uniqueClients.reduce((sum, c) => sum + (c.noShowCount ?? 0), 0)
-  const confirmedTotal = uniqueClients.reduce(
-    (sum, c) => sum + (c.confirmedVisitCount ?? 0),
+  const completedTotal = uniqueClients.reduce(
+    (sum, c) => sum + countCompletedClientVisits(c),
     0
   )
   const cancelledTotal = uniqueClients.reduce(
@@ -536,10 +541,10 @@ export default function ClientsPage() {
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardContent className="px-4 py-3.5">
               <p className="text-xs font-medium text-muted-foreground">
-                {t("clients.confirmed")}
+                {t("clients.completed")}
               </p>
               <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
-                {confirmedTotal}
+                {completedTotal}
               </p>
             </CardContent>
           </Card>
@@ -622,9 +627,10 @@ export default function ClientsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="text-sm text-muted-foreground">
-                              <span className="font-medium text-foreground">{row.visitCount}</span>{" "}
-                              {t("clients.visitsAbbrInline")} · {row.confirmedVisitCount}{" "}
-                              {t("clients.confirmedAbbr")} · {row.noShowCount} {t("clients.noShow")} ·{" "}
+                              <span className="font-medium text-success">
+                                {countCompletedClientVisits(row)}
+                              </span>{" "}
+                              {t("clients.completedShort")} · {row.noShowCount} {t("clients.noShow")} ·{" "}
                               {row.cancelledVisitCount} {t("clients.cancelledShort")}
                             </div>
                           </TableCell>
@@ -705,14 +711,10 @@ export default function ClientsPage() {
                           <div className="flex min-w-0 flex-col gap-2">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                               <span className="tabular-nums">
-                                <span className="font-semibold text-foreground">{row.visitCount}</span>{" "}
-                                {t("clients.visitsShort")}
-                              </span>
-                              <span className="tabular-nums">
                                 <span className="font-semibold text-success">
-                                  {row.confirmedVisitCount}
+                                  {countCompletedClientVisits(row)}
                                 </span>{" "}
-                                {t("clients.confirmedShort")}
+                                {t("clients.completedShort")}
                               </span>
                               <span className="tabular-nums">
                                 <span className="font-semibold text-foreground">
@@ -862,7 +864,7 @@ export default function ClientsPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet
+      <DialogPrimitive.Root
         open={Boolean(detailsClient)}
         onOpenChange={(o) => {
           if (!o) {
@@ -871,11 +873,20 @@ export default function ClientsPage() {
           }
         }}
       >
-        <SheetContent
-          side="right"
-          className="flex w-full min-w-0 flex-col overflow-x-hidden border-border/80 bg-card p-0 sm:max-w-lg"
-          showCloseButton
-        >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/35 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(92vh,52rem)] w-[min(96vw,68rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95">
+            <DialogPrimitive.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="absolute right-4 top-4 z-10"
+                aria-label={language === "en" ? "Close" : "Zamknij"}
+              >
+                <X className="size-4" />
+              </Button>
+            </DialogPrimitive.Close>
           {detailsClient ? (
             <div className="flex min-h-0 flex-1 flex-col">
               <SheetHeader className="space-y-3 border-b border-border/70 px-6 py-6 text-left">
@@ -925,62 +936,60 @@ export default function ClientsPage() {
                 {detailsEditing ? (
                   <form
                     id="client-details-edit-form"
-                    className="space-y-8"
+                    className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start"
                     onSubmit={(e) => void submitDetailsEdit(e)}
                   >
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionContactHead")}
-                      </h3>
-                      <div className="min-w-0 space-y-4">
-                        <InternationalPhoneFieldGroup
-                          label={t("clients.fieldPhoneShort")}
-                          dialCode={detailForm.phoneDialCode}
-                          nationalDigits={detailForm.phoneNational}
-                          onDialCodeChange={(v) =>
-                            setDetailForm((prev) => ({ ...prev, phoneDialCode: v }))
-                          }
-                          onNationalChange={(digits) =>
-                            setDetailForm((prev) => ({ ...prev, phoneNational: digits }))
-                          }
-                          dialSelectId="detail-phone-dial"
-                          nationalInputId="detail-phone-national"
-                        />
-                        <div className="space-y-2">
-                          <Label htmlFor="detail-email">{t("clients.fieldEmailShort")}</Label>
-                          <Input
-                            id="detail-email"
-                            type="email"
-                            autoComplete="email"
-                            className="h-11 rounded-xl"
-                            value={detailForm.email}
-                            onChange={(e) =>
-                              setDetailForm((prev) => ({ ...prev, email: e.target.value }))
+                    <div className="space-y-6">
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionContactHead")}
+                        </h3>
+                        <div className="min-w-0 space-y-4 rounded-xl border border-border/80 bg-muted/15 px-4 py-4">
+                          <InternationalPhoneFieldGroup
+                            label={t("clients.fieldPhoneShort")}
+                            dialCode={detailForm.phoneDialCode}
+                            nationalDigits={detailForm.phoneNational}
+                            onDialCodeChange={(v) =>
+                              setDetailForm((prev) => ({ ...prev, phoneDialCode: v }))
                             }
+                            onNationalChange={(digits) =>
+                              setDetailForm((prev) => ({ ...prev, phoneNational: digits }))
+                            }
+                            dialSelectId="detail-phone-dial"
+                            nationalInputId="detail-phone-national"
                           />
+                          <div className="space-y-2">
+                            <Label htmlFor="detail-email">{t("clients.fieldEmailShort")}</Label>
+                            <Input
+                              id="detail-email"
+                              type="email"
+                              autoComplete="email"
+                              className="h-11 rounded-xl"
+                              value={detailForm.email}
+                              onChange={(e) =>
+                                setDetailForm((prev) => ({ ...prev, email: e.target.value }))
+                              }
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </section>
+                      </section>
 
-                    
-
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionNotesHead")}
-                      </h3>
-                      <Textarea
-                        id="detail-notes"
-                        rows={4}
-                        value={detailForm.notes}
-                        onChange={(e) =>
-                          setDetailForm((prev) => ({ ...prev, notes: e.target.value }))
-                        }
-                        placeholder={t("clients.notesPlaceholderUi")}
-                        className="min-h-[120px] resize-none rounded-xl"
-                      />
-                    </section>
-
-                    <Separator />
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionNotesHead")}
+                        </h3>
+                        <Textarea
+                          id="detail-notes"
+                          rows={4}
+                          value={detailForm.notes}
+                          onChange={(e) =>
+                            setDetailForm((prev) => ({ ...prev, notes: e.target.value }))
+                          }
+                          placeholder={t("clients.notesPlaceholderUi")}
+                          className="min-h-[140px] resize-none rounded-xl"
+                        />
+                      </section>
+                    </div>
 
                     <section className="space-y-4">
                       <div className="flex items-center justify-between gap-2">
@@ -1022,51 +1031,51 @@ export default function ClientsPage() {
                     </section>
                   </form>
                 ) : (
-                  <div className="space-y-8">
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionContactHead")}
-                      </h3>
-                      <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4 text-sm">
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                              {t("clients.fieldFullName")}
-                            </p>
-                            <p className="mt-0.5 text-foreground">
-                              {detailsClient.fullName.trim() || "Brak imienia i nazwiska"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                              {t("clients.fieldPhoneShort")}
-                            </p>
-                            <p className="mt-0.5 break-all text-foreground">
-                              {detailsClient.phone.trim() || "Brak telefonu"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">
-                              {t("clients.fieldEmailShort")}
-                            </p>
-                            <p className="mt-0.5 break-all text-foreground">
-                              {detailsClient.email.trim() || "Brak e-maila"}
-                            </p>
+                  <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+                    <div className="space-y-6">
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionContactHead")}
+                        </h3>
+                        <div className="rounded-xl border border-border/80 bg-muted/20 px-4 py-4 text-sm">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {t("clients.fieldFullName")}
+                              </p>
+                              <p className="mt-0.5 text-foreground">
+                                {detailsClient.fullName.trim() || "Brak imienia i nazwiska"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {t("clients.fieldPhoneShort")}
+                              </p>
+                              <p className="mt-0.5 break-all text-foreground">
+                                {detailsClient.phone.trim() || "Brak telefonu"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {t("clients.fieldEmailShort")}
+                              </p>
+                              <p className="mt-0.5 break-all text-foreground">
+                                {detailsClient.email.trim() || "Brak e-maila"}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </section>
+                      </section>
 
-                    <section className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {t("clients.sectionNotesHead")}
-                      </h3>
-                      <p className="rounded-xl border border-border/80 bg-card px-4 py-4 text-sm leading-relaxed text-foreground">
-                        {detailsClient.notes?.trim() ? detailsClient.notes : t("clients.noNotesText")}
-                      </p>
-                    </section>
-
-                    <Separator />
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionNotesHead")}
+                        </h3>
+                        <p className="rounded-xl border border-border/80 bg-card px-4 py-4 text-sm leading-relaxed text-foreground">
+                          {detailsClient.notes?.trim() ? detailsClient.notes : t("clients.noNotesText")}
+                        </p>
+                      </section>
+                    </div>
 
                     <section className="space-y-4">
                       <div className="flex items-center justify-between gap-2">
@@ -1159,8 +1168,9 @@ export default function ClientsPage() {
               </SheetFooter>
             </div>
           ) : null}
-        </SheetContent>
-      </Sheet>
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </AppShell>
   )
 }
