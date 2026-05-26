@@ -797,7 +797,7 @@ export const dictionaries = {
       fieldTime: "Godzina",
       fieldStatus: "Status",
       fieldStaff: "Osoba",
-      customerNoteLabel: "Notatka klienta",
+      customerNoteLabel: "Notatka",
       customerNotePlaceholder: "Dodaj lub edytuj notatkę klienta...",
       attachmentsLabel: "Załączniki do wizyty",
       attachmentHelp: "Możesz dodać JPG, PNG lub PDF do 4 MB.",

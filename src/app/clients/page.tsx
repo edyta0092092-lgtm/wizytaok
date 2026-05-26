@@ -60,6 +60,10 @@ import {
   persistClientUpdates,
   readStoredClientsCatalogSnapshot,
 } from "@/lib/clients/clients-store"
+import {
+  useAppointmentAttachments,
+  type AppointmentAttachment,
+} from "@/lib/appointments/appointment-attachments"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { deleteClient, createClient } from "@/lib/supabase/repositories/clients.repository"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -69,7 +73,7 @@ import {
   splitStoredPhoneIntoParts,
   validateNationalPhoneLength,
 } from "@/lib/validation/international-phone"
-import type { Client, ClientAttachment } from "@/types/domain"
+import type { Client, ClientAttachment, ClientVisitHistoryItem } from "@/types/domain"
 
 let localFallbackClientSeq = 0
 
@@ -134,6 +138,81 @@ function isAllowedClientAttachment(file: File): boolean {
     file.type === "image/jpeg" ||
     file.type === "image/jpg" ||
     file.type === "image/png"
+  )
+}
+
+function getVisitAppointmentAttachmentId(visit: ClientVisitHistoryItem): string {
+  const explicit = visit.appointmentId?.trim()
+  if (explicit) return explicit
+  return visit.id.startsWith("vh-") ? visit.id.slice(3) : visit.id
+}
+
+function ClientHistoryVisitCard({
+  visit,
+  dateTimeFmt,
+}: {
+  visit: ClientVisitHistoryItem
+  dateTimeFmt: Intl.DateTimeFormat
+}) {
+  const { t } = useTranslations()
+  const [attachments] = useAppointmentAttachments(getVisitAppointmentAttachmentId(visit))
+
+  return (
+    <li className="rounded-2xl border border-border/80 bg-muted/15 px-4 py-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {dateTimeFmt.format(new Date(visit.startsAt))}
+          </p>
+          <p className="mt-1 text-base font-semibold text-foreground">{visit.serviceLabel}</p>
+        </div>
+        <StatusBadge status={visit.status} />
+      </div>
+      {visit.notes?.trim() ? (
+        <div className="mt-3 rounded-xl border border-border/70 bg-card px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("clients.historyVisitNotes")}
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {visit.notes}
+          </p>
+        </div>
+      ) : null}
+      {attachments.length > 0 ? (
+        <div className="mt-3 rounded-xl border border-border/70 bg-card px-3 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("clients.sectionAttachmentsHead")}
+          </p>
+          <ul className="mt-2 space-y-2">
+            {attachments.map((attachment) => (
+              <ClientHistoryVisitAttachmentItem key={attachment.id} attachment={attachment} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
+function ClientHistoryVisitAttachmentItem({
+  attachment,
+}: {
+  attachment: AppointmentAttachment
+}) {
+  const { t } = useTranslations()
+
+  return (
+    <li className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate font-medium text-foreground">{attachment.name}</p>
+        <p className="text-xs text-muted-foreground">{formatAttachmentSize(attachment.size)}</p>
+      </div>
+      <Button asChild type="button" variant="outline" size="sm" className="h-8 shrink-0 rounded-xl">
+        <a href={attachment.dataUrl} download={attachment.name}>
+          {t("clients.attachmentDownload")}
+        </a>
+      </Button>
+    </li>
   )
 }
 
@@ -1451,32 +1530,11 @@ export default function ClientsPage() {
                             new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
                         )
                         .map((visit) => (
-                          <li
+                          <ClientHistoryVisitCard
                             key={visit.id}
-                            className="rounded-2xl border border-border/80 bg-muted/15 px-4 py-4"
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                  {dateTimeFmt.format(new Date(visit.startsAt))}
-                                </p>
-                                <p className="mt-1 text-base font-semibold text-foreground">
-                                  {visit.serviceLabel}
-                                </p>
-                              </div>
-                              <StatusBadge status={visit.status} />
-                            </div>
-                            {visit.notes?.trim() ? (
-                              <div className="mt-3 rounded-xl border border-border/70 bg-card px-3 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                  {t("clients.historyVisitNotes")}
-                                </p>
-                                <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                                  {visit.notes}
-                                </p>
-                              </div>
-                            ) : null}
-                          </li>
+                            visit={visit}
+                            dateTimeFmt={dateTimeFmt}
+                          />
                         ))}
                     </ol>
                   )}

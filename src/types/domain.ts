@@ -101,6 +101,7 @@ export type ClientRiskTier = "low" | "medium" | "high"
 
 export type ClientVisitHistoryItem = {
   id: string
+  appointmentId?: string
   startsAt: string
   serviceLabel: string
   status: AppointmentStatus

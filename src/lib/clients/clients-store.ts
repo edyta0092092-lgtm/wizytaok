@@ -155,6 +155,10 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
               : "booked"
           visits.push({
             id: x.id,
+            appointmentId:
+              typeof x.appointmentId === "string" && x.appointmentId.trim()
+                ? x.appointmentId.trim()
+                : undefined,
             startsAt: x.startsAt,
             serviceLabel: x.serviceLabel,
             status: st,
@@ -366,6 +370,7 @@ function enrichVisitHistories(rows: Appointment[]): ClientVisitHistoryItem[] {
     const notes = Array.from(new Set(noteParts)).join("\n\n")
     list.push({
       id: `vh-${a.id}`,
+      appointmentId: a.id,
       startsAt: a.startsAt,
       serviceLabel: a.serviceLabel,
       status: a.status === "completed" ? "completed" : a.status,

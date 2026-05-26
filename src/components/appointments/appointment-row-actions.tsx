@@ -13,13 +13,13 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 import type { AppointmentStatus } from "@/types/domain"
 
 const actionBarClassName =
-  "flex w-full min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto"
+  "flex w-full min-w-0 flex-wrap items-center justify-end gap-2 overflow-visible"
 
 const outlineActionClassName =
-  "h-9 w-auto shrink-0 justify-center rounded-xl whitespace-nowrap"
+  "h-9 w-auto shrink-0 select-none justify-center rounded-xl whitespace-nowrap active:bg-muted active:text-foreground"
 
 const deleteActionClassName =
-  "h-9 w-auto shrink-0 justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive [&_svg]:size-3.5"
+  "h-9 w-auto shrink-0 select-none justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive [&_svg]:size-3.5"
 
 export type AppointmentRowActionsProps = {
   status: AppointmentStatus
