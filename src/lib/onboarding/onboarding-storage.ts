@@ -3,6 +3,9 @@
 const completedPrefix = "pw_onboarding_completed_v2_"
 const dismissedPrefix = "pw_onboarding_welcome_dismissed_v2_"
 const restartPrefix = "pw_onboarding_restart_v2_"
+const stepCompletedPrefix = "pw_onboarding_step_completed_v1_"
+
+export type StoredOnboardingStepId = "booking_page"
 
 export function onboardingCompletedKey(businessId: string): string {
   return `${completedPrefix}${businessId.trim()}`
@@ -14,6 +17,13 @@ export function onboardingWelcomeDismissedKey(businessId: string): string {
 
 export function onboardingRestartKey(businessId: string): string {
   return `${restartPrefix}${businessId.trim()}`
+}
+
+export function onboardingStepCompletedKey(
+  businessId: string,
+  stepId: StoredOnboardingStepId,
+): string {
+  return `${stepCompletedPrefix}${businessId.trim()}_${stepId}`
 }
 
 export function isOnboardingMarkedComplete(businessId: string): boolean {
@@ -30,6 +40,39 @@ export function markOnboardingComplete(businessId: string): void {
   try {
     window.localStorage.setItem(onboardingCompletedKey(businessId), "1")
     window.localStorage.removeItem(onboardingRestartKey(businessId))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function isOnboardingStepMarkedComplete(
+  businessId: string,
+  stepId: StoredOnboardingStepId,
+): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return window.localStorage.getItem(onboardingStepCompletedKey(businessId, stepId)) === "1"
+  } catch {
+    return false
+  }
+}
+
+export function markOnboardingStepComplete(
+  businessId: string,
+  stepId: StoredOnboardingStepId,
+): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(onboardingStepCompletedKey(businessId, stepId), "1")
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearStoredOnboardingStepCompletions(businessId: string): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(onboardingStepCompletedKey(businessId, "booking_page"))
   } catch {
     /* ignore */
   }
@@ -68,6 +111,7 @@ export function requestOnboardingRestart(businessId: string): void {
     window.localStorage.setItem(onboardingRestartKey(businessId), "1")
     window.localStorage.removeItem(onboardingCompletedKey(businessId))
     window.localStorage.removeItem(onboardingWelcomeDismissedKey(businessId))
+    clearStoredOnboardingStepCompletions(businessId)
   } catch {
     /* ignore */
   }

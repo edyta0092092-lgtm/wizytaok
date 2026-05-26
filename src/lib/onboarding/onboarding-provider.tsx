@@ -8,8 +8,10 @@ import { fetchOnboardingProgress, type OnboardingProgressSnapshot } from "@/lib/
 import {
   consumeOnboardingRestart,
   isOnboardingMarkedComplete,
+  isOnboardingStepMarkedComplete,
   isOnboardingWelcomeDismissed,
   markOnboardingComplete,
+  markOnboardingStepComplete,
   markOnboardingWelcomeDismissed,
   requestOnboardingRestart,
 } from "@/lib/onboarding/onboarding-storage"
@@ -54,6 +56,19 @@ function isBusinessAdmin(access: ReturnType<typeof useBusinessAccess>): boolean 
   return access.isOwner || access.effectiveRole === "admin" || access.canManageSettings
 }
 
+function applyLocalOnboardingProgress(
+  snapshot: OnboardingProgressSnapshot,
+  businessId: string,
+): OnboardingProgressSnapshot {
+  return {
+    ...snapshot,
+    progress: {
+      ...snapshot.progress,
+      booking_page: isOnboardingStepMarkedComplete(businessId, "booking_page"),
+    },
+  }
+}
+
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -86,7 +101,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return
     }
     try {
-      const next = await fetchOnboardingProgress(client, businessId)
+      const fetched = await fetchOnboardingProgress(client, businessId)
+      const next = applyLocalOnboardingProgress(fetched, businessId)
       setSnapshot(next)
       setLoading(false)
       if (flowActive && !freshChecklistOpen && isOnboardingFullyComplete(next.progress) && businessId) {
@@ -250,6 +266,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       if (businessId) markOnboardingWelcomeDismissed(businessId)
 
       if (stepId === "booking_page" && snapshot?.bookingPath) {
+        if (businessId) {
+          markOnboardingStepComplete(businessId, "booking_page")
+          setSnapshot((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: {
+                    ...prev.progress,
+                    booking_page: true,
+                  },
+                }
+              : prev,
+          )
+        }
         window.open(snapshot.bookingPath, "_blank", "noopener,noreferrer")
         if (needsNavigation) router.push(href)
         return
