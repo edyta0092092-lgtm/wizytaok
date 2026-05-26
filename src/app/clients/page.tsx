@@ -3,7 +3,9 @@
 import * as React from "react"
 import {
   Check,
+  Download,
   Eye,
+  FileText,
   History,
   MoreHorizontal,
   Plus,
@@ -54,6 +56,7 @@ import {
   loadClientsWorkspace,
   type ClientsLoadMode,
   persistClientsCatalog,
+  persistClientAttachments,
   persistClientUpdates,
   readStoredClientsCatalogSnapshot,
 } from "@/lib/clients/clients-store"
@@ -66,7 +69,7 @@ import {
   splitStoredPhoneIntoParts,
   validateNationalPhoneLength,
 } from "@/lib/validation/international-phone"
-import type { Client } from "@/types/domain"
+import type { Client, ClientAttachment } from "@/types/domain"
 
 let localFallbackClientSeq = 0
 
@@ -99,6 +102,40 @@ const emptyForm = (): FormState => ({
   email: "",
   notes: "",
 })
+
+const CLIENT_ATTACHMENT_ACCEPT = "image/jpeg,image/jpg,image/png,application/pdf"
+const CLIENT_ATTACHMENT_MAX_BYTES = 4 * 1024 * 1024
+
+function formatAttachmentSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${bytes} B`
+}
+
+function allocateClientAttachmentId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `att-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ""))
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"))
+    reader.readAsDataURL(file)
+  })
+}
+
+function isAllowedClientAttachment(file: File): boolean {
+  return (
+    file.type === "application/pdf" ||
+    file.type === "image/jpeg" ||
+    file.type === "image/jpg" ||
+    file.type === "image/png"
+  )
+}
 
 function splitPersonName(fullName: string): { firstName: string; lastName: string } {
   const normalized = fullName.trim().replace(/\s+/g, " ")
@@ -202,6 +239,7 @@ export default function ClientsPage() {
   const [showSaved, setShowSaved] = React.useState<SaveBanner>(null)
   const [detailsEditing, setDetailsEditing] = React.useState(false)
   const [detailForm, setDetailForm] = React.useState<FormState>(emptyForm)
+  const [detailAttachments, setDetailAttachments] = React.useState<ClientAttachment[]>([])
   const [detailFieldError, setDetailFieldError] = React.useState<string | null>(null)
   const [detailSaving, setDetailSaving] = React.useState(false)
 
@@ -253,8 +291,13 @@ export default function ClientsPage() {
     queueMicrotask(() => {
       setDetailsEditing(false)
       setDetailFieldError(null)
+      const selectedClient = detailsId
+        ? dedupeClientsForRender(clients).find((c) => c.id === detailsId)
+        : null
+      const nextAttachments = selectedClient?.attachments ?? []
+      setDetailAttachments(nextAttachments)
     })
-  }, [detailsId])
+  }, [detailsId, clients])
 
   const uniqueClients = React.useMemo(() => dedupeClientsForRender(clients), [clients])
 
@@ -394,6 +437,7 @@ export default function ClientsPage() {
       email: detailsClient.email,
       notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
     })
+    setDetailAttachments(detailsClient.attachments ?? [])
     setDetailFieldError(null)
     setDetailsEditing(true)
   }
@@ -412,7 +456,44 @@ export default function ClientsPage() {
         email: detailsClient.email,
         notes: detailsClient.notes?.trim() ? detailsClient.notes : "",
       })
+      setDetailAttachments(detailsClient.attachments ?? [])
     }
+  }
+
+  const handleClientAttachmentUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const next: ClientAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (!isAllowedClientAttachment(file)) {
+        setDetailFieldError(t("clients.attachmentInvalidType"))
+        return
+      }
+      if (file.size > CLIENT_ATTACHMENT_MAX_BYTES) {
+        setDetailFieldError(t("clients.attachmentTooLarge"))
+        return
+      }
+      let dataUrl = ""
+      try {
+        dataUrl = await readFileAsDataUrl(file)
+      } catch {
+        setDetailFieldError(t("clients.attachmentReadFailed"))
+        return
+      }
+      next.push({
+        id: allocateClientAttachmentId(),
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl,
+        createdAt: new Date().toISOString(),
+      })
+    }
+    setDetailFieldError(null)
+    setDetailAttachments((prev) => [...prev, ...next])
+  }
+
+  const removeClientAttachment = (attachmentId: string) => {
+    setDetailAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId))
   }
 
   const submitDetailsEdit = async (e: React.FormEvent) => {
@@ -468,7 +549,21 @@ export default function ClientsPage() {
         return
       }
       queueMicrotask(() => {
-        setClients(res.clients)
+        const updatedClients = res.clients.map((client) =>
+          client.id === detailsClient.id ||
+          (client.fullName === fullName && client.phone === phone && client.email === email)
+            ? { ...client, attachments: detailAttachments }
+            : client
+        )
+        const updatedClientId =
+          updatedClients.find(
+            (client) =>
+              client.id === detailsClient.id ||
+              (client.fullName === fullName && client.phone === phone && client.email === email)
+          )?.id ?? detailsClient.id
+        persistClientAttachments(updatedClientId, detailAttachments)
+        persistClientsCatalog(updatedClients)
+        setClients(updatedClients)
         setDetailsEditing(false)
         setDetailFieldError(null)
         setDetailsId(null)
@@ -1021,6 +1116,55 @@ export default function ClientsPage() {
                           className="min-h-[140px] resize-none rounded-xl"
                         />
                       </section>
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionAttachmentsHead")}
+                        </h3>
+                        <div className="rounded-xl border border-border/80 bg-muted/15 px-4 py-4">
+                          <Input
+                            id="client-attachments"
+                            type="file"
+                            accept={CLIENT_ATTACHMENT_ACCEPT}
+                            multiple
+                            className="h-auto cursor-pointer py-2"
+                            onChange={(e) => {
+                              void handleClientAttachmentUpload(e.target.files)
+                              e.currentTarget.value = ""
+                            }}
+                          />
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {t("clients.attachmentHelp")}
+                          </p>
+                          {detailAttachments.length > 0 ? (
+                            <ul className="mt-3 space-y-2">
+                              {detailAttachments.map((attachment) => (
+                                <li
+                                  key={attachment.id}
+                                  className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-foreground">
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatAttachmentSize(attachment.size)}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={() => removeClientAttachment(attachment.id)}
+                                  >
+                                    {t("common.delete")}
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
+                      </section>
                     </div>
 
                     <section className="space-y-4">
@@ -1106,6 +1250,49 @@ export default function ClientsPage() {
                         <p className="rounded-xl border border-border/80 bg-card px-4 py-4 text-sm leading-relaxed text-foreground">
                           {detailsClient.notes?.trim() ? detailsClient.notes : t("clients.noNotesText")}
                         </p>
+                      </section>
+                      <section className="space-y-3">
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {t("clients.sectionAttachmentsHead")}
+                        </h3>
+                        {detailsClient.attachments && detailsClient.attachments.length > 0 ? (
+                          <ul className="space-y-2">
+                            {detailsClient.attachments.map((attachment) => (
+                              <li
+                                key={attachment.id}
+                                className="flex items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 text-sm"
+                              >
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <FileText className="size-4 shrink-0 text-muted-foreground" />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-foreground">
+                                      {attachment.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatAttachmentSize(attachment.size)}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 shrink-0 rounded-lg"
+                                  asChild
+                                >
+                                  <a href={attachment.dataUrl} download={attachment.name}>
+                                    <Download className="size-3.5" />
+                                    {t("clients.attachmentDownload")}
+                                  </a>
+                                </Button>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="rounded-xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
+                            {t("clients.noAttachmentsText")}
+                          </p>
+                        )}
                       </section>
                     </div>
 

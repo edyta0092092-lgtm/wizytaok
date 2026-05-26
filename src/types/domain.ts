@@ -107,6 +107,15 @@ export type ClientVisitHistoryItem = {
   notes?: string
 }
 
+export type ClientAttachment = {
+  id: string
+  name: string
+  mimeType: string
+  size: number
+  dataUrl: string
+  createdAt: string
+}
+
 export type Client = {
   id: string
   fullName: string
@@ -117,6 +126,7 @@ export type Client = {
   noShowCount: number
   cancelledVisitCount: number
   notes?: string
+  attachments?: ClientAttachment[]
   /** 0–100, im wyżej tym większe ryzyko nieobecności klienta */
   riskScore: number
   riskTier: ClientRiskTier

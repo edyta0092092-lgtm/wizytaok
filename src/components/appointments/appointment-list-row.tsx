@@ -106,6 +106,7 @@ export function AppointmentListRow({
   isCancellingVisit,
 }: AppointmentListRowProps) {
   const { t } = useTranslations()
+  const customerNote = (row.customerNote?.trim() || row.notes?.trim() || "").trim()
 
   return (
     <React.Fragment>
@@ -123,6 +124,14 @@ export function AppointmentListRow({
         <div className="min-w-0">
           <p className="font-semibold text-foreground">{row.clientName}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">{row.serviceLabel}</p>
+          {customerNote ? (
+            <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-foreground">
+              <p className="font-semibold text-muted-foreground">
+                {t("appointments.customerNoteLabel")}
+              </p>
+              <p className="mt-0.5 whitespace-pre-wrap">{customerNote}</p>
+            </div>
+          ) : null}
           {showNeedsActionReason ? (
             <p className="mt-1 max-w-full text-xs leading-snug text-amber-800 dark:text-amber-200/95">
               {getBookingActionReason(row, language)}

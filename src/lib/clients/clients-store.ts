@@ -21,7 +21,7 @@ import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-st
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { getClients, updateClient } from "@/lib/supabase/repositories/clients.repository"
 import type { ClientRecord } from "@/types/domain"
-import type { Client, ClientRiskTier, ClientVisitHistoryItem } from "@/types/domain"
+import type { Client, ClientAttachment, ClientRiskTier, ClientVisitHistoryItem } from "@/types/domain"
 import type { Appointment } from "@/types/domain"
 import type { TablesUpdate } from "@/types/database"
 
@@ -30,6 +30,7 @@ export const CLIENTS_CATALOG_STORAGE_KEY = "wizytaok-clients-catalog-v1"
 
 const CLIENT_GROUP_IDENTITY_STORAGE_KEY = "wizytaok-client-group-identity-v1"
 const CLIENT_NOTES_EXTRA_STORAGE_KEY = "wizytaok-client-extra-notes-v1"
+const CLIENT_ATTACHMENTS_STORAGE_KEY = "wizytaok-client-attachments-v1"
 
 export type ClientsLoadMode =
   /** Dane z rekordów `clients` dla zalogowanej firmy. */
@@ -44,6 +45,43 @@ export type ClientsWorkspaceLoad = {
   mode: ClientsLoadMode
   businessSlug: string | null
   businessProfileId: string | null
+}
+
+function parseClientAttachment(value: unknown): ClientAttachment | null {
+  if (!value || typeof value !== "object") return null
+  const o = value as Partial<ClientAttachment>
+  if (
+    typeof o.id !== "string" ||
+    typeof o.name !== "string" ||
+    typeof o.mimeType !== "string" ||
+    typeof o.size !== "number" ||
+    typeof o.dataUrl !== "string" ||
+    typeof o.createdAt !== "string"
+  ) {
+    return null
+  }
+  const mime = o.mimeType.trim()
+  if (
+    mime !== "application/pdf" &&
+    mime !== "image/jpeg" &&
+    mime !== "image/jpg" &&
+    mime !== "image/png"
+  ) {
+    return null
+  }
+  return {
+    id: o.id.trim(),
+    name: o.name.trim(),
+    mimeType: mime,
+    size: Math.max(0, o.size),
+    dataUrl: o.dataUrl,
+    createdAt: o.createdAt,
+  }
+}
+
+function parseClientAttachments(value: unknown): ClientAttachment[] {
+  if (!Array.isArray(value)) return []
+  return value.map(parseClientAttachment).filter((x): x is ClientAttachment => Boolean(x))
 }
 
 export function riskTierFromScore(score: number): ClientRiskTier {
@@ -95,6 +133,7 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
       const can = typeof o.cancelledVisitCount === "number" ? o.cancelledVisitCount : 0
       const rs = typeof o.riskScore === "number" ? o.riskScore : 48
       const rt = o.riskTier === "low" || o.riskTier === "medium" || o.riskTier === "high" ? o.riskTier : riskTierFromScore(rs)
+      const attachments = parseClientAttachments(o.attachments)
       const visits: ClientVisitHistoryItem[] = []
       if (Array.isArray(o.visitHistory)) {
         for (const v of o.visitHistory) {
@@ -134,6 +173,7 @@ export function parseClientsCatalogJson(raw: string | null): Client[] | null {
         cancelledVisitCount: can,
         notes:
           typeof o.notes === "string" || o.notes === undefined ? (o.notes as string | undefined) : undefined,
+        attachments,
         riskScore: rs,
         riskTier: rt,
         visitHistory: visits,
@@ -158,6 +198,13 @@ export function persistClientsCatalog(clients: Client[]): void {
   if (typeof window === "undefined") return
   try {
     window.localStorage.setItem(CLIENTS_CATALOG_STORAGE_KEY, JSON.stringify(clients))
+    const attachmentMap: Record<string, ClientAttachment[]> = {}
+    for (const client of clients) {
+      if (client.attachments && client.attachments.length > 0) {
+        attachmentMap[client.id] = client.attachments
+      }
+    }
+    persistAttachmentMap(attachmentMap)
   } catch {
     // noop
   }
@@ -202,6 +249,37 @@ export function persistExtraNotesMap(map: ExtraNotesMap): void {
 
 export function readExtraNotesMap(): ExtraNotesMap {
   return readJsonMap(CLIENT_NOTES_EXTRA_STORAGE_KEY)
+}
+
+function readAttachmentMap(): Record<string, ClientAttachment[]> {
+  const raw = readJsonMap(CLIENT_ATTACHMENTS_STORAGE_KEY)
+  const out: Record<string, ClientAttachment[]> = {}
+  for (const [clientId, json] of Object.entries(raw)) {
+    try {
+      const attachments = parseClientAttachments(JSON.parse(json))
+      if (attachments.length > 0) out[clientId] = attachments
+    } catch {
+      // noop
+    }
+  }
+  return out
+}
+
+function persistAttachmentMap(map: Record<string, ClientAttachment[]>): void {
+  const serializable: Record<string, string> = {}
+  for (const [clientId, attachments] of Object.entries(map)) {
+    if (attachments.length > 0) serializable[clientId] = JSON.stringify(attachments)
+  }
+  writeJsonMap(CLIENT_ATTACHMENTS_STORAGE_KEY, serializable)
+}
+
+export function persistClientAttachments(clientId: string, attachments: ClientAttachment[]): void {
+  const id = clientId.trim()
+  if (!id) return
+  const map = readAttachmentMap()
+  if (attachments.length > 0) map[id] = attachments
+  else delete map[id]
+  persistAttachmentMap(map)
 }
 
 function bookingGroupKeyFromParts(clientName: string, phone: string, emailRaw: string): string {
@@ -316,6 +394,7 @@ function deriveClientsFromScopedAppointments(
 
   const groupMap = readGroupIdentityMap()
   const extras = readExtraNotesMap()
+  const attachmentMap = readAttachmentMap()
 
   const nextGroupMap = { ...groupMap }
   const clients: Client[] = []
@@ -354,6 +433,7 @@ function deriveClientsFromScopedAppointments(
       noShowCount,
       cancelledVisitCount,
       notes: extras[id] ?? undefined,
+      attachments: attachmentMap[id] ?? [],
       riskScore,
       riskTier: riskTierFromScore(riskScore),
       visitHistory: history,
@@ -392,6 +472,10 @@ function mergeClientsKeepingSnapshot(snapshot: Client[], derived: Client[]): Cli
       byKey.set(key, {
         ...existing,
         notes: existing.notes?.trim() ? existing.notes : row.notes,
+        attachments:
+          existing.attachments && existing.attachments.length > 0
+            ? existing.attachments
+            : row.attachments,
       })
     } else {
       byKey.set(key, clientWithClearedVisitStats(row))
@@ -453,6 +537,7 @@ function djbStableHex(text: string): string {
 }
 
 function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: Appointment[], slugNorm: string | null) {
+  const attachmentMap = readAttachmentMap()
   return rows.map((r) => {
     const scoped = appointments.filter((a) => belongsToScopedBusiness(a, slugNorm))
     const matchAppts = scoped.filter((a) => {
@@ -505,6 +590,7 @@ function enrichSupabaseClientsWithHistories(rows: ClientRecord[], appointments: 
       noShowCount,
       cancelledVisitCount,
       notes: notesVal,
+      attachments: attachmentMap[r.id] ?? [],
       riskScore,
       riskTier: riskTierFromScore(riskScore),
       visitHistory,
