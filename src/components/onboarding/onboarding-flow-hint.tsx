@@ -57,11 +57,23 @@ export function OnboardingFlowHint() {
           return
         }
         const rect = target.getBoundingClientRect()
-        setHighlightRect({
-          top: rect.top - 6,
-          left: rect.left - 6,
-          width: rect.width + 12,
-          height: rect.height + 12,
+        setHighlightRect((prev) => {
+          const next = {
+            top: Math.round(rect.top - 6),
+            left: Math.round(rect.left - 6),
+            width: Math.round(rect.width + 12),
+            height: Math.round(rect.height + 12),
+          }
+          if (
+            prev &&
+            prev.top === next.top &&
+            prev.left === next.left &&
+            prev.width === next.width &&
+            prev.height === next.height
+          ) {
+            return prev
+          }
+          return next
         })
       })
     }
@@ -82,7 +94,7 @@ export function OnboardingFlowHint() {
       updateRect()
       if (scrollTimer) window.clearTimeout(scrollTimer)
       scrollTimer = window.setTimeout(() => {
-        target?.scrollIntoView({ behavior: "smooth", block: "center" })
+        target?.scrollIntoView({ block: "center" })
         updateRect()
       }, 120)
     }
@@ -124,7 +136,7 @@ export function OnboardingFlowHint() {
       {highlightRect ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-[149] rounded-2xl border-[3px] border-primary transition-[top,left,width,height] duration-150"
+          className="pointer-events-none fixed z-[149] rounded-2xl border-[3px] border-primary"
           style={{
             top: highlightRect.top,
             left: highlightRect.left,

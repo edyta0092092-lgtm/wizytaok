@@ -180,9 +180,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const restart = consumeOnboardingRestart(businessId)
     const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
     const markedComplete = isOnboardingMarkedComplete(businessId)
+    const dismissed = isOnboardingWelcomeDismissed(businessId)
     const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
 
     if (restart || pendingActivation) {
+      if (pendingActivation && dismissed) {
+        markWelcomeHandledForBusiness(businessId)
+        return
+      }
       if (pendingActivation && (dataComplete || markedComplete)) {
         markWelcomeHandledForBusiness(businessId)
         return
@@ -195,8 +200,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       })
       return
     }
-
-    const dismissed = isOnboardingWelcomeDismissed(businessId)
 
     if (dataComplete || markedComplete) return
 
@@ -220,6 +223,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   ])
 
   const dismissWelcome = React.useCallback(() => {
+    clearPanelAccessJustActivated()
     if (businessId) {
       markOnboardingWelcomeDismissed(businessId)
       markWelcomeHandledForBusiness(businessId)
