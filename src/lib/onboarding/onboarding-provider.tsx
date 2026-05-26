@@ -337,6 +337,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     Boolean(businessId) &&
     (isOnboardingMarkedComplete(businessId) ||
       Boolean(snapshot && isOnboardingFullyComplete(snapshot.progress)))
+  const welcomeDismissed = Boolean(businessId) && isOnboardingWelcomeDismissed(businessId)
 
   const displaySnapshot = React.useMemo<OnboardingProgressSnapshot | null>(() => {
     if (!freshChecklistOpen) return snapshot
@@ -350,6 +351,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const showDashboardCard =
     eligible &&
     Boolean(businessId) &&
+    !welcomeDismissed &&
     (freshChecklistOpen || !setupComplete)
 
   const value = React.useMemo<OnboardingContextValue>(
