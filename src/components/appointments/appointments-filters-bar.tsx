@@ -149,11 +149,13 @@ export function AppointmentsFiltersBar({
             ? restrictToToday
               ? t("appointments.filterHintConfirmedToday")
               : t("appointments.filterHintConfirmed")
-            : filter === "completed"
-              ? t("appointments.filterHintCompleted")
-              : filter === "no_show"
-                ? t("appointments.filterHintNoShow")
-                : t("appointments.filterHintCancelled")}
+            : filter === "needs_action"
+              ? t("appointments.filterHintNeedsAction")
+              : filter === "completed"
+                ? t("appointments.filterHintCompleted")
+                : filter === "no_show"
+                  ? t("appointments.filterHintNoShow")
+                  : t("appointments.filterHintCancelled")}
         </p>
       ) : null}
       {staffFilter !== "all" ? (

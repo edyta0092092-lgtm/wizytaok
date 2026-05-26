@@ -1,4 +1,7 @@
-import { bookingNeedsAction } from "@/lib/bookings/booking-needs-action"
+import {
+  bookingNeedsAction,
+  bookingRequiresPostVisitStatus,
+} from "@/lib/bookings/booking-needs-action"
 import type { Appointment, AppointmentStatus } from "@/types/domain"
 
 const EXCLUDED_FROM_PLANNED: AppointmentStatus[] = ["cancelled", "no_show", "completed"]
@@ -22,4 +25,8 @@ export function isPlannedVisitForDashboardStats(a: Appointment): boolean {
  */
 export function appointmentRequiresBusinessContact(a: Appointment): boolean {
   return bookingNeedsAction(a)
+}
+
+export function appointmentRequiresPostVisitAction(a: Appointment, at: Date = new Date()): boolean {
+  return bookingRequiresPostVisitStatus(a, at)
 }

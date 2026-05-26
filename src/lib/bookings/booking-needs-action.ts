@@ -4,6 +4,7 @@ import type { Appointment, AppointmentStatus } from "@/types/domain"
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000
 
 const TERMINAL: AppointmentStatus[] = ["confirmed", "cancelled", "no_show", "completed"]
+const POST_VISIT_ACTION_STATUSES: AppointmentStatus[] = ["booked", "pending", "confirmed"]
 
 function dictString(lang: Language, path: string): string {
   const parts = path.split(".")
@@ -36,11 +37,19 @@ function reminderIsAttention(rs: string | null | undefined): boolean {
   return s === "failed" || s === "skipped" || s === "not_configured"
 }
 
+export function bookingRequiresPostVisitStatus(a: Appointment, at: Date = new Date()): boolean {
+  if (!POST_VISIT_ACTION_STATUSES.includes(a.status)) return false
+  const startMs = new Date(a.startsAt).getTime()
+  if (!Number.isFinite(startMs)) return false
+  return startMs < at.getTime()
+}
+
 /**
  * Wizyta wymaga reakcji firmy (decyzja, kontakt lub sprawdzenie przypomnienia).
  * Nie obejmuje wyłącznie statusu pending z poprawnym przypomnieniem i danymi kontaktowymi.
  */
 export function bookingNeedsAction(a: Appointment, at: Date = new Date()): boolean {
+  if (bookingRequiresPostVisitStatus(a, at)) return true
   if (TERMINAL.includes(a.status)) return false
   if (reminderIsAttention(a.reminderStatus) || reminderIsAttention(a.secondReminderStatus)) return true
   if (missingContactActive(a)) return true
@@ -57,6 +66,7 @@ export function countBookingsNeedingAction(rows: Appointment[], at: Date = new D
 }
 
 export type BookingNeedsActionReasonKey =
+  | "postVisitStatusRequired"
   | "reminderFailed"
   | "reminderSkipped"
   | "reminderNotConfigured"
@@ -69,6 +79,7 @@ export function getBookingNeedsActionReasonKey(
   at: Date = new Date()
 ): BookingNeedsActionReasonKey | null {
   if (!bookingNeedsAction(a, at)) return null
+  if (bookingRequiresPostVisitStatus(a, at)) return "postVisitStatusRequired"
   const first = (a.reminderStatus ?? "").trim()
   const second = (a.secondReminderStatus ?? "").trim()
   const rs = second === "failed" ? second : first

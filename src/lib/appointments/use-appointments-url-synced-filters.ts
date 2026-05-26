@@ -29,15 +29,11 @@ export function useAppointmentsUrlSyncedFilters() {
 
     queueMicrotask(() => setRestrictToToday(dateParam === "today"))
 
-    const legacyFilter =
-      filterParam === "needs_action" ||
-      filterParam === "needs_contact" ||
-      filterParam === "unconfirmed"
+    if (!filterParam && !status) return
 
-    if (!filterParam && !status && !legacyFilter) return
-
+    const normalizedFilterParam = filterParam === "needs_contact" ? "needs_action" : filterParam
     const fromUrl = normalizeAppointmentsStatusFilterFromUrl(
-      legacyFilter ? null : filterParam ?? status,
+      normalizedFilterParam ?? status,
     )
     queueMicrotask(() => setFilter(fromUrl))
   }, [searchParams])

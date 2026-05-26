@@ -31,11 +31,13 @@ export function AppointmentsGroupedSections({
         return (
           <section key={groupKey} className="space-y-2.5">
             <h2 className="text-sm font-semibold text-foreground">
-              {groupKey === "today"
-                ? t("appointments.today")
-                : groupKey === "tomorrow"
-                  ? t("appointments.tomorrow")
-                  : t("appointments.upcoming")}
+              {groupKey === "past"
+                ? t("appointments.past")
+                : groupKey === "today"
+                  ? t("appointments.today")
+                  : groupKey === "tomorrow"
+                    ? t("appointments.tomorrow")
+                    : t("appointments.upcoming")}
             </h2>
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">

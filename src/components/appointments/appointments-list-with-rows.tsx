@@ -20,6 +20,8 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
+const NEEDS_ACTION_STATUS_ORDER: AppointmentStatus[] = ["completed", "no_show"]
+
 export type AppointmentsListPresentationBundle = {
   grouped: Record<AppointmentGroupKey, Appointment[]>
   isEmpty: boolean
@@ -100,7 +102,9 @@ export function AppointmentsListWithRows({
 
   React.useEffect(() => {
     let cancelled = false
-    setReminderRowsLoaded(false)
+    queueMicrotask(() => {
+      if (!cancelled) setReminderRowsLoaded(false)
+    })
     void (async () => {
       if (!isSupabaseConfigured()) {
         if (!cancelled) {
@@ -227,7 +231,11 @@ export function AppointmentsListWithRows({
             language={listUiLanguage}
             staffByService={staffByService}
             hasActiveTeamMembers={hasActiveTeamMembers}
-            statusOrder={APPOINTMENT_ROW_STATUS_ORDER}
+            statusOrder={
+              listFilter === "needs_action"
+                ? NEEDS_ACTION_STATUS_ORDER
+                : APPOINTMENT_ROW_STATUS_ORDER
+            }
             allowAppointmentDelete={allowAppointmentDelete}
             onStaffChange={(next) => onStaffChange(row, next)}
             onEditVisit={() => onEditVisit(row)}

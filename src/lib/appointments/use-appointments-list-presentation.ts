@@ -8,7 +8,7 @@ import {
   groupAppointmentByDay,
 } from "@/lib/appointments/appointments-grouping"
 import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
-import { appointmentRequiresBusinessContact } from "@/lib/appointments/stats-rules"
+import { appointmentRequiresPostVisitAction } from "@/lib/appointments/stats-rules"
 import { getAppToday, isSameAppDay } from "@/lib/date/current-date"
 import { bookingMatchesStaffFilter } from "@/lib/staff/staff-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
@@ -70,7 +70,7 @@ export function useAppointmentsListPresentation(args: {
     }
     let stage: Appointment[]
     if (filter === "needs_action") {
-      stage = base.filter((a) => appointmentRequiresBusinessContact(a))
+      stage = base.filter((a) => appointmentRequiresPostVisitAction(a))
     } else if (filter === "all") {
       stage = base
     } else if (filter === "unconfirmed") {
@@ -97,6 +97,7 @@ export function useAppointmentsListPresentation(args: {
 
   const grouped = React.useMemo(() => {
     const out: Record<AppointmentGroupKey, Appointment[]> = {
+      past: [],
       today: [],
       tomorrow: [],
       upcoming: [],
@@ -106,8 +107,10 @@ export function useAppointmentsListPresentation(args: {
     }
     const sortStarts = (a: Appointment, b: Appointment) =>
       new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+    const sortStartsDesc = (a: Appointment, b: Appointment) =>
+      new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime()
     for (const k of APPOINTMENT_GROUP_ORDER) {
-      out[k].sort(sortStarts)
+      out[k].sort(k === "past" ? sortStartsDesc : sortStarts)
     }
     return out
   }, [filtered])
