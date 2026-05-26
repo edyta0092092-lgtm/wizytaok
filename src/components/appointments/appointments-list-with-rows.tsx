@@ -22,6 +22,20 @@ import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain
 
 const NEEDS_ACTION_STATUS_ORDER: AppointmentStatus[] = ["completed", "no_show"]
 
+function formatEditDateTime(startsAt: string): { date: string; time: string } {
+  const date = new Date(startsAt)
+  if (Number.isNaN(date.getTime())) return { date: "", time: "" }
+  return {
+    date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate(),
+    ).padStart(2, "0")}`,
+    time: `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(
+      2,
+      "0",
+    )}`,
+  }
+}
+
 export type AppointmentsListPresentationBundle = {
   grouped: Record<AppointmentGroupKey, Appointment[]>
   isEmpty: boolean
@@ -213,12 +227,17 @@ export function AppointmentsListWithRows({
         const { date, time } = formatWhen(row.startsAt)
         const reminderSections =
           row.id.startsWith("sb-") ? reminderSectionsByBookingId[row.id.slice(3)] ?? [] : []
+        const currentEditDateTime = formatEditDateTime(row.startsAt)
+        const scheduleChanged =
+          proposeDate.trim() !== currentEditDateTime.date ||
+          proposeTime.trim() !== currentEditDateTime.time
         const saveEditDisabled =
           isSavingDirectEdit ||
           isCancellingVisit ||
-          !(proposeResolvedServiceId.trim() || row.serviceId?.trim()) ||
-          proposeStaffListForService === null ||
-          (proposeAvailableStaffIds != null && proposeAvailableStaffIds.size === 0)
+          (scheduleChanged &&
+            (!(proposeResolvedServiceId.trim() || row.serviceId?.trim()) ||
+              proposeStaffListForService === null ||
+              (proposeAvailableStaffIds != null && proposeAvailableStaffIds.size === 0)))
         return (
           <AppointmentListRow
             key={row.id}

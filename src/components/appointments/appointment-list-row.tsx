@@ -119,6 +119,7 @@ export function AppointmentListRow({
   const { t } = useTranslations()
   const [attachments, setAttachments] = useAppointmentAttachments(row.id)
   const [attachmentError, setAttachmentError] = React.useState("")
+  const editPanelRef = React.useRef<HTMLDivElement | null>(null)
   const customerNote = (row.customerNote?.trim() || row.notes?.trim() || "").trim()
   const acceptedAttachmentTypes = "image/jpeg,image/jpg,image/png,application/pdf"
 
@@ -164,6 +165,17 @@ export function AppointmentListRow({
     setAttachments((prev) => [...prev, ...next])
   }
 
+  React.useEffect(() => {
+    if (!editOpen) return
+    const frame = window.requestAnimationFrame(() => {
+      editPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [editOpen, row.id])
+
   return (
     <React.Fragment>
       <div
@@ -186,6 +198,39 @@ export function AppointmentListRow({
                 {t("appointments.customerNoteLabel")}
               </p>
               <p className="mt-0.5 whitespace-pre-wrap">{customerNote}</p>
+            </div>
+          ) : null}
+          {attachments.length > 0 ? (
+            <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-foreground">
+              <p className="font-semibold text-muted-foreground">
+                {t("appointments.attachmentsLabel")}
+              </p>
+              <ul className="mt-1.5 space-y-1.5">
+                {attachments.map((attachment) => (
+                  <li
+                    key={attachment.id}
+                    className="flex flex-col gap-1 rounded-lg border border-border/60 bg-background/80 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">{attachment.name}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatAttachmentSize(attachment.size)}
+                      </p>
+                    </div>
+                    <Button
+                      asChild
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 shrink-0 rounded-lg px-2 text-xs"
+                    >
+                      <a href={attachment.dataUrl} download={attachment.name}>
+                        {t("appointments.attachmentDownload")}
+                      </a>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             </div>
           ) : null}
           {showNeedsActionReason ? (
@@ -313,8 +358,22 @@ export function AppointmentListRow({
       ) : null}
 
       {editOpen ? (
-        <div className="mt-2 w-full rounded-xl border border-border bg-muted/30 p-3">
-          <p className="text-sm font-medium text-foreground">{t("appointments.editVisitFormTitle")}</p>
+        <div
+          ref={editPanelRef}
+          className="relative mt-4 w-full scroll-mt-24 overflow-hidden rounded-2xl border border-primary/35 bg-primary/5 p-4 shadow-lg shadow-primary/10 ring-1 ring-primary/10 dark:bg-primary/10"
+        >
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-primary/60" />
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">{t("appointments.editVisitFormTitle")}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {t("appointments.editVisitFormHint")}
+              </p>
+            </div>
+            <span className="rounded-full border border-primary/25 bg-background/80 px-3 py-1 text-xs font-medium text-primary">
+              {t("appointments.editVisitBadge")}
+            </span>
+          </div>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <div className="grid gap-1">
               <Label htmlFor={`p-date-${row.id}`}>{t("appointments.proposePanelDate")}</Label>

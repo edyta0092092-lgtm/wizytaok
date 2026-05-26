@@ -45,6 +45,20 @@ export type AppointmentInlineActionLabels = {
   visitCancelledLocal: string
 }
 
+function formatEditDateTime(startsAt: string): { date: string; time: string } {
+  const date = new Date(startsAt)
+  if (Number.isNaN(date.getTime())) return { date: "", time: "" }
+  return {
+    date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate(),
+    ).padStart(2, "0")}`,
+    time: `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(
+      2,
+      "0",
+    )}`,
+  }
+}
+
 export function useAppointmentInlineActions(args: {
   labels: AppointmentInlineActionLabels
   language: "en" | "pl"
@@ -107,8 +121,18 @@ export function useAppointmentInlineActions(args: {
       const customerNote = proposeCustomerNote.trim()
       const canonicalServiceId =
         proposeResolvedServiceId.trim() || row.serviceId?.trim() || ""
+      const currentEditDateTime = formatEditDateTime(row.startsAt)
+      const scheduleChanged =
+        date !== currentEditDateTime.date || time !== currentEditDateTime.time
+      const pickedStaffId = proposeStaffId.trim()
+      const currentStaffId = row.staffId?.trim() ?? ""
+      const staffChanged =
+        pickedStaffId.length > 0 &&
+        pickedStaffId !== MANUAL_BOOKING_ANY_STAFF &&
+        pickedStaffId !== currentStaffId
+      const shouldResolveStaff = scheduleChanged || staffChanged
       const slotMsg = () => setProposeValidationError(labels.slotNotAvailableForStaff)
-      if (!canonicalServiceId) {
+      if (shouldResolveStaff && !canonicalServiceId) {
         setProposeValidationError(labels.proposeStaffNeedsBookingService)
         return
       }
@@ -131,8 +155,10 @@ export function useAppointmentInlineActions(args: {
       void (async () => {
         try {
           const serviceForProposal =
-            manualServiceOptions.find((s) => publicBookingServiceIdsMatch(s.id, canonicalServiceId)) ??
-            null
+            shouldResolveStaff
+              ? manualServiceOptions.find((s) => publicBookingServiceIdsMatch(s.id, canonicalServiceId)) ??
+                null
+              : null
 
           let resolvedStaffId: string | undefined
           let resolvedStaffName: string | undefined
@@ -231,7 +257,7 @@ export function useAppointmentInlineActions(args: {
             return true
           }
 
-          if (!(await resolveStaff())) {
+          if (shouldResolveStaff && !(await resolveStaff())) {
             return
           }
 
@@ -250,7 +276,7 @@ export function useAppointmentInlineActions(args: {
               typeof resolvedStaffId === "string" && resolvedStaffId.trim().length > 0
                 ? resolvedStaffId.trim()
                 : null
-            if (staffScope) {
+            if (shouldResolveStaff && staffScope) {
               const dur = Math.max(1, Math.floor(Number(serviceForProposal?.durationMinutes ?? 0) || 60))
               const overlaps = await hasStaffSchedulingIntervalOverlap(
                 client,
@@ -266,6 +292,7 @@ export function useAppointmentInlineActions(args: {
                 return
               }
             } else if (
+              shouldResolveStaff &&
               await isAppointmentSlotTakenByOtherBooking(client, bid, date, time, {
                 excludeBookingId: uuidSb,
                 staffScope: null,
