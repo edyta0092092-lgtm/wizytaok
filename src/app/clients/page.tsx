@@ -170,6 +170,14 @@ function countCompletedClientVisits(c: Client): number {
   return c.visitHistory.filter((v) => v.status === "completed").length
 }
 
+function countClientRequiredActions(c: Client, at: Date = new Date()): number {
+  return c.visitHistory.filter((v) => {
+    if (v.status !== "booked" && v.status !== "pending" && v.status !== "confirmed") return false
+    const startsAtMs = new Date(v.startsAt).getTime()
+    return Number.isFinite(startsAtMs) && startsAtMs < at.getTime()
+  }).length
+}
+
 function dedupeClientsForRender(rows: Client[]): Client[] {
   const byId = new Map<string, Client>()
   for (const row of rows) {
@@ -590,6 +598,10 @@ export default function ClientsPage() {
     (sum, c) => sum + countCompletedClientVisits(c),
     0
   )
+  const requiredActionTotal = uniqueClients.reduce(
+    (sum, c) => sum + countClientRequiredActions(c),
+    0
+  )
   const cancelledTotal = uniqueClients.reduce(
     (sum, c) => sum + (c.cancelledVisitCount ?? 0),
     0
@@ -622,7 +634,7 @@ export default function ClientsPage() {
             {showSaved === "added" ? t("clients.addedBanner") : t("clients.updatedBanner")}
           </div>
         ) : null}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardContent className="px-4 py-3.5">
               <p className="text-xs font-medium text-muted-foreground">
@@ -648,6 +660,16 @@ export default function ClientsPage() {
               </p>
               <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
                 {completedTotal}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+            <CardContent className="px-4 py-3.5">
+              <p className="text-xs font-medium text-muted-foreground">
+                {t("clients.requiredActions")}
+              </p>
+              <p className="mt-1.5 text-xl font-semibold tabular-nums text-foreground">
+                {requiredActionTotal}
               </p>
             </CardContent>
           </Card>
@@ -734,7 +756,8 @@ export default function ClientsPage() {
                                 {countCompletedClientVisits(row)}
                               </span>{" "}
                               {t("clients.completedShort")} · {row.noShowCount} {t("clients.noShow")} ·{" "}
-                              {row.cancelledVisitCount} {t("clients.cancelledShort")}
+                              {row.cancelledVisitCount} {t("clients.cancelledShort")} ·{" "}
+                              {countClientRequiredActions(row)} {t("clients.requiredActionsShort")}
                             </div>
                           </TableCell>
                           <TableCell
@@ -844,6 +867,12 @@ export default function ClientsPage() {
                                   {row.cancelledVisitCount}
                                 </span>{" "}
                                 {t("clients.cancelledShort")}
+                              </span>
+                              <span className="tabular-nums">
+                                <span className="font-semibold text-amber-700 dark:text-amber-300">
+                                  {countClientRequiredActions(row)}
+                                </span>{" "}
+                                {t("clients.requiredActionsShort")}
                               </span>
                             </div>
                           </div>
