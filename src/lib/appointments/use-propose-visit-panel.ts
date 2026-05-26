@@ -38,6 +38,7 @@ export function useProposeVisitPanel(args: {
   const [proposeDate, setProposeDate] = React.useState("")
   const [proposeTime, setProposeTime] = React.useState("")
   const [proposeValidationError, setProposeValidationError] = React.useState("")
+  const [proposeCustomerNote, setProposeCustomerNote] = React.useState("")
   const [proposeStaffId, setProposeStaffId] = React.useState<string>(MANUAL_BOOKING_ANY_STAFF)
   const [proposeAvailableStaffIds, setProposeAvailableStaffIds] = React.useState<Set<string> | null>(null)
   const [proposeResolvedServiceId, setProposeResolvedServiceId] = React.useState("")
@@ -73,6 +74,7 @@ export function useProposeVisitPanel(args: {
       setProposeForId(row.id)
       setProposeDate(date)
       setProposeTime(time)
+      setProposeCustomerNote((row.customerNote ?? row.notes ?? "").trim())
       const svcFromRow = row.serviceId?.trim() ?? ""
       setProposeResolvedServiceId(svcFromRow)
       setProposeStaffListForService(null)
@@ -143,6 +145,7 @@ export function useProposeVisitPanel(args: {
     language,
     proposeDate,
     proposeTime,
+    proposeCustomerNote,
     proposeResolvedServiceId,
     proposeStaffId,
     proposeStaffListForService,
@@ -156,6 +159,7 @@ export function useProposeVisitPanel(args: {
     setProposeForId,
     setProposeDate,
     setProposeTime,
+    setProposeCustomerNote,
     setProposeResolvedServiceId,
     setProposeStaffListForService,
     setIsCancellingVisit,
@@ -169,6 +173,8 @@ export function useProposeVisitPanel(args: {
     setProposeDate,
     proposeTime,
     setProposeTime,
+    proposeCustomerNote,
+    setProposeCustomerNote,
     proposeValidationError,
     setProposeValidationError,
     proposeStaffId,

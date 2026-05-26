@@ -50,6 +50,7 @@ export function useAppointmentInlineActions(args: {
   language: "en" | "pl"
   proposeDate: string
   proposeTime: string
+  proposeCustomerNote: string
   proposeResolvedServiceId: string
   proposeStaffId: string
   proposeStaffListForService: StaffMember[] | null
@@ -63,6 +64,7 @@ export function useAppointmentInlineActions(args: {
   setProposeForId: React.Dispatch<React.SetStateAction<string | null>>
   setProposeDate: React.Dispatch<React.SetStateAction<string>>
   setProposeTime: React.Dispatch<React.SetStateAction<string>>
+  setProposeCustomerNote: React.Dispatch<React.SetStateAction<string>>
   setProposeResolvedServiceId: React.Dispatch<React.SetStateAction<string>>
   setProposeStaffListForService: React.Dispatch<React.SetStateAction<StaffMember[] | null>>
   setIsCancellingVisit: React.Dispatch<React.SetStateAction<boolean>>
@@ -73,6 +75,7 @@ export function useAppointmentInlineActions(args: {
     language,
     proposeDate,
     proposeTime,
+    proposeCustomerNote,
     proposeResolvedServiceId,
     proposeStaffId,
     proposeStaffListForService,
@@ -86,6 +89,7 @@ export function useAppointmentInlineActions(args: {
     setProposeForId,
     setProposeDate,
     setProposeTime,
+    setProposeCustomerNote,
     setProposeResolvedServiceId,
     setProposeStaffListForService,
     setIsCancellingVisit,
@@ -100,6 +104,7 @@ export function useAppointmentInlineActions(args: {
       }
       const date = proposeDate.trim()
       const time = proposeTime.trim()
+      const customerNote = proposeCustomerNote.trim()
       const canonicalServiceId =
         proposeResolvedServiceId.trim() || row.serviceId?.trim() || ""
       const slotMsg = () => setProposeValidationError(labels.slotNotAvailableForStaff)
@@ -272,6 +277,7 @@ export function useAppointmentInlineActions(args: {
             const r = await applyPublicBookingPatchToSupabase(client, bid, uuidSb, {
               date: date.trim(),
               time: time.trim(),
+              customerNote,
               staffId: resolvedStaffId,
               staffName: resolvedStaffName,
               lastUpdatedBy: "business",
@@ -285,6 +291,7 @@ export function useAppointmentInlineActions(args: {
             setProposeForId(null)
             setProposeDate("")
             setProposeTime("")
+            setProposeCustomerNote("")
             setProposeResolvedServiceId("")
             setProposeStaffListForService(null)
             setActionNotice(labels.changesSaved)
@@ -297,6 +304,7 @@ export function useAppointmentInlineActions(args: {
             saved = updatePublicBooking(rawPb, {
               date: date.trim(),
               time: time.trim(),
+              customerNote,
               staffId: resolvedStaffId,
               staffName: resolvedStaffName,
               lastUpdatedBy: "business",
@@ -307,6 +315,7 @@ export function useAppointmentInlineActions(args: {
             saved = updateManualAppointment(rawMa, {
               date: date.trim(),
               time: time.trim(),
+              customerNote,
               staffId: resolvedStaffId,
               staffName: resolvedStaffName,
               lastUpdatedBy: "business",
@@ -321,6 +330,7 @@ export function useAppointmentInlineActions(args: {
           setProposeForId(null)
           setProposeDate("")
           setProposeTime("")
+          setProposeCustomerNote("")
           setProposeResolvedServiceId("")
           setProposeStaffListForService(null)
           setActionNotice(labels.changesSaved)
@@ -333,6 +343,7 @@ export function useAppointmentInlineActions(args: {
       labels,
       proposeDate,
       proposeTime,
+      proposeCustomerNote,
       proposeResolvedServiceId,
       proposeStaffId,
       proposeStaffListForService,
@@ -346,6 +357,7 @@ export function useAppointmentInlineActions(args: {
       setProposeForId,
       setProposeDate,
       setProposeTime,
+      setProposeCustomerNote,
       setProposeResolvedServiceId,
       setProposeStaffListForService,
     ],

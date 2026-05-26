@@ -30,8 +30,10 @@ export type AppointmentsListWithRowsBundlesParams = {
   proposeForId: string | null
   proposeDate: string
   proposeTime: string
+  proposeCustomerNote: string
   setProposeDate: (v: string) => void
   setProposeTime: (v: string) => void
+  setProposeCustomerNote: (v: string) => void
   proposeValidationError: string
   setProposeValidationError: (v: string) => void
   proposeStaffId: string
@@ -72,8 +74,10 @@ export function useAppointmentsListWithRowsBundles({
   proposeForId,
   proposeDate,
   proposeTime,
+  proposeCustomerNote,
   setProposeDate,
   setProposeTime,
+  setProposeCustomerNote,
   proposeValidationError,
   setProposeValidationError,
   proposeStaffId,
@@ -130,6 +134,11 @@ export function useAppointmentsListWithRowsBundles({
           setProposeTime(value)
           setProposeValidationError("")
         },
+        proposeCustomerNote,
+        onProposeCustomerNoteChange: (value: string) => {
+          setProposeCustomerNote(value)
+          setProposeValidationError("")
+        },
         proposeValidationError,
         proposeStaffId,
         onProposeStaffIdChange: (id: string) => {
@@ -142,6 +151,7 @@ export function useAppointmentsListWithRowsBundles({
         onCloseEditPanel: () => {
           setProposeForId(null)
           setProposeValidationError("")
+          setProposeCustomerNote("")
           setProposeResolvedServiceId("")
           setProposeStaffListForService(null)
           setConfirmCancelVisitForId(null)
@@ -186,8 +196,10 @@ export function useAppointmentsListWithRowsBundles({
       proposeForId,
       proposeDate,
       proposeTime,
+      proposeCustomerNote,
       setProposeDate,
       setProposeTime,
+      setProposeCustomerNote,
       setProposeValidationError,
       proposeValidationError,
       proposeStaffId,

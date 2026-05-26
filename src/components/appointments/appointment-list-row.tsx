@@ -10,6 +10,13 @@ import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  allocateAppointmentAttachmentId,
+  readFileAsDataUrl,
+  useAppointmentAttachments,
+  type AppointmentAttachment,
+} from "@/lib/appointments/appointment-attachments"
 import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
@@ -43,8 +50,10 @@ export type AppointmentListRowProps = {
   editOpen: boolean
   proposeDate: string
   proposeTime: string
+  proposeCustomerNote: string
   onProposeDateChange: (iso: string) => void
   onProposeTimeChange: (value: string) => void
+  onProposeCustomerNoteChange: (value: string) => void
   proposeValidationError: string
   proposeStaffId: string
   onProposeStaffIdChange: (id: string) => void
@@ -87,8 +96,10 @@ export function AppointmentListRow({
   editOpen,
   proposeDate,
   proposeTime,
+  proposeCustomerNote,
   onProposeDateChange,
   onProposeTimeChange,
+  onProposeCustomerNoteChange,
   proposeValidationError,
   proposeStaffId,
   onProposeStaffIdChange,
@@ -106,7 +117,52 @@ export function AppointmentListRow({
   isCancellingVisit,
 }: AppointmentListRowProps) {
   const { t } = useTranslations()
+  const [attachments, setAttachments] = useAppointmentAttachments(row.id)
+  const [attachmentError, setAttachmentError] = React.useState("")
   const customerNote = (row.customerNote?.trim() || row.notes?.trim() || "").trim()
+  const acceptedAttachmentTypes = "image/jpeg,image/jpg,image/png,application/pdf"
+
+  const formatAttachmentSize = (bytes: number): string => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`
+    return `${bytes} B`
+  }
+
+  const isAllowedAttachment = (file: File): boolean =>
+    file.type === "application/pdf" ||
+    file.type === "image/jpeg" ||
+    file.type === "image/jpg" ||
+    file.type === "image/png"
+
+  const handleAttachmentUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setAttachmentError("")
+    const next: AppointmentAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (!isAllowedAttachment(file)) {
+        setAttachmentError(t("appointments.attachmentInvalidType"))
+        return
+      }
+      if (file.size > 4 * 1024 * 1024) {
+        setAttachmentError(t("appointments.attachmentTooLarge"))
+        return
+      }
+      try {
+        next.push({
+          id: allocateAppointmentAttachmentId(),
+          name: file.name,
+          mimeType: file.type,
+          size: file.size,
+          dataUrl: await readFileAsDataUrl(file),
+          createdAt: new Date().toISOString(),
+        })
+      } catch {
+        setAttachmentError(t("appointments.attachmentReadFailed"))
+        return
+      }
+    }
+    setAttachments((prev) => [...prev, ...next])
+  }
 
   return (
     <React.Fragment>
@@ -375,6 +431,71 @@ export function AppointmentListRow({
                 </div>
               )
             })()}
+          </div>
+          <div className="mt-3 grid gap-1">
+            <Label htmlFor={`p-note-${row.id}`}>{t("appointments.customerNoteLabel")}</Label>
+            <Textarea
+              id={`p-note-${row.id}`}
+              value={proposeCustomerNote}
+              onChange={(e) => onProposeCustomerNoteChange(e.target.value)}
+              placeholder={t("appointments.customerNotePlaceholder")}
+              className="min-h-24 rounded-xl"
+            />
+          </div>
+          <div className="mt-3 rounded-xl border border-border/80 bg-card/70 px-3 py-3">
+            <Label htmlFor={`p-attachments-${row.id}`}>{t("appointments.attachmentsLabel")}</Label>
+            <Input
+              id={`p-attachments-${row.id}`}
+              type="file"
+              accept={acceptedAttachmentTypes}
+              multiple
+              className="mt-2 h-auto cursor-pointer py-2"
+              onChange={(event) => {
+                void handleAttachmentUpload(event.target.files)
+                event.currentTarget.value = ""
+              }}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">{t("appointments.attachmentHelp")}</p>
+            {attachmentError ? (
+              <p className="mt-2 text-xs text-destructive" role="alert">
+                {attachmentError}
+              </p>
+            ) : null}
+            {attachments.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {attachments.map((attachment) => (
+                  <li
+                    key={attachment.id}
+                    className="flex flex-col gap-2 rounded-xl border border-border/70 bg-background px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-foreground">{attachment.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatAttachmentSize(attachment.size)}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button asChild type="button" variant="outline" size="sm" className="h-8 rounded-lg">
+                        <a href={attachment.dataUrl} download={attachment.name}>
+                          {t("appointments.attachmentDownload")}
+                        </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() =>
+                          setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
+                        }
+                      >
+                        {t("common.delete")}
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
           {proposeValidationError ? (
             <p className="mt-2 text-sm text-amber-800 dark:text-amber-200" role="alert">

@@ -35,8 +35,10 @@ export type UseAppointmentsPageListControllerParams = {
   | "proposeForId"
   | "proposeDate"
   | "proposeTime"
+  | "proposeCustomerNote"
   | "setProposeDate"
   | "setProposeTime"
+  | "setProposeCustomerNote"
   | "proposeValidationError"
   | "setProposeValidationError"
   | "proposeStaffId"
@@ -77,8 +79,10 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     proposeForId,
     proposeDate,
     proposeTime,
+    proposeCustomerNote,
     setProposeDate,
     setProposeTime,
+    setProposeCustomerNote,
     proposeValidationError,
     setProposeValidationError,
     proposeStaffId,
@@ -130,8 +134,10 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     proposeForId,
     proposeDate,
     proposeTime,
+    proposeCustomerNote,
     setProposeDate,
     setProposeTime,
+    setProposeCustomerNote,
     proposeValidationError,
     setProposeValidationError,
     proposeStaffId,

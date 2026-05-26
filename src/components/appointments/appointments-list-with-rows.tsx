@@ -53,8 +53,10 @@ export type AppointmentsListProposePanelBundle = {
   proposeForId: string | null
   proposeDate: string
   proposeTime: string
+  proposeCustomerNote: string
   onProposeDateChange: (iso: string) => void
   onProposeTimeChange: (value: string) => void
+  onProposeCustomerNoteChange: (value: string) => void
   proposeValidationError: string
   proposeStaffId: string
   onProposeStaffIdChange: (id: string) => void
@@ -180,8 +182,10 @@ export function AppointmentsListWithRows({
     proposeForId,
     proposeDate,
     proposeTime,
+    proposeCustomerNote,
     onProposeDateChange,
     onProposeTimeChange,
+    onProposeCustomerNoteChange,
     proposeValidationError,
     proposeStaffId,
     onProposeStaffIdChange,
@@ -248,8 +252,10 @@ export function AppointmentsListWithRows({
             editOpen={proposeForId === row.id}
             proposeDate={proposeDate}
             proposeTime={proposeTime}
+            proposeCustomerNote={proposeCustomerNote}
             onProposeDateChange={onProposeDateChange}
             onProposeTimeChange={onProposeTimeChange}
+            onProposeCustomerNoteChange={onProposeCustomerNoteChange}
             proposeValidationError={proposeValidationError}
             proposeStaffId={proposeStaffId}
             onProposeStaffIdChange={onProposeStaffIdChange}
