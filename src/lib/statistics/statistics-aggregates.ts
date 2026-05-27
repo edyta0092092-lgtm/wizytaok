@@ -66,10 +66,6 @@ function isSameDay(a: Date | null, b: Date): boolean {
   return dayKey(a) === dayKey(b)
 }
 
-function isOnlineSource(source: Appointment["source"]): boolean {
-  return source === "online" || !source
-}
-
 function appointmentClientKey(appointment: Appointment): string {
   const preferred =
     appointment.clientId ??
@@ -115,7 +111,26 @@ function buildRangeBuckets(
     return buckets
   }
 
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90
+  if (range === "90d") {
+    const start = startOfDay(addDays(end, -90))
+    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
+    let cursor = start
+    while (cursor < end) {
+      const bucketEnd = addDays(cursor, 7)
+      const cappedEnd = bucketEnd.getTime() > end.getTime() ? end : bucketEnd
+      const lastDay = addDays(cappedEnd, -1)
+      buckets.push({
+        key: `${dayKey(cursor)}-week`,
+        label: `${dayFormatter.format(cursor)}–${dayFormatter.format(lastDay)}`,
+        start: cursor,
+        end: cappedEnd,
+      })
+      cursor = cappedEnd
+    }
+    return buckets
+  }
+
+  const days = range === "7d" ? 7 : 30
   const start = addDays(end, -days)
   return Array.from({ length: days }, (_, index) => {
     const bucketStart = addDays(start, index)
@@ -361,11 +376,12 @@ export function buildStatisticsDataset({
   const newClients = [...firstVisitByClient.values()].filter((date) =>
     inRange(date, monthStart, monthEnd)
   ).length
-  const onlineBookings = appointmentsInMonth.filter((appointment) =>
-    isOnlineSource(appointment.source)
-  ).length
-  const manualBookings = appointmentsInMonth.length - onlineBookings
-  const elapsedDays = Math.max(1, today.getDate())
+  const daysWithVisits = new Set(
+    appointmentsInMonth
+      .map((appointment) => parseDate(appointment.startsAt))
+      .filter((date): date is Date => date !== null)
+      .map((date) => dayKey(date))
+  ).size
 
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
@@ -408,10 +424,7 @@ export function buildStatisticsDataset({
       cancelled: statusCounts.cancelled,
       noShow: statusCounts.no_show,
       newClients,
-      onlineBookings,
-      manualBookings,
-      onlinePercent: percent(onlineBookings, appointmentsInMonth.length),
-      averageDailyVisits: Number((appointmentsInMonth.length / elapsedDays).toFixed(1)),
+      daysWithVisits,
     },
     chart,
     topServices: buildTopServices(appointmentsInRange, services),

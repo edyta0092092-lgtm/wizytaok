@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ScheduleVisitCardDetails } from "@/components/schedule/schedule-visit-card-details"
 import { scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ export type DayScheduleAppointmentCardProps = {
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
+  staffFallbackLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
   onCancelVisit: (id: string) => void
 }
@@ -42,12 +44,13 @@ export function DayScheduleAppointmentCard({
   statusLabel,
   changeStatusLabel,
   cancelLabel,
+  staffFallbackLabel,
   onChangeStatus,
   onCancelVisit,
 }: DayScheduleAppointmentCardProps) {
   const theme = scheduleCardTheme(entry)
   const isCancelled = entry.status === "cancelled"
-  const showService = heightPx >= 48 && Boolean(entry.service_name?.trim())
+  const compactDetails = heightPx < 56
   const laneWidthPct = 100 / laneCount
   const laneLeftPct = laneIndex * laneWidthPct
 
@@ -68,22 +71,12 @@ export function DayScheduleAppointmentCard({
         zIndex: 20 + laneIndex,
       }}
     >
-      <div
-        className={cn(
-          "flex h-full min-w-0 items-center gap-2 px-2.5",
-          showService ? "py-2" : "py-1.5",
-        )}
-      >
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-          <p className="truncate text-sm font-semibold leading-5 text-foreground" title={entry.client_name}>
-            {entry.client_name}
-          </p>
-          {showService ? (
-            <p className="mt-0.5 truncate text-xs leading-4 text-muted-foreground" title={entry.service_name}>
-              {entry.service_name}
-            </p>
-          ) : null}
-        </div>
+      <div className="flex h-full min-w-0 items-start gap-1.5 px-2 py-1.5">
+        <ScheduleVisitCardDetails
+          entry={entry}
+          staffFallback={staffFallbackLabel}
+          compact={compactDetails}
+        />
 
         <div className="flex shrink-0 items-center gap-1">
           {isCancelled ? (

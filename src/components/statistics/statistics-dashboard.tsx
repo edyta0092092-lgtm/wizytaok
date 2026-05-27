@@ -7,7 +7,6 @@ import { StatisticsHeatmap } from "@/components/statistics/statistics-heatmap"
 import { StatisticsKpiGrid } from "@/components/statistics/statistics-kpi-grid"
 import { StatisticsLineChart } from "@/components/statistics/statistics-line-chart"
 import { StatisticsNotificationsCard } from "@/components/statistics/statistics-notifications-card"
-import { StatisticsOnlineCard } from "@/components/statistics/statistics-online-card"
 import { StatisticsProgressList } from "@/components/statistics/statistics-progress-list"
 import { StatisticsSkeleton } from "@/components/statistics/statistics-skeleton"
 import { StatisticsStatusChart } from "@/components/statistics/statistics-status-chart"
@@ -20,7 +19,7 @@ const COPY = {
   pl: {
     heroTitle: "Statystyki WizytaOK",
     heroDescription:
-      "Lekki dashboard do szybkiej oceny wizyt, klientów, rezerwacji online, zespołu i powiadomień.",
+      "Lekki dashboard do szybkiej oceny wizyt, klientów, zespołu i powiadomień.",
     heroBadge: "MVP analityki",
     rangeLabel: "Zakres",
     loadError: "Nie udało się pobrać części danych. Pokazuję dostępne statystyki.",
@@ -28,17 +27,16 @@ const COPY = {
     kpis: {
       visitsToday: "Wizyty dzisiaj",
       visitsThisMonth: "Wizyty w tym miesiącu",
-      completed: "completed",
-      cancelled: "cancelled",
-      noShow: "no_show",
+      completed: "Zrealizowane",
+      cancelled: "Anulowane",
+      noShow: "Nieobecność klienta",
       newClients: "Nowi klienci",
-      onlineVsManual: "Online / manual",
-      averageDailyVisits: "Śr. wizyt dziennie",
-      onlineShare: "{percent} online w tym miesiącu",
+      daysWithVisits: "Dni z wizytami",
     },
     chart: {
       title: "Trend wizyt",
-      subtitle: "Created bookings, completed, cancelled i no_show w wybranym zakresie.",
+      subtitle:
+        "Utworzone rezerwacje oraz wizyty zrealizowane, anulowane i z nieobecnością klienta w wybranym zakresie.",
       ranges: {
         "7d": "7 dni",
         "30d": "30 dni",
@@ -46,12 +44,22 @@ const COPY = {
         "12m": "12 mies.",
       },
       series: {
-        created: "created bookings",
-        completed: "completed",
-        cancelled: "cancelled",
-        noShow: "no_show",
+        created: "Utworzone rezerwacje",
+        completed: "Zrealizowane",
+        cancelled: "Anulowane",
+        noShow: "Nieobecność klienta",
       },
       empty: "Brak wizyt w tym zakresie.",
+      axes: {
+        x: "Data",
+        y: "Liczba wizyt",
+      },
+      periodHint: {
+        "7d": "Każdy słupek to jeden dzień (ostatnie 7 dni).",
+        "30d": "Każdy słupek to jeden dzień (ostatnie 30 dni).",
+        "90d": "Każdy słupek to jeden tydzień (ostatnie 90 dni).",
+        "12m": "Każdy słupek to jeden miesiąc (ostatnie 12 miesięcy).",
+      },
     },
     services: {
       title: "Top usługi",
@@ -60,41 +68,24 @@ const COPY = {
     },
     staff: {
       title: "Top pracownicy",
-      subtitle: "Liczba wizyt, completed i udział w obłożeniu.",
+      subtitle: "Liczba wizyt, zrealizowanych wizyt i udział w obłożeniu.",
       empty: "Brak przypisanych wizyt w wybranym zakresie.",
-      completed: "completed",
-    },
-    statuses: {
-      title: "Statusy wizyt",
-      subtitle: "Podział statusów w bieżącym miesiącu.",
-      labels: {
-        confirmed: "confirmed",
-        completed: "completed",
-        cancelled: "cancelled",
-        no_show: "no_show",
-      },
-    },
-    online: {
-      title: "Rezerwacje online",
-      subtitle: "Porównanie rezerwacji z formularza online i wizyt dodanych ręcznie.",
-      labels: {
-        online: "Online bookings",
-        manual: "Manual bookings",
-        percentOnline: "procent online",
-      },
+      completed: "zrealizowane",
     },
     notifications: {
       title: "Powiadomienia",
-      subtitle: "Dane z notification_logs, appointment_reminders i lokalnych wysyłek.",
+      subtitle: "Wysłane SMS, e-maile i przypomnienia w wybranym zakresie.",
       labels: {
         sms: "Wysłane SMS",
         email: "Wysłane e-maile",
-        failed: "Failed notifications",
-        successRate: "Reminder success rate",
+        failed: "Błędy wysyłki",
+        failedHint: "Ile prób wysyłki zakończyło się błędem (SMS/e-mail).",
+        successRate: "Skuteczność dostarczenia",
+        successRateHint: "Odsetek udanych wysyłek wśród wszystkich prób.",
       },
     },
     heatmap: {
-      title: "Heatmap / obłożenie",
+      title: "Obłożenie",
       subtitle: "Najbardziej zajęte dni i godziny w wybranym zakresie.",
       busyDays: "Najbardziej zajęte dni",
       busyHours: "Najbardziej zajęte godziny",
@@ -111,13 +102,11 @@ const COPY = {
     kpis: {
       visitsToday: "Visits today",
       visitsThisMonth: "Visits this month",
-      completed: "completed",
-      cancelled: "cancelled",
-      noShow: "no_show",
+      completed: "Completed",
+      cancelled: "Cancelled",
+      noShow: "Client did not attend",
       newClients: "New clients",
-      onlineVsManual: "Online / manual",
-      averageDailyVisits: "Avg. visits daily",
-      onlineShare: "{percent} online this month",
+      daysWithVisits: "Days with visits",
     },
     chart: {
       title: "Visit trend",
@@ -129,12 +118,22 @@ const COPY = {
         "12m": "12 mo.",
       },
       series: {
-        created: "created bookings",
-        completed: "completed",
-        cancelled: "cancelled",
-        noShow: "no_show",
+        created: "Created bookings",
+        completed: "Completed",
+        cancelled: "Cancelled",
+        noShow: "Client did not attend",
       },
       empty: "No visits in this range.",
+      axes: {
+        x: "Date",
+        y: "Visit count",
+      },
+      periodHint: {
+        "7d": "Each bar is one day (last 7 days).",
+        "30d": "Each bar is one day (last 30 days).",
+        "90d": "Each bar is one week (last 90 days).",
+        "12m": "Each bar is one month (last 12 months).",
+      },
     },
     services: {
       title: "Top services",
@@ -147,33 +146,16 @@ const COPY = {
       empty: "No assigned visits in the selected range.",
       completed: "completed",
     },
-    statuses: {
-      title: "Visit statuses",
-      subtitle: "Status breakdown for the current month.",
-      labels: {
-        confirmed: "confirmed",
-        completed: "completed",
-        cancelled: "cancelled",
-        no_show: "no_show",
-      },
-    },
-    online: {
-      title: "Online bookings",
-      subtitle: "Comparison of online form bookings and manually added visits.",
-      labels: {
-        online: "Online bookings",
-        manual: "Manual bookings",
-        percentOnline: "online percentage",
-      },
-    },
     notifications: {
       title: "Notifications",
       subtitle: "Data from notification_logs, appointment_reminders, and local sends.",
       labels: {
         sms: "Sent SMS",
         email: "Sent emails",
-        failed: "Failed notifications",
-        successRate: "Reminder success rate",
+        failed: "Send failures",
+        failedHint: "How many send attempts ended with an error (SMS/email).",
+        successRate: "Delivery success rate",
+        successRateHint: "Share of successful sends among all attempts.",
       },
     },
     heatmap: {
@@ -186,9 +168,9 @@ const COPY = {
 } as const
 
 export function StatisticsDashboard() {
-  const { language } = useTranslations()
+  const { language, t } = useTranslations()
   const [range, setRange] = React.useState<StatisticsRange>("30d")
-  const copy = COPY[language]
+  const copy = COPY[language] ?? COPY.pl
   const { ready, loadError, dataset } = useStatisticsData({
     range,
     locale: language,
@@ -259,20 +241,13 @@ export function StatisticsDashboard() {
               completedLabel={copy.staff.completed}
             />
           </div>
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <StatisticsStatusChart
-              title={copy.statuses.title}
-              subtitle={copy.statuses.subtitle}
-              items={dataset.statuses}
-              labels={copy.statuses.labels}
-            />
-            <StatisticsOnlineCard
-              title={copy.online.title}
-              subtitle={copy.online.subtitle}
-              kpis={dataset.kpis}
-              labels={copy.online.labels}
-            />
-          </div>
+          <StatisticsStatusChart
+            title={t("statistics.statusTitle")}
+            subtitle={t("statistics.statusSubtitle")}
+            items={dataset.statuses}
+            empty={t("statistics.statusEmpty")}
+            axisY={t("statistics.statusAxisY")}
+          />
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <StatisticsNotificationsCard
               title={copy.notifications.title}

@@ -16,7 +16,9 @@ export function StatisticsNotificationsCard({
     sms: string
     email: string
     failed: string
+    failedHint: string
     successRate: string
+    successRateHint: string
   }
 }) {
   const items = [
@@ -33,11 +35,13 @@ export function StatisticsNotificationsCard({
     {
       label: labels.failed,
       value: stats.failed,
+      hint: labels.failedHint,
       icon: TriangleAlert,
     },
     {
       label: labels.successRate,
       value: `${stats.reminderSuccessRate}%`,
+      hint: labels.successRateHint,
       icon: Zap,
     },
   ]
@@ -65,6 +69,9 @@ export function StatisticsNotificationsCard({
               <p className="mt-3 text-2xl font-semibold tabular-nums text-foreground">
                 {item.value}
               </p>
+              {"hint" in item && item.hint ? (
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{item.hint}</p>
+              ) : null}
             </div>
           )
         })}

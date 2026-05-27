@@ -2436,6 +2436,20 @@ Pozdrawiamy,
       statusProgress: "W toku",
       statusDone: "Gotowe",
     },
+    statistics: {
+      statusTitle: "Statusy wizyt",
+      statusSubtitle:
+        "Ile wizyt w bieżącym miesiącu ma dany status końcowy lub aktywny.",
+      statusEmpty: "Brak wizyt z rozpoznawalnym statusem w tym miesiącu.",
+      statusAxisY: "Liczba wizyt",
+      statusHint: {
+        confirmed:
+          "Potwierdzone — aktywna wizyta (termin jeszcze przed Tobą lub klient potwierdził).",
+        completed: "Zrealizowane — wizyta się odbyła.",
+        cancelled: "Anulowane — wizyta została odwołana, termin nie blokuje kalendarza.",
+        noShow: "Nieobecność klienta — klient nie przyszedł na umówioną wizytę.",
+      },
+    },
     footer: {
       terms: "Regulamin",
       privacy: "Polityka prywatności",
@@ -4825,6 +4839,18 @@ Regards,
       statusTodo: "Not started",
       statusProgress: "In progress",
       statusDone: "Done",
+    },
+    statistics: {
+      statusTitle: "Visit statuses",
+      statusSubtitle: "How many visits in the current month have each status.",
+      statusEmpty: "No visits with a recognized status this month.",
+      statusAxisY: "Visit count",
+      statusHint: {
+        confirmed: "Confirmed — active visit (upcoming or client confirmed).",
+        completed: "Completed — the visit took place.",
+        cancelled: "Cancelled — visit was called off; the slot is free again.",
+        noShow: "Client did not attend — the client did not show up.",
+      },
     },
     footer: {
       terms: "Terms",

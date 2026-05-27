@@ -1,3 +1,16 @@
+"use client"
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   StatisticsChartPoint,
@@ -9,43 +22,33 @@ type SeriesKey = "created" | "completed" | "cancelled" | "noShow"
 
 const SERIES: Array<{
   key: SeriesKey
-  className: string
-  labelClassName: string
+  dataKey: SeriesKey
+  fill: string
 }> = [
-  {
-    key: "created",
-    className: "stroke-primary",
-    labelClassName: "bg-primary",
-  },
-  {
-    key: "completed",
-    className: "stroke-emerald-500",
-    labelClassName: "bg-emerald-500",
-  },
-  {
-    key: "cancelled",
-    className: "stroke-amber-500",
-    labelClassName: "bg-amber-500",
-  },
-  {
-    key: "noShow",
-    className: "stroke-rose-500",
-    labelClassName: "bg-rose-500",
-  },
+  { key: "created", dataKey: "created", fill: "#0f766e" },
+  { key: "completed", dataKey: "completed", fill: "#10b981" },
+  { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
+  { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
 ]
 
-function polylinePoints(points: StatisticsChartPoint[], key: SeriesKey, max: number): string {
-  if (points.length === 0) return ""
-  const width = 100
-  const height = 100
-  const denominator = Math.max(1, points.length - 1)
-  return points
-    .map((point, index) => {
-      const x = (index / denominator) * width
-      const y = height - (point[key] / Math.max(1, max)) * 82 - 9
-      return `${x.toFixed(2)},${y.toFixed(2)}`
-    })
-    .join(" ")
+function xAxisTickInterval(pointCount: number): number {
+  if (pointCount <= 8) return 0
+  if (pointCount <= 16) return 1
+  if (pointCount <= 31) return 4
+  return 2
+}
+
+type ChartCopy = {
+  title: string
+  subtitle: string
+  ranges: Record<StatisticsRange, string>
+  series: Record<SeriesKey, string>
+  empty: string
+  axes: {
+    x: string
+    y: string
+  }
+  periodHint: Record<StatisticsRange, string>
 }
 
 export function StatisticsLineChart({
@@ -57,26 +60,16 @@ export function StatisticsLineChart({
   points: StatisticsChartPoint[]
   range: StatisticsRange
   onRangeChange: (range: StatisticsRange) => void
-  copy: {
-    title: string
-    subtitle: string
-    ranges: Record<StatisticsRange, string>
-    series: Record<SeriesKey, string>
-    empty: string
-  }
+  copy: ChartCopy
 }) {
-  const max = Math.max(
-    1,
-    ...points.flatMap((point) => [
-      point.created,
-      point.completed,
-      point.cancelled,
-      point.noShow,
-    ])
-  )
-  const labels = points.length > 10
-    ? points.filter((_, index) => index === 0 || index === points.length - 1)
-    : points
+  const chartData = points.map((point) => ({
+    label: point.label,
+    created: point.created,
+    completed: point.completed,
+    cancelled: point.cancelled,
+    noShow: point.noShow,
+  }))
+  const tickInterval = xAxisTickInterval(chartData.length)
 
   return (
     <Card className="rounded-3xl border-border/80 bg-card/95 shadow-sm shadow-slate-900/5">
@@ -84,6 +77,7 @@ export function StatisticsLineChart({
         <div>
           <CardTitle className="text-base">{copy.title}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{copy.periodHint[range]}</p>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {(Object.keys(copy.ranges) as StatisticsRange[]).map((item) => (
@@ -104,61 +98,101 @@ export function StatisticsLineChart({
         </div>
       </CardHeader>
       <CardContent className="px-5 pb-5">
-        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-          {SERIES.map((series) => (
-            <span key={series.key} className="inline-flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-full", series.labelClassName)} />
-              {copy.series[series.key]}
-            </span>
-          ))}
-        </div>
-        <div className="mt-5 rounded-2xl border border-border/70 bg-muted/15 px-3 py-4">
-          {points.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-              {copy.empty}
+        {points.length === 0 ? (
+          <div className="flex h-72 items-center justify-center rounded-2xl border border-border/70 bg-muted/15 text-sm text-muted-foreground">
+            {copy.empty}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border/70 bg-muted/15 px-2 py-4 sm:px-4">
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 8, right: 8, left: 0, bottom: 48 }}
+                  barCategoryGap="18%"
+                  barGap={2}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
+                  <XAxis
+                    dataKey="label"
+                    interval={tickInterval}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    angle={chartData.length > 10 ? -40 : 0}
+                    textAnchor={chartData.length > 10 ? "end" : "middle"}
+                    height={chartData.length > 10 ? 56 : 32}
+                    label={{
+                      value: copy.axes.x,
+                      position: "insideBottom",
+                      offset: chartData.length > 10 ? -8 : -4,
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 12,
+                    }}
+                  />
+                  <YAxis
+                    allowDecimals={false}
+                    width={36}
+                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    label={{
+                      value: copy.axes.y,
+                      angle: -90,
+                      position: "insideLeft",
+                      offset: 12,
+                      fill: "hsl(var(--muted-foreground))",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Tooltip
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null
+                      return (
+                        <div className="rounded-xl border border-border/80 bg-card px-3 py-2.5 text-xs shadow-lg">
+                          <p className="mb-2 font-medium text-foreground">{label}</p>
+                          <ul className="space-y-1">
+                            {payload.map((entry) => (
+                              <li
+                                key={entry.name}
+                                className="flex items-center justify-between gap-4"
+                              >
+                                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+                                  <span
+                                    className="size-2 rounded-sm"
+                                    style={{ backgroundColor: entry.color }}
+                                    aria-hidden
+                                  />
+                                  {entry.name}
+                                </span>
+                                <span className="font-semibold tabular-nums text-foreground">
+                                  {typeof entry.value === "number" ? entry.value : 0}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )
+                    }}
+                    cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+                  />
+                  <Legend
+                    wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
+                    formatter={(value) => (
+                      <span className="text-muted-foreground">{value}</span>
+                    )}
+                  />
+                  {SERIES.map((series) => (
+                    <Bar
+                      key={series.key}
+                      dataKey={series.dataKey}
+                      name={copy.series[series.key]}
+                      fill={series.fill}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={28}
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-          ) : (
-            <>
-              <svg
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                className="h-64 w-full overflow-visible"
-                role="img"
-                aria-label={copy.title}
-              >
-                {[20, 40, 60, 80].map((line) => (
-                  <line
-                    key={line}
-                    x1="0"
-                    x2="100"
-                    y1={line}
-                    y2={line}
-                    className="stroke-border/70"
-                    strokeWidth="0.35"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ))}
-                {SERIES.map((series) => (
-                  <polyline
-                    key={series.key}
-                    fill="none"
-                    points={polylinePoints(points, series.key, max)}
-                    className={cn(series.className, "drop-shadow-sm")}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                ))}
-              </svg>
-              <div className="mt-3 flex justify-between gap-3 text-[0.68rem] text-muted-foreground">
-                {labels.map((point) => (
-                  <span key={point.key}>{point.label}</span>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

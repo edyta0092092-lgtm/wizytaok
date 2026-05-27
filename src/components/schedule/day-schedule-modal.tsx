@@ -27,6 +27,7 @@ type DayScheduleModalProps = {
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
+  staffFallbackLabel: string
   emptyLabel: string
   actionNotice?: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
@@ -75,6 +76,7 @@ export function DayScheduleModal({
   statusLabel,
   changeStatusLabel,
   cancelLabel,
+  staffFallbackLabel,
   emptyLabel,
   actionNotice,
   onChangeStatus,
@@ -142,6 +144,7 @@ export function DayScheduleModal({
                 statusLabel={statusLabel}
                 changeStatusLabel={changeStatusLabel}
                 cancelLabel={cancelLabel}
+                staffFallbackLabel={staffFallbackLabel}
                 onChangeStatus={onChangeStatus}
                 onCancelVisit={onCancelVisit}
               />
@@ -154,6 +157,7 @@ export function DayScheduleModal({
                 statusLabel={statusLabel}
                 changeStatusLabel={changeStatusLabel}
                 cancelLabel={cancelLabel}
+                staffFallbackLabel={staffFallbackLabel}
                 onChangeStatus={onChangeStatus}
                 onCancelVisit={onCancelVisit}
               />

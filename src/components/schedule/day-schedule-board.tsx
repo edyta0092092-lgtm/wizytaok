@@ -26,6 +26,7 @@ type DayScheduleBoardProps = {
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
+  staffFallbackLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
   onCancelVisit: (id: string) => void
 }
@@ -75,6 +76,7 @@ function StaffColumn({
   statusLabel,
   changeStatusLabel,
   cancelLabel,
+  staffFallbackLabel,
   onChangeStatus,
   onCancelVisit,
 }: {
@@ -87,6 +89,7 @@ function StaffColumn({
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
+  staffFallbackLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
   onCancelVisit: (id: string) => void
 }) {
@@ -135,6 +138,7 @@ function StaffColumn({
               statusLabel={statusLabel}
               changeStatusLabel={changeStatusLabel}
               cancelLabel={cancelLabel}
+              staffFallbackLabel={staffFallbackLabel}
               onChangeStatus={onChangeStatus}
               onCancelVisit={onCancelVisit}
             />
@@ -153,6 +157,7 @@ export function DayScheduleBoard({
   statusLabel,
   changeStatusLabel,
   cancelLabel,
+  staffFallbackLabel,
   onChangeStatus,
   onCancelVisit,
 }: DayScheduleBoardProps) {
@@ -176,6 +181,7 @@ export function DayScheduleBoard({
               statusLabel={statusLabel}
               changeStatusLabel={changeStatusLabel}
               cancelLabel={cancelLabel}
+              staffFallbackLabel={staffFallbackLabel}
               onChangeStatus={onChangeStatus}
               onCancelVisit={onCancelVisit}
             />

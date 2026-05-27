@@ -1,11 +1,10 @@
 import type { LucideIcon } from "lucide-react"
 import {
-  Activity,
   CalendarCheck2,
   CalendarClock,
+  CalendarDays,
   CheckCircle2,
   CircleSlash,
-  MonitorSmartphone,
   UserPlus,
   XCircle,
 } from "lucide-react"
@@ -20,9 +19,7 @@ type KpiCopy = {
   cancelled: string
   noShow: string
   newClients: string
-  onlineVsManual: string
-  averageDailyVisits: string
-  onlineShare: string
+  daysWithVisits: string
 }
 
 type KpiCardProps = {
@@ -94,15 +91,9 @@ export function StatisticsKpiGrid({
       icon: UserPlus,
     },
     {
-      label: copy.onlineVsManual,
-      value: `${kpis.onlineBookings} / ${kpis.manualBookings}`,
-      helper: copy.onlineShare.replace("{percent}", `${kpis.onlinePercent}%`),
-      icon: MonitorSmartphone,
-    },
-    {
-      label: copy.averageDailyVisits,
-      value: String(kpis.averageDailyVisits),
-      icon: Activity,
+      label: copy.daysWithVisits,
+      value: String(kpis.daysWithVisits),
+      icon: CalendarDays,
     },
   ]
 

@@ -1,7 +1,8 @@
 "use client"
 
+import { ScheduleVisitCardDetails } from "@/components/schedule/schedule-visit-card-details"
 import { Button } from "@/components/ui/button"
-import { formatHm, scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
+import { scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
 import type { AppointmentStatus } from "@/types/domain"
@@ -13,6 +14,7 @@ type DayScheduleMobileListProps = {
   statusLabel: (status: AppointmentStatus) => string
   changeStatusLabel: string
   cancelLabel: string
+  staffFallbackLabel: string
   onChangeStatus: (id: string, status: AppointmentStatus) => void
   onCancelVisit: (id: string) => void
 }
@@ -24,6 +26,7 @@ export function DayScheduleMobileList({
   statusLabel,
   changeStatusLabel,
   cancelLabel,
+  staffFallbackLabel,
   onChangeStatus,
   onCancelVisit,
 }: DayScheduleMobileListProps) {
@@ -31,17 +34,13 @@ export function DayScheduleMobileList({
     <div className="divide-y divide-border/80 overflow-y-auto px-4 py-2">
       {entries.map((row) => {
         const isCancelled = row.status === "cancelled"
-        const staff = row.staff_name?.trim()
         return (
           <div key={row.id} className={cn("my-2 rounded-lg border px-3 py-3", scheduleCardTheme(row).cardClass)}>
-            <div className="flex gap-3">
-              <p className="w-12 shrink-0 text-sm font-semibold tabular-nums">{formatHm(row.appointment_time)}</p>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-foreground">{row.client_name}</p>
-                <p className="text-sm text-muted-foreground">{row.service_name}</p>
-                {staff ? <p className="text-xs text-muted-foreground">{staff}</p> : null}
-              </div>
-            </div>
+            <ScheduleVisitCardDetails
+              entry={row}
+              staffFallback={staffFallbackLabel}
+              className="gap-3"
+            />
             {!isCancelled ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <select

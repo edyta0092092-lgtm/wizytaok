@@ -18,10 +18,7 @@ export type StatisticsKpis = {
   cancelled: number
   noShow: number
   newClients: number
-  onlineBookings: number
-  manualBookings: number
-  onlinePercent: number
-  averageDailyVisits: number
+  daysWithVisits: number
 }
 
 export type StatisticsRankItem = {

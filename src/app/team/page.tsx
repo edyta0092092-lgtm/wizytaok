@@ -142,6 +142,10 @@ function weekdayLabelKey(weekday: number): string {
   return `availability.${keys[weekday] ?? "monday"}`
 }
 
+function weekdayShortLabel(t: (key: string) => string, weekday: number): string {
+  return t(weekdayLabelKey(weekday)).slice(0, 3)
+}
+
 function sortRulesByUiWeekdayOrder(rules: StaffAvailabilityRuleInput[]): StaffAvailabilityRuleInput[] {
   const order = new Map<number, number>([
     [1, 0],
@@ -1919,8 +1923,8 @@ export default function TeamPage() {
                     </div>
                   </TabsContent>
                   <TabsContent value="schedule" className="mt-5">
-                    <div className="space-y-5">
-                      <div className="w-full max-w-none min-w-0 space-y-5 overflow-x-hidden rounded-xl border border-border/70 p-4">
+                    <div className="space-y-4">
+                      <div className="w-full max-w-none min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-4">
                         <p className="text-sm font-semibold text-foreground">{t("team.schedule")}</p>
                         {showSchedulePreview ? (
                           <div className="space-y-3">
@@ -1968,8 +1972,8 @@ export default function TeamPage() {
                           </div>
                         ) : (
                           <>
-                            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5">
+                              <div className="flex items-center justify-between gap-3">
                                 <Label htmlFor="use-biz-hours" className="text-sm font-medium">
                                   {t("team.useBusinessHours")}
                                 </Label>
@@ -1982,20 +1986,24 @@ export default function TeamPage() {
                                 />
                               </div>
                               {form.useBusinessHours ? (
-                                <p className="text-xs leading-relaxed text-muted-foreground">
+                                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                                   {t("team.useBusinessHoursDescription")}
                                 </p>
                               ) : null}
                             </div>
-                            {!form.useBusinessHours
-                              ? form.rules.map((rule) => (
-                                  <div
-                                    key={rule.weekday}
-                                    className="min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-3"
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <span className="text-sm font-medium text-foreground">
-                                        {t(weekdayLabelKey(rule.weekday))}
+                            {!form.useBusinessHours ? (
+                              <div className="overflow-hidden rounded-xl border border-border/70">
+                                <ul className="divide-y divide-border/70">
+                                  {sortRulesByUiWeekdayOrder(form.rules).map((rule) => (
+                                    <li
+                                      key={rule.weekday}
+                                      className="grid min-w-0 grid-cols-[2.75rem_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2 px-3 py-2 sm:py-2.5"
+                                    >
+                                      <span
+                                        className="text-sm font-semibold text-foreground"
+                                        title={t(weekdayLabelKey(rule.weekday))}
+                                      >
+                                        {weekdayShortLabel(t, rule.weekday)}
                                       </span>
                                       <Switch
                                         checked={rule.isAvailable}
@@ -2004,48 +2012,45 @@ export default function TeamPage() {
                                         }
                                         aria-label={t(weekdayLabelKey(rule.weekday))}
                                       />
-                                    </div>
-                                    <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-                                      <div className="min-w-0 space-y-1.5">
-                                        <Label
-                                          className="text-xs text-muted-foreground"
-                                          htmlFor={`start-${rule.weekday}`}
-                                        >
-                                          {t("team.timeFrom")}
-                                        </Label>
-                                        <Input
-                                          id={`start-${rule.weekday}`}
-                                          type="time"
-                                          value={rule.startTime}
-                                          onChange={(e) =>
-                                            updateRule(rule.weekday, { startTime: e.target.value })
-                                          }
-                                          disabled={!rule.isAvailable}
-                                          className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
-                                        />
-                                      </div>
-                                      <div className="min-w-0 space-y-1.5">
-                                        <Label
-                                          className="text-xs text-muted-foreground"
-                                          htmlFor={`end-${rule.weekday}`}
-                                        >
-                                          {t("team.timeTo")}
-                                        </Label>
-                                        <Input
-                                          id={`end-${rule.weekday}`}
-                                          type="time"
-                                          value={rule.endTime}
-                                          onChange={(e) =>
-                                            updateRule(rule.weekday, { endTime: e.target.value })
-                                          }
-                                          disabled={!rule.isAvailable}
-                                          className="h-11 w-full min-w-0 max-w-full rounded-xl disabled:opacity-60"
-                                        />
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))
-                              : null}
+                                      {rule.isAvailable ? (
+                                        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                                          <Input
+                                            id={`start-${rule.weekday}`}
+                                            type="time"
+                                            value={rule.startTime}
+                                            onChange={(e) =>
+                                              updateRule(rule.weekday, { startTime: e.target.value })
+                                            }
+                                            aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeFrom")}`}
+                                            className="h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums"
+                                          />
+                                          <span
+                                            className="shrink-0 text-xs text-muted-foreground"
+                                            aria-hidden
+                                          >
+                                            –
+                                          </span>
+                                          <Input
+                                            id={`end-${rule.weekday}`}
+                                            type="time"
+                                            value={rule.endTime}
+                                            onChange={(e) =>
+                                              updateRule(rule.weekday, { endTime: e.target.value })
+                                            }
+                                            aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeTo")}`}
+                                            className="h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums"
+                                          />
+                                        </div>
+                                      ) : (
+                                        <p className="text-right text-xs text-muted-foreground sm:text-left">
+                                          {t("availability.closed")}
+                                        </p>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : null}
                           </>
                         )}
                       </div>

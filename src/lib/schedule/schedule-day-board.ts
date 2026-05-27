@@ -222,7 +222,7 @@ function blockGeometry(
 
   return {
     topPx: Math.round(rawTop + gap / 2),
-    heightPx: Math.max(28, Math.round(rawHeight - gap)),
+    heightPx: Math.max(44, Math.round(rawHeight - gap)),
     clipped: startMin < range.start || endMin > range.end,
   }
 }

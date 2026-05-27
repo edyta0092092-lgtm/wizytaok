@@ -706,6 +706,7 @@ export default function SchedulePage() {
         }
         changeStatusLabel={t("appointments.changeStatusAction")}
         cancelLabel={t("appointments.cancelVisit")}
+        staffFallbackLabel={t("appointments.staffNotAssignedShort")}
         emptyLabel="Brak zaplanowanych wizyt"
         actionNotice={statusNotice}
         onChangeStatus={changeScheduleBookingStatus}

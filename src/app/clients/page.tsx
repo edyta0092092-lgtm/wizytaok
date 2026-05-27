@@ -1280,6 +1280,18 @@ export default function ClientsPage() {
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {t("clients.sectionVisitsHead")}
                         </h3>
+                        {detailsClient ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 rounded-xl"
+                            onClick={() => setHistoryId(detailsClient.id)}
+                          >
+                            <History className="size-3.5" />
+                            {t("clients.history")}
+                          </Button>
+                        ) : null}
                       </div>
                       {detailsClient.visitHistory.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("clients.noVisitHistoryUi")}</p>
@@ -1403,6 +1415,18 @@ export default function ClientsPage() {
                         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           {t("clients.sectionVisitsHead")}
                         </h3>
+                        {detailsClient ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 rounded-xl"
+                            onClick={() => setHistoryId(detailsClient.id)}
+                          >
+                            <History className="size-3.5" />
+                            {t("clients.history")}
+                          </Button>
+                        ) : null}
                       </div>
                       {detailsClient.visitHistory.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("clients.noVisitHistoryUi")}</p>
