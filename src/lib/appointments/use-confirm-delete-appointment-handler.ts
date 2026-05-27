@@ -46,6 +46,7 @@ export function useConfirmDeleteAppointmentHandler(args: {
         const publicId = unwrapPublicAppointmentId(deletingId)
         if (publicId) {
           removePublicBooking(publicId)
+          window.dispatchEvent(new Event("pw-bookings"))
           setActionNotice(t("appointments.appointmentDeleted"))
           setConfirmDeleteAppointmentId(null)
           return
@@ -54,6 +55,7 @@ export function useConfirmDeleteAppointmentHandler(args: {
         const manualId = unwrapManualAppointmentId(deletingId)
         if (manualId) {
           deleteManualAppointment(manualId)
+          window.dispatchEvent(new Event("pw-bookings"))
           setActionNotice(t("appointments.appointmentDeleted"))
           setConfirmDeleteAppointmentId(null)
           return

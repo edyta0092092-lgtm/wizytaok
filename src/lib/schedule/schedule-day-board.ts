@@ -238,25 +238,44 @@ export function layoutColumnBlocks(
   entries: ScheduleDayEntry[],
   range: { start: number; end: number; span: number },
 ): Map<string, ScheduleBlockLayout> {
-  const base = entries.map((entry) => ({
-    entry,
-    ...blockGeometry(entry, range),
-  }))
-  const result = new Map<string, ScheduleBlockLayout>()
+  const base = entries
+    .map((entry) => ({
+      entry,
+      ...blockGeometry(entry, range),
+    }))
+    .sort((a, b) => {
+      const byTop = a.topPx - b.topPx
+      if (byTop !== 0) return byTop
+      return b.heightPx - a.heightPx
+    })
 
-  for (let i = 0; i < base.length; i += 1) {
-    const current = base[i]
-    const group = base
-      .filter((other) => intervalsOverlapPx(current, other))
-      .sort((a, b) => a.entry.id.localeCompare(b.entry.id))
-    const laneCount = group.length
-    const laneIndex = group.findIndex((item) => item.entry.id === current.entry.id)
-    result.set(current.entry.id, {
-      topPx: current.topPx,
-      heightPx: current.heightPx,
-      clipped: current.clipped,
-      laneIndex: Math.max(0, laneIndex),
-      laneCount: Math.max(1, laneCount),
+  const laneBottoms: number[] = []
+  const laneIndexById = new Map<string, number>()
+
+  for (const item of base) {
+    let laneIndex = laneBottoms.findIndex((bottomPx) => bottomPx <= item.topPx)
+    if (laneIndex === -1) {
+      laneIndex = laneBottoms.length
+      laneBottoms.push(item.topPx + item.heightPx)
+    } else {
+      laneBottoms[laneIndex] = item.topPx + item.heightPx
+    }
+    laneIndexById.set(item.entry.id, laneIndex)
+  }
+
+  const result = new Map<string, ScheduleBlockLayout>()
+  for (const item of base) {
+    const overlapping = base.filter((other) => intervalsOverlapPx(item, other))
+    const laneCount = Math.max(
+      1,
+      ...overlapping.map((other) => (laneIndexById.get(other.entry.id) ?? 0) + 1),
+    )
+    result.set(item.entry.id, {
+      topPx: item.topPx,
+      heightPx: item.heightPx,
+      clipped: item.clipped,
+      laneIndex: laneIndexById.get(item.entry.id) ?? 0,
+      laneCount,
     })
   }
 

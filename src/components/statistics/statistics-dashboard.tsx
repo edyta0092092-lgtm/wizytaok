@@ -31,7 +31,6 @@ const COPY = {
       cancelled: "Anulowane",
       noShow: "Nieobecność klienta",
       newClients: "Nowi klienci",
-      daysWithVisits: "Dni z wizytami",
     },
     chart: {
       title: "Trend wizyt",
@@ -106,7 +105,6 @@ const COPY = {
       cancelled: "Cancelled",
       noShow: "Client did not attend",
       newClients: "New clients",
-      daysWithVisits: "Days with visits",
     },
     chart: {
       title: "Visit trend",

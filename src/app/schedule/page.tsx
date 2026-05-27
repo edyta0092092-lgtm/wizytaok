@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { fetchMergedAppointments, updateAppointmentStatus } from "@/lib/appointments/appointments-store"
-import { SB_BOOKING_PREFIX } from "@/lib/bookings/bookings-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getPublicBookings } from "@/lib/bookings/public-bookings"
 import { getPolishHolidayDisplayName } from "@/lib/calendar/polish-holidays"
@@ -21,7 +20,6 @@ import { formatHm } from "@/lib/schedule/schedule-day-board"
 import { getStaffForBusiness } from "@/lib/staff/staff-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import type { Tables } from "@/types/database"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
 
 type CalendarEntry = ScheduleDayEntry & {
@@ -36,30 +34,6 @@ type CalendarEntry = ScheduleDayEntry & {
 const DAY_PREVIEW_LIMIT = 3
 const SCHEDULE_MONTH_CACHE_TTL_MS = 30_000
 const SCHEDULE_STAFF_CACHE_TTL_MS = 5 * 60_000
-const SCHEDULE_BOOKING_SELECT =
-  "id,appointment_date,appointment_time,client_name,client_phone,service_name,service_duration_minutes,staff_id,staff_name,status,customer_note,business_note,internal_note,reminder_status,first_reminder_status,second_reminder_status,reminder_sent_at,first_reminder_sent_at"
-
-type ScheduleBookingRow = Pick<
-  Tables<"bookings">,
-  | "id"
-  | "appointment_date"
-  | "appointment_time"
-  | "client_name"
-  | "client_phone"
-  | "service_name"
-  | "service_duration_minutes"
-  | "staff_id"
-  | "staff_name"
-  | "status"
-  | "customer_note"
-  | "business_note"
-  | "internal_note"
-  | "reminder_status"
-  | "first_reminder_status"
-  | "second_reminder_status"
-  | "reminder_sent_at"
-  | "first_reminder_sent_at"
->
 
 const scheduleMonthCache = new Map<string, { loadedAt: number; entries: CalendarEntry[] }>()
 const scheduleStaffCache = new Map<string, { loadedAt: number; staff: StaffMember[] }>()
@@ -138,50 +112,6 @@ function normalizeStatus(raw: string): AppointmentStatus {
   if (raw === "completed") return "completed"
   if (raw === "confirmed" || raw === "pending" || raw === "booked") return "confirmed"
   return "confirmed"
-}
-
-function mapScheduleBookingRowToEntry(row: ScheduleBookingRow): CalendarEntry {
-  return {
-    id: `${SB_BOOKING_PREFIX}${row.id}`,
-    appointment_date: String(row.appointment_date).slice(0, 10),
-    appointment_time: formatHm(String(row.appointment_time ?? "")),
-    duration_minutes: Math.max(
-      15,
-      Math.floor(Number(row.service_duration_minutes) || SCHEDULE_BOARD_DEFAULT_DURATION_MINUTES),
-    ),
-    client_name: row.client_name?.trim() || "Klient",
-    client_phone: row.client_phone?.trim() || "",
-    service_name: row.service_name?.trim() || "Usługa",
-    staff_id: row.staff_id?.trim() || null,
-    staff_name: row.staff_name?.trim() || null,
-    status: normalizeStatus(String(row.status ?? "confirmed")),
-    customer_note: row.customer_note ?? null,
-    internal_note: row.internal_note ?? row.business_note ?? null,
-    reminder_status: row.reminder_status ?? row.first_reminder_status ?? null,
-    second_reminder_status: row.second_reminder_status ?? null,
-    reminder_sent_at: row.reminder_sent_at ?? row.first_reminder_sent_at ?? null,
-  }
-}
-
-async function fetchScheduleMonthEntries(
-  client: NonNullable<ReturnType<typeof getBrowserClient>>,
-  businessId: string,
-  year: number,
-  month: number,
-): Promise<CalendarEntry[]> {
-  const lastDay = daysInMonth(year, month)
-  const fromDate = `${year}-${pad2(month)}-01`
-  const toDate = `${year}-${pad2(month)}-${pad2(lastDay)}`
-  const { data, error } = await client
-    .from("bookings")
-    .select(SCHEDULE_BOOKING_SELECT)
-    .eq("business_id", businessId)
-    .gte("appointment_date", fromDate)
-    .lte("appointment_date", toDate)
-    .order("appointment_date", { ascending: true })
-    .order("appointment_time", { ascending: true })
-  if (error || !data) return []
-  return (data as ScheduleBookingRow[]).map(mapScheduleBookingRowToEntry)
 }
 
 function resolveDurationMinutes(row: Appointment): number {
@@ -422,34 +352,19 @@ export default function SchedulePage() {
     setLoadError(false)
     void (async () => {
       try {
-        const client = getBrowserClient()
-        if (!client || !isSupabaseConfigured()) {
+        if (!isSupabaseConfigured()) {
           if (!cancelled) setBookings([])
           return
         }
-        let monthAppointments: Awaited<ReturnType<typeof fetchMergedAppointments>> = []
-        if (access.businessId) {
-          const monthEntries = await fetchScheduleMonthEntries(
-            client,
-            access.businessId,
-            ym.year,
-            ym.month,
-          )
-          writeScheduleMonthCache(cacheKey, monthEntries)
-          if (!cancelled) {
-            setBookings(monthEntries)
-            scheduleBookingsLoadedRef.current = true
-          }
-          return
-        } else {
-          const merged = await fetchMergedAppointments({ businessId: access.businessId })
-          monthAppointments = merged.filter((row) => {
+        const merged = await fetchMergedAppointments({
+          businessId: access.businessId ?? undefined,
+        })
+        const monthEntries = merged
+          .filter((row) => {
             const dt = new Date(row.startsAt)
             if (Number.isNaN(dt.getTime())) return false
             return dt.getFullYear() === ym.year && dt.getMonth() + 1 === ym.month
           })
-        }
-        const monthEntries = monthAppointments
           .map(mapAppointmentToEntry)
           .filter((row): row is CalendarEntry => row != null)
         writeScheduleMonthCache(cacheKey, monthEntries)

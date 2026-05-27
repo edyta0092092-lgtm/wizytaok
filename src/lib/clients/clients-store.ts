@@ -319,20 +319,6 @@ export function deriveRiskScoreFromStats(total: number, noShowCount: number, con
   return Math.max(10, Math.min(92, score))
 }
 
-function clientWithClearedVisitStats(row: Client): Client {
-  const riskScore = deriveRiskScoreFromStats(0, 0, 0)
-  return {
-    ...row,
-    visitCount: 0,
-    confirmedVisitCount: 0,
-    noShowCount: 0,
-    cancelledVisitCount: 0,
-    visitHistory: [],
-    riskScore,
-    riskTier: riskTierFromScore(riskScore),
-  }
-}
-
 function belongsToScopedBusiness(appt: Appointment, slugNormalized: string | null): boolean {
   const rawSlug = typeof appt.businessSlug === "string" ? appt.businessSlug.trim() : ""
   if (!slugNormalized) return true
@@ -459,12 +445,58 @@ function clientSnapshotKey(c: Pick<Client, "fullName" | "phone" | "email">): str
   return `nm:${name}|d:${phone}`
 }
 
+function findPreviousClientMatch(previous: Client[], next: Client): Client | undefined {
+  return (
+    previous.find((row) => row.id === next.id) ??
+    previous.find((row) => clientSnapshotKey(row) === clientSnapshotKey(next))
+  )
+}
+
+function isVisitHistoryDeletionOnly(previous: Client, next: Client): boolean {
+  if (next.visitHistory.length >= previous.visitHistory.length) return false
+  const nextIds = new Set(next.visitHistory.map((visit) => visit.id))
+  return previous.visitHistory.every((visit) => nextIds.has(visit.id))
+}
+
+/** Po trwałym usunięciu wizyty z panelu Wizyty zachowaj statystyki klienta w katalogu. */
+export function mergeClientPreservingVisitStatsOnDeletion(
+  previous: Client | undefined,
+  next: Client,
+): Client {
+  if (!previous || !isVisitHistoryDeletionOnly(previous, next)) return next
+  return {
+    ...next,
+    visitCount: previous.visitCount,
+    confirmedVisitCount: previous.confirmedVisitCount,
+    noShowCount: previous.noShowCount,
+    cancelledVisitCount: previous.cancelledVisitCount,
+    visitHistory: previous.visitHistory,
+    riskScore: previous.riskScore,
+    riskTier: previous.riskTier,
+  }
+}
+
+export function mergeClientsCatalogPreservingVisitStatsOnDeletion(
+  previous: Client[],
+  incoming: Client[],
+): Client[] {
+  const mergedIncoming = incoming.map((next) =>
+    mergeClientPreservingVisitStatsOnDeletion(findPreviousClientMatch(previous, next), next),
+  )
+  const incomingKeys = new Set(incoming.map((row) => clientSnapshotKey(row)))
+  const incomingIds = new Set(incoming.map((row) => row.id))
+  const preservedOnlyInPrevious = previous.filter(
+    (row) => !incomingIds.has(row.id) && !incomingKeys.has(clientSnapshotKey(row)),
+  )
+  return [...mergedIncoming, ...preservedOnlyInPrevious].sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }),
+  )
+}
+
 function mergeClientsKeepingSnapshot(snapshot: Client[], derived: Client[]): Client[] {
   if (snapshot.length === 0) return derived
   if (derived.length === 0) {
-    return snapshot
-      .map((row) => clientWithClearedVisitStats(row))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }))
+    return snapshot.sort((a, b) => a.fullName.localeCompare(b.fullName, "pl", { sensitivity: "base" }))
   }
   const byKey = new Map<string, Client>()
   for (const row of derived) {
@@ -474,16 +506,19 @@ function mergeClientsKeepingSnapshot(snapshot: Client[], derived: Client[]): Cli
     const key = clientSnapshotKey(row)
     const existing = byKey.get(key)
     if (existing) {
-      byKey.set(key, {
-        ...existing,
-        notes: existing.notes?.trim() ? existing.notes : row.notes,
-        attachments:
-          existing.attachments && existing.attachments.length > 0
-            ? existing.attachments
-            : row.attachments,
-      })
+      byKey.set(
+        key,
+        mergeClientPreservingVisitStatsOnDeletion(row, {
+          ...existing,
+          notes: existing.notes?.trim() ? existing.notes : row.notes,
+          attachments:
+            existing.attachments && existing.attachments.length > 0
+              ? existing.attachments
+              : row.attachments,
+        }),
+      )
     } else {
-      byKey.set(key, clientWithClearedVisitStats(row))
+      byKey.set(key, row)
     }
   }
   return Array.from(byKey.values()).sort((a, b) =>
@@ -666,7 +701,9 @@ export async function loadClientsWorkspace(options?: {
 
   const res = await getClients(sb, bid)
   if (!res.error && res.data) {
-    const clients = enrichSupabaseClientsWithHistories(res.data, appointments, slugNorm)
+    const enriched = enrichSupabaseClientsWithHistories(res.data, appointments, slugNorm)
+    const previous = readStoredCatalog() ?? []
+    const clients = mergeClientsCatalogPreservingVisitStatsOnDeletion(previous, enriched)
     persistClientsCatalog(clients)
     return {
       clients,

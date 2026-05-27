@@ -54,6 +54,7 @@ import {
   buildPriorIdentity,
   isLikelyUuidClientId,
   loadClientsWorkspace,
+  mergeClientsCatalogPreservingVisitStatsOnDeletion,
   type ClientsLoadMode,
   persistClientsCatalog,
   persistClientAttachments,
@@ -323,6 +324,8 @@ export default function ClientsPage() {
   const [detailsId, setDetailsId] = React.useState<string | null>(null)
   const [historyId, setHistoryId] = React.useState<string | null>(null)
   const [form, setForm] = React.useState<FormState>(emptyForm)
+  const [createAttachments, setCreateAttachments] = React.useState<ClientAttachment[]>([])
+  const [createFieldError, setCreateFieldError] = React.useState<string | null>(null)
   const [showSaved, setShowSaved] = React.useState<SaveBanner>(null)
   const [detailsEditing, setDetailsEditing] = React.useState(false)
   const [detailForm, setDetailForm] = React.useState<FormState>(emptyForm)
@@ -351,7 +354,7 @@ export default function ClientsPage() {
   const reloadCatalog = React.useCallback(() => {
     void (async () => {
       const w = await loadClientsWorkspace({ businessId: businessId ?? undefined })
-      setClients(w.clients)
+      setClients((prev) => mergeClientsCatalogPreservingVisitStatsOnDeletion(prev, w.clients))
       setWorkspace({
         mode: w.mode,
         businessProfileId: w.businessProfileId,
@@ -413,7 +416,45 @@ export default function ClientsPage() {
 
   const openCreate = () => {
     setForm(emptyForm())
+    setCreateAttachments([])
+    setCreateFieldError(null)
     setCreateOpen(true)
+  }
+
+  const handleCreateAttachmentUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const next: ClientAttachment[] = []
+    for (const file of Array.from(files)) {
+      if (!isAllowedClientAttachment(file)) {
+        setCreateFieldError(t("clients.attachmentInvalidType"))
+        return
+      }
+      if (file.size > CLIENT_ATTACHMENT_MAX_BYTES) {
+        setCreateFieldError(t("clients.attachmentTooLarge"))
+        return
+      }
+      let dataUrl = ""
+      try {
+        dataUrl = await readFileAsDataUrl(file)
+      } catch {
+        setCreateFieldError(t("clients.attachmentReadFailed"))
+        return
+      }
+      next.push({
+        id: allocateClientAttachmentId(),
+        name: file.name,
+        mimeType: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl,
+        createdAt: new Date().toISOString(),
+      })
+    }
+    setCreateFieldError(null)
+    setCreateAttachments((prev) => [...prev, ...next])
+  }
+
+  const removeCreateAttachment = (attachmentId: string) => {
+    setCreateAttachments((prev) => prev.filter((attachment) => attachment.id !== attachmentId))
   }
 
   const submitCreate = async (e: React.FormEvent) => {
@@ -421,10 +462,23 @@ export default function ClientsPage() {
     const fullName = joinPersonName(form.firstName, form.lastName)
     const phone = buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational).trim()
     const email = form.email.trim()
-    if (!fullName) return
-    if (!phone) return
-    if (!validateNationalPhoneLength(form.phoneDialCode, form.phoneNational).ok) return
-    if (!isEmailFormatValid(email)) return
+    if (!fullName) {
+      setCreateFieldError(t("clients.validationFullName"))
+      return
+    }
+    if (!phone) {
+      setCreateFieldError(t("clients.validationPhoneRequired"))
+      return
+    }
+    if (!validateNationalPhoneLength(form.phoneDialCode, form.phoneNational).ok) {
+      setCreateFieldError(t("clients.validationPhoneInvalid"))
+      return
+    }
+    if (!isEmailFormatValid(email)) {
+      setCreateFieldError(t("clients.validationEmail"))
+      return
+    }
+    setCreateFieldError(null)
 
     const sb = isSupabaseConfigured() ? getBrowserClient() : null
     const bid = workspace?.businessProfileId ?? null
@@ -440,6 +494,9 @@ export default function ClientsPage() {
         notes: notesTrim.length > 0 ? notesTrim : null,
       })
       if (created.error || !created.data) return
+      if (createAttachments.length > 0) {
+        persistClientAttachments(created.data.id, createAttachments)
+      }
       const w = await loadClientsWorkspace()
       queueMicrotask(() => {
         setClients(w.clients)
@@ -454,8 +511,9 @@ export default function ClientsPage() {
       return
     }
 
+    const newId = allocateLocalFallbackClientId()
     const next: Client = {
-      id: allocateLocalFallbackClientId(),
+      id: newId,
       fullName,
       phone,
       email,
@@ -467,12 +525,16 @@ export default function ClientsPage() {
       riskScore: 24,
       riskTier: "low",
       visitHistory: [],
+      attachments: createAttachments,
     }
 
     const merged = [next, ...clients]
     setClients(merged)
     if (workspace?.mode !== "supabase_clients") {
       persistClientsCatalog(merged)
+    }
+    if (createAttachments.length > 0) {
+      persistClientAttachments(newId, createAttachments)
     }
     setCreateOpen(false)
     setShowSaved("added")
@@ -1068,7 +1130,6 @@ export default function ClientsPage() {
                 <Label htmlFor="client-email">{t("clients.fieldEmailShort")}</Label>
                 <Input
                   id="client-email"
-                  required
                   type="email"
                   autoComplete="email"
                   value={form.email}
@@ -1087,12 +1148,65 @@ export default function ClientsPage() {
                   className="resize-none"
                 />
               </div>
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t("clients.sectionAttachmentsHead")}
+                </h3>
+                <div className="rounded-xl border border-border/80 bg-muted/15 px-4 py-4">
+                  <Input
+                    id="client-attachments-create"
+                    type="file"
+                    accept={CLIENT_ATTACHMENT_ACCEPT}
+                    multiple
+                    className="h-auto cursor-pointer py-2"
+                    onChange={(e) => {
+                      void handleCreateAttachmentUpload(e.target.files)
+                      e.currentTarget.value = ""
+                    }}
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground">{t("clients.attachmentHelp")}</p>
+                  {createAttachments.length > 0 ? (
+                    <ul className="mt-3 space-y-2">
+                      {createAttachments.map((attachment) => (
+                        <li
+                          key={attachment.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card px-3 py-2 text-sm"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-foreground">{attachment.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatAttachmentSize(attachment.size)}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeCreateAttachment(attachment.id)}
+                          >
+                            {t("common.delete")}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </div>
             </div>
             <SheetFooter className="mt-auto border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+              {createFieldError ? (
+                <p className="mb-3 w-full text-sm text-destructive" role="alert">
+                  {createFieldError}
+                </p>
+              ) : null}
               <FormActions
                 cancelLabel={t("messages.cancel")}
                 submitLabel={t("clients.saveClientSubmit")}
-                onCancel={() => setCreateOpen(false)}
+                onCancel={() => {
+                  setCreateFieldError(null)
+                  setCreateOpen(false)
+                }}
               />
             </SheetFooter>
           </form>

@@ -18,7 +18,6 @@ export type StatisticsKpis = {
   cancelled: number
   noShow: number
   newClients: number
-  daysWithVisits: number
 }
 
 export type StatisticsRankItem = {

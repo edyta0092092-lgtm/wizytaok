@@ -376,13 +376,6 @@ export function buildStatisticsDataset({
   const newClients = [...firstVisitByClient.values()].filter((date) =>
     inRange(date, monthStart, monthEnd)
   ).length
-  const daysWithVisits = new Set(
-    appointmentsInMonth
-      .map((appointment) => parseDate(appointment.startsAt))
-      .filter((date): date is Date => date !== null)
-      .map((date) => dayKey(date))
-  ).size
-
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
       inRange(parseDate(appointment.startsAt), bucket.start, bucket.end)
@@ -424,7 +417,6 @@ export function buildStatisticsDataset({
       cancelled: statusCounts.cancelled,
       noShow: statusCounts.no_show,
       newClients,
-      daysWithVisits,
     },
     chart,
     topServices: buildTopServices(appointmentsInRange, services),

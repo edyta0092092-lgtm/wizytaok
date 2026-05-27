@@ -2,7 +2,6 @@ import type { LucideIcon } from "lucide-react"
 import {
   CalendarCheck2,
   CalendarClock,
-  CalendarDays,
   CheckCircle2,
   CircleSlash,
   UserPlus,
@@ -19,7 +18,6 @@ type KpiCopy = {
   cancelled: string
   noShow: string
   newClients: string
-  daysWithVisits: string
 }
 
 type KpiCardProps = {
@@ -90,15 +88,10 @@ export function StatisticsKpiGrid({
       value: String(kpis.newClients),
       icon: UserPlus,
     },
-    {
-      label: copy.daysWithVisits,
-      value: String(kpis.daysWithVisits),
-      icon: CalendarDays,
-    },
   ]
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {cards.map((card) => (
         <KpiCard key={card.label} {...card} />
       ))}

@@ -75,7 +75,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <Tooltip
-                  cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+                  cursor={false}
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
                     const value = payload[0]?.value
@@ -124,7 +124,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
                 />
                 <Tooltip
-                  cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+                  cursor={false}
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null
                     const value = payload[0]?.value

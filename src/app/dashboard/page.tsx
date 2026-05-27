@@ -329,7 +329,7 @@ export default function DashboardPage() {
       pageDescription={t("dashboard.pageDescription")}
       primaryAction={
         <Button size="lg" className="h-10 px-4 text-sm" asChild>
-          <Link href="/appointments">{t("common.addAppointment")}</Link>
+          <Link href="/rezerwacje">{t("common.addAppointment")}</Link>
         </Button>
       }
     >
