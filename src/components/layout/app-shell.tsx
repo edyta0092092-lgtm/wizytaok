@@ -48,21 +48,17 @@ export function AppShell({
   const SIDEBAR_COLLAPSED_KEY = "pw_sidebar_collapsed_v1"
 
   const [mobileOpen, setMobileOpen] = React.useState(false)
-  const [sidebarWidth, setSidebarWidth] = React.useState(SIDEBAR_DEFAULT)
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
+  const [sidebarWidth, setSidebarWidth] = React.useState(() => {
+    if (typeof window === "undefined") return SIDEBAR_DEFAULT
+    const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY))
+    if (!Number.isFinite(stored)) return SIDEBAR_DEFAULT
+    return Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.floor(stored)))
+  })
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(() => {
+    if (typeof window === "undefined") return false
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"
+  })
   const [isResizing, setIsResizing] = React.useState(false)
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    const storedWidth = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY))
-    if (Number.isFinite(storedWidth)) {
-      setSidebarWidth(Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, Math.floor(storedWidth))))
-    }
-    const storedCollapsed = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
-    if (storedCollapsed === "1") {
-      setSidebarCollapsed(true)
-    }
-  }, [])
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -73,6 +69,12 @@ export function AppShell({
     if (typeof window === "undefined") return
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? "1" : "0")
   }, [sidebarCollapsed])
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    // Inform other overlays (np. onboarding highlight), że layout się przesunął.
+    window.dispatchEvent(new Event("pw-layout-change"))
+  }, [sidebarWidth, sidebarCollapsed])
 
   React.useEffect(() => {
     if (!isResizing) return
@@ -107,7 +109,7 @@ export function AppShell({
     <div className={cn("flex min-h-screen bg-background", className)}>
       <aside
         className={cn(
-          "relative hidden shrink-0 border-r border-border/90 bg-[var(--sidebar)] transition-[width] duration-200 lg:block",
+          "relative hidden shrink-0 border-r border-border/90 bg-[var(--sidebar)] lg:block",
           sidebarCollapsed ? "w-0 border-r-0" : "overflow-hidden",
         )}
         style={sidebarCollapsed ? undefined : { width: `${sidebarWidth}px` }}

@@ -66,6 +66,15 @@ type PlannedReminderRow = {
   second_reminder_status: string | null
 }
 
+type PreviewBookingInfo = {
+  id: string
+  clientName: string
+  serviceName: string
+  appointmentDate: string
+  appointmentTime: string
+  status: string
+}
+
 type LegacyPlannedReminderRow = {
   id: string
   client_name: string
@@ -420,7 +429,7 @@ export function SendingHistorySection() {
   const [dateRange, setDateRange] = React.useState<DateRangeFilter>("30d")
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("all")
   const [preview, setPreview] = React.useState<PreviewTarget | null>(null)
-  const [previewClientName, setPreviewClientName] = React.useState<string | null>(null)
+  const [previewBookingInfo, setPreviewBookingInfo] = React.useState<PreviewBookingInfo | null>(null)
   const [integrationFlags, setIntegrationFlags] = React.useState<{
     enableTestNotifications: boolean
     enableTestBilling: boolean
@@ -731,7 +740,7 @@ export function SendingHistorySection() {
         : null
 
   React.useEffect(() => {
-    if (!preview || (preview.kind !== "db" && preview.kind !== "planned") || !bookingIdForPreview) {
+    if (!preview || !bookingIdForPreview) {
       return
     }
     if (!isSupabaseConfigured()) {
@@ -745,21 +754,46 @@ export function SendingHistorySection() {
     void (async () => {
       const { data } = await client
         .from("bookings")
-        .select("client_name")
+        .select("id,client_name,service_name,appointment_date,appointment_time,status")
         .eq("id", bookingIdForPreview)
         .maybeSingle()
       if (!cancelled) {
-        const name =
-          data && typeof data.client_name === "string"
-            ? data.client_name.trim()
-            : ""
-        setPreviewClientName(name || null)
+        if (!data) {
+          setPreviewBookingInfo(null)
+          return
+        }
+        setPreviewBookingInfo({
+          id: String(data.id ?? bookingIdForPreview),
+          clientName: typeof data.client_name === "string" ? data.client_name.trim() : "",
+          serviceName: typeof data.service_name === "string" ? data.service_name.trim() : "",
+          appointmentDate:
+            typeof data.appointment_date === "string"
+              ? String(data.appointment_date).slice(0, 10)
+              : "",
+          appointmentTime:
+            typeof data.appointment_time === "string"
+              ? String(data.appointment_time).slice(0, 5)
+              : "",
+          status: typeof data.status === "string" ? data.status.trim() : "",
+        })
       }
     })()
     return () => {
       cancelled = true
     }
   }, [preview, bookingIdForPreview])
+
+  const relatedStatusLabel = React.useMemo(() => {
+    const raw = (previewBookingInfo?.status ?? "").toLowerCase()
+    if (!raw) return "-"
+    if (raw === "booked") return "Zarezerwowana"
+    if (raw === "pending") return "Do potwierdzenia"
+    if (raw === "confirmed") return "Potwierdzona"
+    if (raw === "cancelled") return "Anulowana"
+    if (raw === "completed") return "Zrealizowana"
+    if (raw === "no_show") return "Nieobecność"
+    return raw
+  }, [previewBookingInfo?.status])
 
   const previewOpen = Boolean(preview)
 
@@ -912,7 +946,7 @@ export function SendingHistorySection() {
                         variant="outline"
                         className="h-9 w-full shrink-0 sm:w-auto"
                         onClick={() => {
-                          setPreviewClientName(null)
+                          setPreviewBookingInfo(null)
                           setPreview(
                             entry.kind === "db"
                               ? { kind: "db", row: entry.row }
@@ -938,7 +972,7 @@ export function SendingHistorySection() {
         onOpenChange={(o) => {
           if (!o) {
             setPreview(null)
-            setPreviewClientName(null)
+            setPreviewBookingInfo(null)
           }
         }}
       >
@@ -994,7 +1028,7 @@ export function SendingHistorySection() {
                               (!preview.row.booking_id ||
                                 String(preview.row.type ?? "").trim() === "integration_test")
                             ? t("messagesLog.fieldClientIntegrationTest")
-                            : previewClientName || "-"}
+                            : previewBookingInfo?.clientName || "-"}
                     </dd>
                   </div>
                   <div>
@@ -1090,16 +1124,19 @@ export function SendingHistorySection() {
                       <dt className="text-xs font-medium text-muted-foreground">
                         {t("messagesLog.fieldRelatedAppointment")}
                       </dt>
-                      <dd className="mt-0.5">
+                      <dd className="mt-0.5 space-y-1">
                         <Link
                           href="/appointments"
                           className="text-primary underline-offset-4 hover:underline"
                         >
                           {t("messagesLog.relatedAppointmentLink")}
                         </Link>
-                        <span className="ml-1 font-mono text-xs text-muted-foreground">
-                          ({bookingIdForPreview})
-                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {previewBookingInfo?.appointmentDate || "-"} {previewBookingInfo?.appointmentTime || ""}
+                          {" · "}
+                          {previewBookingInfo?.serviceName || "-"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Status: {relatedStatusLabel}</p>
                       </dd>
                     </div>
                   ) : null}

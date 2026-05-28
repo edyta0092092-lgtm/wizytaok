@@ -109,6 +109,7 @@ export function OnboardingFlowHint() {
     })
     window.addEventListener("resize", updateRect)
     window.addEventListener("scroll", updateRect, true)
+    window.addEventListener("pw-layout-change", updateRect)
 
     return () => {
       observer.disconnect()
@@ -116,6 +117,7 @@ export function OnboardingFlowHint() {
       if (rectFrame) window.cancelAnimationFrame(rectFrame)
       window.removeEventListener("resize", updateRect)
       window.removeEventListener("scroll", updateRect, true)
+      window.removeEventListener("pw-layout-change", updateRect)
       target?.removeAttribute("data-onboarding-highlight")
     }
   }, [activeStepId, canShowStep])

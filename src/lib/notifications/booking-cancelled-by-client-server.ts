@@ -27,8 +27,12 @@ export async function notifyBookingCancelledByClient(args: {
   const staffDisplayName = getStaffDisplayName({ name: staffNameRel ?? booking.staff_name ?? "" })
 
   let messageOverrides = undefined
+  let sendSms = true
+  let sendEmail = true
   if (admin) {
     const template = await getTemplateRuntime(admin, booking.business_id, "booking_cancelled_by_client")
+    sendSms = template.smsExists ? template.smsEnabled : true
+    sendEmail = template.emailExists ? template.emailEnabled : true
     const hasCustom =
       (template.smsEnabled && template.smsBody) ||
       (template.emailEnabled && (template.emailSubject || template.emailBody))
@@ -48,5 +52,7 @@ export async function notifyBookingCancelledByClient(args: {
     logType: "booking_cancelled_by_client",
     staffDisplayName,
     messageOverrides,
+    sendSms,
+    sendEmail,
   })
 }

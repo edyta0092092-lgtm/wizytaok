@@ -173,6 +173,8 @@ export async function sendBookingCancelledConfirmation(args: {
   logType: BookingCancelledLogType
   staffDisplayName?: string
   messageOverrides?: BookingCancelledMessageOverrides
+  sendSms?: boolean
+  sendEmail?: boolean
 }): Promise<{ notice: "sent" | "queued" }> {
   const { booking, business, language, logType } = args
   const appUrl = getPublicAppOrigin()
@@ -202,8 +204,11 @@ export async function sendBookingCancelledConfirmation(args: {
   const nowIso = new Date().toISOString()
   let anySent = false
 
+  const shouldSendSms = args.sendSms ?? true
+  const shouldSendEmail = args.sendEmail ?? true
+
   const phone = booking.client_phone?.trim() ?? ""
-  if (phone) {
+  if (shouldSendSms && phone) {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
@@ -224,7 +229,7 @@ export async function sendBookingCancelledConfirmation(args: {
   }
 
   const email = booking.client_email?.trim() ?? ""
-  if (email) {
+  if (shouldSendEmail && email) {
     const emailRes = await sendReminderEmail({
       to: email,
       subject: messages.emailSubject,

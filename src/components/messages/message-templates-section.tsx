@@ -68,10 +68,23 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
 const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
   reminder_24h: ["reminder_24h", "reminder", "first_reminder_24h", "appointment_reminder_24h"],
   reminder_before_visit: ["reminder_before_visit", "second_reminder", "appointment_reminder_short"],
-  booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed"],
+  booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed", "booking_created"],
   booking_cancelled_by_company: ["booking_cancelled_by_company", "company_cancelled_booking"],
   booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
+}
+
+function fallbackEnabledWhenNoTemplate(type: TemplateType): { sms: boolean; email: boolean } {
+  // Te typy były historycznie wysyłane domyślnie nawet bez zapisanych rekordów
+  // w `message_templates`, więc UI powinien pokazywać "on".
+  if (
+    type === "booking_confirmation" ||
+    type === "booking_cancelled_by_company" ||
+    type === "booking_cancelled_by_client"
+  ) {
+    return { sms: true, email: true }
+  }
+  return { sms: false, email: false }
 }
 
 const TEMPLATE_DEFAULT_CONTENT: Record<
@@ -240,12 +253,13 @@ function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplat
     const matched = rows.filter((row) => aliases.includes(String(row.type)))
     const sms = matched.find((row) => row.channel === "sms")
     const email = matched.find((row) => row.channel === "email")
+    const fallbackEnabled = fallbackEnabledWhenNoTemplate(type)
     const timingSource = (sms ?? email) as (Tables<"message_templates"> & { timing_minutes_before?: number | null }) | undefined
     return {
       type,
       title: TEMPLATE_LABELS[type],
-      smsEnabled: sms?.status === "active",
-      emailEnabled: email?.status === "active",
+      smsEnabled: sms ? sms.status === "active" : fallbackEnabled.sms,
+      emailEnabled: email ? email.status === "active" : fallbackEnabled.email,
       smsBody: sms?.content ?? "",
       emailSubject: email?.title ?? "",
       emailBody: email?.content ?? "",
