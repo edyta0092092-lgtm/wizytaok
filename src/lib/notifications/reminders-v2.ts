@@ -7,6 +7,7 @@ import {
 } from "@/lib/notifications/template-runtime"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { getPublicAppOrigin } from "@/lib/notifications/public-app-origin"
+import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { insertNotificationLog as persistNotificationLog } from "@/lib/notifications/notification-log-insert"
@@ -250,7 +251,10 @@ async function processSingleReminder(
       runtime.emailBody && runtime.emailBody.trim().length > 0
         ? withAddress(applyTemplateVariables(runtime.emailBody, templateVars), "email")
         : withAddress(fallbackMessage.text, "email"),
-    html: fallbackMessage.html,
+    html:
+      runtime.emailBody && runtime.emailBody.trim().length > 0
+        ? plainTextEmailToHtml(withAddress(applyTemplateVariables(runtime.emailBody, templateVars), "email"))
+        : fallbackMessage.html,
     sms:
       runtime.smsBody && runtime.smsBody.trim().length > 0
         ? withAddress(applyTemplateVariables(runtime.smsBody, templateVars), "sms")

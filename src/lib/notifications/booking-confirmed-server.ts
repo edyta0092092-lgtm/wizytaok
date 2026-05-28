@@ -1,5 +1,6 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { sendReminderSms } from "@/lib/notifications/sms"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -207,7 +208,10 @@ export async function confirmBookingAndNotify(
       templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
         ? applyTemplateVariables(templateRuntime.emailBody, templateVars)
         : fallbackMessages.emailText,
-    emailHtml: fallbackMessages.emailHtml,
+    emailHtml:
+      templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
+        ? plainTextEmailToHtml(applyTemplateVariables(templateRuntime.emailBody, templateVars))
+        : fallbackMessages.emailHtml,
     sms:
       templateRuntime.smsBody && templateRuntime.smsBody.trim().length > 0
         ? applyTemplateVariables(templateRuntime.smsBody, templateVars)

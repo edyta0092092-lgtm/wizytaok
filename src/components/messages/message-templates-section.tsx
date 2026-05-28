@@ -289,6 +289,7 @@ export function MessageTemplatesSection({
   const [editingType, setEditingType] = React.useState<TemplateType | null>(null)
   const [form, setForm] = React.useState<GroupedTemplate | null>(null)
   const [showSaved, setShowSaved] = React.useState(false)
+  const [saveError, setSaveError] = React.useState<string | null>(null)
 
   const openCreate = React.useCallback(() => {
     if (readOnly) return
@@ -389,6 +390,8 @@ export function MessageTemplatesSection({
     e.preventDefault()
     if (!form || !businessId || templatesUnavailable || readOnly) return
     const submitFormData = form
+    setSaveError(null)
+    setShowSaved(false)
     void (async () => {
       const client = getBrowserClient()
       if (!client || !isSupabaseConfigured()) return
@@ -423,12 +426,20 @@ export function MessageTemplatesSection({
           setSheetOpen(false)
           return
         }
+        if (res.error) {
+          setSaveError(res.error.message)
+          return
+        }
       } else {
         const res = await client.from("message_templates").insert(smsPayload as never)
         if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
           setTemplatesUnavailable(true)
           setLoadError(null)
           setSheetOpen(false)
+          return
+        }
+        if (res.error) {
+          setSaveError(res.error.message)
           return
         }
       }
@@ -443,6 +454,10 @@ export function MessageTemplatesSection({
           setSheetOpen(false)
           return
         }
+        if (res.error) {
+          setSaveError(res.error.message)
+          return
+        }
       } else {
         const res = await client.from("message_templates").insert(emailPayload as never)
         if (res.error && isMissingMessageTemplatesTableError(res.error.message)) {
@@ -451,10 +466,44 @@ export function MessageTemplatesSection({
           setSheetOpen(false)
           return
         }
+        if (res.error) {
+          setSaveError(res.error.message)
+          return
+        }
       }
-      setTemplates((prev) =>
-        prev.map((row) => (row.type === submitFormData.type ? submitFormData : row)),
-      )
+      const [{ data, error }, { data: profileData, error: profileError }] = await Promise.all([
+        client
+          .from("message_templates")
+          .select("*")
+          .eq("business_id", businessId)
+          .order("updated_at", { ascending: false }),
+        client
+          .from("business_profiles")
+          .select("default_reminder_hours,second_reminder_minutes")
+          .eq("id", businessId)
+          .maybeSingle(),
+      ])
+      if (error) {
+        setSaveError(error.message)
+        return
+      }
+      if (profileError) {
+        setSaveError(profileError.message)
+        return
+      }
+      const nextDefaults: ReminderTimingDefaults = {
+        firstReminderMinutes:
+          typeof profileData?.default_reminder_hours === "number" &&
+          Number.isFinite(profileData.default_reminder_hours)
+            ? Math.max(1, Math.floor(profileData.default_reminder_hours)) * 60
+            : 24 * 60,
+        secondReminderMinutes:
+          typeof profileData?.second_reminder_minutes === "number" &&
+          Number.isFinite(profileData.second_reminder_minutes)
+            ? Math.max(0, Math.floor(profileData.second_reminder_minutes))
+            : 120,
+      }
+      setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], nextDefaults))
       setShowSaved(true)
       setSheetOpen(false)
     })()
@@ -477,6 +526,11 @@ export function MessageTemplatesSection({
           >
             <Check className="size-4 shrink-0 text-success" aria-hidden />
             {t("messages.savedBanner")}
+          </div>
+        ) : null}
+        {saveError ? (
+          <div className="mb-3 rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {saveError}
           </div>
         ) : null}
 

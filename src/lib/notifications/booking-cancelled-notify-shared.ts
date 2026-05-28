@@ -4,6 +4,7 @@ import {
   buildTransactionalEmailText,
 } from "@/lib/notifications/transactional-email-layout"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
@@ -122,14 +123,14 @@ export function buildBookingCancelledMessages(
     ? applyTemplateVariables(overrides.smsBody, vars)
     : defaultSms
 
-  const emailText = buildTransactionalEmailText({
+  const emailTextFallback = buildTransactionalEmailText({
     lang: language,
     intro,
     detailRows,
     cta,
   })
 
-  const emailHtml = buildTransactionalEmailHtml({
+  const emailHtmlFallback = buildTransactionalEmailHtml({
     lang: language,
     subject: emailSubject,
     preheader:
@@ -141,6 +142,12 @@ export function buildBookingCancelledMessages(
     detailRows,
     cta,
   })
+
+  const customEmailBody = overrides?.emailBodyPlain?.trim()
+    ? applyTemplateVariables(overrides.emailBodyPlain, vars).trim()
+    : ""
+  const emailText = customEmailBody || emailTextFallback
+  const emailHtml = customEmailBody ? plainTextEmailToHtml(customEmailBody) : emailHtmlFallback
 
   return { sms, emailSubject, emailText, emailHtml }
 }

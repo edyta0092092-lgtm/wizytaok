@@ -2,6 +2,7 @@ import { sendReminderEmail } from "@/lib/notifications/email"
 import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import {
   buildTransactionalEmailHtml,
@@ -355,7 +356,10 @@ export async function sendBookingCreatedNotifications(
       templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
         ? applyTemplateVariables(templateRuntime.emailBody, templateVars)
         : fallbackMessages.emailText,
-    emailHtml: fallbackMessages.emailHtml,
+    emailHtml:
+      templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
+        ? plainTextEmailToHtml(applyTemplateVariables(templateRuntime.emailBody, templateVars))
+        : fallbackMessages.emailHtml,
     sms:
       templateRuntime.smsBody && templateRuntime.smsBody.trim().length > 0
         ? applyTemplateVariables(templateRuntime.smsBody, templateVars)
