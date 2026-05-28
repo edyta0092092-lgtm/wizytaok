@@ -43,6 +43,19 @@ function bestTitle(row: Pick<Tables<"message_templates">, "title" | "content">):
   return null
 }
 
+function pickChannelRow(
+  rows: Tables<"message_templates">[],
+  templateType: string,
+  channel: "sms" | "email",
+): Tables<"message_templates"> | undefined {
+  const typeNorm = normalize(templateType)
+  const primary = rows.find(
+    (row) => normalize(row.type) === typeNorm && normalize(row.channel) === channel,
+  )
+  if (primary) return primary
+  return rows.find((row) => normalize(row.channel) === channel)
+}
+
 export async function getTemplateRuntime(
   client: Sb,
   businessId: string,
@@ -70,8 +83,8 @@ export async function getTemplateRuntime(
   }
 
   const rows = (data ?? []) as Tables<"message_templates">[]
-  const sms = rows.find((row) => normalize(row.channel) === "sms")
-  const email = rows.find((row) => normalize(row.channel) === "email")
+  const sms = pickChannelRow(rows, templateType, "sms")
+  const email = pickChannelRow(rows, templateType, "email")
   const runtime = rows.find((row) => typeof (row as { timing_minutes_before?: unknown }).timing_minutes_before === "number")
 
   const timingCandidate = (runtime as { timing_minutes_before?: unknown } | undefined)?.timing_minutes_before

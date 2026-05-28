@@ -239,11 +239,25 @@ function reminder24hTitleFromMinutes(minutes: number | null): string {
 }
 
 function toGroupedTemplates(rows: Tables<"message_templates">[], defaults: ReminderTimingDefaults): GroupedTemplate[] {
+  const normalizeType = (value: string | null | undefined) => String(value ?? "").trim().toLowerCase()
+  const pickChannelRow = (
+    matchedRows: Tables<"message_templates">[],
+    type: TemplateType,
+    channel: "sms" | "email",
+  ): Tables<"message_templates"> | undefined => {
+    const typeNorm = normalizeType(type)
+    const primary = matchedRows.find(
+      (row) => normalizeType(row.type) === typeNorm && row.channel === channel,
+    )
+    if (primary) return primary
+    return matchedRows.find((row) => row.channel === channel)
+  }
+
   return TEMPLATE_ORDER.map((type) => {
     const aliases = TEMPLATE_TYPE_ALIASES[type]
     const matched = rows.filter((row) => aliases.includes(String(row.type)))
-    const sms = matched.find((row) => row.channel === "sms")
-    const email = matched.find((row) => row.channel === "email")
+    const sms = pickChannelRow(matched, type, "sms")
+    const email = pickChannelRow(matched, type, "email")
     const fallbackEnabled = fallbackEnabledWhenNoTemplate(type)
     const timingSource = (sms ?? email) as (Tables<"message_templates"> & { timing_minutes_before?: number | null }) | undefined
     const timingMinutesBefore =
