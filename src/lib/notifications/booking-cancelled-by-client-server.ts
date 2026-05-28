@@ -30,7 +30,8 @@ export async function notifyBookingCancelledByClient(args: {
   let sendSms = true
   let sendEmail = true
   if (admin) {
-    const template = await getTemplateRuntime(admin, booking.business_id, "booking_cancelled_by_client")
+    // Jeden wspólny szablon anulowania (firma/klient).
+    const template = await getTemplateRuntime(admin, booking.business_id, "booking_cancelled_by_company")
     sendSms = template.smsExists ? template.smsEnabled : true
     sendEmail = template.emailExists ? template.emailEnabled : true
     const hasCustom =

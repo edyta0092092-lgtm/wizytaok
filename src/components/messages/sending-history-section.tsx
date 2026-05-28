@@ -31,15 +31,7 @@ type NotificationLogRow = Tables<"notification_logs">
 type HistoryFilter = "all" | "sent" | "scheduled" | "skipped"
 type ChannelFilter = "all" | "sms" | "email"
 type DateRangeFilter = "today" | "7d" | "30d" | "all"
-type TypeFilter =
-  | "all"
-  | "reminder_24h"
-  | "reminder_before_visit"
-  | "booking_confirmation"
-  | "booking_cancelled_by_company"
-  | "booking_cancelled_by_client"
-  | "no_show_follow_up"
-  | "integration_test"
+type TypeFilter = "all" | string
 
 type MergedEntry =
   | { kind: "db"; sortAt: string; row: NotificationLogRow }
@@ -98,6 +90,41 @@ function isMissingColumnInBookingsQuery(message: string | null | undefined): boo
 function dbChannel(row: NotificationLogRow): "sms" | "email" {
   const c = String(row.channel ?? "").trim().toLowerCase()
   return c === "email" ? "email" : "sms"
+}
+
+function canonicalNotificationType(raw: string): string {
+  const type = raw.trim()
+  if (!type) return ""
+  if (["reminder_24h", "first_reminder_24h", "appointment_reminder_24h", "reminder"].includes(type)) {
+    return "reminder_24h"
+  }
+  if (["reminder_before_visit", "second_reminder", "appointment_reminder_short"].includes(type)) {
+    return "reminder_before_visit"
+  }
+  if (["booking_confirmation", "booking_confirmed", "booking_created", "confirmation"].includes(type)) {
+    return "booking_confirmation"
+  }
+  if (
+    ["booking_cancelled_by_company", "company_cancelled_booking", "booking_cancelled_by_client", "client_cancelled_booking"].includes(
+      type,
+    )
+  ) {
+    return "booking_cancelled_by_company"
+  }
+  if (["no_show_follow_up", "followup_noshow", "follow_up_no_show"].includes(type)) {
+    return "no_show_follow_up"
+  }
+  return type
+}
+
+function typeLabel(canonicalType: string, t: (key: string) => string): string {
+  if (canonicalType === "reminder_24h") return t("notifications.reminder24hType")
+  if (canonicalType === "reminder_before_visit") return t("notifications.secondReminderType")
+  if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmedType")
+  if (canonicalType === "booking_cancelled_by_company") return "Anulowanie wizyty"
+  if (canonicalType === "no_show_follow_up") return "Follow-up po nieobecności"
+  if (canonicalType === "integration_test") return t("messagesLog.integrationTestLine")
+  return canonicalType
 }
 
 function mergeEntries(
@@ -241,51 +268,24 @@ function listTypeLine(
   entry: MergedEntry,
   t: (key: string) => string
 ): string {
-  const type =
+  const rawType =
     entry.kind === "db"
       ? String(entry.row.type ?? "").trim()
       : entry.kind === "planned"
         ? entry.reminderType
       : entry.msg.type
+  const type = canonicalNotificationType(rawType)
   const channel =
     entry.kind === "db" ? dbChannel(entry.row) : entry.kind === "planned" ? entry.channel : entry.msg.channel
 
-  if (type === "manual_reminder") {
+  if (rawType === "manual_reminder") {
     return channel === "email"
       ? t("messagesLog.reminderEmailLine")
       : t("messagesLog.reminderSmsLine")
   }
 
   const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
-  if (type === "integration_test") {
-    return `${t("messagesLog.integrationTestLine")} - ${chLabel}`
-  }
-  if (type === "booking_created") {
-    return `${t("notifications.bookingCreatedType")} - ${chLabel}`
-  }
-  if (type === "booking_confirmed") {
-    return `${t("notifications.bookingConfirmedType")} - ${chLabel}`
-  }
-  if (type === "reminder_24h" || type === "first_reminder_24h" || type === "appointment_reminder_24h") {
-    return `${t("notifications.reminder24hType")} - ${chLabel}`
-  }
-  if (
-    type === "second_reminder" ||
-    type === "appointment_reminder_short" ||
-    type === "reminder_before_visit"
-  ) {
-    return `${t("notifications.secondReminderType")} - ${chLabel}`
-  }
-  if (type === "confirmation" || type === "booking_confirmed") {
-    return `${t("notifications.bookingConfirmedType")} - ${chLabel}`
-  }
-  if (type === "company_cancelled_booking") {
-    return `Anulowanie przez firmę - ${chLabel}`
-  }
-  if (type === "follow_up_no_show" || type === "followup_noshow") {
-    return `Follow-up no show - ${chLabel}`
-  }
-  if (type) return `${type} - ${chLabel}`
+  if (type) return `${typeLabel(type, t)} - ${chLabel}`
   return chLabel
 }
 
@@ -422,6 +422,7 @@ export function SendingHistorySection() {
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [loadingDb, setLoadingDb] = React.useState(true)
   const [plannedRows, setPlannedRows] = React.useState<PlannedReminderRow[]>([])
+  const [templateTypes, setTemplateTypes] = React.useState<string[]>([])
   const [localMessages, setLocalMessages] = React.useState<NotificationMessage[]>([])
   const [businessSlugNorm, setBusinessSlugNorm] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState<HistoryFilter>("all")
@@ -520,12 +521,15 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const { data, error: qErr } = await client
-        .from("notification_logs")
-        .select("*")
-        .eq("business_id", bid)
-        .order("created_at", { ascending: false })
-        .limit(200)
+      const [{ data, error: qErr }, { data: templateRows }] = await Promise.all([
+        client
+          .from("notification_logs")
+          .select("*")
+          .eq("business_id", bid)
+          .order("created_at", { ascending: false })
+          .limit(200),
+        client.from("message_templates").select("type").eq("business_id", bid),
+      ])
 
       const { data: planData, error: planErr } = await client
         .from("bookings")
@@ -604,6 +608,7 @@ export function SendingHistorySection() {
         setLoadError(qErr.message)
         setRows([])
         setPlannedRows([])
+        setTemplateTypes([])
       } else {
         setLoadError(null)
         setRows((data ?? []) as NotificationLogRow[])
@@ -612,6 +617,14 @@ export function SendingHistorySection() {
         } else {
           setPlannedRows([])
         }
+        const nextTemplateTypes = Array.from(
+          new Set(
+            (templateRows ?? [])
+              .map((row) => canonicalNotificationType(String((row as { type?: string }).type ?? "").trim()))
+              .filter(Boolean),
+          ),
+        )
+        setTemplateTypes(nextTemplateTypes)
         if (process.env.NODE_ENV === "development") {
           console.info("[notifications.logs.load]", {
             businessId: bid,
@@ -663,6 +676,20 @@ export function SendingHistorySection() {
     [rows, scopedLocal, plannedRows]
   )
 
+  const availableTypeFilters = React.useMemo(() => {
+    const fromEntries = merged.map((entry) => {
+      const raw =
+        entry.kind === "db"
+          ? String(entry.row.type ?? "").trim()
+          : entry.kind === "planned"
+            ? entry.reminderType
+            : String(entry.msg.type ?? "").trim()
+      return canonicalNotificationType(raw)
+    })
+    const values = Array.from(new Set([...templateTypes, ...fromEntries].filter(Boolean)))
+    return values
+  }, [merged, templateTypes])
+
   const [nowMs] = React.useState<number>(() => new Date().getTime())
 
   const tabFiltered = React.useMemo(() => {
@@ -695,20 +722,16 @@ export function SendingHistorySection() {
             : e.kind === "planned"
               ? e.reminderType
               : String(e.msg.type)
-        if (typeFilter === "reminder_24h") {
-          return ["reminder_24h", "first_reminder_24h", "appointment_reminder_24h"].includes(resolvedType)
-        }
-        if (typeFilter === "reminder_before_visit") {
-          return ["second_reminder", "appointment_reminder_short", "reminder_before_visit"].includes(resolvedType)
-        }
-        if (typeFilter === "booking_confirmation") return ["booking_confirmed", "booking_confirmation", "confirmation"].includes(resolvedType)
-        if (typeFilter === "booking_cancelled_by_company") return ["booking_cancelled_by_company", "company_cancelled_booking"].includes(resolvedType)
-        if (typeFilter === "booking_cancelled_by_client") return ["booking_cancelled_by_client", "client_cancelled_booking"].includes(resolvedType)
-        if (typeFilter === "no_show_follow_up") return ["followup_noshow", "follow_up_no_show", "no_show_follow_up"].includes(resolvedType)
-        if (typeFilter === "integration_test") return resolvedType === "integration_test"
-        return true
+        return canonicalNotificationType(resolvedType) === typeFilter
       })
   }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs])
+
+  React.useEffect(() => {
+    if (typeFilter === "all") return
+    if (!availableTypeFilters.includes(typeFilter)) {
+      setTypeFilter("all")
+    }
+  }, [typeFilter, availableTypeFilters])
 
   const listEntries = React.useMemo(() => {
     if (logFilter === "failed") {
@@ -887,13 +910,11 @@ export function SendingHistorySection() {
               onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
             >
               <option value="all">Wszystkie typy</option>
-              <option value="reminder_24h">Przypomnienie 24h</option>
-              <option value="reminder_before_visit">Przypomnienie przed wizytą</option>
-              <option value="booking_confirmation">Potwierdzenie wizyty</option>
-              <option value="booking_cancelled_by_company">Firma anuluje wizytę</option>
-              <option value="booking_cancelled_by_client">Klient anuluje wizytę</option>
-              <option value="no_show_follow_up">Follow-up po nieobecności</option>
-              <option value="integration_test">{t("messagesLog.integrationTestLine")}</option>
+              {availableTypeFilters.map((type) => (
+                <option key={type} value={type}>
+                  {typeLabel(type, t)}
+                </option>
+              ))}
             </select>
           </div>
         </CardHeader>

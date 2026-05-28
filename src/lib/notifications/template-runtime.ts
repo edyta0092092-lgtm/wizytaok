@@ -19,7 +19,12 @@ const TYPE_ALIASES: Record<string, string[]> = {
   reminder_24h: ["reminder_24h", "reminder", "first_reminder_24h", "appointment_reminder_24h"],
   reminder_before_visit: ["reminder_before_visit", "second_reminder", "appointment_reminder_short"],
   booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed", "booking_created"],
-  booking_cancelled_by_company: ["booking_cancelled_by_company", "company_cancelled_booking"],
+  booking_cancelled_by_company: [
+    "booking_cancelled_by_company",
+    "company_cancelled_booking",
+    "booking_cancelled_by_client",
+    "client_cancelled_booking",
+  ],
   booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
 }
@@ -41,9 +46,9 @@ function bestTitle(row: Pick<Tables<"message_templates">, "title" | "content">):
 export async function getTemplateRuntime(
   client: Sb,
   businessId: string,
-  templateType: keyof typeof TYPE_ALIASES
+  templateType: string
 ): Promise<NotificationTemplateRuntime> {
-  const aliases = TYPE_ALIASES[templateType]
+  const aliases = TYPE_ALIASES[templateType] ?? [templateType]
   const { data, error } = await client
     .from("message_templates")
     .select("*")

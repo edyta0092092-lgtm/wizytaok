@@ -223,7 +223,7 @@ export default function PublicBookingPage() {
         setCatalog(active)
         setSelectedServiceId((prev) => {
           if (prev && active.some((s) => s.id === prev)) return prev
-          return null
+          return active[0]?.id ?? null
         })
       })()
     }
@@ -708,10 +708,10 @@ export default function PublicBookingPage() {
     [language]
   )
 
-  const getStaffFirstName = React.useCallback((staff: StaffMember | null | undefined): string => {
+  const getStaffDisplayName = React.useCallback((staff: StaffMember | null | undefined): string => {
     const normalized = (staff?.name ?? "").trim().replace(/\s+/g, " ")
     if (!normalized) return t("bookingPublic.noSelection")
-    return normalized.split(" ")[0] ?? t("bookingPublic.noSelection")
+    return normalized
   }, [t])
 
   const confirmBooking = () => {
@@ -1012,7 +1012,7 @@ export default function PublicBookingPage() {
                       <p className="text-sm text-foreground">
                         {t("bookingPublic.singleStaffExecutingService").replace(
                           "{name}",
-                          getStaffFirstName(serviceStaff[0] ?? null)
+                          getStaffDisplayName(serviceStaff[0] ?? null)
                         )}
                       </p>
                     ) : (
@@ -1031,7 +1031,7 @@ export default function PublicBookingPage() {
                           <option value="">{t("bookingPublic.anyAvailableStaff")}</option>
                           {(selectedDayKey && selectedTime ? availableStaffForSelectedSlot : serviceStaff).map((staff) => (
                             <option key={staff.id} value={staff.id}>
-                              {getStaffFirstName(staff)}
+                              {getStaffDisplayName(staff)}
                             </option>
                           ))}
                         </select>
@@ -1206,10 +1206,10 @@ export default function PublicBookingPage() {
                     <span className="text-muted-foreground">{t("appointments.fieldStaff")}:</span>{" "}
                     <span className="font-medium text-foreground">
                       {selectedStaffId
-                        ? getStaffFirstName(serviceStaff.find((x) => x.id === selectedStaffId) ?? null)
+                        ? getStaffDisplayName(serviceStaff.find((x) => x.id === selectedStaffId) ?? null)
                         : serviceStaff.length > 1
                           ? t("bookingPublic.anyAvailableStaff")
-                          : getStaffFirstName(serviceStaff[0] ?? null)}
+                          : getStaffDisplayName(serviceStaff[0] ?? null)}
                     </span>
                   </p>
                 ) : null}

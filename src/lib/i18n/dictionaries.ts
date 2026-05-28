@@ -1476,7 +1476,7 @@ export const dictionaries = {
         second_reminder: "Przypomnienie przed wizytą",
         confirmation: "Potwierdzenie",
         followup_noshow: "Follow-up po nieobecności klienta",
-        booking_cancelled_by_company: "Firma anuluje wizytę",
+        booking_cancelled_by_company: "Anulowanie wizyty",
       },
       templateStatus: {
         active: "Aktywny",
@@ -1505,7 +1505,7 @@ export const dictionaries = {
       tpl5Title: "Przypomnienie przed wizytą",
       tpl5Body:
         "Cześć {{imie}}, przypominamy o wizycie dziś o {{godzina}} - {{usluga}}. Do zobaczenia!",
-      tpl6Title: "Firma anuluje wizytę",
+      tpl6Title: "Anulowanie wizyty",
       tpl6Body:
         "Przepraszamy! Niestety nie możemy zrealizować Twojej wizyty lub osoba, którą wybrałeś do wykonania usługi, będzie niedostępna. Wizyta została anulowana. Umów nową wizytę: {{link_rezerwacji}} lub skontaktuj się z nami: {{telefon_firmy}}",
       tpl7Title: "Twoja wizyta została anulowana",

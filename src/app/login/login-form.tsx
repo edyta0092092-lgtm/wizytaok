@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { ArrowLeft } from "lucide-react"
 
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
@@ -22,7 +23,6 @@ import {
 } from "@/components/auth/oauth-provider-buttons"
 import {
   isEmailNotConfirmedAuthError,
-  requestSignupConfirmationEmail,
 } from "@/lib/auth/signup-confirmation-client"
 import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
@@ -60,7 +60,7 @@ export function LoginForm() {
   )
   const [loading, setLoading] = React.useState(false)
   const [sendingReset, setSendingReset] = React.useState(false)
-  const [sendingConfirmation, setSendingConfirmation] = React.useState(false)
+  const [passwordResetMode, setPasswordResetMode] = React.useState(false)
 
   const isActiveSubscriptionStatus = React.useCallback((status: string | null | undefined) => {
     const normalized = String(status ?? "").trim().toLowerCase()
@@ -93,6 +93,10 @@ export function LoginForm() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (passwordResetMode) {
+      void handleResetPassword()
+      return
+    }
     setError(null)
     if (!isSupabaseConfigured()) {
       setError(t("auth.supabaseNotConfigured"))
@@ -218,35 +222,6 @@ export function LoginForm() {
     }
   }
 
-  const handleResendConfirmation = async () => {
-    setError(null)
-    setInfo(null)
-    setOauthError(null)
-    if (!isSupabaseConfigured()) {
-      setError(t("auth.supabaseNotConfigured"))
-      return
-    }
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail) {
-      setError(t("auth.enterEmailForConfirmation"))
-      return
-    }
-    setSendingConfirmation(true)
-    try {
-      const sent = await requestSignupConfirmationEmail(
-        trimmedEmail,
-        postLoginPath ?? "/settings?setup=business",
-      )
-      if (!sent.ok) {
-        setError(t("auth.resendConfirmationError"))
-        return
-      }
-      setInfo(t("auth.resendConfirmationSent"))
-    } finally {
-      setSendingConfirmation(false)
-    }
-  }
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-border/80 bg-card/80 px-4 py-3 sm:px-5">
@@ -263,11 +238,31 @@ export function LoginForm() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <OAuthProviderButtons
-              next={postLoginPath ?? "/dashboard"}
-              onError={(code) => setOauthError(oauthErrorMessageFromCode(code, t))}
-            />
+            {!passwordResetMode ? (
+              <OAuthProviderButtons
+                next={postLoginPath ?? "/dashboard"}
+                onError={(code) => setOauthError(oauthErrorMessageFromCode(code, t))}
+              />
+            ) : null}
             <form className="space-y-4" onSubmit={onSubmit}>
+              {passwordResetMode ? (
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="-ml-2 h-auto p-1 text-xs text-muted-foreground"
+                    onClick={() => {
+                      setPasswordResetMode(false)
+                      setError(null)
+                      setInfo(null)
+                      setOauthError(null)
+                    }}
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    {t("auth.logIn")}
+                  </Button>
+                </div>
+              ) : null}
               <div className="space-y-2">
                 <Label htmlFor="login-email">{t("auth.email")}</Label>
                 <Input
@@ -280,36 +275,35 @@ export function LoginForm() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">{t("auth.password")}</Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-xl"
-                  required
-                />
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  <button
-                    type="button"
-                    onClick={() => void handleResetPassword()}
-                    disabled={sendingReset || sendingConfirmation}
-                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
-                  >
-                    {t("auth.forgotPassword")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleResendConfirmation()}
-                    disabled={sendingReset || sendingConfirmation}
-                    className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
-                  >
-                    {sendingConfirmation ? "…" : t("auth.resendConfirmation")}
-                  </button>
+              {!passwordResetMode ? (
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">{t("auth.password")}</Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-11 rounded-xl"
+                    required
+                  />
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPasswordResetMode(true)
+                        setError(null)
+                        setInfo(null)
+                        setOauthError(null)
+                      }}
+                      disabled={sendingReset}
+                      className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-60"
+                    >
+                      {t("auth.forgotPassword")}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
               {oauthError ? (
                 <p className="text-sm text-red-600 dark:text-red-400" role="alert">
                   {oauthError}
@@ -325,9 +319,20 @@ export function LoginForm() {
                   {info}
                 </p>
               ) : null}
-              <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading || sendingConfirmation}>
-                {loading ? "…" : t("auth.logIn")}
-              </Button>
+              {passwordResetMode ? (
+                <Button
+                  type="button"
+                  className="h-11 w-full rounded-xl"
+                  disabled={sendingReset}
+                  onClick={() => void handleResetPassword()}
+                >
+                  {sendingReset ? "…" : t("auth.forgotPassword")}
+                </Button>
+              ) : (
+                <Button type="submit" className="h-11 w-full rounded-xl" disabled={loading}>
+                  {loading ? "…" : t("auth.logIn")}
+                </Button>
+              )}
             </form>
           </CardContent>
           <CardFooter className="flex flex-col gap-2 border-t border-border/70 bg-muted/15 text-center text-sm text-muted-foreground">

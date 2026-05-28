@@ -7,12 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -31,7 +25,6 @@ type TemplateType =
   | "reminder_before_visit"
   | "booking_confirmation"
   | "booking_cancelled_by_company"
-  | "booking_cancelled_by_client"
   | "no_show_follow_up"
 
 type GroupedTemplate = {
@@ -47,12 +40,16 @@ type GroupedTemplate = {
   emailRowId: string | null
 }
 
+type ReminderTimingDefaults = {
+  firstReminderMinutes: number
+  secondReminderMinutes: number
+}
+
 const TEMPLATE_ORDER: TemplateType[] = [
   "reminder_24h",
   "reminder_before_visit",
   "booking_confirmation",
   "booking_cancelled_by_company",
-  "booking_cancelled_by_client",
   "no_show_follow_up",
 ]
 
@@ -60,8 +57,7 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
   reminder_24h: "Przypomnienie 24h przed wizytą",
   reminder_before_visit: "Przypomnienie przed wizytą",
   booking_confirmation: "Potwierdzenie wizyty",
-  booking_cancelled_by_company: "Firma anuluje wizytę",
-  booking_cancelled_by_client: "Klient anuluje wizytę",
+  booking_cancelled_by_company: "Anulowanie wizyty",
   no_show_follow_up: "Follow-up po nieobecności klienta",
 }
 
@@ -69,8 +65,12 @@ const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
   reminder_24h: ["reminder_24h", "reminder", "first_reminder_24h", "appointment_reminder_24h"],
   reminder_before_visit: ["reminder_before_visit", "second_reminder", "appointment_reminder_short"],
   booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed", "booking_created"],
-  booking_cancelled_by_company: ["booking_cancelled_by_company", "company_cancelled_booking"],
-  booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
+  booking_cancelled_by_company: [
+    "booking_cancelled_by_company",
+    "company_cancelled_booking",
+    "booking_cancelled_by_client",
+    "client_cancelled_booking",
+  ],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
 }
 
@@ -79,8 +79,7 @@ function fallbackEnabledWhenNoTemplate(type: TemplateType): { sms: boolean; emai
   // w `message_templates`, więc UI powinien pokazywać "on".
   if (
     type === "booking_confirmation" ||
-    type === "booking_cancelled_by_company" ||
-    type === "booking_cancelled_by_client"
+    type === "booking_cancelled_by_company"
   ) {
     return { sms: true, email: true }
   }
@@ -165,22 +164,6 @@ W razie pytań: {{telefon_firmy}}
 Pozdrawiamy,
 {{nazwa_firmy}}`,
   },
-  booking_cancelled_by_client: {
-    smsBody: "Wizyta odwołana: {{usluga}}, {{data}} o {{godzina}}.",
-    emailSubject: "Wizyta odwołana",
-    emailBody: `Twoja wizyta została odwołana.
-
-Anulowany termin:
-- Data: {{data}}
-- Godzina: {{godzina}}
-- Usługa: {{usluga}}
-
-Nową wizytę umówisz tutaj:
-{{link_rezerwacji}}
-
-Pozdrawiamy,
-{{nazwa_firmy}}`,
-  },
   no_show_follow_up: {
     smsBody:
       "Cześć {{imie}}, nie odnotowaliśmy Twojej wizyty {{data}} o {{godzina}}. Umów nowy termin: {{link_rezerwacji}}",
@@ -208,9 +191,9 @@ function isMissingMessageTemplatesTableError(message: string | null | undefined)
   )
 }
 
-function defaultTiming(type: TemplateType): number | null {
-  if (type === "reminder_24h") return 1440
-  if (type === "reminder_before_visit") return 60
+function defaultTiming(type: TemplateType, defaults: ReminderTimingDefaults): number | null {
+  if (type === "reminder_24h") return defaults.firstReminderMinutes
+  if (type === "reminder_before_visit") return defaults.secondReminderMinutes
   return null
 }
 
@@ -247,7 +230,15 @@ function withReadyContent(tpl: GroupedTemplate): GroupedTemplate {
   }
 }
 
-function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplate[] {
+function reminder24hTitleFromMinutes(minutes: number | null): string {
+  const safe = typeof minutes === "number" && Number.isFinite(minutes) ? Math.max(0, Math.floor(minutes)) : 1440
+  if (safe > 0 && safe % 60 === 0) {
+    return `Przypomnienie ${Math.floor(safe / 60)}h przed wizytą`
+  }
+  return `Przypomnienie ${formatTimingLabel(safe)} przed wizytą`
+}
+
+function toGroupedTemplates(rows: Tables<"message_templates">[], defaults: ReminderTimingDefaults): GroupedTemplate[] {
   return TEMPLATE_ORDER.map((type) => {
     const aliases = TEMPLATE_TYPE_ALIASES[type]
     const matched = rows.filter((row) => aliases.includes(String(row.type)))
@@ -255,18 +246,23 @@ function toGroupedTemplates(rows: Tables<"message_templates">[]): GroupedTemplat
     const email = matched.find((row) => row.channel === "email")
     const fallbackEnabled = fallbackEnabledWhenNoTemplate(type)
     const timingSource = (sms ?? email) as (Tables<"message_templates"> & { timing_minutes_before?: number | null }) | undefined
+    const timingMinutesBefore =
+      typeof timingSource?.timing_minutes_before === "number"
+        ? timingSource.timing_minutes_before
+        : defaultTiming(type, defaults)
+    const title =
+      type === "reminder_24h"
+        ? reminder24hTitleFromMinutes(timingMinutesBefore)
+        : TEMPLATE_LABELS[type]
     return {
       type,
-      title: TEMPLATE_LABELS[type],
+      title,
       smsEnabled: sms ? sms.status === "active" : fallbackEnabled.sms,
       emailEnabled: email ? email.status === "active" : fallbackEnabled.email,
       smsBody: sms?.content ?? "",
       emailSubject: email?.title ?? "",
       emailBody: email?.content ?? "",
-      timingMinutesBefore:
-        typeof timingSource?.timing_minutes_before === "number"
-          ? timingSource.timing_minutes_before
-          : defaultTiming(type),
+      timingMinutesBefore,
       smsRowId: sms?.id ?? null,
       emailRowId: email?.id ?? null,
     }
@@ -316,31 +312,50 @@ export function MessageTemplatesSection({
       const bid = accessBusinessId
       if (!client || !isSupabaseConfigured() || !bid) {
         if (!cancelled) {
-          setTemplates(toGroupedTemplates([]))
+          setTemplates(
+            toGroupedTemplates([], { firstReminderMinutes: 24 * 60, secondReminderMinutes: 120 }),
+          )
           setBusinessId(null)
           setLoadError(null)
           setLoading(false)
         }
         return
       }
-      const { data, error } = await client
-        .from("message_templates")
-        .select("*")
-        .eq("business_id", bid)
-        .order("updated_at", { ascending: false })
+      const [{ data, error }, { data: profileData }] = await Promise.all([
+        client
+          .from("message_templates")
+          .select("*")
+          .eq("business_id", bid)
+          .order("updated_at", { ascending: false }),
+        client
+          .from("business_profiles")
+          .select("default_reminder_hours,second_reminder_minutes")
+          .eq("id", bid)
+          .maybeSingle(),
+      ])
+      const nextDefaults: ReminderTimingDefaults = {
+        firstReminderMinutes:
+          typeof profileData?.default_reminder_hours === "number" && Number.isFinite(profileData.default_reminder_hours)
+            ? Math.max(1, Math.floor(profileData.default_reminder_hours)) * 60
+            : 24 * 60,
+        secondReminderMinutes:
+          typeof profileData?.second_reminder_minutes === "number" && Number.isFinite(profileData.second_reminder_minutes)
+            ? Math.max(0, Math.floor(profileData.second_reminder_minutes))
+            : 120,
+      }
       if (cancelled) return
       if (error) {
         if (isMissingMessageTemplatesTableError(error.message)) {
           setTemplatesUnavailable(true)
           setLoadError(null)
-          setTemplates(toGroupedTemplates([]))
+          setTemplates(toGroupedTemplates([], nextDefaults))
         } else {
           setLoadError(error.message)
         }
       } else {
         setTemplatesUnavailable(false)
         setLoadError(null)
-        setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[]))
+        setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], nextDefaults))
       }
       setBusinessId(bid)
       setLoading(false)
@@ -355,6 +370,20 @@ export function MessageTemplatesSection({
     setForm(withReadyContent(tpl))
     setSheetOpen(true)
   }
+
+  React.useEffect(() => {
+    if (readOnly || !sheetOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSheetOpen(false)
+    }
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    window.addEventListener("keydown", onKeyDown)
+    return () => {
+      document.body.style.overflow = prevOverflow
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [sheetOpen, readOnly])
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault()
@@ -494,100 +523,112 @@ export function MessageTemplatesSection({
         )}
       </section>
 
-      <Sheet open={!readOnly && sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent
-          side="right"
-          className="flex w-full flex-col overflow-hidden border-border/80 bg-card p-0 sm:max-w-xl"
-          showCloseButton
+      {!readOnly && sheetOpen ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 sm:p-6"
+          onClick={() => setSheetOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
         >
-          <SheetHeader className="space-y-1 border-b border-border/70 px-6 py-6 text-left">
-            <SheetTitle className="font-heading text-xl">
-              {editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
-            </SheetTitle>
-          </SheetHeader>
-          <form
-            onSubmit={submitForm}
-            className="premium-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+          <div
+            className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex-1 space-y-5 px-6 py-6">
-              <div className="space-y-2 rounded-xl border border-border p-3">
-                <Label className="font-medium">Kanał SMS</Label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form?.smsEnabled)}
-                    onChange={(e) => setForm((prev) => (prev ? { ...prev, smsEnabled: e.target.checked } : prev))}
-                  />
-                  Aktywny
-                </label>
-                <Textarea
-                  rows={6}
-                  value={form?.smsBody ?? ""}
-                  onChange={(e) => setForm((prev) => (prev ? { ...prev, smsBody: e.target.value } : prev))}
-                  placeholder="Treść SMS"
-                />
-              </div>
-              <div className="space-y-2 rounded-xl border border-border p-3">
-                <Label className="font-medium">Kanał E-mail</Label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(form?.emailEnabled)}
-                    onChange={(e) => setForm((prev) => (prev ? { ...prev, emailEnabled: e.target.checked } : prev))}
-                  />
-                  Aktywny
-                </label>
-                <Input
-                  value={form?.emailSubject ?? ""}
-                  onChange={(e) => setForm((prev) => (prev ? { ...prev, emailSubject: e.target.value } : prev))}
-                  placeholder="Temat e-maila"
-                />
-                <Textarea
-                  rows={8}
-                  value={form?.emailBody ?? ""}
-                  onChange={(e) => setForm((prev) => (prev ? { ...prev, emailBody: e.target.value } : prev))}
-                  placeholder="Treść e-maila"
-                />
-              </div>
-              {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
-                <div className="space-y-2">
-                  <Label>Wyślij ile czasu przed wizytą</Label>
-                  <Select
-                    value={String(form?.timingMinutesBefore ?? "")}
-                    onValueChange={(v) => {
-                      const parsed = Number(v)
-                      if (Number.isNaN(parsed)) return
-                      setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Wybierz czas przypomnienia" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REMINDER_TIMING_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={String(opt.value)}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              <div className="text-xs text-muted-foreground">
-                Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{adres_firmy}}"}, {"{{nazwa_firmy}}"}
-              </div>
-            </div>
-            <div className="mt-auto flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            <div className="flex items-center justify-between gap-3 border-b border-border/70 px-6 py-5">
+              <h3 className="font-heading text-xl">
+                {editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
+              </h3>
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                Anuluj
-              </Button>
-              <Button type="submit" disabled={templatesUnavailable}>
-                Zapisz szablon
+                Zamknij
               </Button>
             </div>
-          </form>
-        </SheetContent>
-      </Sheet>
+            <form
+              onSubmit={submitForm}
+              className="premium-scrollbar flex flex-1 flex-col overflow-x-hidden overflow-y-auto"
+            >
+              <div className="flex-1 space-y-5 px-6 py-6">
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <div className="space-y-2 rounded-xl border border-border p-3">
+                    <Label className="font-medium">Kanał SMS</Label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form?.smsEnabled)}
+                        onChange={(e) => setForm((prev) => (prev ? { ...prev, smsEnabled: e.target.checked } : prev))}
+                      />
+                      Aktywny
+                    </label>
+                    <Textarea
+                      rows={10}
+                      value={form?.smsBody ?? ""}
+                      onChange={(e) => setForm((prev) => (prev ? { ...prev, smsBody: e.target.value } : prev))}
+                      placeholder="Treść SMS"
+                    />
+                  </div>
+                  <div className="space-y-2 rounded-xl border border-border p-3">
+                    <Label className="font-medium">Kanał E-mail</Label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form?.emailEnabled)}
+                        onChange={(e) => setForm((prev) => (prev ? { ...prev, emailEnabled: e.target.checked } : prev))}
+                      />
+                      Aktywny
+                    </label>
+                    <Input
+                      value={form?.emailSubject ?? ""}
+                      onChange={(e) => setForm((prev) => (prev ? { ...prev, emailSubject: e.target.value } : prev))}
+                      placeholder="Temat e-maila"
+                    />
+                    <Textarea
+                      rows={10}
+                      value={form?.emailBody ?? ""}
+                      onChange={(e) => setForm((prev) => (prev ? { ...prev, emailBody: e.target.value } : prev))}
+                      placeholder="Treść e-maila"
+                    />
+                  </div>
+                </div>
+                {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
+                  <div className="space-y-2">
+                    <Label>Wyślij ile czasu przed wizytą</Label>
+                    <Select
+                      value={String(form?.timingMinutesBefore ?? "")}
+                      onValueChange={(v) => {
+                        const parsed = Number(v)
+                        if (Number.isNaN(parsed)) return
+                        setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Wybierz czas przypomnienia" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {REMINDER_TIMING_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <div className="text-xs text-muted-foreground">
+                  Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{adres_firmy}}"}, {"{{nazwa_firmy}}"}
+                </div>
+              </div>
+              <div className="mt-auto flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+                  Anuluj
+                </Button>
+                <Button type="submit" disabled={templatesUnavailable}>
+                  Zapisz szablon
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
