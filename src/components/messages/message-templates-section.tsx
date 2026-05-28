@@ -114,7 +114,7 @@ Do zobaczenia,
   },
   booking_confirmation: {
     smsBody:
-      "Wizyta potwierdzona: {{usluga}}, {{data}} o {{godzina}}. Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
+      "Wizyta potwierdzona: {{usluga}}, {{data}} o {{godzina}}. Adres: {{adres_firmy}}. Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
     emailSubject: "Wizyta potwierdzona",
     emailBody: `Cześć {{imie}},
 
@@ -124,6 +124,7 @@ Szczegóły wizyty:
 - Usługa: {{usluga}}
 - Termin: {{data}} o {{godzina}}
 - Klient: {{imie}}
+- Adres: {{adres_firmy}}
 
 Zarządzaj wizytą:
 {{link_potwierdzenia}}

@@ -213,6 +213,24 @@ async function processOneBooking(admin: NonNullable<ReturnType<typeof getService
   const wantEmail = ch === "email" || ch === "both"
   const wantSms = ch === "sms" || ch === "both"
 
+  // Legacy path: dodatkowy guard wyścigu anulowania.
+  const { data: currentBooking } = await admin
+    .from("bookings")
+    .select("status")
+    .eq("id", row.id)
+    .maybeSingle()
+  if ((currentBooking?.status ?? "") === "cancelled") {
+    const cancelled: TablesUpdate<"bookings"> = {
+      reminder_sent_at: nowIso,
+      reminder_status: "skipped",
+      reminder_error: "booking_cancelled",
+      last_updated_by: "system",
+      updated_at: nowIso,
+    }
+    await admin.from("bookings").update(cancelled).eq("id", row.id)
+    return
+  }
+
   type ChannelResult = {
     channel: "email" | "sms"
     logStatus: string

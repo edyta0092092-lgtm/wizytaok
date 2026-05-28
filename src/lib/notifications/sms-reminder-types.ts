@@ -3,6 +3,7 @@ export type SmsReminderProviderId = "smsapi" | "szybkisms"
 export type AppointmentReminderSmsInput = {
   to: string
   businessName: string
+  businessAddress?: string | null
   serviceName?: string | null
   appointmentDate: string
   appointmentTime: string

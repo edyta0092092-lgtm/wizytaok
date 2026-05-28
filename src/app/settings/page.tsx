@@ -773,14 +773,6 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="grid min-w-0 gap-4 pt-4 sm:grid-cols-2">
-              <div className="sm:col-span-2 rounded-xl border border-primary/15 bg-primary/5 px-3 py-2.5 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">{t("auth.businessProfileTitle")}</p>
-                <p className="mt-1 leading-relaxed">{t("settings.supabaseProfileHint")}</p>
-              </div>
-              <div className="sm:col-span-2 rounded-xl border border-border/70 bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-                <p className="font-medium text-foreground">{t("settings.operatorStatusTitle")}</p>
-                <p className="mt-1 leading-relaxed">{t("settings.operatorStatusHint")}</p>
-              </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="businessName">{t("settings.businessNameLabel")}</Label>
                 <Input

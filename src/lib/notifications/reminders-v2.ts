@@ -234,6 +234,13 @@ async function processSingleReminder(
       link_anulowania: confirmUrl,
     }),
   }
+  const templateAddress = templateVars.adres_firmy?.trim() ?? ""
+  const withAddress = (body: string, kind: "email" | "sms"): string => {
+    const base = body.trim()
+    if (!templateAddress || base.toLowerCase().includes(templateAddress.toLowerCase())) return base
+    if (kind === "sms") return `${base} Adres: ${templateAddress}`
+    return `${base}\n\nAdres: ${templateAddress}`
+  }
   const message = {
     subject:
       runtime.emailSubject && runtime.emailSubject.trim().length > 0
@@ -241,13 +248,13 @@ async function processSingleReminder(
         : fallbackMessage.subject,
     text:
       runtime.emailBody && runtime.emailBody.trim().length > 0
-        ? applyTemplateVariables(runtime.emailBody, templateVars)
-        : fallbackMessage.text,
+        ? withAddress(applyTemplateVariables(runtime.emailBody, templateVars), "email")
+        : withAddress(fallbackMessage.text, "email"),
     html: fallbackMessage.html,
     sms:
       runtime.smsBody && runtime.smsBody.trim().length > 0
-        ? applyTemplateVariables(runtime.smsBody, templateVars)
-        : fallbackMessage.sms,
+        ? withAddress(applyTemplateVariables(runtime.smsBody, templateVars), "sms")
+        : withAddress(fallbackMessage.sms, "sms"),
   }
   const type = kind === "appointment_reminder_24h" ? "appointment_reminder_24h" : "appointment_reminder_short"
   const hasEmail = Boolean(row.client_email?.trim())
@@ -279,6 +286,19 @@ async function processSingleReminder(
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "template_disabled", false)
     return "skipped"
   }
+
+  // Double-check tuż przed wysyłką: jeśli wizyta została anulowana między
+  // pobraniem kolejki a próbą wysyłki, niczego nie wysyłamy.
+  const { data: currentBooking } = await admin
+    .from("bookings")
+    .select("status")
+    .eq("id", row.id)
+    .maybeSingle()
+  if ((currentBooking?.status ?? "") === "cancelled") {
+    await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "booking_cancelled", false)
+    return "skipped"
+  }
+
   const statuses: string[] = []
   const errors: string[] = []
 

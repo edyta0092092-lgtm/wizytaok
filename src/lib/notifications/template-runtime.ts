@@ -5,6 +5,8 @@ import type { Database, Tables } from "@/types/database"
 type Sb = SupabaseClient<Database>
 
 export type NotificationTemplateRuntime = {
+  smsExists: boolean
+  emailExists: boolean
   smsEnabled: boolean
   emailEnabled: boolean
   smsBody: string | null
@@ -16,7 +18,7 @@ export type NotificationTemplateRuntime = {
 const TYPE_ALIASES: Record<string, string[]> = {
   reminder_24h: ["reminder_24h", "reminder", "first_reminder_24h", "appointment_reminder_24h"],
   reminder_before_visit: ["reminder_before_visit", "second_reminder", "appointment_reminder_short"],
-  booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed"],
+  booking_confirmation: ["booking_confirmation", "confirmation", "booking_confirmed", "booking_created"],
   booking_cancelled_by_company: ["booking_cancelled_by_company", "company_cancelled_booking"],
   booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
@@ -53,6 +55,8 @@ export async function getTemplateRuntime(
     return {
       smsEnabled: false,
       emailEnabled: false,
+      smsExists: false,
+      emailExists: false,
       smsBody: null,
       emailSubject: null,
       emailBody: null,
@@ -70,6 +74,8 @@ export async function getTemplateRuntime(
     typeof timingCandidate === "number" && Number.isFinite(timingCandidate) ? Math.max(0, Math.floor(timingCandidate)) : null
 
   return {
+    smsExists: Boolean(sms),
+    emailExists: Boolean(email),
     smsEnabled: Boolean(sms && isActive(sms)),
     emailEnabled: Boolean(email && isActive(email)),
     smsBody: sms?.content?.trim() || null,

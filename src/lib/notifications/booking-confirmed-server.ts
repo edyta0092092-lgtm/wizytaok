@@ -1,5 +1,7 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
+import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { sendReminderSms } from "@/lib/notifications/sms"
+import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { TablesInsert } from "@/types/database"
 
@@ -14,6 +16,14 @@ type BookingPayload = {
   client_name: string
   client_phone: string | null
   client_email: string | null
+}
+
+type BusinessProfileRow = {
+  slug: string | null
+  business_name: string | null
+  phone: string | null
+  contact_phone: string | null
+  business_address: string | null
 }
 
 function getPublicAppOrigin(): string {
@@ -32,6 +42,7 @@ function formatTimeHmFromDb(t: string): string {
 
 function buildMessages(
   booking: BookingPayload,
+  businessAddress: string,
   language: "pl" | "en",
   confirmUrl: string
 ): { sms: string; emailSubject: string; emailText: string; emailHtml: string } {
@@ -41,17 +52,17 @@ function buildMessages(
   const service = booking.service_name
   if (language === "en") {
     return {
-      sms: `Thank you ${name}. Your appointment on ${dateLabel} at ${timeHm} is confirmed. Manage your appointment or cancel here: ${confirmUrl}`,
+      sms: `Thank you ${name}. Your appointment on ${dateLabel} at ${timeHm} is confirmed.${businessAddress ? ` Address: ${businessAddress}.` : ""} Manage your appointment or cancel here: ${confirmUrl}`,
       emailSubject: "Appointment confirmed",
-      emailText: `Thank you ${name},\n\nYour appointment is confirmed.\n\nService: ${service}\nTime: ${dateLabel} at ${timeHm}\n\nManage your appointment:\n${confirmUrl}\n\nUse this link to view appointment details or cancel your visit.`,
-      emailHtml: `<p>Thank you ${name},</p><p>Your appointment is confirmed.</p><p>Service: <strong>${service}</strong><br/>Time: ${dateLabel} at ${timeHm}</p><p><a href="${confirmUrl}">Manage your appointment</a></p><p>Use this link to view appointment details or cancel your visit.</p>`,
+      emailText: `Thank you ${name},\n\nYour appointment is confirmed.\n\nService: ${service}\nTime: ${dateLabel} at ${timeHm}${businessAddress ? `\nAddress: ${businessAddress}` : ""}\n\nManage your appointment:\n${confirmUrl}\n\nUse this link to view appointment details or cancel your visit.`,
+      emailHtml: `<p>Thank you ${name},</p><p>Your appointment is confirmed.</p><p>Service: <strong>${service}</strong><br/>Time: ${dateLabel} at ${timeHm}${businessAddress ? `<br/>Address: ${businessAddress}` : ""}</p><p><a href="${confirmUrl}">Manage your appointment</a></p><p>Use this link to view appointment details or cancel your visit.</p>`,
     }
   }
   return {
-    sms: `Dziękujemy ${name}. Twoja wizyta ${dateLabel} o ${timeHm} jest potwierdzona. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
+    sms: `Dziękujemy ${name}. Twoja wizyta ${dateLabel} o ${timeHm} jest potwierdzona.${businessAddress ? ` Adres: ${businessAddress}.` : ""} Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
     emailSubject: "Wizyta potwierdzona",
-    emailText: `Dziękujemy ${name},\n\nTwoja wizyta jest potwierdzona.\n\nUsługa: ${service}\nTermin: ${dateLabel} o ${timeHm}\n\nZarządzaj wizytą:\n${confirmUrl}\n\nPod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.`,
-    emailHtml: `<p>Dziękujemy ${name},</p><p>Twoja wizyta jest potwierdzona.</p><p>Usługa: <strong>${service}</strong><br/>Termin: ${dateLabel} o ${timeHm}</p><p><a href="${confirmUrl}">Zarządzaj wizytą</a></p><p>Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.</p>`,
+    emailText: `Dziękujemy ${name},\n\nTwoja wizyta jest potwierdzona.\n\nUsługa: ${service}\nTermin: ${dateLabel} o ${timeHm}${businessAddress ? `\nAdres: ${businessAddress}` : ""}\n\nZarządzaj wizytą:\n${confirmUrl}\n\nPod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.`,
+    emailHtml: `<p>Dziękujemy ${name},</p><p>Twoja wizyta jest potwierdzona.</p><p>Usługa: <strong>${service}</strong><br/>Termin: ${dateLabel} o ${timeHm}${businessAddress ? `<br/>Adres: ${businessAddress}` : ""}</p><p><a href="${confirmUrl}">Zarządzaj wizytą</a></p><p>Pod tym linkiem możesz sprawdzić szczegóły wizyty lub anulować wizytę.</p>`,
   }
 }
 
@@ -160,14 +171,56 @@ export async function confirmBookingAndNotify(
     client_email: typeof o.client_email === "string" ? o.client_email : null,
   }
 
+  const { data: businessRaw } = await admin
+    .from("business_profiles")
+    .select("slug,business_name,phone,contact_phone,business_address")
+    .eq("id", booking.business_id)
+    .maybeSingle()
+  const business =
+    businessRaw && typeof businessRaw === "object"
+      ? (businessRaw as BusinessProfileRow)
+      : null
+  const businessAddress = (business?.business_address ?? "").trim()
+
   const confirmUrl = `${getPublicAppOrigin()}/confirm/${encodeURIComponent(booking.confirmation_token || booking.id)}`
-  const messages = buildMessages(booking, language, confirmUrl)
+  const fallbackMessages = buildMessages(booking, businessAddress, language, confirmUrl)
+  const templateRuntime = await getTemplateRuntime(admin, booking.business_id, "booking_confirmation")
+  const dateLabel = String(booking.appointment_date).slice(0, 10)
+  const timeHm = formatTimeHmFromDb(booking.appointment_time)
+  const templateVars: Record<string, string> = {
+    imie: booking.client_name.split(/\s+/)[0] || booking.client_name,
+    data: dateLabel,
+    godzina: timeHm,
+    usluga: booking.service_name,
+    osoba: "",
+    ...buildBusinessTemplateVars(business, {
+      link_potwierdzenia: confirmUrl,
+      link_anulowania: confirmUrl,
+    }),
+  }
+  const messages = {
+    emailSubject:
+      templateRuntime.emailSubject && templateRuntime.emailSubject.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.emailSubject, templateVars)
+        : fallbackMessages.emailSubject,
+    emailText:
+      templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.emailBody, templateVars)
+        : fallbackMessages.emailText,
+    emailHtml: fallbackMessages.emailHtml,
+    sms:
+      templateRuntime.smsBody && templateRuntime.smsBody.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.smsBody, templateVars)
+        : fallbackMessages.sms,
+  }
+  const wantSms = templateRuntime.smsExists ? templateRuntime.smsEnabled : true
+  const wantEmail = templateRuntime.emailExists ? templateRuntime.emailEnabled : true
   const nowIso = new Date().toISOString()
 
   let smsStatus = "skipped"
   let emailStatus = "skipped"
 
-  if (booking.client_phone?.trim()) {
+  if (wantSms && booking.client_phone?.trim()) {
     const sms = await sendReminderSms({ to: booking.client_phone.trim(), body: messages.sms })
     smsStatus = sms.ok ? "sent" : sms.code
     await insertNotificationLog(booking, {
@@ -183,7 +236,7 @@ export async function confirmBookingAndNotify(
     })
   }
 
-  if (booking.client_email?.trim()) {
+  if (wantEmail && booking.client_email?.trim()) {
     const email = await sendReminderEmail({
       to: booking.client_email.trim(),
       subject: messages.emailSubject,

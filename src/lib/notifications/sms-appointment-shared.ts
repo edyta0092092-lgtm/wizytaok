@@ -6,6 +6,7 @@ import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-re
  */
 export function buildSmsMessage(input: {
   serviceName?: string | null
+  businessAddress?: string | null
   appointmentDate: string
   appointmentTime: string
   manageUrl: string
@@ -17,13 +18,14 @@ export function buildSmsMessage(input: {
   )
   const appointmentDateTime = `${dateLabel}, ${timeLabel}`
   const service = input.serviceName?.trim() || (input.language === "en" ? "appointment" : "wizyta")
+  const address = input.businessAddress?.trim() ?? ""
   const confirmUrl = input.manageUrl.trim()
 
   if (input.language === "en") {
-    return `Appointment reminder: ${service}, ${appointmentDateTime}. Manage or cancel your appointment: ${confirmUrl}`
+    return `Appointment reminder: ${service}, ${appointmentDateTime}.${address ? ` Address: ${address}.` : ""} Manage or cancel your appointment: ${confirmUrl}`
   }
 
-  return `Przypomnienie o wizycie: ${service}, ${appointmentDateTime}. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`
+  return `Przypomnienie o wizycie: ${service}, ${appointmentDateTime}.${address ? ` Adres: ${address}.` : ""} Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`
 }
 
 /** MSISDN bez „+” (SMSAPI). */

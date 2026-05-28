@@ -73,7 +73,6 @@ export function buildBookingCancelledMessages(
 } {
   const appointmentDateTime = vars.termin ?? vars.data ?? ""
   const serviceName = vars.usluga ?? ""
-
   const defaultSmsPl = `Wizyta odwołana: ${serviceName}, ${appointmentDateTime}.`
   const defaultSmsEn = `Appointment cancelled: ${serviceName}, ${appointmentDateTime}.`
   const defaultSms = language === "en" ? defaultSmsEn : defaultSmsPl

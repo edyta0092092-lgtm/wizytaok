@@ -392,6 +392,15 @@ function resolveBusinessName(business: BusinessRow | null): string {
   return name && name.length > 0 ? name : "WizytaOK"
 }
 
+async function isBookingCancelledNow(admin: AdminClient, bookingId: string): Promise<boolean> {
+  const { data } = await admin
+    .from("bookings")
+    .select("status")
+    .eq("id", bookingId)
+    .maybeSingle()
+  return (data?.status ?? "") === "cancelled"
+}
+
 // ---------------------------------------------------------------------------
 // EMAIL
 // ---------------------------------------------------------------------------
@@ -424,6 +433,11 @@ async function processEmailReminder(
     const replyTo =
       business?.email && business.email.trim().length > 0 ? business.email.trim() : null
     const manageUrl = resolveManageUrl(booking)
+
+    if (await isBookingCancelledNow(admin, booking.id)) {
+      await markSkipped(admin, item.id, "booking_cancelled_race")
+      return "skipped"
+    }
 
     const emailResult: AppointmentReminderEmailResult = await sendAppointmentReminderEmail({
       to: recipient,
@@ -572,9 +586,15 @@ async function processSmsReminder(
     }
 
     const businessName = resolveBusinessName(business)
+
+    if (await isBookingCancelledNow(admin, booking.id)) {
+      await markSkipped(admin, item.id, "booking_cancelled_race")
+      return "skipped"
+    }
     const smsResult: AppointmentReminderSmsResult = await sendAppointmentReminderSms({
       to: phone,
       businessName,
+      businessAddress: business?.business_address ?? null,
       serviceName: booking.service_name,
       appointmentDate: booking.appointment_date,
       appointmentTime: booking.appointment_time,

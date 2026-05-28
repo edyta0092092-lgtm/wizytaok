@@ -1,6 +1,8 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
+import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import {
   buildTransactionalEmailHtml,
   buildTransactionalEmailText,
@@ -38,6 +40,14 @@ type BookingRow = {
   client_name: string
   client_phone: string | null
   client_email: string | null
+}
+
+type BusinessRow = {
+  slug: string | null
+  business_name: string | null
+  phone: string | null
+  contact_phone: string | null
+  business_address: string | null
 }
 
 function getPublicAppOrigin(): string {
@@ -111,6 +121,7 @@ function channelDetail(
 
 function buildMessages(
   booking: BookingRow,
+  business: BusinessRow | null,
   language: "pl" | "en",
   confirmUrl: string,
 ) {
@@ -121,17 +132,20 @@ function buildMessages(
     String(booking.appointment_time),
     language,
   )
+  const businessAddress = business?.business_address?.trim() ?? ""
 
   const detailRows = language === "en"
     ? [
         { label: "Service", value: serviceName },
         { label: "Date and time", value: appointmentDateTime },
         { label: "Client", value: clientName },
+        ...(businessAddress ? [{ label: "Address", value: businessAddress }] : []),
       ]
     : [
         { label: "Usługa", value: serviceName },
         { label: "Termin", value: appointmentDateTime },
         { label: "Klient", value: clientName },
+        ...(businessAddress ? [{ label: "Adres", value: businessAddress }] : []),
       ]
 
   const emailSubject = language === "en" ? "Appointment confirmed" : "Wizyta potwierdzona"
@@ -174,8 +188,8 @@ function buildMessages(
   return {
     sms:
       language === "en"
-        ? `Appointment confirmed: ${serviceName}, ${appointmentDateTime}. Manage or cancel: ${confirmUrl}`
-        : `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}. Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
+        ? `Appointment confirmed: ${serviceName}, ${appointmentDateTime}.${businessAddress ? ` Address: ${businessAddress}.` : ""} Manage or cancel: ${confirmUrl}`
+        : `Wizyta potwierdzona: ${serviceName}, ${appointmentDateTime}.${businessAddress ? ` Adres: ${businessAddress}.` : ""} Zarządzaj wizytą lub anuluj ją tutaj: ${confirmUrl}`,
     emailSubject,
     emailText,
     emailHtml,
@@ -306,13 +320,56 @@ export async function sendBookingCreatedNotifications(
     }
   }
 
+  const { data: businessRaw } = await admin
+    .from("business_profiles")
+    .select("slug,business_name,phone,contact_phone,business_address")
+    .eq("id", booking.business_id)
+    .maybeSingle()
+  const business =
+    businessRaw && typeof businessRaw === "object"
+      ? (businessRaw as BusinessRow)
+      : null
+
   const confirmUrl = buildConfirmUrl(booking.confirmation_token)
-  const messages = buildMessages(booking, language, confirmUrl)
+  const fallbackMessages = buildMessages(booking, business, language, confirmUrl)
+  const templateRuntime = await getTemplateRuntime(admin, booking.business_id, "booking_confirmation")
+  const dateLabel = String(booking.appointment_date).slice(0, 10)
+  const timeHm = formatTimeHmFromDb(booking.appointment_time)
+  const templateVars: Record<string, string> = {
+    imie: booking.client_name.split(/\s+/)[0] || booking.client_name,
+    data: dateLabel,
+    godzina: timeHm,
+    usluga: booking.service_name,
+    osoba: "",
+    ...buildBusinessTemplateVars(business, {
+      link_potwierdzenia: confirmUrl,
+      link_anulowania: confirmUrl,
+    }),
+  }
+  const messages = {
+    emailSubject:
+      templateRuntime.emailSubject && templateRuntime.emailSubject.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.emailSubject, templateVars)
+        : fallbackMessages.emailSubject,
+    emailText:
+      templateRuntime.emailBody && templateRuntime.emailBody.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.emailBody, templateVars)
+        : fallbackMessages.emailText,
+    emailHtml: fallbackMessages.emailHtml,
+    sms:
+      templateRuntime.smsBody && templateRuntime.smsBody.trim().length > 0
+        ? applyTemplateVariables(templateRuntime.smsBody, templateVars)
+        : fallbackMessages.sms,
+  }
+  const wantEmail = templateRuntime.emailExists ? templateRuntime.emailEnabled : true
+  const wantSms = templateRuntime.smsExists ? templateRuntime.smsEnabled : true
   const nowIso = new Date().toISOString()
 
   let emailResult: BookingCreatedChannelDetail = channelDetail("missing")
   const email = booking.client_email ?? ""
-  if (!email) {
+  if (!wantEmail) {
+    emailResult = channelDetail("skipped")
+  } else if (!email) {
     emailResult = channelDetail("missing")
   } else if (await hasAlreadySentLog(admin, booking.id, "email")) {
     emailResult = channelDetail("already_sent")
@@ -389,7 +446,9 @@ export async function sendBookingCreatedNotifications(
   let smsResult: BookingCreatedChannelDetail = channelDetail("missing")
   const phone = booking.client_phone ?? ""
   const smsProvider = getActiveSmsReminderProvider()
-  if (!phone) {
+  if (!wantSms) {
+    smsResult = channelDetail("skipped")
+  } else if (!phone) {
     smsResult = channelDetail("missing")
   } else if (await hasAlreadySentLog(admin, booking.id, "sms")) {
     smsResult = channelDetail("already_sent", { provider: smsProvider })
