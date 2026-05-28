@@ -290,6 +290,7 @@ export function MessageTemplatesSection({
   const [form, setForm] = React.useState<GroupedTemplate | null>(null)
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
+  const dialogRef = React.useRef<HTMLDivElement | null>(null)
 
   const openCreate = React.useCallback(() => {
     if (readOnly) return
@@ -377,12 +378,21 @@ export function MessageTemplatesSection({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSheetOpen(false)
     }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (!target) return
+      if (dialogRef.current && !dialogRef.current.contains(target)) {
+        setSheetOpen(false)
+      }
+    }
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     window.addEventListener("keydown", onKeyDown)
+    window.addEventListener("pointerdown", onPointerDown)
     return () => {
       document.body.style.overflow = prevOverflow
       window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener("pointerdown", onPointerDown)
     }
   }, [sheetOpen, readOnly])
 
@@ -580,14 +590,13 @@ export function MessageTemplatesSection({
       {!readOnly && sheetOpen ? (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 sm:p-6"
-          onClick={() => setSheetOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label={editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
         >
           <div
+            ref={dialogRef}
             className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between gap-3 border-b border-border/70 px-6 py-5">
               <h3 className="font-heading text-xl">
