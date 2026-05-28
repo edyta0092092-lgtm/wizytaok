@@ -107,7 +107,7 @@ export async function POST(req: Request) {
 
   const { data: profile, error: profErr } = await supabase
     .from("business_profiles")
-    .select("id, slug, phone, business_name")
+    .select("id, slug, phone, contact_phone, business_name, business_address")
     .eq("id", booking.business_id)
     .maybeSingle()
 

@@ -9,7 +9,10 @@ import type { Tables } from "@/types/database"
 
 export type { CancelNotifyLanguage }
 
-type BusinessRow = Pick<Tables<"business_profiles">, "id" | "slug" | "phone" | "business_name">
+type BusinessRow = Pick<
+  Tables<"business_profiles">,
+  "id" | "slug" | "phone" | "contact_phone" | "business_name" | "business_address"
+>
 
 /**
  * Po anulowaniu wizyty przez firmę — SMS i e-mail z potwierdzeniem „Wizyta odwołana”.

@@ -1617,6 +1617,16 @@ Pozdrawiamy,
       supabaseProfileHint:
         "Zalogowany użytkownik: nazwa firmy, adres strony rezerwacji i kontakt zapisują się w Supabase. Pozostałe ustawienia nadal działają lokalnie w tej przeglądarce.",
       businessNameLabel: "Nazwa firmy",
+      businessAddressLabel: "Lokalizacja firmy",
+      businessAddressPlaceholder: "Wpisz adres i wybierz z listy",
+      businessAddressHint:
+        "Adres pojawi się w SMS-ach i e-mailach z przypomnieniami o wizytach.",
+      businessAddressRequired: "Podaj lokalizację firmy.",
+      businessAddressPickFromList: "Wybierz adres z listy podpowiedzi Google.",
+      businessAddressManualHint:
+        "Uzupełnij pełny adres ręcznie (autouzupełnianie wymaga klucza Google Maps w konfiguracji).",
+      businessAddressMapsError:
+        "Nie udało się załadować map Google — wpisz pełny adres ręcznie.",
       emailLabel: "E-mail",
       phoneLabel: "Telefon",
       phoneDialAria: "Kod kraju",
@@ -4047,6 +4057,16 @@ Regards,
       supabaseProfileHint:
         "When signed in, business name, booking page address and contact are stored in Supabase. Other settings still work locally in this browser.",
       businessNameLabel: "Business name",
+      businessAddressLabel: "Business location",
+      businessAddressPlaceholder: "Type an address and pick from the list",
+      businessAddressHint:
+        "This address appears in SMS and email appointment reminders.",
+      businessAddressRequired: "Enter your business location.",
+      businessAddressPickFromList: "Pick an address from the Google suggestions list.",
+      businessAddressManualHint:
+        "Enter the full address manually (autocomplete requires a Google Maps API key).",
+      businessAddressMapsError:
+        "Could not load Google Maps — enter the full address manually.",
       emailLabel: "Email",
       phoneLabel: "Phone",
       phoneDialAria: "Country code",

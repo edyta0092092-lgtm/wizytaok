@@ -80,7 +80,7 @@ const TEMPLATE_DEFAULT_CONTENT: Record<
 > = {
   reminder_24h: {
     smsBody:
-      "Cześć {{imie}}, przypominamy o Twojej wizycie jutro o {{godzina}} ({{usluga}}). Zarządzaj wizytą lub anuluj ją tutaj: {{link_potwierdzenia}}",
+      "Cześć {{imie}}, przypominamy o Twojej wizycie jutro o {{godzina}} ({{usluga}}). Adres: {{adres_firmy}}. Zarządzaj wizytą: {{link_potwierdzenia}}",
     emailSubject: "Przypomnienie o wizycie jutro",
     emailBody: `Cześć {{imie}},
 
@@ -89,6 +89,7 @@ przypominamy o Twojej wizycie:
 - Godzina: {{godzina}}
 - Usługa: {{usluga}}
 - Osoba: {{osoba}}
+- Adres: {{adres_firmy}}
 
 Zarządzaj wizytą (możesz też anulować wizytę, jeśli nie możesz przyjść):
 {{link_potwierdzenia}}
@@ -98,7 +99,7 @@ Pozdrawiamy,
   },
   reminder_before_visit: {
     smsBody:
-      "Cześć {{imie}}, przypominamy o dzisiejszej wizycie o {{godzina}} ({{usluga}}). Do zobaczenia!",
+      "Cześć {{imie}}, przypominamy o dzisiejszej wizycie o {{godzina}} ({{usluga}}). Adres: {{adres_firmy}}. Do zobaczenia!",
     emailSubject: "Przypomnienie o dzisiejszej wizycie",
     emailBody: `Cześć {{imie}},
 
@@ -106,6 +107,7 @@ to krótkie przypomnienie o Twojej dzisiejszej wizycie:
 - Godzina: {{godzina}}
 - Usługa: {{usluga}}
 - Osoba: {{osoba}}
+- Adres: {{adres_firmy}}
 
 Do zobaczenia,
 {{nazwa_firmy}}`,
@@ -557,7 +559,7 @@ export function MessageTemplatesSection({
                 </div>
               ) : null}
               <div className="text-xs text-muted-foreground">
-                Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{nazwa_firmy}}"}
+                Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{adres_firmy}}"}, {"{{nazwa_firmy}}"}
               </div>
             </div>
             <div className="mt-auto flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">

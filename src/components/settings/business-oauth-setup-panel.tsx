@@ -9,7 +9,15 @@ import {
   loadOAuthSetupPrefillAction,
   type OAuthSetupAccountType,
 } from "@/app/settings/business-oauth-setup-actions"
+import {
+  BusinessAddressAutocomplete,
+  businessAddressRequiresPlaceId,
+} from "@/components/forms/business-address-autocomplete"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
+import {
+  isBusinessAddressEntryValid,
+  normalizeBusinessAddress,
+} from "@/lib/business/business-address"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -39,6 +47,8 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
   const [error, setError] = React.useState<string | null>(null)
 
   const [businessName, setBusinessName] = React.useState("")
+  const [businessAddress, setBusinessAddress] = React.useState("")
+  const [businessAddressPlaceId, setBusinessAddressPlaceId] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [ownerFirstName, setOwnerFirstName] = React.useState("")
   const [ownerLastName, setOwnerLastName] = React.useState("")
@@ -88,6 +98,19 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
       setError(t("auth.signupBusinessNameRequired"))
       return
     }
+    const addressNormalized = normalizeBusinessAddress(businessAddress)
+    if (
+      !isBusinessAddressEntryValid(addressNormalized, businessAddressPlaceId, {
+        requirePlaceId: businessAddressRequiresPlaceId(),
+      })
+    ) {
+      setError(
+        !addressNormalized
+          ? t("settings.businessAddressRequired")
+          : t("settings.businessAddressPickFromList"),
+      )
+      return
+    }
     if (!ownerFirstName.trim()) {
       setError(t("auth.signupOwnerFirstRequired"))
       return
@@ -120,6 +143,8 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
       const phone = buildStoredInternationalPhone(phoneDialCode, phoneNational)
       const result = await completeOAuthBusinessSetupAction({
         businessName: businessName.trim(),
+        businessAddress: addressNormalized,
+        businessAddressPlaceId: businessAddressPlaceId.trim(),
         email: email.trim(),
         phone,
         accountType,
@@ -135,6 +160,14 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
         }
         if (result.code === "slug_taken") {
           setError(t("auth.slugTaken"))
+          return
+        }
+        if (result.code === "missing_business_address") {
+          setError(t("settings.businessAddressRequired"))
+          return
+        }
+        if (result.code === "invalid_business_address") {
+          setError(t("settings.businessAddressPickFromList"))
           return
         }
         if (result.code === "missing_tax_id") {
@@ -249,6 +282,23 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
               className="h-11 rounded-xl"
               disabled={saving}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="oauth-business-address">{t("settings.businessAddressLabel")}</Label>
+            <BusinessAddressAutocomplete
+              id="oauth-business-address"
+              value={businessAddress}
+              placeId={businessAddressPlaceId}
+              onValueChange={setBusinessAddress}
+              onPlaceIdChange={setBusinessAddressPlaceId}
+              disabled={saving}
+              placeholder={t("settings.businessAddressPlaceholder")}
+              pickFromListHint={t("settings.businessAddressPickFromList")}
+              manualEntryHint={t("settings.businessAddressManualHint")}
+              mapsLoadErrorHint={t("settings.businessAddressMapsError")}
+            />
+            <p className="text-xs text-muted-foreground">{t("settings.businessAddressHint")}</p>
           </div>
 
           <div className="space-y-2">

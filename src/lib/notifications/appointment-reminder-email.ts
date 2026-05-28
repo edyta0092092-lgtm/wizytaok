@@ -77,6 +77,8 @@ export function getClientFirstName(
 export type AppointmentReminderEmailInput = {
   to: string
   businessName: string
+  /** Adres firmy — widoczny w treści przypomnienia. */
+  businessAddress?: string | null
   appointmentDate: string
   appointmentTime: string
   serviceName: string | null
@@ -132,6 +134,10 @@ export async function sendAppointmentReminderEmail(
     { label: "Usługa", value: trimmedService },
     { label: "Termin", value: appointmentDateTime },
   ]
+  const trimmedAddress = input.businessAddress?.trim()
+  if (trimmedAddress && trimmedAddress.length > 0) {
+    detailRows.push({ label: "Adres", value: trimmedAddress })
+  }
   const trimmedStaff = input.staffName?.trim()
   if (trimmedStaff && trimmedStaff.length > 0) {
     detailRows.push({ label: "Osoba", value: trimmedStaff })

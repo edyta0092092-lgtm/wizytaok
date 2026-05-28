@@ -123,6 +123,8 @@ export interface Database {
           company_tax_id_normalized: string | null
           contact_phone: string | null
           contact_phone_normalized: string | null
+          business_address: string | null
+          business_address_place_id: string | null
           default_reminder_hours: number
           second_reminder_minutes: number
           reminder_channel: string
@@ -161,6 +163,8 @@ export interface Database {
           company_tax_id_normalized?: string | null
           contact_phone?: string | null
           contact_phone_normalized?: string | null
+          business_address?: string | null
+          business_address_place_id?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
           reminder_channel?: string
@@ -199,6 +203,8 @@ export interface Database {
           company_tax_id_normalized?: string | null
           contact_phone?: string | null
           contact_phone_normalized?: string | null
+          business_address?: string | null
+          business_address_place_id?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
           reminder_channel?: string

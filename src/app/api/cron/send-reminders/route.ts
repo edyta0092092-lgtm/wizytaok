@@ -88,6 +88,7 @@ type BookingRow = {
 type BusinessRow = {
   id: string
   business_name: string | null
+  business_address: string | null
   email: string | null
 }
 
@@ -372,7 +373,7 @@ async function loadBookingAndBusiness(
 
   const { data: businessRaw } = await admin
     .from("business_profiles")
-    .select("id, business_name, email")
+    .select("id, business_name, business_address, email")
     .eq("id", item.business_id)
     .maybeSingle()
   const business = (businessRaw ?? null) as BusinessRow | null
@@ -427,6 +428,7 @@ async function processEmailReminder(
     const emailResult: AppointmentReminderEmailResult = await sendAppointmentReminderEmail({
       to: recipient,
       businessName,
+      businessAddress: business?.business_address ?? null,
       appointmentDate: booking.appointment_date,
       appointmentTime: booking.appointment_time,
       serviceName: booking.service_name,

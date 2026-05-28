@@ -36,7 +36,7 @@ export async function POST(req: Request) {
 
   const { data: business } = await admin
     .from("business_profiles")
-    .select("slug,phone,business_name")
+    .select("slug,phone,contact_phone,business_name,business_address")
     .eq("id", booking.business_id)
     .maybeSingle()
 

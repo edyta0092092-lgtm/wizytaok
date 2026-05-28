@@ -5,6 +5,8 @@ import {
   getTemplateRuntime,
   type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
+import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { getPublicAppOrigin } from "@/lib/notifications/public-app-origin"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { insertNotificationLog as persistNotificationLog } from "@/lib/notifications/notification-log-insert"
@@ -12,6 +14,11 @@ import type { TablesInsert, TablesUpdate } from "@/types/database"
 
 type BusinessProfileJoin = {
   reminder_channel: string | null
+  slug?: string | null
+  business_name?: string | null
+  phone?: string | null
+  contact_phone?: string | null
+  business_address?: string | null
 } | null
 
 type DueBookingRow = {
@@ -39,14 +46,6 @@ type DueBookingRow = {
 type ReminderKind = "appointment_reminder_24h" | "appointment_reminder_short"
 type ReminderTemplateType = "reminder_24h" | "reminder_before_visit"
 
-function getPublicAppOrigin(): string {
-  const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
-  if (explicit) return explicit.replace(/\/$/, "")
-  const vercel = process.env.VERCEL_URL?.trim()
-  if (vercel) return `https://${vercel.replace(/^https?:\/\//, "")}`
-  return "http://localhost:3000"
-}
-
 function reminderLocale(): "pl" | "en" {
   return process.env.REMINDER_LOCALE?.trim().toLowerCase() === "en" ? "en" : "pl"
 }
@@ -64,37 +63,56 @@ function escapeHtml(s: string): string {
 function buildMessage(
   kind: ReminderKind,
   lang: "pl" | "en",
-  payload: { clientName: string; serviceName: string; dateLabel: string; timeHm: string; confirmUrl: string }
+  payload: {
+    clientName: string
+    serviceName: string
+    dateLabel: string
+    timeHm: string
+    confirmUrl: string
+    businessAddress?: string
+  }
 ) {
+  const addressLine =
+    payload.businessAddress && payload.businessAddress.trim().length > 0
+      ? lang === "en"
+        ? `\nAddress: ${payload.businessAddress.trim()}`
+        : `\nAdres: ${payload.businessAddress.trim()}`
+      : ""
+  const addressSms =
+    payload.businessAddress && payload.businessAddress.trim().length > 0
+      ? lang === "en"
+        ? ` Address: ${payload.businessAddress.trim()}`
+        : ` Adres: ${payload.businessAddress.trim()}`
+      : ""
   if (kind === "appointment_reminder_short") {
     if (lang === "en") {
       return {
         subject: "Appointment reminder",
-        text: `Hi ${payload.clientName},\n\nthis is a reminder about your appointment today at ${payload.timeHm}.\n\nService: ${payload.serviceName}\nDate: ${payload.dateLabel} at ${payload.timeHm}\n\nSee you soon,\nYour business`,
+        text: `Hi ${payload.clientName},\n\nthis is a reminder about your appointment today at ${payload.timeHm}.\n\nService: ${payload.serviceName}\nDate: ${payload.dateLabel} at ${payload.timeHm}${addressLine}\n\nSee you soon,\nYour business`,
         html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder about your appointment today at ${escapeHtml(payload.timeHm)}.</p><p>Service: <strong>${escapeHtml(payload.serviceName)}</strong><br/>Date: ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}</p><p>See you soon,<br/>Your business</p>`,
-        sms: `Hi ${payload.clientName}, this is a reminder about your appointment today at ${payload.timeHm} - ${payload.serviceName}. See you soon!`,
+        sms: `Hi ${payload.clientName}, this is a reminder about your appointment today at ${payload.timeHm} - ${payload.serviceName}.${addressSms} See you soon!`,
       }
     }
     return {
       subject: "Przypomnienie o wizycie",
-      text: `Cześć ${payload.clientName},\n\nprzypominamy o Twojej wizycie dziś o ${payload.timeHm}.\n\nUsługa: ${payload.serviceName}\nTermin: ${payload.dateLabel} o ${payload.timeHm}\n\nDo zobaczenia,\nTwoja firma`,
+      text: `Cześć ${payload.clientName},\n\nprzypominamy o Twojej wizycie dziś o ${payload.timeHm}.\n\nUsługa: ${payload.serviceName}\nTermin: ${payload.dateLabel} o ${payload.timeHm}${addressLine}\n\nDo zobaczenia,\nTwoja firma`,
       html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o Twojej wizycie dziś o ${escapeHtml(payload.timeHm)}.</p><p>Usługa: <strong>${escapeHtml(payload.serviceName)}</strong><br/>Termin: ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}</p><p>Do zobaczenia,<br/>Twoja firma</p>`,
-      sms: `Cześć ${payload.clientName}, przypominamy o wizycie dziś o ${payload.timeHm} - ${payload.serviceName}. Do zobaczenia!`,
+      sms: `Cześć ${payload.clientName}, przypominamy o wizycie dziś o ${payload.timeHm} - ${payload.serviceName}.${addressSms} Do zobaczenia!`,
     }
   }
   if (lang === "en") {
     return {
       subject: "Appointment reminder",
-      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}. Manage your appointment or cancel if needed: ${payload.confirmUrl}`,
+      text: `Hi ${payload.clientName}, this is a reminder for your appointment: ${payload.serviceName} on ${payload.dateLabel} at ${payload.timeHm}.${addressLine}\n\nManage your appointment or cancel if needed: ${payload.confirmUrl}`,
       html: `<p>Hi ${escapeHtml(payload.clientName)},</p><p>This is a reminder for your appointment: <strong>${escapeHtml(payload.serviceName)}</strong> on ${escapeHtml(payload.dateLabel)} at ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Manage appointment</a> — view details or cancel if you cannot attend.</p>`,
-      sms: `Appointment reminder: ${payload.serviceName}, ${payload.dateLabel} at ${payload.timeHm}. Manage your appointment or cancel: ${payload.confirmUrl}`,
+      sms: `Appointment reminder: ${payload.serviceName}, ${payload.dateLabel} at ${payload.timeHm}.${addressSms} Manage: ${payload.confirmUrl}`,
     }
   }
   return {
     subject: "Przypomnienie o wizycie",
-    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${payload.confirmUrl}`,
+    text: `Cześć ${payload.clientName}, przypominamy o wizycie: ${payload.serviceName} dnia ${payload.dateLabel} o ${payload.timeHm}.${addressLine}\n\nZarządzaj wizytą lub anuluj ją tutaj: ${payload.confirmUrl}`,
     html: `<p>Cześć ${escapeHtml(payload.clientName)},</p><p>Przypominamy o wizycie: <strong>${escapeHtml(payload.serviceName)}</strong> dnia ${escapeHtml(payload.dateLabel)} o ${escapeHtml(payload.timeHm)}.</p><p><a href="${escapeHtml(payload.confirmUrl)}">Zarządzaj wizytą</a> — sprawdź szczegóły wizyty lub anuluj wizytę, jeśli nie możesz przyjść.</p>`,
-    sms: `Przypomnienie o wizycie: ${payload.serviceName}, ${payload.dateLabel} o ${payload.timeHm}. Zarządzaj wizytą lub anuluj ją tutaj: ${payload.confirmUrl}`,
+    sms: `Przypomnienie o wizycie: ${payload.serviceName}, ${payload.dateLabel} o ${payload.timeHm}.${addressSms} Zarządzaj: ${payload.confirmUrl}`,
   }
 }
 
@@ -183,12 +201,18 @@ async function processSingleReminder(
   const confirmUrl = `${origin}/confirm/${encodeURIComponent(row.confirmation_token)}?source=reminder`
   const timeHm = formatTimeHmFromDb(row.appointment_time)
   const dateLabel = String(row.appointment_date).slice(0, 10)
+  const businessJoin = row.business_profiles
+  const businessAddress =
+    typeof businessJoin?.business_address === "string"
+      ? businessJoin.business_address.trim()
+      : ""
   const fallbackMessage = buildMessage(kind, lang, {
     clientName: row.client_name,
     serviceName: row.service_name,
     dateLabel,
     timeHm,
     confirmUrl,
+    businessAddress,
   })
   const templateType = reminderTemplateType(kind)
   const runtime = await getTemplateRuntime(admin, row.business_id, templateType)
@@ -205,11 +229,10 @@ async function processSingleReminder(
     usluga: row.service_name,
     osoba: staffDisplayName,
     imie_osoby: staffFirstName,
-    link_rezerwacji: "",
-    link_potwierdzenia: confirmUrl,
-    link_anulowania: confirmUrl,
-    telefon_firmy: "",
-    nazwa_firmy: "",
+    ...buildBusinessTemplateVars(businessJoin, {
+      link_potwierdzenia: confirmUrl,
+      link_anulowania: confirmUrl,
+    }),
   }
   const message = {
     subject:
@@ -359,7 +382,7 @@ export async function processDueBookingReminders(): Promise<{
   const { data, error } = await admin
     .from("bookings")
     .select(
-      "id,business_id,confirmation_token,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status,staff_name,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,business_profiles(reminder_channel),staff_members(name)"
+      "id,business_id,confirmation_token,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status,staff_name,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,business_profiles(reminder_channel,slug,business_name,phone,contact_phone,business_address),staff_members(name)"
     )
     .in("status", ["booked", "pending", "confirmed"])
 

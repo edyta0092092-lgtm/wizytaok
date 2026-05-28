@@ -19,7 +19,15 @@ import { BillingRequiredSettingsBanner } from "@/components/billing/billing-requ
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
+import {
+  BusinessAddressAutocomplete,
+  businessAddressRequiresPlaceId,
+} from "@/components/forms/business-address-autocomplete"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
+import {
+  isBusinessAddressEntryValid,
+  normalizeBusinessAddress,
+} from "@/lib/business/business-address"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
@@ -62,6 +70,8 @@ const SETTINGS_STORAGE_KEY = "pw_settings_form_v2"
 
 type SettingsForm = {
   businessName: string
+  businessAddress: string
+  businessAddressPlaceId: string
   publicSlug: string
   email: string
   phoneDialCode: string
@@ -78,6 +88,8 @@ type SettingsForm = {
 
 const demoSettings: SettingsForm = {
   businessName: "Studio WizytaOK",
+  businessAddress: "ul. Przykładowa 1, 00-001 Warszawa",
+  businessAddressPlaceId: "",
   publicSlug: "rezerwacje",
   email: "kontakt@example.pl",
   phoneDialCode: "+48",
@@ -94,6 +106,8 @@ const demoSettings: SettingsForm = {
 
 const emptySettings: SettingsForm = {
   businessName: "",
+  businessAddress: "",
+  businessAddressPlaceId: "",
   publicSlug: "",
   email: "",
   phoneDialCode: "+48",
@@ -165,6 +179,7 @@ export default function SettingsPage() {
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [taxIdEmptySaveError, setTaxIdEmptySaveError] = React.useState(false)
+  const [addressSaveError, setAddressSaveError] = React.useState(false)
 
   const stripeReturnHandledRef = React.useRef(false)
   React.useEffect(() => {
@@ -292,6 +307,12 @@ export default function SettingsPage() {
           setForm((f) => ({
             ...f,
             businessName: data.business_name,
+            businessAddress:
+              typeof data.business_address === "string" ? data.business_address : "",
+            businessAddressPlaceId:
+              typeof data.business_address_place_id === "string"
+                ? data.business_address_place_id
+                : "",
             publicSlug: data.slug,
             email: data.email ?? user.email ?? f.email,
             phoneDialCode: phoneParts.dialCode,
@@ -412,6 +433,7 @@ export default function SettingsPage() {
     e.preventDefault()
     setSaveError(null)
     setTaxIdEmptySaveError(false)
+    setAddressSaveError(false)
     const taxForSave = form.taxIdEntryEnabled ? normalizeTaxIdPayload(form.taxId) : null
     if (form.taxIdEntryEnabled && taxForSave === null) {
       setTaxIdEmptySaveError(true)
@@ -419,6 +441,20 @@ export default function SettingsPage() {
     }
     if (form.taxIdEntryEnabled && taxForSave !== null && !isPolishNip10Valid(taxForSave)) {
       setSaveError(t("settings.taxIdInvalidChecksum"))
+      return
+    }
+    const addressNormalized = normalizeBusinessAddress(form.businessAddress)
+    if (
+      !isBusinessAddressEntryValid(addressNormalized, form.businessAddressPlaceId, {
+        requirePlaceId: businessAddressRequiresPlaceId(),
+      })
+    ) {
+      setAddressSaveError(true)
+      setSaveError(
+        !addressNormalized
+          ? t("settings.businessAddressRequired")
+          : t("settings.businessAddressPickFromList"),
+      )
       return
     }
     const pv = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
@@ -443,6 +479,8 @@ export default function SettingsPage() {
       if (isSupabaseConfigured()) {
         const result = await saveBusinessProfileAction({
           businessName: form.businessName,
+          businessAddress: addressNormalized,
+          businessAddressPlaceId: form.businessAddressPlaceId.trim(),
           slug: form.publicSlug,
           email: form.email,
           phone: buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational),
@@ -479,6 +517,16 @@ export default function SettingsPage() {
           }
           if (result.code === "email_taken") {
             setSaveError(t("auth.emailTaken"))
+            return
+          }
+          if (result.code === "missing_business_address") {
+            setAddressSaveError(true)
+            setSaveError(t("settings.businessAddressRequired"))
+            return
+          }
+          if (result.code === "invalid_business_address") {
+            setAddressSaveError(true)
+            setSaveError(t("settings.businessAddressPickFromList"))
             return
           }
           const fallbackError =
@@ -745,6 +793,30 @@ export default function SettingsPage() {
                   placeholder={t("settings.placeholderBusinessExample")}
                   className="h-11 rounded-xl"
                 />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="businessAddress">{t("settings.businessAddressLabel")}</Label>
+                <BusinessAddressAutocomplete
+                  id="businessAddress"
+                  value={form.businessAddress}
+                  placeId={form.businessAddressPlaceId}
+                  onValueChange={(businessAddress) =>
+                    setForm((f) => ({ ...f, businessAddress }))
+                  }
+                  onPlaceIdChange={(businessAddressPlaceId) =>
+                    setForm((f) => ({ ...f, businessAddressPlaceId }))
+                  }
+                  onPlaceSelected={() => setAddressSaveError(false)}
+                  placeholder={t("settings.businessAddressPlaceholder")}
+                  pickFromListHint={t("settings.businessAddressPickFromList")}
+                  manualEntryHint={t("settings.businessAddressManualHint")}
+                  mapsLoadErrorHint={t("settings.businessAddressMapsError")}
+                />
+                {addressSaveError ? (
+                  <p className="text-xs text-destructive">{t("settings.businessAddressRequired")}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t("settings.businessAddressHint")}</p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <Button type="button" variant="outline" size="sm" asChild>

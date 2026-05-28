@@ -6,7 +6,10 @@ import type { Tables } from "@/types/database"
 
 export async function notifyBookingCancelledByClient(args: {
   booking: Tables<"bookings">
-  business: Pick<Tables<"business_profiles">, "slug" | "phone" | "business_name">
+  business: Pick<
+    Tables<"business_profiles">,
+    "slug" | "phone" | "contact_phone" | "business_name" | "business_address"
+  >
   language: "pl" | "en"
 }) {
   const admin = getServiceRoleClient()

@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache"
 import type { PostgrestError } from "@supabase/supabase-js"
 
+import {
+  isBusinessAddressEntryValid,
+  normalizeBusinessAddress,
+} from "@/lib/business/business-address"
 import { allocateSignupBookingSlug } from "@/lib/business/allocate-signup-slug"
+import { isGoogleMapsPlacesConfigured } from "@/lib/maps/load-google-maps-places"
 import {
   ACCOUNT_TYPE_REGISTERED,
   ACCOUNT_TYPE_UNREGISTERED,
@@ -22,6 +27,8 @@ export type OAuthSetupAccountType = BusinessAccountType
 
 export type CompleteOAuthBusinessSetupInput = {
   businessName: string
+  businessAddress: string
+  businessAddressPlaceId: string
   email: string
   phone: string
   accountType: OAuthSetupAccountType
@@ -42,6 +49,8 @@ export type CompleteOAuthBusinessSetupResult =
         | "tax_id_invalid"
         | "identity_conflict"
         | "missing_business_name"
+        | "missing_business_address"
+        | "invalid_business_address"
         | "missing_phone"
         | "missing_tax_id"
         | "missing_owner_name"
@@ -102,6 +111,9 @@ function isProfileSetupComplete(
   if (!row?.id) return false
   const name = typeof row.business_name === "string" ? row.business_name.trim() : ""
   if (!name) return false
+  const address =
+    typeof row.business_address === "string" ? row.business_address.trim() : ""
+  if (!address) return false
   const accountType = typeof row.account_type === "string" ? row.account_type.trim() : ""
   if (accountType !== ACCOUNT_TYPE_REGISTERED && accountType !== ACCOUNT_TYPE_UNREGISTERED) {
     return false
@@ -191,6 +203,17 @@ export async function completeOAuthBusinessSetupAction(
   const businessName = input.businessName.trim()
   if (!businessName) return { ok: false, code: "missing_business_name" }
 
+  const businessAddress = normalizeBusinessAddress(input.businessAddress)
+  const businessAddressPlaceId = input.businessAddressPlaceId.trim()
+  if (!businessAddress) return { ok: false, code: "missing_business_address" }
+  if (
+    !isBusinessAddressEntryValid(businessAddress, businessAddressPlaceId, {
+      requirePlaceId: isGoogleMapsPlacesConfigured(),
+    })
+  ) {
+    return { ok: false, code: "invalid_business_address" }
+  }
+
   const ownerFirst = input.ownerFirstName.trim()
   const ownerLast = input.ownerLastName.trim()
   if (!ownerFirst || !ownerLast) return { ok: false, code: "missing_owner_name" }
@@ -251,6 +274,8 @@ export async function completeOAuthBusinessSetupAction(
 
   const profilePatch: Record<string, unknown> = {
     business_name: businessName,
+    business_address: businessAddress,
+    business_address_place_id: businessAddressPlaceId || null,
     slug,
     email: emailTrimmed,
     phone: phoneTrimmed,

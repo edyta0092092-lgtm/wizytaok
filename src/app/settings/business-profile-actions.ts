@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache"
 
+import {
+  isBusinessAddressEntryValid,
+  normalizeBusinessAddress,
+} from "@/lib/business/business-address"
 import { isValidPublicSlugFormat, normalizePublicSlug } from "@/lib/business/slug"
+import { isGoogleMapsPlacesConfigured } from "@/lib/maps/load-google-maps-places"
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import { getServerAuthUser } from "@/lib/supabase/auth"
 import {
@@ -16,6 +21,8 @@ import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export type SaveBusinessProfileInput = {
   businessName: string
+  businessAddress: string
+  businessAddressPlaceId: string
   slug: string
   email: string
   phone: string
@@ -38,6 +45,8 @@ export type SaveBusinessProfileResult =
         | "tax_id_taken"
         | "phone_taken"
         | "email_taken"
+        | "missing_business_address"
+        | "invalid_business_address"
         | "unknown"
       details?: string
     }
@@ -148,6 +157,17 @@ export async function saveBusinessProfileAction(
   const slug = normalizePublicSlug(input.slug)
   if (!isValidPublicSlugFormat(slug)) return { ok: false, code: "slug_invalid" }
 
+  const businessAddress = normalizeBusinessAddress(input.businessAddress)
+  const businessAddressPlaceId = input.businessAddressPlaceId.trim()
+  if (!businessAddress) return { ok: false, code: "missing_business_address" }
+  if (
+    !isBusinessAddressEntryValid(businessAddress, businessAddressPlaceId, {
+      requirePlaceId: isGoogleMapsPlacesConfigured(),
+    })
+  ) {
+    return { ok: false, code: "invalid_business_address" }
+  }
+
   const client = await getServerClient()
   if (!client) return { ok: false, code: "unknown" }
 
@@ -183,6 +203,8 @@ export async function saveBusinessProfileAction(
 
   const patch = {
     business_name: input.businessName.trim(),
+    business_address: businessAddress,
+    business_address_place_id: businessAddressPlaceId || null,
     slug,
     email: emailTrimmed,
     phone: phoneTrimmed || null,
@@ -207,6 +229,8 @@ export async function saveBusinessProfileAction(
     const { error } = await tryInsertWithSchemaFallback(client, {
       owner_id: user.id,
       business_name: patch.business_name,
+      business_address: patch.business_address,
+      business_address_place_id: patch.business_address_place_id,
       slug: patch.slug,
       owner_name: null,
       email: patch.email,

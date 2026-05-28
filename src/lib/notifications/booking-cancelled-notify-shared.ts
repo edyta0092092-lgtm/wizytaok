@@ -3,6 +3,7 @@ import {
   buildTransactionalEmailHtml,
   buildTransactionalEmailText,
 } from "@/lib/notifications/transactional-email-layout"
+import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
@@ -165,7 +166,10 @@ function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notificatio
  */
 export async function sendBookingCancelledConfirmation(args: {
   booking: Tables<"bookings">
-  business: Pick<Tables<"business_profiles">, "slug" | "phone" | "business_name">
+  business: Pick<
+    Tables<"business_profiles">,
+    "slug" | "phone" | "contact_phone" | "business_name" | "business_address"
+  >
   language: CancelNotifyLanguage
   logType: BookingCancelledLogType
   staffDisplayName?: string
@@ -180,6 +184,7 @@ export async function sendBookingCancelledConfirmation(args: {
     String(booking.appointment_time),
     language,
   )
+  const confirmPath = `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`
   const vars: Record<string, string> = {
     imie: firstToken(booking.client_name),
     data: String(booking.appointment_date).slice(0, 10),
@@ -187,11 +192,11 @@ export async function sendBookingCancelledConfirmation(args: {
     termin: appointmentDateTime,
     usluga: booking.service_name,
     osoba: args.staffDisplayName ?? getStaffDisplayName({ name: booking.staff_name ?? "" }),
-    link_rezerwacji: linkRezerwacji,
-    link_potwierdzenia: `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`,
-    link_anulowania: `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`,
-    telefon_firmy: business.phone?.trim() ?? "",
-    nazwa_firmy: business.business_name?.trim() ?? "",
+    ...buildBusinessTemplateVars(business, {
+      link_rezerwacji: linkRezerwacji,
+      link_potwierdzenia: confirmPath,
+      link_anulowania: confirmPath,
+    }),
   }
 
   const messages = buildBookingCancelledMessages(language, vars, args.messageOverrides)
