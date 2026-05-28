@@ -116,7 +116,7 @@ export function StatisticsLineChart({
                   <XAxis
                     dataKey="label"
                     interval={tickInterval}
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     angle={chartData.length > 10 ? -40 : 0}
                     textAnchor={chartData.length > 10 ? "end" : "middle"}
                     height={chartData.length > 10 ? 56 : 32}
@@ -124,20 +124,20 @@ export function StatisticsLineChart({
                       value: copy.axes.x,
                       position: "insideBottom",
                       offset: chartData.length > 10 ? -8 : -4,
-                      fill: "hsl(var(--muted-foreground))",
+                      fill: "var(--muted-foreground)",
                       fontSize: 12,
                     }}
                   />
                   <YAxis
                     allowDecimals={false}
                     width={36}
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     label={{
                       value: copy.axes.y,
                       angle: -90,
                       position: "insideLeft",
                       offset: 12,
-                      fill: "hsl(var(--muted-foreground))",
+                      fill: "var(--muted-foreground)",
                       fontSize: 12,
                     }}
                   />
@@ -170,7 +170,7 @@ export function StatisticsLineChart({
                         </div>
                       )
                     }}
-                    cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+                    cursor={{ fill: "var(--muted)", fillOpacity: 0.35 }}
                   />
                   <Legend
                     wrapperStyle={{ fontSize: 12, paddingTop: 12 }}

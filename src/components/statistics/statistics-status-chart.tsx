@@ -82,7 +82,7 @@ export function StatisticsStatusChart({
                   <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border/60" />
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     interval={0}
                     angle={visibleItems.length > 2 ? -18 : 0}
                     textAnchor={visibleItems.length > 2 ? "end" : "middle"}
@@ -91,13 +91,13 @@ export function StatisticsStatusChart({
                   <YAxis
                     allowDecimals={false}
                     width={32}
-                    tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                    tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     label={{
                       value: axisY,
                       angle: -90,
                       position: "insideLeft",
                       offset: 10,
-                      fill: "hsl(var(--muted-foreground))",
+                      fill: "var(--muted-foreground)",
                       fontSize: 12,
                     }}
                   />
@@ -120,7 +120,7 @@ export function StatisticsStatusChart({
                         </div>
                       )
                     }}
-                    cursor={{ fill: "hsl(var(--muted) / 0.35)" }}
+                    cursor={{ fill: "var(--muted)", fillOpacity: 0.35 }}
                   />
                   <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={72} />
                 </BarChart>

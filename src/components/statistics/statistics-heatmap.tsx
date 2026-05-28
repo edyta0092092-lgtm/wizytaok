@@ -67,12 +67,12 @@ export function StatisticsHeatmap({
                 <XAxis
                   dataKey="label"
                   interval={0}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
                   allowDecimals={false}
                   width={32}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
                 <Tooltip
                   cursor={false}
@@ -116,12 +116,12 @@ export function StatisticsHeatmap({
                   angle={-35}
                   textAnchor="end"
                   height={56}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
                   allowDecimals={false}
                   width={32}
-                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
                 <Tooltip
                   cursor={false}
