@@ -165,12 +165,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
         return
       }
 
-      const confirmationEmail = await requestSignupConfirmationEmail(email.trim(), afterConfirmPath)
       await client.auth.signOut()
-      if (!confirmationEmail.ok) {
-        setError(t("auth.confirmationEmailSendFailed"))
-        return
-      }
       setInfo(t("auth.signupSuccessCheckEmail"))
     } finally {
       setLoading(false)
