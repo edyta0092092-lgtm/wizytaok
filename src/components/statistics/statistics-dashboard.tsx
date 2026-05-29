@@ -92,15 +92,15 @@ const COPY = {
     heatmap: {
       title: "Obłożenie",
       subtitle:
-        "Kiedy masz najwięcej pracy. Dni tygodnia – łączna liczba zrealizowanych wizyt; godziny – średnia liczba wizyt na dzień roboczy.",
+        "Kiedy klienci najczęściej się umawiają. Dni tygodnia – łączna liczba wizyt; godziny – udział % wszystkich wizyt (obłożenie godzin).",
       busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
       busyDaysHint:
-        "Łączna liczba zrealizowanych wizyt w danym dniu tygodnia w wybranym zakresie.",
+        "Łączna liczba wizyt (zrealizowanych, bieżących i przyszłych, bez anulowanych) w danym dniu tygodnia.",
       busyHoursHint:
-        "Średnia liczba zrealizowanych wizyt o danej godzinie, liczona tylko z dni, w których o tej godzinie były wizyty.",
+        "Jaki procent wszystkich wizyt przypada na daną godzinę — czyli które godziny są najczęściej wybierane.",
       averageLabel: "wizyt",
-      hoursValueLabel: "śr. wizyt/dzień",
+      hoursValueLabel: "% wizyt",
     },
   },
   en: {
@@ -175,15 +175,15 @@ const COPY = {
     heatmap: {
       title: "Heatmap / workload",
       subtitle:
-        "When you are busiest. Weekdays – total completed visits; hours – average visits per working day.",
+        "When clients book most often. Weekdays – total visits; hours – share (%) of all visits (hour occupancy).",
       busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
       busyDaysHint:
-        "Total completed visits on a given weekday in the selected range.",
+        "Total visits (completed, current and upcoming, excluding cancelled) on a given weekday.",
       busyHoursHint:
-        "Average completed visits in a given hour, counted only from days that had visits in that hour.",
+        "What percentage of all visits falls in a given hour — i.e. which hours are chosen most often.",
       averageLabel: "visits",
-      hoursValueLabel: "avg visits/day",
+      hoursValueLabel: "% of visits",
     },
   },
 } as const

@@ -308,20 +308,19 @@ function buildHeatmap(
   const dayLabels = locale === "en" ? DAY_LABELS_EN : DAY_LABELS_PL
   const dayCounts = Array.from({ length: 7 }, () => 0)
   const hourCounts = new Map<number, number>()
-  const hourActiveDates = new Map<number, Set<string>>()
+  let total = 0
 
   for (const appointment of appointments) {
     const date = parseDate(appointment.startsAt)
     if (!date) continue
+    total += 1
     const dayIndex = (date.getDay() + 6) % 7
     dayCounts[dayIndex] += 1
     const hour = date.getHours()
     hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1)
-    if (!hourActiveDates.has(hour)) hourActiveDates.set(hour, new Set<string>())
-    hourActiveDates.get(hour)?.add(dayKey(date))
   }
 
-  // Days: total completed visits per weekday in the range.
+  // Days: total visits per weekday in the range.
   const maxDay = Math.max(1, ...dayCounts)
   const busyDays = dayCounts.map((count, index) => ({
     key: String(index),
@@ -330,19 +329,18 @@ function buildHeatmap(
     intensity: count / maxDay,
   }))
 
-  // Hours: average visits across the days that actually had a visit in that
-  // hour (e.g. 3 visits at 12:00 across 3 different days => 1; two visits at
-  // 12:00 on the same day plus one on another => 3 / 2 = 1.5).
+  // Hours: how often each hour is chosen, as a share (%) of all visits in the
+  // range. Shows which time slots are the most popular / busiest.
   const hours = Array.from({ length: 16 }, (_, index) => index + 6)
-  const hourAverages = hours.map(
-    (hour) => (hourCounts.get(hour) ?? 0) / Math.max(1, hourActiveDates.get(hour)?.size ?? 0)
+  const hourShares = hours.map((hour) =>
+    total > 0 ? ((hourCounts.get(hour) ?? 0) / total) * 100 : 0
   )
-  const maxHourAverage = Math.max(0.0001, ...hourAverages)
+  const maxShare = Math.max(0.0001, ...hourShares)
   const busyHours = hours.map((hour, index) => ({
     key: String(hour),
     label: `${String(hour).padStart(2, "0")}:00`,
-    count: round1(hourAverages[index] ?? 0),
-    intensity: (hourAverages[index] ?? 0) / maxHourAverage,
+    count: round1(hourShares[index] ?? 0),
+    intensity: (hourShares[index] ?? 0) / maxShare,
   }))
 
   return { busyDays, busyHours }
@@ -431,10 +429,10 @@ export function buildStatisticsDataset({
       no_show: 0,
     }
   )
-  const completedInRange = appointmentsInRange.filter(
-    (appointment) => appointment.status === "completed"
+  const heatmapAppointments = appointmentsInRange.filter(
+    (appointment) => appointment.status !== "cancelled"
   )
-  const heatmap = buildHeatmap(completedInRange, locale)
+  const heatmap = buildHeatmap(heatmapAppointments, locale)
 
   return {
     kpis: {
