@@ -66,7 +66,7 @@ export function StatisticsStatusChart({
   monthPlaceholder: string
 }) {
   const { t, language } = useTranslations()
-  const isMonthRange = range.startsWith("month:")
+  const isMonthRange = range.startsWith("month:") || range.startsWith("year:")
   const visibleItems = items.filter((item) => item.count > 0)
   const chartData = visibleItems.map((item) => ({
     status: item.status,

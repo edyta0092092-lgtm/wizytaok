@@ -109,6 +109,22 @@ function buildRangeBuckets(
     return buckets
   }
 
+  if (range.startsWith("year:")) {
+    const year = Number(range.slice("year:".length))
+    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
+    for (let month = 0; month < 12; month += 1) {
+      const start = new Date(year, month, 1)
+      const next = new Date(year, month + 1, 1)
+      buckets.push({
+        key: monthKey(start),
+        label: monthFormatter.format(start),
+        start,
+        end: next,
+      })
+    }
+    return buckets
+  }
+
   if (range === "12m") {
     const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
     for (let i = 11; i >= 0; i -= 1) {

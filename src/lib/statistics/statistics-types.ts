@@ -2,7 +2,10 @@ import type { AppointmentStatus } from "@/types/domain"
 
 export type StatisticsPresetRange = "7d" | "30d" | "90d" | "12m"
 
-export type StatisticsRange = StatisticsPresetRange | `month:${string}`
+export type StatisticsRange =
+  | StatisticsPresetRange
+  | `month:${string}`
+  | `year:${string}`
 
 export type StatisticsChartPoint = {
   key: string

@@ -57,7 +57,7 @@ export function StatisticsHeatmap({
   monthOptions: StatisticsMonthOption[]
   monthPlaceholder: string
 }) {
-  const isMonthRange = range.startsWith("month:")
+  const isMonthRange = range.startsWith("month:") || range.startsWith("year:")
   const dayData = days.map((item) => ({
     key: item.key,
     label: item.label,

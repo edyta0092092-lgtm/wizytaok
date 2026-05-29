@@ -55,8 +55,9 @@ const COPY = {
         noShow: "Nieobecność klienta",
       },
       total: "Razem",
-      monthPlaceholder: "Miesiąc…",
+      monthPlaceholder: "Okres…",
       monthHint: "Każdy słupek to jeden dzień wybranego miesiąca.",
+      yearHint: "Każdy słupek to jeden miesiąc wybranego roku.",
       empty: "Brak wizyt w tym zakresie.",
       axes: {
         x: "Data",
@@ -141,8 +142,9 @@ const COPY = {
         noShow: "Client did not attend",
       },
       total: "Total",
-      monthPlaceholder: "Month…",
+      monthPlaceholder: "Period…",
       monthHint: "Each bar is one day of the selected month.",
+      yearHint: "Each bar is one month of the selected year.",
       empty: "No visits in this range.",
       axes: {
         x: "Date",
@@ -205,7 +207,7 @@ export function StatisticsDashboard() {
   const [statusRange, setStatusRange] = React.useState<StatisticsRange>(currentMonthRange)
   const [heatmapRange, setHeatmapRange] = React.useState<StatisticsRange>(currentMonthRange)
   const copy = COPY[language] ?? COPY.pl
-  const { ready, loadError, dataset, statuses, busyDays, busyHours, availableMonths } =
+  const { ready, loadError, dataset, statuses, busyDays, busyHours, availableMonths, availableYears } =
     useStatisticsData({
       range,
       statusRange,
@@ -218,7 +220,12 @@ export function StatisticsDashboard() {
       month: "long",
       year: "numeric",
     })
-    return availableMonths.map((month) => {
+    const yearLabel = language === "en" ? "Year" : "Rok"
+    const yearOptions: StatisticsMonthOption[] = availableYears.map((year) => ({
+      value: `year:${year}` as StatisticsRange,
+      label: `${yearLabel} ${year}`,
+    }))
+    const monthEntries: StatisticsMonthOption[] = availableMonths.map((month) => {
       const [year, monthNumber] = month.split("-").map((value) => Number(value))
       const label = formatter.format(new Date(year, (monthNumber || 1) - 1, 1))
       return {
@@ -226,7 +233,8 @@ export function StatisticsDashboard() {
         label: label.charAt(0).toUpperCase() + label.slice(1),
       }
     })
-  }, [availableMonths, language])
+    return [...yearOptions, ...monthEntries]
+  }, [availableMonths, availableYears, language])
 
   return (
     <div className="space-y-6">

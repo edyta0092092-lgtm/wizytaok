@@ -245,6 +245,17 @@ export function useStatisticsData({
     return [...months].sort((a, b) => b.localeCompare(a))
   }, [appointments])
 
+  const availableYears = React.useMemo(() => {
+    const years = new Set<string>()
+    // Current year is always offered so a full-year range is selectable.
+    years.add(String(new Date().getFullYear()))
+    for (const appointment of appointments) {
+      const month = monthKeyFromValue(appointment.startsAt)
+      if (month) years.add(month.slice(0, 4))
+    }
+    return [...years].sort((a, b) => b.localeCompare(a))
+  }, [appointments])
+
   return {
     ready: appointmentsReady && detailsReady,
     loadError: appointmentsLoadError || loadError,
@@ -253,6 +264,7 @@ export function useStatisticsData({
     busyDays: heatmap?.busyDays ?? null,
     busyHours: heatmap?.busyHours ?? null,
     availableMonths,
+    availableYears,
     appointmentsReady,
   }
 }

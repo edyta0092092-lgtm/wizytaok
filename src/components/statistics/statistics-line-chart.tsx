@@ -51,6 +51,7 @@ type ChartCopy = {
   empty: string
   monthPlaceholder: string
   monthHint: string
+  yearHint: string
   axes: {
     x: string
     y: string
@@ -72,6 +73,8 @@ export function StatisticsLineChart({
   copy: ChartCopy
 }) {
   const isMonthRange = range.startsWith("month:")
+  const isYearRange = range.startsWith("year:")
+  const isCustomRange = isMonthRange || isYearRange
   const chartData = points.map((point) => ({
     label: point.label,
     completed: point.completed,
@@ -88,7 +91,11 @@ export function StatisticsLineChart({
           <CardTitle className="text-base">{copy.title}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {isMonthRange ? copy.monthHint : copy.periodHint[range as StatisticsPresetRange]}
+            {isYearRange
+              ? copy.yearHint
+              : isMonthRange
+                ? copy.monthHint
+                : copy.periodHint[range as StatisticsPresetRange]}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -109,17 +116,17 @@ export function StatisticsLineChart({
           ))}
           {monthOptions.length > 0 ? (
             <NativeSelect
-              value={isMonthRange ? range : ""}
+              value={isCustomRange ? range : ""}
               onChange={(event) => {
                 if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
               }}
               className={cn(
                 "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
-                isMonthRange
+                isCustomRange
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-              chevronClassName={isMonthRange ? "text-primary-foreground" : undefined}
+              chevronClassName={isCustomRange ? "text-primary-foreground" : undefined}
             >
               <option value="">{copy.monthPlaceholder}</option>
               {monthOptions.map((option) => (
