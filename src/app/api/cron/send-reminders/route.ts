@@ -7,8 +7,16 @@ import {
 import {
   getActiveSmsReminderProvider,
   sendAppointmentReminderSms,
+  sendAppointmentReminderSmsPlainText,
   type AppointmentReminderSmsResult,
 } from "@/lib/notifications/appointment-reminder-sms"
+import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-reminder-email"
+import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import {
+  applyTemplateVariables,
+  getTemplateRuntime,
+} from "@/lib/notifications/template-runtime"
+import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -90,6 +98,9 @@ type BusinessRow = {
   business_name: string | null
   business_address: string | null
   email: string | null
+  phone: string | null
+  contact_phone: string | null
+  slug: string | null
 }
 
 /**
@@ -373,7 +384,7 @@ async function loadBookingAndBusiness(
 
   const { data: businessRaw } = await admin
     .from("business_profiles")
-    .select("id, business_name, business_address, email")
+    .select("id, business_name, business_address, email, phone, contact_phone, slug")
     .eq("id", item.business_id)
     .maybeSingle()
   const business = (businessRaw ?? null) as BusinessRow | null
@@ -390,6 +401,75 @@ function resolveManageUrl(booking: BookingRow): string | null {
 function resolveBusinessName(business: BusinessRow | null): string {
   const name = business?.business_name?.trim()
   return name && name.length > 0 ? name : "WizytaOK"
+}
+
+/** Mapuje rodzaj przypomnienia z kolejki na typ edytowalnego szablonu. */
+function smsTemplateTypeFromKind(kind: string): string {
+  const k = kind.trim().toLowerCase()
+  if (k === "second" || k === "appointment_reminder_short") return "reminder_before_visit"
+  return "reminder_24h"
+}
+
+/** Zmienne podstawiane w treści szablonu SMS ({{imie}}, {{data}}, …). */
+function buildReminderTemplateVars(
+  booking: BookingRow,
+  business: BusinessRow | null,
+  manageUrl: string
+): Record<string, string> {
+  const { dateLabel, timeLabel } = formatPolishAppointmentLabel(
+    booking.appointment_date,
+    booking.appointment_time
+  )
+  const clientName = (booking.client_name ?? "").trim()
+  const staffName = booking.staff_name ?? ""
+  return {
+    imie: clientName.split(/\s+/)[0] || clientName,
+    data: dateLabel,
+    godzina: timeLabel,
+    usluga: (booking.service_name ?? "").trim(),
+    osoba: getStaffDisplayName({ name: staffName }),
+    imie_osoby: getStaffFirstName({ name: staffName }),
+    ...buildBusinessTemplateVars(business, {
+      link_potwierdzenia: manageUrl,
+      link_anulowania: manageUrl,
+    }),
+  }
+}
+
+/**
+ * Treść SMS przypomnienia: jeśli firma ma zapisany własny szablon (smsBody),
+ * używamy go (z podstawieniem zmiennych), w przeciwnym razie domyślnej treści.
+ */
+async function resolveReminderSms(
+  admin: AdminClient,
+  item: DueReminderRow,
+  booking: BookingRow,
+  business: BusinessRow | null,
+  phone: string,
+  manageUrl: string
+): Promise<AppointmentReminderSmsResult> {
+  const templateType = smsTemplateTypeFromKind(item.reminder_kind)
+  const runtime = await getTemplateRuntime(admin, item.business_id, templateType)
+  if (runtime.smsBody && runtime.smsBody.trim().length > 0) {
+    const vars = buildReminderTemplateVars(booking, business, manageUrl)
+    let body = applyTemplateVariables(runtime.smsBody, vars).trim()
+    const address = (business?.business_address ?? "").trim()
+    if (address && !body.toLowerCase().includes(address.toLowerCase())) {
+      body = `${body} Adres: ${address}`
+    }
+    if (body.length > 0) {
+      return sendAppointmentReminderSmsPlainText({ to: phone, body })
+    }
+  }
+  return sendAppointmentReminderSms({
+    to: phone,
+    businessName: resolveBusinessName(business),
+    businessAddress: business?.business_address ?? null,
+    serviceName: booking.service_name,
+    appointmentDate: booking.appointment_date,
+    appointmentTime: booking.appointment_time,
+    manageUrl,
+  })
 }
 
 async function isBookingCancelledNow(admin: AdminClient, bookingId: string): Promise<boolean> {
@@ -585,21 +665,18 @@ async function processSmsReminder(
       return "skipped"
     }
 
-    const businessName = resolveBusinessName(business)
-
     if (await isBookingCancelledNow(admin, booking.id)) {
       await markSkipped(admin, item.id, "booking_cancelled_race")
       return "skipped"
     }
-    const smsResult: AppointmentReminderSmsResult = await sendAppointmentReminderSms({
-      to: phone,
-      businessName,
-      businessAddress: business?.business_address ?? null,
-      serviceName: booking.service_name,
-      appointmentDate: booking.appointment_date,
-      appointmentTime: booking.appointment_time,
-      manageUrl,
-    })
+    const smsResult: AppointmentReminderSmsResult = await resolveReminderSms(
+      admin,
+      item,
+      booking,
+      business,
+      phone,
+      manageUrl
+    )
 
     if (smsResult.ok) {
       const { error: updateError } = await admin

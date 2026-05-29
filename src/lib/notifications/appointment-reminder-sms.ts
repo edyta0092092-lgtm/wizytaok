@@ -20,8 +20,14 @@
  * Limit miesięczny / feature flagi — w `send-reminders` (cron), nie tutaj.
  */
 
-import { sendSmsapiAppointmentReminder } from "@/lib/notifications/providers/smsapi-reminder"
-import { sendSzybkiSmsAppointmentReminder } from "@/lib/notifications/providers/szybkisms-reminder"
+import {
+  sendSmsapiAppointmentReminder,
+  sendSmsapiPlainText,
+} from "@/lib/notifications/providers/smsapi-reminder"
+import {
+  sendSzybkiSmsAppointmentReminder,
+  sendSzybkiSmsPlainText,
+} from "@/lib/notifications/providers/szybkisms-reminder"
 import {
   buildSmsMessage,
   normalizePhoneToMsisdn,
@@ -57,4 +63,17 @@ export async function sendAppointmentReminderSms(
   return getActiveSmsReminderProvider() === "szybkisms"
     ? sendSzybkiSmsAppointmentReminder(input)
     : sendSmsapiAppointmentReminder(input)
+}
+
+/**
+ * Wysyłka SMS o dowolnej (już zbudowanej) treści — używana, gdy treść pochodzi
+ * z edytowalnego szablonu firmy. Wybór dostawcy jak w `sendAppointmentReminderSms`.
+ */
+export async function sendAppointmentReminderSmsPlainText(input: {
+  to: string
+  body: string
+}): Promise<AppointmentReminderSmsResult> {
+  return getActiveSmsReminderProvider() === "szybkisms"
+    ? sendSzybkiSmsPlainText(input)
+    : sendSmsapiPlainText(input)
 }
