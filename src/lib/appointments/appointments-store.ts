@@ -403,6 +403,16 @@ export async function updateAppointmentStatus(
       // następnego pollingu. Wymuszamy natychmiastowe odświeżenie obu widoków.
       invalidateMergedAppointmentsCache()
       window.dispatchEvent(new Event("pw-bookings"))
+      // Po oznaczeniu „nieobecność klienta” wysyłamy follow-up (tylko gdy firma
+      // ma włączony szablon `no_show_follow_up`). Fire-and-forget — nie blokuje UI.
+      if (status === "no_show") {
+        void fetch("/api/bookings/notify-no-show", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId: appointmentId }),
+          keepalive: true,
+        }).catch(() => {})
+      }
     }
     return r.ok
   }
