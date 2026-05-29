@@ -438,7 +438,10 @@ export function buildStatisticsDataset({
       no_show: 0,
     }
   )
-  const heatmap = buildHeatmap(appointmentsInRange, locale)
+  const completedInRange = appointmentsInRange.filter(
+    (appointment) => appointment.status === "completed"
+  )
+  const heatmap = buildHeatmap(completedInRange, locale)
 
   return {
     kpis: {

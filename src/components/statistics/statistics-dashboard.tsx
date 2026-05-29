@@ -92,13 +92,13 @@ const COPY = {
     heatmap: {
       title: "Obłożenie",
       subtitle:
-        "Średnia liczba wizyt wg dnia tygodnia i godziny w wybranym zakresie. Im dłuższy okres (np. 12 mies.), tym wiarygodniejszy typowy wzorzec tygodnia.",
+        "Średnia liczba zrealizowanych wizyt wg dnia tygodnia i godziny w wybranym zakresie. Im dłuższy okres (np. 12 mies.), tym wiarygodniejszy typowy wzorzec tygodnia.",
       busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
       busyDaysHint:
-        "Średnia liczba wizyt przypadająca na dany dzień tygodnia, liczona tylko z dni, w których faktycznie były wizyty.",
+        "Średnia liczba zrealizowanych wizyt przypadająca na dany dzień tygodnia, liczona tylko z dni, w których faktycznie były wizyty.",
       busyHoursHint:
-        "Średnia liczba wizyt w danej godzinie, liczona tylko z dni, w których o tej godzinie były wizyty.",
+        "Średnia liczba zrealizowanych wizyt w danej godzinie, liczona tylko z dni, w których o tej godzinie były wizyty.",
       averageLabel: "śr. wizyt",
     },
   },
@@ -174,13 +174,13 @@ const COPY = {
     heatmap: {
       title: "Heatmap / workload",
       subtitle:
-        "Average number of visits by weekday and hour in the selected range. The longer the period (e.g. 12 mo.), the more reliable the typical weekly pattern.",
+        "Average number of completed visits by weekday and hour in the selected range. The longer the period (e.g. 12 mo.), the more reliable the typical weekly pattern.",
       busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
       busyDaysHint:
-        "Average visits on a given weekday, counted only from days that actually had visits.",
+        "Average completed visits on a given weekday, counted only from days that actually had visits.",
       busyHoursHint:
-        "Average visits in a given hour, counted only from days that had visits in that hour.",
+        "Average completed visits in a given hour, counted only from days that had visits in that hour.",
       averageLabel: "avg visits",
     },
   },
