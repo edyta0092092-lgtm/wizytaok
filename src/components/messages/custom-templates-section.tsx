@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, ChevronDown, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { cn } from "@/lib/utils"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
@@ -96,6 +97,18 @@ function rowToForm(row: Tables<"custom_templates">): CustomForm {
   }
 }
 
+function friendlySaveError(message: string | null | undefined): string {
+  const m = String(message ?? "")
+  if (
+    /Could not find the table 'public\.custom_templates'/i.test(m) ||
+    /relation ["']?custom_templates["']? does not exist/i.test(m) ||
+    /schema cache/i.test(m)
+  ) {
+    return "Tabela własnych szablonów nie istnieje jeszcze w bazie. Wymagana migracja 060_custom_templates."
+  }
+  return m || "Nie udało się zapisać szablonu."
+}
+
 function describeTrigger(row: Tables<"custom_templates">): string {
   const trigger = (row.trigger_type as TriggerType) ?? "manual"
   if (trigger === "event") {
@@ -107,6 +120,31 @@ function describeTrigger(row: Tables<"custom_templates">): string {
   const unitLabel = off.unit === "days" ? "dni" : off.unit === "hours" ? "godz." : "min"
   const direction = trigger === "schedule_before" ? "przed wizytą" : "po wizycie"
   return `${off.value} ${unitLabel} ${direction}`
+}
+
+function NativeSelect({
+  value,
+  onChange,
+  className,
+  children,
+}: {
+  value: string
+  onChange: (value: string) => void
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full appearance-none rounded-xl border border-input bg-card pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/20"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  )
 }
 
 export type CustomTemplatesSectionProps = {
@@ -210,7 +248,12 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
 
   const submitForm = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form || !businessId || readOnly || saving) return
+    if (readOnly || saving) return
+    if (!form) return
+    if (!businessId) {
+      setSaveError("Brak kontekstu firmy — odśwież stronę i spróbuj ponownie.")
+      return
+    }
     const f = form
     const name = f.name.trim()
     if (!name) {
@@ -252,23 +295,27 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
     setShowSaved(false)
     setSaving(true)
     void (async () => {
-      const client = getBrowserClient()
-      if (!client || !isSupabaseConfigured()) {
+      try {
+        const client = getBrowserClient()
+        if (!client || !isSupabaseConfigured()) {
+          setSaveError("Brak połączenia z bazą danych.")
+          return
+        }
+        const res = f.id
+          ? await client.from("custom_templates").update(payload as never).eq("id", f.id)
+          : await client.from("custom_templates").insert(payload as never)
+        if (res.error) {
+          setSaveError(friendlySaveError(res.error.message))
+          return
+        }
+        await reload(businessId)
+        setShowSaved(true)
+        setSheetOpen(false)
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Nie udało się zapisać szablonu.")
+      } finally {
         setSaving(false)
-        return
       }
-      const res = f.id
-        ? await client.from("custom_templates").update(payload as never).eq("id", f.id)
-        : await client.from("custom_templates").insert(payload as never)
-      if (res.error) {
-        setSaveError(res.error.message)
-        setSaving(false)
-        return
-      }
-      await reload(businessId)
-      setSaving(false)
-      setShowSaved(true)
-      setSheetOpen(false)
     })()
   }
 
@@ -412,6 +459,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                         <Label className="text-xs">Ile</Label>
                         <Input
                           type="number"
+                          inputMode="numeric"
                           min={1}
                           value={String(form.offsetValue)}
                           onChange={(e) =>
@@ -419,24 +467,22 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                               prev ? { ...prev, offsetValue: Math.max(0, Number(e.target.value) || 0) } : prev,
                             )
                           }
-                          className="w-24"
+                          className="w-24 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:m-0"
                         />
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Jednostka</Label>
-                        <select
-                          className="h-10 w-36 rounded-xl border border-input bg-card px-3 text-sm"
+                        <NativeSelect
+                          className="w-36"
                           value={form.offsetUnit}
-                          onChange={(e) =>
-                            setForm((prev) =>
-                              prev ? { ...prev, offsetUnit: e.target.value as OffsetUnit } : prev,
-                            )
+                          onChange={(v) =>
+                            setForm((prev) => (prev ? { ...prev, offsetUnit: v as OffsetUnit } : prev))
                           }
                         >
                           <option value="minutes">minut</option>
                           <option value="hours">godzin</option>
                           <option value="days">dni</option>
-                        </select>
+                        </NativeSelect>
                       </div>
                       <p className="pb-2 text-xs text-muted-foreground">
                         {form.triggerType === "schedule_before" ? "przed wizytą" : "po wizycie"}
@@ -447,11 +493,11 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                   {form.triggerType === "event" ? (
                     <div className="space-y-1">
                       <Label className="text-xs">Zdarzenie</Label>
-                      <select
-                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm sm:w-72"
+                      <NativeSelect
+                        className="w-full sm:w-72"
                         value={form.eventKey}
-                        onChange={(e) =>
-                          setForm((prev) => (prev ? { ...prev, eventKey: e.target.value as EventKey } : prev))
+                        onChange={(v) =>
+                          setForm((prev) => (prev ? { ...prev, eventKey: v as EventKey } : prev))
                         }
                       >
                         {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
@@ -459,7 +505,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                             {EVENT_LABELS[k]}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     </div>
                   ) : null}
 
@@ -527,13 +573,20 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                   Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{adres_firmy}}"}, {"{{nazwa_firmy}}"}
                 </div>
               </div>
-              <div className="mt-auto flex items-center justify-end gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-                <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                  Anuluj
-                </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Zapisywanie…" : "Zapisz szablon"}
-                </Button>
+              <div className="mt-auto flex flex-col gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                {saveError ? (
+                  <div className="rounded-md border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {saveError}
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
+                    Anuluj
+                  </Button>
+                  <Button type="submit" disabled={saving}>
+                    {saving ? "Zapisywanie…" : "Zapisz szablon"}
+                  </Button>
+                </div>
               </div>
             </form>
           </div>

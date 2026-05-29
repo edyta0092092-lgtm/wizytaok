@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
+import { FilterSelect } from "@/components/messages/filter-select"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
@@ -177,25 +178,25 @@ export function CustomTemplatesHistorySection() {
       <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
         <CardHeader className="space-y-3 pb-0">
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="h-9 rounded-full border border-input bg-background px-3 text-xs sm:text-sm"
+            <FilterSelect
+              aria-label="Filtr kanału"
               value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as ChannelFilter)}
+              onChange={(v) => setChannelFilter(v as ChannelFilter)}
             >
               <option value="all">Wszystkie kanały</option>
               <option value="sms">SMS</option>
               <option value="email">E-mail</option>
-            </select>
-            <select
-              className="h-9 rounded-full border border-input bg-background px-3 text-xs sm:text-sm"
+            </FilterSelect>
+            <FilterSelect
+              aria-label="Filtr statusu"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              onChange={(v) => setStatusFilter(v as StatusFilter)}
             >
               <option value="all">Wszystkie statusy</option>
               <option value="sent">Wysłane</option>
               <option value="failed">Błędy</option>
               <option value="skipped">Pominięte</option>
-            </select>
+            </FilterSelect>
           </div>
         </CardHeader>
         <CardContent className="pt-4">

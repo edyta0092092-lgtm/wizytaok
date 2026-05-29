@@ -6,6 +6,7 @@ import { Send } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 
 import { TestNotificationsPanel } from "@/components/messages/test-notifications-panel"
+import { FilterSelect } from "@/components/messages/filter-select"
 import { EmptyState } from "@/components/shared/empty-state"
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { Button } from "@/components/ui/button"
@@ -885,29 +886,29 @@ export function SendingHistorySection() {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <select
-              className="h-9 rounded-full border border-input bg-background px-3 text-xs sm:text-sm"
+            <FilterSelect
+              aria-label="Filtr kanału"
               value={channelFilter}
-              onChange={(e) => setChannelFilter(e.target.value as ChannelFilter)}
+              onChange={(v) => setChannelFilter(v as ChannelFilter)}
             >
               <option value="all">Wszystkie kanały</option>
               <option value="sms">{t("messages.sms")}</option>
               <option value="email">{t("messages.email")}</option>
-            </select>
-            <select
-              className="h-9 rounded-full border border-input bg-background px-3 text-xs sm:text-sm"
+            </FilterSelect>
+            <FilterSelect
+              aria-label="Zakres dat"
               value={dateRange}
-              onChange={(e) => setDateRange(e.target.value as DateRangeFilter)}
+              onChange={(v) => setDateRange(v as DateRangeFilter)}
             >
               <option value="today">Dzisiaj</option>
               <option value="7d">7 dni</option>
               <option value="30d">30 dni</option>
               <option value="all">Wszystkie</option>
-            </select>
-            <select
-              className="h-9 rounded-full border border-input bg-background px-3 text-xs sm:text-sm"
+            </FilterSelect>
+            <FilterSelect
+              aria-label="Filtr typu"
               value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+              onChange={(v) => setTypeFilter(v as TypeFilter)}
             >
               <option value="all">Wszystkie typy</option>
               {availableTypeFilters.map((type) => (
@@ -915,7 +916,7 @@ export function SendingHistorySection() {
                   {typeLabel(type, t)}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
