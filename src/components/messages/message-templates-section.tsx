@@ -75,15 +75,13 @@ const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
 }
 
 function fallbackEnabledWhenNoTemplate(type: TemplateType): { sms: boolean; email: boolean } {
-  // Te typy były historycznie wysyłane domyślnie nawet bez zapisanych rekordów
-  // w `message_templates`, więc UI powinien pokazywać "on".
-  if (
-    type === "booking_confirmation" ||
-    type === "booking_cancelled_by_company"
-  ) {
-    return { sms: true, email: true }
+  // Domyślnie WŁĄCZONE (firma może wyłączyć): przypomnienia, potwierdzenie,
+  // anulowanie. Follow-up po nieobecności jest domyślnie wyłączony i firma musi
+  // sama go włączyć. Stany muszą zgadzać się z bramkowaniem wysyłki na serwerze.
+  if (type === "no_show_follow_up") {
+    return { sms: false, email: false }
   }
-  return { sms: false, email: false }
+  return { sms: true, email: true }
 }
 
 const TEMPLATE_DEFAULT_CONTENT: Record<
