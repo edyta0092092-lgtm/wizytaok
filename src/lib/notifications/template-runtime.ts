@@ -62,11 +62,16 @@ export async function getTemplateRuntime(
   templateType: string
 ): Promise<NotificationTemplateRuntime> {
   const aliases = TYPE_ALIASES[templateType] ?? [templateType]
+  const aliasSet = new Set(aliases.map(normalize))
+  // Uwaga: NIE filtrujemy po `type` w SQL. Kolumna `type` to ENUM, a lista aliasów
+  // może zawierać wartości spoza enuma (np. legacy/synonimy). PostgREST rzutuje
+  // literały na enum i całe zapytanie pada na nieistniejącej wartości, przez co
+  // szablon nie jest znajdowany (fallback + zignorowany przełącznik on/off).
+  // Pobieramy wszystkie szablony firmy i filtrujemy aliasy w JS.
   const { data, error } = await client
     .from("message_templates")
     .select("*")
     .eq("business_id", businessId)
-    .in("type", aliases as never)
     .order("updated_at", { ascending: false })
 
   if (error) {
@@ -82,7 +87,9 @@ export async function getTemplateRuntime(
     }
   }
 
-  const rows = (data ?? []) as Tables<"message_templates">[]
+  const rows = ((data ?? []) as Tables<"message_templates">[]).filter((row) =>
+    aliasSet.has(normalize(row.type)),
+  )
   const sms = pickChannelRow(rows, templateType, "sms")
   const email = pickChannelRow(rows, templateType, "email")
   const runtime = rows.find((row) => typeof (row as { timing_minutes_before?: unknown }).timing_minutes_before === "number")
