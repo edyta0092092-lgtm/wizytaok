@@ -35,7 +35,7 @@ const COPY = {
     chart: {
       title: "Trend wizyt",
       subtitle:
-        "Wizyty w wybranym zakresie z podziałem na statusy: potwierdzone, zrealizowane, anulowane i z nieobecnością klienta.",
+        "Łączna liczba wizyt dziennie w wybranym zakresie. Najedź na słupek, aby zobaczyć podział na statusy.",
       ranges: {
         "7d": "7 dni",
         "30d": "30 dni",
@@ -48,6 +48,7 @@ const COPY = {
         cancelled: "Anulowane",
         noShow: "Nieobecność klienta",
       },
+      total: "Razem",
       empty: "Brak wizyt w tym zakresie.",
       axes: {
         x: "Data",
@@ -108,7 +109,7 @@ const COPY = {
     },
     chart: {
       title: "Visit trend",
-      subtitle: "Visits in the selected range split by status: confirmed, completed, cancelled, and no_show.",
+      subtitle: "Total visits per day in the selected range. Hover a bar to see the status breakdown.",
       ranges: {
         "7d": "7 days",
         "30d": "30 days",
@@ -121,6 +122,7 @@ const COPY = {
         cancelled: "Cancelled",
         noShow: "Client did not attend",
       },
+      total: "Total",
       empty: "No visits in this range.",
       axes: {
         x: "Date",

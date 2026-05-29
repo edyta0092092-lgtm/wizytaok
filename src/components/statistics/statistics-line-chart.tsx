@@ -4,7 +4,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -20,12 +19,14 @@ import { cn } from "@/lib/utils"
 
 type SeriesKey = "confirmed" | "completed" | "cancelled" | "noShow"
 
+const TOTAL_FILL = "#0f766e"
+
 const SERIES: Array<{
   key: SeriesKey
   dataKey: SeriesKey
   fill: string
 }> = [
-  { key: "confirmed", dataKey: "confirmed", fill: "#0f766e" },
+  { key: "confirmed", dataKey: "confirmed", fill: "#0ea5e9" },
   { key: "completed", dataKey: "completed", fill: "#10b981" },
   { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
   { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
@@ -43,6 +44,7 @@ type ChartCopy = {
   subtitle: string
   ranges: Record<StatisticsRange, string>
   series: Record<SeriesKey, string>
+  total: string
   empty: string
   axes: {
     x: string
@@ -68,6 +70,7 @@ export function StatisticsLineChart({
     completed: point.completed,
     cancelled: point.cancelled,
     noShow: point.noShow,
+    total: point.confirmed + point.completed + point.cancelled + point.noShow,
   }))
   const tickInterval = xAxisTickInterval(chartData.length)
 
@@ -144,25 +147,35 @@ export function StatisticsLineChart({
                   <Tooltip
                     content={({ active, payload, label }) => {
                       if (!active || !payload?.length) return null
+                      const row = payload[0]?.payload as
+                        | (typeof chartData)[number]
+                        | undefined
+                      if (!row) return null
                       return (
                         <div className="rounded-xl border border-border/80 bg-card px-3 py-2.5 text-xs shadow-lg">
                           <p className="mb-2 font-medium text-foreground">{label}</p>
+                          <div className="mb-2 flex items-center justify-between gap-4 border-b border-border/60 pb-2">
+                            <span className="text-muted-foreground">{copy.total}</span>
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {row.total}
+                            </span>
+                          </div>
                           <ul className="space-y-1">
-                            {payload.map((entry) => (
+                            {SERIES.map((series) => (
                               <li
-                                key={entry.name}
+                                key={series.key}
                                 className="flex items-center justify-between gap-4"
                               >
                                 <span className="inline-flex items-center gap-1.5 text-muted-foreground">
                                   <span
                                     className="size-2 rounded-sm"
-                                    style={{ backgroundColor: entry.color }}
+                                    style={{ backgroundColor: series.fill }}
                                     aria-hidden
                                   />
-                                  {entry.name}
+                                  {copy.series[series.key]}
                                 </span>
                                 <span className="font-semibold tabular-nums text-foreground">
-                                  {typeof entry.value === "number" ? entry.value : 0}
+                                  {row[series.dataKey]}
                                 </span>
                               </li>
                             ))}
@@ -172,22 +185,13 @@ export function StatisticsLineChart({
                     }}
                     cursor={{ fill: "var(--muted)", fillOpacity: 0.35 }}
                   />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12, paddingTop: 12 }}
-                    formatter={(value) => (
-                      <span className="text-muted-foreground">{value}</span>
-                    )}
+                  <Bar
+                    dataKey="total"
+                    name={copy.total}
+                    fill={TOTAL_FILL}
+                    radius={[4, 4, 0, 0]}
+                    maxBarSize={28}
                   />
-                  {SERIES.map((series) => (
-                    <Bar
-                      key={series.key}
-                      dataKey={series.dataKey}
-                      name={copy.series[series.key]}
-                      fill={series.fill}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={28}
-                    />
-                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>
