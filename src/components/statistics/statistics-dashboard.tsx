@@ -195,7 +195,7 @@ export function StatisticsDashboard() {
   const { language, t } = useTranslations()
   const [range, setRange] = React.useState<StatisticsRange>(currentMonthRange)
   const [statusRange, setStatusRange] = React.useState<StatisticsRange>(currentMonthRange)
-  const [heatmapRange, setHeatmapRange] = React.useState<StatisticsRange>("12m")
+  const [heatmapRange, setHeatmapRange] = React.useState<StatisticsRange>(currentMonthRange)
   const copy = COPY[language] ?? COPY.pl
   const { ready, loadError, dataset, statuses, busyDays, busyHours, availableMonths } =
     useStatisticsData({
