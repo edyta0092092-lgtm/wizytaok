@@ -8,13 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
@@ -431,21 +424,19 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Jednostka</Label>
-                        <Select
+                        <select
+                          className="h-10 w-36 rounded-xl border border-input bg-card px-3 text-sm"
                           value={form.offsetUnit}
-                          onValueChange={(v) =>
-                            setForm((prev) => (prev ? { ...prev, offsetUnit: v as OffsetUnit } : prev))
+                          onChange={(e) =>
+                            setForm((prev) =>
+                              prev ? { ...prev, offsetUnit: e.target.value as OffsetUnit } : prev,
+                            )
                           }
                         >
-                          <SelectTrigger className="w-36">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="minutes">minut</SelectItem>
-                            <SelectItem value="hours">godzin</SelectItem>
-                            <SelectItem value="days">dni</SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <option value="minutes">minut</option>
+                          <option value="hours">godzin</option>
+                          <option value="days">dni</option>
+                        </select>
                       </div>
                       <p className="pb-2 text-xs text-muted-foreground">
                         {form.triggerType === "schedule_before" ? "przed wizytą" : "po wizycie"}
@@ -456,23 +447,19 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                   {form.triggerType === "event" ? (
                     <div className="space-y-1">
                       <Label className="text-xs">Zdarzenie</Label>
-                      <Select
+                      <select
+                        className="h-10 w-full rounded-xl border border-input bg-card px-3 text-sm sm:w-72"
                         value={form.eventKey}
-                        onValueChange={(v) =>
-                          setForm((prev) => (prev ? { ...prev, eventKey: v as EventKey } : prev))
+                        onChange={(e) =>
+                          setForm((prev) => (prev ? { ...prev, eventKey: e.target.value as EventKey } : prev))
                         }
                       >
-                        <SelectTrigger className="w-full sm:w-72">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
-                            <SelectItem key={k} value={k}>
-                              {EVENT_LABELS[k]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
+                          <option key={k} value={k}>
+                            {EVENT_LABELS[k]}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   ) : null}
 
