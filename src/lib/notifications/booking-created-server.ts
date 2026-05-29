@@ -1,6 +1,7 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import {
@@ -447,6 +448,27 @@ export async function sendBookingCreatedNotifications(
   const email = booking.client_email ?? ""
   if (!wantEmail) {
     emailResult = channelDetail("skipped")
+    if (email) {
+      // Zapis „skipped" w historii — żeby było widać, że kanał jest wyłączony.
+      await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "email",
+          type: "booking_created",
+          recipient: email,
+          status: "skipped",
+          subject: null,
+          body: null,
+          provider: null,
+          provider_message_id: null,
+          error: "channel_disabled",
+          sent_at: null,
+        },
+        "[booking-created.notify.log]",
+      )
+    }
   } else if (!email) {
     emailResult = channelDetail("missing")
   } else {
@@ -503,6 +525,26 @@ export async function sendBookingCreatedNotifications(
   const smsProvider = getActiveSmsReminderProvider()
   if (!wantSms) {
     smsResult = channelDetail("skipped")
+    if (phone) {
+      await insertNotificationLog(
+        admin,
+        {
+          business_id: booking.business_id,
+          booking_id: booking.id,
+          channel: "sms",
+          type: "booking_created",
+          recipient: phone,
+          status: "skipped",
+          subject: null,
+          body: null,
+          provider: null,
+          provider_message_id: null,
+          error: "channel_disabled",
+          sent_at: null,
+        },
+        "[booking-created.notify.log]",
+      )
+    }
   } else if (!phone) {
     smsResult = channelDetail("missing")
   } else {
