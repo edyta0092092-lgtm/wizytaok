@@ -92,13 +92,14 @@ const COPY = {
     heatmap: {
       title: "Obłożenie",
       subtitle:
-        "Rozkład wizyt wg dnia tygodnia i godziny rozpoczęcia w wybranym zakresie. Pomaga wychwycić, kiedy masz najwięcej pracy.",
+        "Średnie obłożenie wg dnia tygodnia i godziny w wybranym zakresie. Im dłuższy okres (np. 12 mies.), tym wiarygodniejszy typowy wzorzec tygodnia.",
       busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
       busyDaysHint:
-        "Liczba wizyt przypadających na każdy dzień tygodnia (łącznie w wybranym zakresie). Wyższy słupek = więcej wizyt tego dnia.",
+        "Średnia liczba wizyt przypadająca na dany dzień tygodnia (suma wizyt tego dnia podzielona przez liczbę jego wystąpień w zakresie).",
       busyHoursHint:
-        "Liczba wizyt wg godziny rozpoczęcia (łącznie w wybranym zakresie). Pokazuje, w których godzinach jest największy ruch.",
+        "Średnia liczba wizyt w danej godzinie na dzień (suma wizyt w tej godzinie podzielona przez liczbę dni w zakresie).",
+      averageLabel: "śr. wizyt",
     },
   },
   en: {
@@ -173,13 +174,14 @@ const COPY = {
     heatmap: {
       title: "Heatmap / workload",
       subtitle:
-        "Distribution of visits by weekday and start hour in the selected range. Helps you spot your busiest times.",
+        "Average workload by weekday and hour in the selected range. The longer the period (e.g. 12 mo.), the more reliable the typical weekly pattern.",
       busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
       busyDaysHint:
-        "Number of visits on each weekday (totalled across the selected range). Taller bar = more visits that day.",
+        "Average visits on a given weekday (total visits that weekday divided by how many times it occurs in the range).",
       busyHoursHint:
-        "Number of visits by start hour (totalled across the selected range). Shows when you get the most traffic.",
+        "Average visits in a given hour per day (total visits in that hour divided by the number of days in the range).",
+      averageLabel: "avg visits",
     },
   },
 } as const
@@ -193,12 +195,15 @@ export function StatisticsDashboard() {
   const { language, t } = useTranslations()
   const [range, setRange] = React.useState<StatisticsRange>(currentMonthRange)
   const [statusRange, setStatusRange] = React.useState<StatisticsRange>(currentMonthRange)
+  const [heatmapRange, setHeatmapRange] = React.useState<StatisticsRange>("12m")
   const copy = COPY[language] ?? COPY.pl
-  const { ready, loadError, dataset, statuses, availableMonths } = useStatisticsData({
-    range,
-    statusRange,
-    locale: language,
-  })
+  const { ready, loadError, dataset, statuses, busyDays, busyHours, availableMonths } =
+    useStatisticsData({
+      range,
+      statusRange,
+      heatmapRange,
+      locale: language,
+    })
 
   const monthOptions = React.useMemo<StatisticsMonthOption[]>(() => {
     const formatter = new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
@@ -303,12 +308,18 @@ export function StatisticsDashboard() {
             <StatisticsHeatmap
               title={copy.heatmap.title}
               subtitle={copy.heatmap.subtitle}
-              days={dataset.busyDays}
-              hours={dataset.busyHours}
+              days={busyDays ?? dataset.busyDays}
+              hours={busyHours ?? dataset.busyHours}
               busyDaysTitle={copy.heatmap.busyDays}
               busyHoursTitle={copy.heatmap.busyHours}
               busyDaysHint={copy.heatmap.busyDaysHint}
               busyHoursHint={copy.heatmap.busyHoursHint}
+              averageLabel={copy.heatmap.averageLabel}
+              range={heatmapRange}
+              ranges={copy.chart.ranges}
+              onRangeChange={setHeatmapRange}
+              monthOptions={monthOptions}
+              monthPlaceholder={copy.chart.monthPlaceholder}
             />
           </div>
         </>

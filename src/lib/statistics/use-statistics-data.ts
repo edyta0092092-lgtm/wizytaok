@@ -11,6 +11,7 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { buildStatisticsDataset } from "@/lib/statistics/statistics-aggregates"
 import type {
   StatisticsDataset,
+  StatisticsHeatmapItem,
   StatisticsNotificationSource,
   StatisticsRange,
   StatisticsStatusItem,
@@ -22,6 +23,8 @@ type StatisticsState = {
   loadError: boolean
   dataset: StatisticsDataset | null
   statuses: StatisticsStatusItem[] | null
+  busyDays: StatisticsHeatmapItem[] | null
+  busyHours: StatisticsHeatmapItem[] | null
   availableMonths: string[]
   appointmentsReady: boolean
 }
@@ -97,10 +100,12 @@ async function fetchNotificationSources(
 export function useStatisticsData({
   range,
   statusRange,
+  heatmapRange,
   locale,
 }: {
   range: StatisticsRange
   statusRange?: StatisticsRange
+  heatmapRange?: StatisticsRange
   locale: "pl" | "en"
 }): StatisticsState {
   const access = useBusinessAccess()
@@ -198,6 +203,34 @@ export function useStatisticsData({
     staff,
   ])
 
+  const effectiveHeatmapRange = heatmapRange ?? range
+  const heatmap = React.useMemo(() => {
+    if (!appointmentsReady || !detailsReady) return null
+    if (effectiveHeatmapRange === range && dataset) {
+      return { busyDays: dataset.busyDays, busyHours: dataset.busyHours }
+    }
+    const built = buildStatisticsDataset({
+      appointments,
+      services,
+      staff,
+      notificationSources,
+      range: effectiveHeatmapRange,
+      locale,
+    })
+    return { busyDays: built.busyDays, busyHours: built.busyHours }
+  }, [
+    appointments,
+    appointmentsReady,
+    dataset,
+    detailsReady,
+    effectiveHeatmapRange,
+    locale,
+    notificationSources,
+    range,
+    services,
+    staff,
+  ])
+
   const availableMonths = React.useMemo(() => {
     const months = new Set<string>()
     // Current month is always offered because it is the default range.
@@ -217,6 +250,8 @@ export function useStatisticsData({
     loadError: appointmentsLoadError || loadError,
     dataset,
     statuses,
+    busyDays: heatmap?.busyDays ?? null,
+    busyHours: heatmap?.busyHours ?? null,
     availableMonths,
     appointmentsReady,
   }

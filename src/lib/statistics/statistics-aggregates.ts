@@ -297,9 +297,30 @@ function buildNotificationStats(
   }
 }
 
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function countWeekdayOccurrences(rangeStart: Date, rangeEnd: Date): number[] {
+  const occurrences = Array.from({ length: 7 }, () => 0)
+  let cursor = startOfDay(rangeStart)
+  const endTime = rangeEnd.getTime()
+  // Guard against pathological ranges (cap at ~2 years of iterations).
+  let guard = 0
+  while (cursor.getTime() < endTime && guard < 800) {
+    const dayIndex = (cursor.getDay() + 6) % 7
+    occurrences[dayIndex] += 1
+    cursor = addDays(cursor, 1)
+    guard += 1
+  }
+  return occurrences
+}
+
 function buildHeatmap(
   appointments: Appointment[],
-  locale: "pl" | "en"
+  locale: "pl" | "en",
+  rangeStart: Date,
+  rangeEnd: Date
 ): { busyDays: StatisticsHeatmapItem[]; busyHours: StatisticsHeatmapItem[] } {
   const dayLabels = locale === "en" ? DAY_LABELS_EN : DAY_LABELS_PL
   const dayCounts = Array.from({ length: 7 }, () => 0)
@@ -314,26 +335,34 @@ function buildHeatmap(
     hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1)
   }
 
-  const maxDay = Math.max(1, ...dayCounts)
-  const maxHour = Math.max(1, ...hourCounts.values())
+  // Normalise totals into averages so longer ranges stay comparable:
+  // - days: average visits per occurrence of that weekday in the range
+  // - hours: average visits in that hour per calendar day in the range
+  const weekdayOccurrences = countWeekdayOccurrences(rangeStart, rangeEnd)
+  const daysInRange = Math.max(1, weekdayOccurrences.reduce((sum, value) => sum + value, 0))
 
-  const busyDays = dayCounts.map((count, index) => ({
+  const dayAverages = dayCounts.map(
+    (total, index) => total / Math.max(1, weekdayOccurrences[index] ?? 0)
+  )
+  const maxDayAverage = Math.max(0.0001, ...dayAverages)
+
+  const busyDays = dayAverages.map((average, index) => ({
     key: String(index),
     label: dayLabels[index] ?? String(index + 1),
-    count,
-    intensity: count / maxDay,
+    count: round1(average),
+    intensity: average / maxDayAverage,
   }))
 
   const hours = Array.from({ length: 16 }, (_, index) => index + 6)
-  const busyHours = hours.map((hour) => {
-    const count = hourCounts.get(hour) ?? 0
-    return {
-      key: String(hour),
-      label: `${String(hour).padStart(2, "0")}:00`,
-      count,
-      intensity: count / maxHour,
-    }
-  })
+  const hourAverages = hours.map((hour) => (hourCounts.get(hour) ?? 0) / daysInRange)
+  const maxHourAverage = Math.max(0.0001, ...hourAverages)
+
+  const busyHours = hours.map((hour, index) => ({
+    key: String(hour),
+    label: `${String(hour).padStart(2, "0")}:00`,
+    count: round1(hourAverages[index] ?? 0),
+    intensity: (hourAverages[index] ?? 0) / maxHourAverage,
+  }))
 
   return { busyDays, busyHours }
 }
@@ -421,7 +450,7 @@ export function buildStatisticsDataset({
       no_show: 0,
     }
   )
-  const heatmap = buildHeatmap(appointmentsInRange, locale)
+  const heatmap = buildHeatmap(appointmentsInRange, locale, rangeStart, rangeEnd)
 
   return {
     kpis: {
