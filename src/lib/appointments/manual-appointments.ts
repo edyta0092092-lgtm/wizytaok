@@ -249,6 +249,7 @@ export function mapManualToAppointment(m: ManualAppointment): Appointment {
     email: m.clientEmail,
     serviceLabel: m.serviceName,
     startsAt: new Date(`${m.date}T${m.time}:00`).toISOString(),
+    createdAt: m.createdAt,
     status,
     source: normalizeBookingSource(m.source),
     notes: m.note,

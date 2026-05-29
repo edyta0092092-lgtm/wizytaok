@@ -212,6 +212,7 @@ export function mapBookingRowToAppointment(row: Tables<"bookings">, businessSlug
     email: pb.customerEmail,
     serviceLabel: pb.serviceName,
     startsAt: combineLocalDateTimeToUtcIso(pb.date, pb.time),
+    createdAt: pb.createdAt ?? row.created_at ?? undefined,
     status: mapDbStatusToAppointmentStatus(row.status),
     source: normalizeBookingSource(row.source),
     notes: [pb.note, pb.customerNote].filter((x) => x && x.trim()).join("\n\n") || undefined,

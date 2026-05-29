@@ -35,7 +35,7 @@ const COPY = {
       cancelled: "Anulowane",
       noShow: "Nieobecność klienta",
       newClients: "Nowi klienci",
-      groupAllTime: "Łącznie (cały czas)",
+      groupAllTime: "Łącznie",
       groupThisMonth: "Ten miesiąc",
     },
     chart: {
@@ -122,7 +122,7 @@ const COPY = {
       cancelled: "Cancelled",
       noShow: "Client did not attend",
       newClients: "New clients",
-      groupAllTime: "Total (all time)",
+      groupAllTime: "Total",
       groupThisMonth: "This month",
     },
     chart: {

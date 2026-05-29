@@ -11,7 +11,6 @@ import type {
 } from "@/lib/statistics/statistics-types"
 
 const STATUS_ORDER: Array<StatisticsStatusItem["status"]> = [
-  "confirmed",
   "completed",
   "cancelled",
   "no_show",
@@ -385,19 +384,17 @@ export function buildStatisticsDataset({
       isPlannedVisitForDashboardStats(appointment, today)
   ).length
 
-  const firstVisitByClient = new Map<string, Date>()
+  // Clients who made any reservation in the current month (by booking creation
+  // date, regardless of when the visit itself takes place). Scoped to this
+  // month, so the counter naturally resets when a new month starts.
+  const clientsBookedThisMonth = new Set<string>()
   for (const appointment of appointments) {
+    const createdAt = parseDate(appointment.createdAt) ?? parseDate(appointment.startsAt)
+    if (!createdAt || !inRange(createdAt, monthStart, monthEnd)) continue
     const key = appointmentClientKey(appointment)
-    if (!key) continue
-    const date = parseDate(appointment.startsAt)
-    if (!date) continue
-    const previous = firstVisitByClient.get(key)
-    if (!previous || date.getTime() < previous.getTime()) firstVisitByClient.set(key, date)
+    if (key) clientsBookedThisMonth.add(key)
   }
-
-  const newClients = [...firstVisitByClient.values()].filter((date) =>
-    inRange(date, monthStart, monthEnd)
-  ).length
+  const newClients = clientsBookedThisMonth.size
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
       inRange(parseDate(appointment.startsAt), bucket.start, bucket.end)

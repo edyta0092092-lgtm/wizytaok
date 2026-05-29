@@ -18,6 +18,8 @@ export type Appointment = {
   email?: string
   serviceLabel: string
   startsAt: string
+  /** ISO czasu utworzenia rezerwacji (kiedy klient dokonał rezerwacji). */
+  createdAt?: string
   status: AppointmentStatus
   notes?: string
   /** Prośba o zmiana terminu z publicznego linku potwierdzenia (MVP localStorage). */
