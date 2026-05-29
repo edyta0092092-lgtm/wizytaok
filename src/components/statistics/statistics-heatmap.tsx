@@ -24,6 +24,8 @@ export function StatisticsHeatmap({
   hours,
   busyDaysTitle,
   busyHoursTitle,
+  busyDaysHint,
+  busyHoursHint,
 }: {
   title: string
   subtitle: string
@@ -31,6 +33,8 @@ export function StatisticsHeatmap({
   hours: StatisticsHeatmapItem[]
   busyDaysTitle: string
   busyHoursTitle: string
+  busyDaysHint?: string
+  busyHoursHint?: string
 }) {
   const dayData = days.map((item) => ({
     key: item.key,
@@ -56,6 +60,9 @@ export function StatisticsHeatmap({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {busyDaysTitle}
           </h3>
+          {busyDaysHint ? (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{busyDaysHint}</p>
+          ) : null}
           <div className="mt-3 h-56 rounded-2xl border border-border/70 bg-muted/15 px-2 py-3 sm:px-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dayData} margin={{ top: 8, right: 8, left: 0, bottom: 24 }}>
@@ -102,6 +109,9 @@ export function StatisticsHeatmap({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {busyHoursTitle}
           </h3>
+          {busyHoursHint ? (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{busyHoursHint}</p>
+          ) : null}
           <div className="mt-3 h-64 rounded-2xl border border-border/70 bg-muted/15 px-2 py-3 sm:px-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={hourData} margin={{ top: 8, right: 8, left: 0, bottom: 44 }}>

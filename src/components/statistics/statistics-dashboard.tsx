@@ -91,9 +91,14 @@ const COPY = {
     },
     heatmap: {
       title: "Obłożenie",
-      subtitle: "Najbardziej zajęte dni i godziny w wybranym zakresie.",
-      busyDays: "Najbardziej zajęte dni",
+      subtitle:
+        "Rozkład wizyt wg dnia tygodnia i godziny rozpoczęcia w wybranym zakresie. Pomaga wychwycić, kiedy masz najwięcej pracy.",
+      busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
+      busyDaysHint:
+        "Liczba wizyt przypadających na każdy dzień tygodnia (łącznie w wybranym zakresie). Wyższy słupek = więcej wizyt tego dnia.",
+      busyHoursHint:
+        "Liczba wizyt wg godziny rozpoczęcia (łącznie w wybranym zakresie). Pokazuje, w których godzinach jest największy ruch.",
     },
   },
   en: {
@@ -167,9 +172,14 @@ const COPY = {
     },
     heatmap: {
       title: "Heatmap / workload",
-      subtitle: "Busiest days and hours in the selected range.",
-      busyDays: "Busiest days",
+      subtitle:
+        "Distribution of visits by weekday and start hour in the selected range. Helps you spot your busiest times.",
+      busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
+      busyDaysHint:
+        "Number of visits on each weekday (totalled across the selected range). Taller bar = more visits that day.",
+      busyHoursHint:
+        "Number of visits by start hour (totalled across the selected range). Shows when you get the most traffic.",
     },
   },
 } as const
@@ -297,6 +307,8 @@ export function StatisticsDashboard() {
               hours={dataset.busyHours}
               busyDaysTitle={copy.heatmap.busyDays}
               busyHoursTitle={copy.heatmap.busyHours}
+              busyDaysHint={copy.heatmap.busyDaysHint}
+              busyHoursHint={copy.heatmap.busyHoursHint}
             />
           </div>
         </>
