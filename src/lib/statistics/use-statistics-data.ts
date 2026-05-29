@@ -26,6 +26,7 @@ type StatisticsState = {
   busyDays: StatisticsHeatmapItem[] | null
   busyHours: StatisticsHeatmapItem[] | null
   availableMonths: string[]
+  availableYears: string[]
   appointmentsReady: boolean
 }
 
