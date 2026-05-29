@@ -39,33 +39,25 @@ export function useConfirmDeleteAppointmentHandler(args: {
       setIsDeletingAppointment(true)
       try {
         const row = appointments.find((a) => a.id === deletingId)
-        if (row?.status === "cancelled") {
-          dismissAppointmentFromPanel(deletingId, businessId)
-          invalidateMergedAppointmentsCache()
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new Event("pw-bookings"))
+
+        // Wizyta już anulowana: tylko chowamy ją z panelu. Status w bazie się nie
+        // zmienia, więc statystyki nadal liczą ją jako anulowaną.
+        if (row?.status !== "cancelled") {
+          const result = await cancelAppointmentFromRemove(deletingId, language, false)
+          if (!result.ok) {
+            const detail =
+              result.error && result.error.trim().length > 0
+                ? result.error
+                : t("appointments.appointmentCancelFromRemoveMissingIdDetail")
+            setActionNotice(
+              t("appointments.appointmentCancelFromRemoveFailed").replace("{detail}", detail),
+            )
+            return
           }
-          setActionNotice(t("appointments.appointmentRemovedFromList"))
-          setConfirmDeleteAppointmentId(null)
-          return
         }
 
-        const result = await cancelAppointmentFromRemove(
-          deletingId,
-          language,
-          false,
-          businessId,
-        )
-        if (!result.ok) {
-          const detail =
-            result.error && result.error.trim().length > 0
-              ? result.error
-              : t("appointments.appointmentCancelFromRemoveMissingIdDetail")
-          setActionNotice(
-            t("appointments.appointmentCancelFromRemoveFailed").replace("{detail}", detail),
-          )
-          return
-        }
+        dismissAppointmentFromPanel(deletingId, businessId)
+        invalidateMergedAppointmentsCache()
         setActionNotice(t("appointments.appointmentRemovedFromList"))
         setConfirmDeleteAppointmentId(null)
       } finally {

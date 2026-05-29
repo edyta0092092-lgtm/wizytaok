@@ -7,6 +7,10 @@ import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
 import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
+import {
+  APPOINTMENTS_PANEL_DISMISSED_EVENT,
+  filterDismissedAppointments,
+} from "@/lib/appointments/appointments-panel-dismissed"
 import { useAppointmentsFiltersController } from "@/lib/appointments/use-appointments-filters-controller"
 import { useAppointmentsUrlSyncedFilters } from "@/lib/appointments/use-appointments-url-synced-filters"
 import { useAppointmentsStaffForFilters } from "@/lib/appointments/use-appointments-staff-for-filters"
@@ -25,7 +29,21 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 export function AppointmentsPageInner() {
   const { ready: accessReady, canDeleteBookings, businessId } = useBusinessAccess()
   const { t, language } = useTranslations()
-  const { appointments } = useAppointmentsStore(accessReady ? businessId : undefined)
+  const { appointments: allAppointments } = useAppointmentsStore(accessReady ? businessId : undefined)
+
+  // Wizyty „usunięte z listy" znikają tylko z panelu — w bazie i w statystykach
+  // pozostają (np. nadal liczone jako anulowane). Ten filtr działa wyłącznie tutaj.
+  const [dismissTick, setDismissTick] = React.useState(0)
+  React.useEffect(() => {
+    const onDismissed = () => setDismissTick((n) => n + 1)
+    window.addEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
+    return () => window.removeEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
+  }, [])
+  const appointments = React.useMemo(
+    () => filterDismissedAppointments(allAppointments, businessId),
+    [allAppointments, businessId, dismissTick],
+  )
+
   const { filter, setFilter, staffFilter, restrictToToday, setStaffFilterAndUrl } =
     useAppointmentsUrlSyncedFilters()
   const { allStaffMembers, staffLoading, staffLoadError, staffSelectOptions } =
