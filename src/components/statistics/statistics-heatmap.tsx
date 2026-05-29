@@ -138,7 +138,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
-                  allowDecimals
+                  allowDecimals={false}
                   width={32}
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
@@ -190,7 +190,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
-                  allowDecimals
+                  allowDecimals={false}
                   width={32}
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
