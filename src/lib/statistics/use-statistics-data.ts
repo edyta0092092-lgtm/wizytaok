@@ -15,6 +15,7 @@ import type {
   StatisticsDataset,
   StatisticsNotificationSource,
   StatisticsRange,
+  StatisticsStatusItem,
 } from "@/lib/statistics/statistics-types"
 import type { Service, StaffMember } from "@/types/domain"
 
@@ -22,6 +23,7 @@ type StatisticsState = {
   ready: boolean
   loadError: boolean
   dataset: StatisticsDataset | null
+  statuses: StatisticsStatusItem[] | null
   appointmentsReady: boolean
 }
 
@@ -111,9 +113,11 @@ async function fetchNotificationSources(
 
 export function useStatisticsData({
   range,
+  statusRange,
   locale,
 }: {
   range: StatisticsRange
+  statusRange?: StatisticsRange
   locale: "pl" | "en"
 }): StatisticsState {
   const access = useBusinessAccess()
@@ -193,10 +197,38 @@ export function useStatisticsData({
     staff,
   ])
 
+  const effectiveStatusRange = statusRange ?? range
+  const statuses = React.useMemo(() => {
+    if (!appointmentsReady || !detailsReady) return null
+    if (effectiveStatusRange === range) return dataset?.statuses ?? null
+    return buildStatisticsDataset({
+      appointments,
+      services,
+      staff,
+      notificationSources,
+      appointmentMeta,
+      range: effectiveStatusRange,
+      locale,
+    }).statuses
+  }, [
+    appointmentMeta,
+    appointments,
+    appointmentsReady,
+    dataset,
+    detailsReady,
+    effectiveStatusRange,
+    locale,
+    notificationSources,
+    range,
+    services,
+    staff,
+  ])
+
   return {
     ready: appointmentsReady && detailsReady,
     loadError: appointmentsLoadError || loadError,
     dataset,
+    statuses,
     appointmentsReady,
   }
 }

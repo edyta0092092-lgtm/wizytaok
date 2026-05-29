@@ -12,7 +12,10 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useTranslations } from "@/lib/i18n/use-translations"
-import type { StatisticsStatusItem } from "@/lib/statistics/statistics-types"
+import type {
+  StatisticsRange,
+  StatisticsStatusItem,
+} from "@/lib/statistics/statistics-types"
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE: Record<StatisticsStatusItem["status"], string> = {
@@ -42,12 +45,18 @@ export function StatisticsStatusChart({
   items,
   empty,
   axisY,
+  range,
+  ranges,
+  onRangeChange,
 }: {
   title: string
   subtitle: string
   items: StatisticsStatusItem[]
   empty: string
   axisY: string
+  range: StatisticsRange
+  ranges: Record<StatisticsRange, string>
+  onRangeChange: (range: StatisticsRange) => void
 }) {
   const { t, language } = useTranslations()
   const visibleItems = items.filter((item) => item.count > 0)
@@ -61,9 +70,28 @@ export function StatisticsStatusChart({
 
   return (
     <Card className="rounded-3xl border-border/80 bg-card/95 shadow-sm shadow-slate-900/5">
-      <CardHeader className="px-5">
-        <CardTitle className="text-base">{title}</CardTitle>
-        <p className="text-sm text-muted-foreground">{subtitle}</p>
+      <CardHeader className="gap-3 px-5 sm:flex sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <CardTitle className="text-base">{title}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(ranges) as StatisticsRange[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                range === item
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              onClick={() => onRangeChange(item)}
+            >
+              {ranges[item]}
+            </button>
+          ))}
+        </div>
       </CardHeader>
       <CardContent className="px-5 pb-5">
         {visibleItems.length === 0 ? (

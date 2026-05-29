@@ -168,9 +168,11 @@ const COPY = {
 export function StatisticsDashboard() {
   const { language, t } = useTranslations()
   const [range, setRange] = React.useState<StatisticsRange>("30d")
+  const [statusRange, setStatusRange] = React.useState<StatisticsRange>("30d")
   const copy = COPY[language] ?? COPY.pl
-  const { ready, loadError, dataset } = useStatisticsData({
+  const { ready, loadError, dataset, statuses } = useStatisticsData({
     range,
+    statusRange,
     locale: language,
   })
 
@@ -242,9 +244,12 @@ export function StatisticsDashboard() {
           <StatisticsStatusChart
             title={t("statistics.statusTitle")}
             subtitle={t("statistics.statusSubtitle")}
-            items={dataset.statuses}
+            items={statuses ?? dataset.statuses}
             empty={t("statistics.statusEmpty")}
             axisY={t("statistics.statusAxisY")}
+            range={statusRange}
+            ranges={copy.chart.ranges}
+            onRangeChange={setStatusRange}
           />
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <StatisticsNotificationsCard
