@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
 import {
   APPOINTMENTS_STATUS_FILTERS,
   appointmentsStatusFilterLabel,
@@ -58,9 +59,10 @@ export function AppointmentsFiltersBar({
           >
             {t("appointments.staffFilterLabel")}
           </label>
-          <select
+          <NativeSelect
             id="appointments-staff-filter"
-            className="h-9 w-full max-w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+            wrapperClassName="w-full"
+            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
             disabled={staffLoading || staffLoadError}
             value={staffFilter}
             onChange={(e) =>
@@ -75,7 +77,7 @@ export function AppointmentsFiltersBar({
                 {m.role?.trim() ? ` - ${m.role.trim()}` : ""}
               </option>
             ))}
-          </select>
+          </NativeSelect>
           {staffLoading ? (
             <p className="mt-1 text-xs text-muted-foreground">
               {t("appointments.staffFilterLoading")}
@@ -111,11 +113,12 @@ export function AppointmentsFiltersBar({
           >
             {t("appointments.serviceFilterLabel")}
           </label>
-          <select
+          <NativeSelect
             id="appointments-service-filter"
             value={serviceFilter}
             onChange={(e) => onServiceFilterChange(e.target.value)}
-            className="h-9 w-full max-w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+            wrapperClassName="w-full"
+            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
           >
             <option value="">{t("appointments.serviceFilterAll")}</option>
             {serviceOptions.map((serviceName) => (
@@ -123,7 +126,7 @@ export function AppointmentsFiltersBar({
                 {serviceName}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
       </div>
       <div className="flex min-w-0 flex-wrap gap-2">

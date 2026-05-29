@@ -10,6 +10,7 @@ import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import {
   allocateAppointmentAttachmentId,
@@ -266,8 +267,9 @@ export function AppointmentListRow({
           {row.id.startsWith("sb-") &&
           row.serviceId &&
           (staffByService[row.serviceId]?.length ?? 0) >= 1 ? (
-            <select
-              className="mt-1 h-8 max-w-full rounded-md border border-border bg-background px-2 text-xs"
+            <NativeSelect
+              wrapperClassName="mt-1 max-w-full"
+              className="h-8 rounded-md border border-border bg-background px-2 text-xs"
               value={row.staffId ?? ""}
               onChange={(e) => onStaffChange(e.target.value)}
               aria-label={t("appointments.manualStaffField")}
@@ -278,7 +280,7 @@ export function AppointmentListRow({
                   {s.name}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           ) : null}
           {row.id.startsWith("sb-") ? (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -455,8 +457,9 @@ export function AppointmentListRow({
                 : MANUAL_BOOKING_ANY_STAFF
               return (
                 <div className="space-y-2">
-                  <select
+                  <NativeSelect
                     id={`p-staff-${row.id}`}
+                    wrapperClassName="w-full"
                     className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={selectValue}
                     disabled={!canPick}
@@ -480,7 +483,7 @@ export function AppointmentListRow({
                         {t("appointments.proposeNoStaffAvailableInSlot")}
                       </option>
                     )}
-                  </select>
+                  </NativeSelect>
                   {!canPick ? (
                     <p className="text-xs text-muted-foreground">
                       {t("appointments.proposeNoStaffAvailableInSlot")}

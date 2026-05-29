@@ -11,6 +11,7 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { NativeSelect } from "@/components/ui/native-select"
 import type { StatisticsMonthOption } from "@/components/statistics/statistics-line-chart"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import type {
@@ -99,17 +100,18 @@ export function StatisticsStatusChart({
             </button>
           ))}
           {monthOptions.length > 0 ? (
-            <select
+            <NativeSelect
               value={isMonthRange ? range : ""}
               onChange={(event) => {
                 if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
               }}
               className={cn(
-                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
                 isMonthRange
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
+              chevronClassName={isMonthRange ? "text-primary-foreground" : undefined}
             >
               <option value="">{monthPlaceholder}</option>
               {monthOptions.map((option) => (
@@ -117,7 +119,7 @@ export function StatisticsStatusChart({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           ) : null}
         </div>
       </CardHeader>
