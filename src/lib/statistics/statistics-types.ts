@@ -5,7 +5,7 @@ export type StatisticsRange = "7d" | "30d" | "90d" | "12m"
 export type StatisticsChartPoint = {
   key: string
   label: string
-  created: number
+  confirmed: number
   completed: number
   cancelled: number
   noShow: number

@@ -378,15 +378,17 @@ export function buildStatisticsDataset({
   ).length
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
-      inRange(parseDate(appointment.startsAt), bucket.start, bucket.end)
-    )
-    const created = appointments.filter((appointment) =>
       inRange(appointmentCreatedAt(appointment, appointmentMeta), bucket.start, bucket.end)
-    ).length
+    )
     return {
       key: bucket.key,
       label: bucket.label,
-      created,
+      confirmed: bucketAppointments.filter(
+        (appointment) =>
+          appointment.status === "confirmed" ||
+          appointment.status === "booked" ||
+          appointment.status === "pending"
+      ).length,
       completed: bucketAppointments.filter((appointment) => appointment.status === "completed").length,
       cancelled: bucketAppointments.filter((appointment) => appointment.status === "cancelled").length,
       noShow: bucketAppointments.filter((appointment) => appointment.status === "no_show").length,

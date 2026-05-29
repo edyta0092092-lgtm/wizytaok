@@ -18,14 +18,14 @@ import type {
 } from "@/lib/statistics/statistics-types"
 import { cn } from "@/lib/utils"
 
-type SeriesKey = "created" | "completed" | "cancelled" | "noShow"
+type SeriesKey = "confirmed" | "completed" | "cancelled" | "noShow"
 
 const SERIES: Array<{
   key: SeriesKey
   dataKey: SeriesKey
   fill: string
 }> = [
-  { key: "created", dataKey: "created", fill: "#0f766e" },
+  { key: "confirmed", dataKey: "confirmed", fill: "#0f766e" },
   { key: "completed", dataKey: "completed", fill: "#10b981" },
   { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
   { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
@@ -64,7 +64,7 @@ export function StatisticsLineChart({
 }) {
   const chartData = points.map((point) => ({
     label: point.label,
-    created: point.created,
+    confirmed: point.confirmed,
     completed: point.completed,
     cancelled: point.cancelled,
     noShow: point.noShow,

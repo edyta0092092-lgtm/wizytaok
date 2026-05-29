@@ -35,7 +35,7 @@ const COPY = {
     chart: {
       title: "Trend wizyt",
       subtitle:
-        "Utworzone rezerwacje oraz wizyty zrealizowane, anulowane i z nieobecnością klienta w wybranym zakresie.",
+        "Wizyty w wybranym zakresie z podziałem na statusy: potwierdzone, zrealizowane, anulowane i z nieobecnością klienta.",
       ranges: {
         "7d": "7 dni",
         "30d": "30 dni",
@@ -43,7 +43,7 @@ const COPY = {
         "12m": "12 mies.",
       },
       series: {
-        created: "Utworzone rezerwacje",
+        confirmed: "Potwierdzone",
         completed: "Zrealizowane",
         cancelled: "Anulowane",
         noShow: "Nieobecność klienta",
@@ -108,7 +108,7 @@ const COPY = {
     },
     chart: {
       title: "Visit trend",
-      subtitle: "Created bookings, completed, cancelled, and no_show in the selected range.",
+      subtitle: "Visits in the selected range split by status: confirmed, completed, cancelled, and no_show.",
       ranges: {
         "7d": "7 days",
         "30d": "30 days",
@@ -116,7 +116,7 @@ const COPY = {
         "12m": "12 mo.",
       },
       series: {
-        created: "Created bookings",
+        confirmed: "Confirmed",
         completed: "Completed",
         cancelled: "Cancelled",
         noShow: "Client did not attend",
