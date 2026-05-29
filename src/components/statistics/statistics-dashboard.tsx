@@ -92,14 +92,15 @@ const COPY = {
     heatmap: {
       title: "Obłożenie",
       subtitle:
-        "Średnia liczba zrealizowanych wizyt wg dnia tygodnia i godziny w wybranym zakresie. Im dłuższy okres (np. 12 mies.), tym wiarygodniejszy typowy wzorzec tygodnia.",
+        "Kiedy masz najwięcej pracy. Dni tygodnia – łączna liczba zrealizowanych wizyt; godziny – średnia liczba wizyt na dzień roboczy.",
       busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
       busyDaysHint:
-        "Średnia liczba zrealizowanych wizyt przypadająca na dany dzień tygodnia, liczona tylko z dni, w których faktycznie były wizyty.",
+        "Łączna liczba zrealizowanych wizyt w danym dniu tygodnia w wybranym zakresie.",
       busyHoursHint:
-        "Średnia liczba zrealizowanych wizyt w danej godzinie, liczona tylko z dni, w których o tej godzinie były wizyty.",
-      averageLabel: "śr. wizyt",
+        "Średnia liczba zrealizowanych wizyt o danej godzinie, liczona tylko z dni, w których o tej godzinie były wizyty.",
+      averageLabel: "wizyt",
+      hoursValueLabel: "śr. wizyt/dzień",
     },
   },
   en: {
@@ -174,14 +175,15 @@ const COPY = {
     heatmap: {
       title: "Heatmap / workload",
       subtitle:
-        "Average number of completed visits by weekday and hour in the selected range. The longer the period (e.g. 12 mo.), the more reliable the typical weekly pattern.",
+        "When you are busiest. Weekdays – total completed visits; hours – average visits per working day.",
       busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
       busyDaysHint:
-        "Average completed visits on a given weekday, counted only from days that actually had visits.",
+        "Total completed visits on a given weekday in the selected range.",
       busyHoursHint:
         "Average completed visits in a given hour, counted only from days that had visits in that hour.",
-      averageLabel: "avg visits",
+      averageLabel: "visits",
+      hoursValueLabel: "avg visits/day",
     },
   },
 } as const
@@ -315,6 +317,7 @@ export function StatisticsDashboard() {
               busyDaysHint={copy.heatmap.busyDaysHint}
               busyHoursHint={copy.heatmap.busyHoursHint}
               averageLabel={copy.heatmap.averageLabel}
+              hoursValueLabel={copy.heatmap.hoursValueLabel}
               range={heatmapRange}
               ranges={copy.chart.ranges}
               onRangeChange={setHeatmapRange}

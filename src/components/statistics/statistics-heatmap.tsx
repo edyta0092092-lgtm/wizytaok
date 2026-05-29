@@ -34,6 +34,7 @@ export function StatisticsHeatmap({
   busyDaysHint,
   busyHoursHint,
   averageLabel,
+  hoursValueLabel,
   range,
   ranges,
   onRangeChange,
@@ -49,6 +50,7 @@ export function StatisticsHeatmap({
   busyDaysHint?: string
   busyHoursHint?: string
   averageLabel: string
+  hoursValueLabel: string
   range: StatisticsRange
   ranges: Record<StatisticsPresetRange, string>
   onRangeChange: (range: StatisticsRange) => void
@@ -190,7 +192,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
-                  allowDecimals={false}
+                  allowDecimals
                   width={32}
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
@@ -203,7 +205,7 @@ export function StatisticsHeatmap({
                       <div className="rounded-xl border border-border/80 bg-card px-3 py-2.5 text-xs shadow-lg">
                         <p className="font-medium text-foreground">{label}</p>
                         <p className="mt-1 font-semibold tabular-nums text-foreground">
-                          {typeof value === "number" ? value : 0} {averageLabel}
+                          {typeof value === "number" ? value : 0} {hoursValueLabel}
                         </p>
                       </div>
                     )

@@ -306,45 +306,38 @@ function buildHeatmap(
   locale: "pl" | "en"
 ): { busyDays: StatisticsHeatmapItem[]; busyHours: StatisticsHeatmapItem[] } {
   const dayLabels = locale === "en" ? DAY_LABELS_EN : DAY_LABELS_PL
-  const dayVisits = Array.from({ length: 7 }, () => 0)
-  const dayActiveDates = Array.from({ length: 7 }, () => new Set<string>())
-  const hourVisits = new Map<number, number>()
+  const dayCounts = Array.from({ length: 7 }, () => 0)
+  const hourCounts = new Map<number, number>()
   const hourActiveDates = new Map<number, Set<string>>()
 
   for (const appointment of appointments) {
     const date = parseDate(appointment.startsAt)
     if (!date) continue
-    const dateId = dayKey(date)
     const dayIndex = (date.getDay() + 6) % 7
-    dayVisits[dayIndex] += 1
-    dayActiveDates[dayIndex]?.add(dateId)
+    dayCounts[dayIndex] += 1
     const hour = date.getHours()
-    hourVisits.set(hour, (hourVisits.get(hour) ?? 0) + 1)
+    hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1)
     if (!hourActiveDates.has(hour)) hourActiveDates.set(hour, new Set<string>())
-    hourActiveDates.get(hour)?.add(dateId)
+    hourActiveDates.get(hour)?.add(dayKey(date))
   }
 
-  // Concrete averages: visits divided by the number of days that actually had
-  // visits on that weekday / in that hour. Empty calendar days do not dilute
-  // the figure, so "average visits on a Thursday" stays meaningful.
-  const dayAverages = dayVisits.map(
-    (total, index) => total / Math.max(1, dayActiveDates[index]?.size ?? 0)
-  )
-  const maxDayAverage = Math.max(0.0001, ...dayAverages)
-
-  const busyDays = dayAverages.map((average, index) => ({
+  // Days: total completed visits per weekday in the range.
+  const maxDay = Math.max(1, ...dayCounts)
+  const busyDays = dayCounts.map((count, index) => ({
     key: String(index),
     label: dayLabels[index] ?? String(index + 1),
-    count: round1(average),
-    intensity: average / maxDayAverage,
+    count,
+    intensity: count / maxDay,
   }))
 
+  // Hours: average visits across the days that actually had a visit in that
+  // hour (e.g. 3 visits at 12:00 across 3 different days => 1; two visits at
+  // 12:00 on the same day plus one on another => 3 / 2 = 1.5).
   const hours = Array.from({ length: 16 }, (_, index) => index + 6)
   const hourAverages = hours.map(
-    (hour) => (hourVisits.get(hour) ?? 0) / Math.max(1, hourActiveDates.get(hour)?.size ?? 0)
+    (hour) => (hourCounts.get(hour) ?? 0) / Math.max(1, hourActiveDates.get(hour)?.size ?? 0)
   )
   const maxHourAverage = Math.max(0.0001, ...hourAverages)
-
   const busyHours = hours.map((hour, index) => ({
     key: String(hour),
     label: `${String(hour).padStart(2, "0")}:00`,
