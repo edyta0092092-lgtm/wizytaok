@@ -398,6 +398,12 @@ export async function updateAppointmentStatus(
       reminderStatus: options.reminderStatus,
       reminderDueAtIso: options.reminderDueAtIso,
     })
+    if (r.ok) {
+      // Bez tego lista i statystyki czytałyby stary status z cache aż do
+      // następnego pollingu. Wymuszamy natychmiastowe odświeżenie obu widoków.
+      invalidateMergedAppointmentsCache()
+      window.dispatchEvent(new Event("pw-bookings"))
+    }
     return r.ok
   }
 
