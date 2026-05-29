@@ -53,6 +53,8 @@ export function StatisticsStatusChart({
   onRangeChange,
   monthOptions,
   monthPlaceholder,
+  yearOptions,
+  yearPlaceholder,
 }: {
   title: string
   subtitle: string
@@ -64,9 +66,12 @@ export function StatisticsStatusChart({
   onRangeChange: (range: StatisticsRange) => void
   monthOptions: StatisticsMonthOption[]
   monthPlaceholder: string
+  yearOptions: StatisticsMonthOption[]
+  yearPlaceholder: string
 }) {
   const { t, language } = useTranslations()
-  const isMonthRange = range.startsWith("month:") || range.startsWith("year:")
+  const isMonthRange = range.startsWith("month:")
+  const isYearRange = range.startsWith("year:")
   const visibleItems = items.filter((item) => item.count > 0)
   const chartData = visibleItems.map((item) => ({
     status: item.status,
@@ -115,6 +120,28 @@ export function StatisticsStatusChart({
             >
               <option value="">{monthPlaceholder}</option>
               {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </NativeSelect>
+          ) : null}
+          {yearOptions.length > 0 ? (
+            <NativeSelect
+              value={isYearRange ? range : ""}
+              onChange={(event) => {
+                if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
+              }}
+              className={cn(
+                "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
+                isYearRange
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              chevronClassName={isYearRange ? "text-primary-foreground" : undefined}
+            >
+              <option value="">{yearPlaceholder}</option>
+              {yearOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

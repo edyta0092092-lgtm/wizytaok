@@ -50,6 +50,7 @@ type ChartCopy = {
   total: string
   empty: string
   monthPlaceholder: string
+  yearPlaceholder: string
   monthHint: string
   yearHint: string
   axes: {
@@ -64,17 +65,18 @@ export function StatisticsLineChart({
   range,
   onRangeChange,
   monthOptions,
+  yearOptions,
   copy,
 }: {
   points: StatisticsChartPoint[]
   range: StatisticsRange
   onRangeChange: (range: StatisticsRange) => void
   monthOptions: StatisticsMonthOption[]
+  yearOptions: StatisticsMonthOption[]
   copy: ChartCopy
 }) {
   const isMonthRange = range.startsWith("month:")
   const isYearRange = range.startsWith("year:")
-  const isCustomRange = isMonthRange || isYearRange
   const chartData = points.map((point) => ({
     label: point.label,
     completed: point.completed,
@@ -116,20 +118,42 @@ export function StatisticsLineChart({
           ))}
           {monthOptions.length > 0 ? (
             <NativeSelect
-              value={isCustomRange ? range : ""}
+              value={isMonthRange ? range : ""}
               onChange={(event) => {
                 if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
               }}
               className={cn(
                 "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
-                isCustomRange
+                isMonthRange
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
-              chevronClassName={isCustomRange ? "text-primary-foreground" : undefined}
+              chevronClassName={isMonthRange ? "text-primary-foreground" : undefined}
             >
               <option value="">{copy.monthPlaceholder}</option>
               {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </NativeSelect>
+          ) : null}
+          {yearOptions.length > 0 ? (
+            <NativeSelect
+              value={isYearRange ? range : ""}
+              onChange={(event) => {
+                if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
+              }}
+              className={cn(
+                "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
+                isYearRange
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              chevronClassName={isYearRange ? "text-primary-foreground" : undefined}
+            >
+              <option value="">{copy.yearPlaceholder}</option>
+              {yearOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

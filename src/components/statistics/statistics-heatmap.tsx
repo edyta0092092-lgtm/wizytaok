@@ -40,6 +40,8 @@ export function StatisticsHeatmap({
   onRangeChange,
   monthOptions,
   monthPlaceholder,
+  yearOptions,
+  yearPlaceholder,
 }: {
   title: string
   subtitle: string
@@ -56,8 +58,11 @@ export function StatisticsHeatmap({
   onRangeChange: (range: StatisticsRange) => void
   monthOptions: StatisticsMonthOption[]
   monthPlaceholder: string
+  yearOptions: StatisticsMonthOption[]
+  yearPlaceholder: string
 }) {
-  const isMonthRange = range.startsWith("month:") || range.startsWith("year:")
+  const isMonthRange = range.startsWith("month:")
+  const isYearRange = range.startsWith("year:")
   const dayData = days.map((item) => ({
     key: item.key,
     label: item.label,
@@ -110,6 +115,28 @@ export function StatisticsHeatmap({
             >
               <option value="">{monthPlaceholder}</option>
               {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </NativeSelect>
+          ) : null}
+          {yearOptions.length > 0 ? (
+            <NativeSelect
+              value={isYearRange ? range : ""}
+              onChange={(event) => {
+                if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
+              }}
+              className={cn(
+                "rounded-full py-1.5 pl-3 text-xs font-medium transition-colors",
+                isYearRange
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+              chevronClassName={isYearRange ? "text-primary-foreground" : undefined}
+            >
+              <option value="">{yearPlaceholder}</option>
+              {yearOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>

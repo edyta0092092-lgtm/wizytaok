@@ -55,7 +55,8 @@ const COPY = {
         noShow: "Nieobecność klienta",
       },
       total: "Razem",
-      monthPlaceholder: "Okres…",
+      monthPlaceholder: "Miesiąc…",
+      yearPlaceholder: "Rok…",
       monthHint: "Każdy słupek to jeden dzień wybranego miesiąca.",
       yearHint: "Każdy słupek to jeden miesiąc wybranego roku.",
       empty: "Brak wizyt w tym zakresie.",
@@ -142,7 +143,8 @@ const COPY = {
         noShow: "Client did not attend",
       },
       total: "Total",
-      monthPlaceholder: "Period…",
+      monthPlaceholder: "Month…",
+      yearPlaceholder: "Year…",
       monthHint: "Each bar is one day of the selected month.",
       yearHint: "Each bar is one month of the selected year.",
       empty: "No visits in this range.",
@@ -220,12 +222,7 @@ export function StatisticsDashboard() {
       month: "long",
       year: "numeric",
     })
-    const yearLabel = language === "en" ? "Year" : "Rok"
-    const yearOptions: StatisticsMonthOption[] = availableYears.map((year) => ({
-      value: `year:${year}` as StatisticsRange,
-      label: `${yearLabel} ${year}`,
-    }))
-    const monthEntries: StatisticsMonthOption[] = availableMonths.map((month) => {
+    return availableMonths.map((month) => {
       const [year, monthNumber] = month.split("-").map((value) => Number(value))
       const label = formatter.format(new Date(year, (monthNumber || 1) - 1, 1))
       return {
@@ -233,8 +230,16 @@ export function StatisticsDashboard() {
         label: label.charAt(0).toUpperCase() + label.slice(1),
       }
     })
-    return [...yearOptions, ...monthEntries]
-  }, [availableMonths, availableYears, language])
+  }, [availableMonths, language])
+
+  const yearOptions = React.useMemo<StatisticsMonthOption[]>(
+    () =>
+      availableYears.map((year) => ({
+        value: `year:${year}` as StatisticsRange,
+        label: year,
+      })),
+    [availableYears]
+  )
 
   return (
     <div className="space-y-6">
@@ -285,6 +290,7 @@ export function StatisticsDashboard() {
             range={range}
             onRangeChange={setRange}
             monthOptions={monthOptions}
+            yearOptions={yearOptions}
             copy={copy.chart}
           />
           <div className="grid gap-6 lg:grid-cols-2">
@@ -313,6 +319,8 @@ export function StatisticsDashboard() {
             onRangeChange={setStatusRange}
             monthOptions={monthOptions}
             monthPlaceholder={copy.chart.monthPlaceholder}
+            yearOptions={yearOptions}
+            yearPlaceholder={copy.chart.yearPlaceholder}
           />
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <StatisticsNotificationsCard
@@ -337,6 +345,8 @@ export function StatisticsDashboard() {
               onRangeChange={setHeatmapRange}
               monthOptions={monthOptions}
               monthPlaceholder={copy.chart.monthPlaceholder}
+              yearOptions={yearOptions}
+              yearPlaceholder={copy.chart.yearPlaceholder}
             />
           </div>
         </>
