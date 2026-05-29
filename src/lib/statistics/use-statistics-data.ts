@@ -200,7 +200,10 @@ export function useStatisticsData({
 
   const availableMonths = React.useMemo(() => {
     const months = new Set<string>()
-    // A month is selectable only when a visit actually takes place in it
+    // Current month is always offered because it is the default range.
+    const now = new Date()
+    months.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+    // Other months show up only when a visit actually takes place in them
     // (by the appointment date), so new months appear automatically.
     for (const appointment of appointments) {
       const startMonth = monthKeyFromValue(appointment.startsAt)

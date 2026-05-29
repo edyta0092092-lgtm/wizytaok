@@ -174,10 +174,15 @@ const COPY = {
   },
 } as const
 
+function currentMonthRange(): StatisticsRange {
+  const now = new Date()
+  return `month:${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+}
+
 export function StatisticsDashboard() {
   const { language, t } = useTranslations()
-  const [range, setRange] = React.useState<StatisticsRange>("30d")
-  const [statusRange, setStatusRange] = React.useState<StatisticsRange>("30d")
+  const [range, setRange] = React.useState<StatisticsRange>(currentMonthRange)
+  const [statusRange, setStatusRange] = React.useState<StatisticsRange>(currentMonthRange)
   const copy = COPY[language] ?? COPY.pl
   const { ready, loadError, dataset, statuses, availableMonths } = useStatisticsData({
     range,
