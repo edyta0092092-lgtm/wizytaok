@@ -140,7 +140,7 @@ export function StatisticsHeatmap({
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />
                 <YAxis
-                  allowDecimals={false}
+                  allowDecimals
                   width={32}
                   tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 />

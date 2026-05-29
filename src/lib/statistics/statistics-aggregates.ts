@@ -320,13 +320,15 @@ function buildHeatmap(
     hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1)
   }
 
-  // Days: total visits per weekday in the range.
-  const maxDay = Math.max(1, ...dayCounts)
-  const busyDays = dayCounts.map((count, index) => ({
+  // Days: how often each weekday is chosen, as a share (%) of all visits in
+  // the range. Shows which weekdays are the most popular / busiest.
+  const dayShares = dayCounts.map((count) => (total > 0 ? (count / total) * 100 : 0))
+  const maxDayShare = Math.max(0.0001, ...dayShares)
+  const busyDays = dayShares.map((share, index) => ({
     key: String(index),
     label: dayLabels[index] ?? String(index + 1),
-    count,
-    intensity: count / maxDay,
+    count: round1(share),
+    intensity: share / maxDayShare,
   }))
 
   // Hours: how often each hour is chosen, as a share (%) of all visits in the

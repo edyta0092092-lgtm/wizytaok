@@ -92,14 +92,14 @@ const COPY = {
     heatmap: {
       title: "Obłożenie",
       subtitle:
-        "Kiedy klienci najczęściej się umawiają. Dni tygodnia – łączna liczba wizyt; godziny – udział % wszystkich wizyt (obłożenie godzin).",
+        "Kiedy klienci najczęściej się umawiają. Słupki pokazują udział % wszystkich wizyt (obłożenie) – wg dnia tygodnia i wg godziny.",
       busyDays: "Najbardziej zajęte dni tygodnia",
       busyHours: "Najbardziej zajęte godziny",
       busyDaysHint:
-        "Łączna liczba wizyt (zrealizowanych, bieżących i przyszłych, bez anulowanych) w danym dniu tygodnia.",
+        "Jaki procent wszystkich wizyt przypada na dany dzień tygodnia — czyli które dni są najczęściej wybierane.",
       busyHoursHint:
         "Jaki procent wszystkich wizyt przypada na daną godzinę — czyli które godziny są najczęściej wybierane.",
-      averageLabel: "wizyt",
+      averageLabel: "% wizyt",
       hoursValueLabel: "% wizyt",
     },
   },
@@ -175,14 +175,14 @@ const COPY = {
     heatmap: {
       title: "Heatmap / workload",
       subtitle:
-        "When clients book most often. Weekdays – total visits; hours – share (%) of all visits (hour occupancy).",
+        "When clients book most often. Bars show the share (%) of all visits (occupancy) – by weekday and by hour.",
       busyDays: "Busiest weekdays",
       busyHours: "Busiest hours",
       busyDaysHint:
-        "Total visits (completed, current and upcoming, excluding cancelled) on a given weekday.",
+        "What percentage of all visits falls on a given weekday — i.e. which days are chosen most often.",
       busyHoursHint:
         "What percentage of all visits falls in a given hour — i.e. which hours are chosen most often.",
-      averageLabel: "visits",
+      averageLabel: "% of visits",
       hoursValueLabel: "% of visits",
     },
   },
