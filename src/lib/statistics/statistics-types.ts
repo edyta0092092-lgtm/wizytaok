@@ -62,10 +62,6 @@ export type StatisticsDataset = {
   totalInRange: number
 }
 
-export type StatisticsAppointmentMeta = {
-  createdAt?: string
-}
-
 export type StatisticsNotificationSource = {
   channel: "sms" | "email"
   status: string

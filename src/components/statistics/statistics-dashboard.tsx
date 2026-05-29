@@ -38,7 +38,7 @@ const COPY = {
     chart: {
       title: "Trend wizyt",
       subtitle:
-        "Łączna liczba wizyt dziennie w wybranym zakresie. Najedź na słupek, aby zobaczyć podział na statusy.",
+        "Łączna liczba wizyt dziennie (wg daty wizyty) w wybranym zakresie. Najedź na słupek, aby zobaczyć podział na statusy.",
       ranges: {
         "7d": "7 dni",
         "30d": "30 dni",
@@ -114,7 +114,7 @@ const COPY = {
     },
     chart: {
       title: "Visit trend",
-      subtitle: "Total visits per day in the selected range. Hover a bar to see the status breakdown.",
+      subtitle: "Total visits per day (by visit date) in the selected range. Hover a bar to see the status breakdown.",
       ranges: {
         "7d": "7 days",
         "30d": "30 days",

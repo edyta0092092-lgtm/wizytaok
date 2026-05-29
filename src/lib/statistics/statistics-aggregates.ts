@@ -1,7 +1,6 @@
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import type { Appointment, AppointmentStatus, Service, StaffMember } from "@/types/domain"
 import type {
-  StatisticsAppointmentMeta,
   StatisticsChartPoint,
   StatisticsDataset,
   StatisticsHeatmapItem,
@@ -73,13 +72,6 @@ function appointmentClientKey(appointment: Appointment): string {
     appointment.phone ??
     appointment.clientName
   return preferred.trim().toLowerCase()
-}
-
-function appointmentCreatedAt(
-  appointment: Appointment,
-  meta: Map<string, StatisticsAppointmentMeta>
-): Date | null {
-  return parseDate(meta.get(appointment.id)?.createdAt) ?? parseDate(appointment.startsAt)
 }
 
 function buildRangeBuckets(
@@ -351,7 +343,6 @@ export function buildStatisticsDataset({
   services,
   staff,
   notificationSources,
-  appointmentMeta,
   range,
   today = new Date(),
   locale = "pl",
@@ -360,7 +351,6 @@ export function buildStatisticsDataset({
   services: Service[]
   staff: StaffMember[]
   notificationSources: StatisticsNotificationSource[]
-  appointmentMeta: Map<string, StatisticsAppointmentMeta>
   range: StatisticsRange
   today?: Date
   locale?: "pl" | "en"
@@ -378,9 +368,6 @@ export function buildStatisticsDataset({
   )
   const appointmentsInRange = appointments.filter((appointment) =>
     inRange(parseDate(appointment.startsAt), rangeStart, rangeEnd)
-  )
-  const appointmentsCreatedInRange = appointments.filter((appointment) =>
-    inRange(appointmentCreatedAt(appointment, appointmentMeta), rangeStart, rangeEnd)
   )
   const visitsToday = appointments.filter(
     (appointment) =>
@@ -403,7 +390,7 @@ export function buildStatisticsDataset({
   ).length
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
-      inRange(appointmentCreatedAt(appointment, appointmentMeta), bucket.start, bucket.end)
+      inRange(parseDate(appointment.startsAt), bucket.start, bucket.end)
     )
     return {
       key: bucket.key,
@@ -448,7 +435,7 @@ export function buildStatisticsDataset({
     chart,
     topServices: buildTopServices(appointmentsInRange, services),
     topStaff: buildTopStaff(appointmentsInRange, staff, locale),
-    statuses: buildStatuses(appointmentsCreatedInRange),
+    statuses: buildStatuses(appointmentsInRange),
     notifications: buildNotificationStats(notificationSources, appointmentsInRange),
     busyDays: heatmap.busyDays,
     busyHours: heatmap.busyHours,
