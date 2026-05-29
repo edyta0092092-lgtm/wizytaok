@@ -2,6 +2,7 @@ import { sendReminderEmail } from "@/lib/notifications/email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { sendReminderSms } from "@/lib/notifications/sms"
+import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { TablesInsert } from "@/types/database"
@@ -259,6 +260,12 @@ export async function confirmBookingAndNotify(
       error_message: email.ok ? null : email.error ?? email.code,
       sent_at: nowIso,
     })
+  }
+
+  try {
+    await dispatchCustomTemplatesForEvent({ bookingId: booking.id, eventKey: "confirmed" })
+  } catch {
+    // brak wpływu na wynik potwierdzenia
   }
 
   return { ok: true, sms: smsStatus, email: emailStatus }

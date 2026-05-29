@@ -808,6 +808,123 @@ export interface Database {
         }
         Relationships: []
       }
+      custom_templates: {
+        Row: {
+          id: string
+          business_id: string
+          name: string
+          sms_enabled: boolean
+          sms_content: string
+          email_enabled: boolean
+          email_subject: string
+          email_content: string
+          trigger_type: string
+          offset_minutes: number | null
+          event_key: string | null
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          business_id: string
+          name: string
+          sms_enabled?: boolean
+          sms_content?: string
+          email_enabled?: boolean
+          email_subject?: string
+          email_content?: string
+          trigger_type: string
+          offset_minutes?: number | null
+          event_key?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          business_id?: string
+          name?: string
+          sms_enabled?: boolean
+          sms_content?: string
+          email_enabled?: boolean
+          email_subject?: string
+          email_content?: string
+          trigger_type?: string
+          offset_minutes?: number | null
+          event_key?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      custom_template_sends: {
+        Row: {
+          id: string
+          business_id: string
+          appointment_id: string
+          custom_template_id: string
+          channel: string
+          status: string
+          attempts: number
+          locked_at: string | null
+          sent_at: string | null
+          failed_at: string | null
+          skipped_at: string | null
+          recipient: string | null
+          subject: string | null
+          body: string | null
+          provider: string | null
+          provider_message_id: string | null
+          last_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          business_id: string
+          appointment_id: string
+          custom_template_id: string
+          channel: string
+          status?: string
+          attempts?: number
+          locked_at?: string | null
+          sent_at?: string | null
+          failed_at?: string | null
+          skipped_at?: string | null
+          recipient?: string | null
+          subject?: string | null
+          body?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          business_id?: string
+          appointment_id?: string
+          custom_template_id?: string
+          channel?: string
+          status?: string
+          attempts?: number
+          locked_at?: string | null
+          sent_at?: string | null
+          failed_at?: string | null
+          skipped_at?: string | null
+          recipient?: string | null
+          subject?: string | null
+          body?: string | null
+          provider?: string | null
+          provider_message_id?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           id: string
@@ -1272,6 +1389,10 @@ export interface Database {
       get_booked_slots_for_public_booking: {
         Args: { p_slug: string; p_date_from: string; p_date_to: string }
         Returns: Json
+      }
+      due_custom_templates: {
+        Args: { p_window_minutes?: number }
+        Returns: { template_id: string; booking_id: string; business_id: string }[]
       }
       get_booking_by_confirmation_token: {
         Args: { p_token: string }

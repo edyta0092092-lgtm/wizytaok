@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/send-reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/custom-templates",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

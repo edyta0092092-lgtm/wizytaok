@@ -413,6 +413,21 @@ export async function updateAppointmentStatus(
           keepalive: true,
         }).catch(() => {})
       }
+      // Własne szablony typu „zdarzenie" dla zmian statusu z panelu (created jest
+      // wysyłane na ścieżce rezerwacji). Fire-and-forget; dedup chroni przed dublami.
+      if (
+        status === "confirmed" ||
+        status === "cancelled" ||
+        status === "no_show" ||
+        status === "completed"
+      ) {
+        void fetch("/api/bookings/notify-status-change", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookingId: appointmentId, status }),
+          keepalive: true,
+        }).catch(() => {})
+      }
     }
     return r.ok
   }

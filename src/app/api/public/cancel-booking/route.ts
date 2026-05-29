@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 
 import { cancelPublicBookingByToken } from "@/lib/bookings/cancel-public-booking-server"
 import { notifyBookingCancelledByClient } from "@/lib/notifications/booking-cancelled-by-client-server"
+import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 type Body = {
@@ -47,6 +48,12 @@ export async function POST(req: Request) {
     business,
     language: body.language === "en" ? "en" : "pl",
   })
+
+  try {
+    await dispatchCustomTemplatesForEvent({ bookingId, eventKey: "cancelled" })
+  } catch {
+    // własne szablony nie blokują anulowania
+  }
 
   return NextResponse.json({ ok: true, notice: result.notice })
 }

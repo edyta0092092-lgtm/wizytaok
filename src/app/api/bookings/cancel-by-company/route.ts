@@ -6,6 +6,7 @@ import {
   type CancelNotifyLanguage,
 } from "@/lib/notifications/booking-cancelled-by-company-server"
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
 import type { Tables, TablesUpdate } from "@/types/database"
 
@@ -136,6 +137,11 @@ export async function POST(req: Request) {
       language,
       messagesEffectivelySent: messagesOn,
     })
+    try {
+      await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
+    } catch {
+      // własne szablony nie blokują głównej odpowiedzi
+    }
     return NextResponse.json({ ok: true, notice })
   } catch {
     return NextResponse.json({

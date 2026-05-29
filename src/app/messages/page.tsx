@@ -5,6 +5,8 @@ import { Suspense } from "react"
 import { Plus } from "lucide-react"
 
 import { MessageTemplatesSection } from "@/components/messages/message-templates-section"
+import { CustomTemplatesSection } from "@/components/messages/custom-templates-section"
+import { CustomTemplatesHistorySection } from "@/components/messages/custom-templates-history-section"
 import { SendingHistorySection } from "@/components/messages/sending-history-section"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
@@ -146,14 +148,18 @@ function MessagesPageContent() {
       <PageShell>
         <div data-tour="messages-list" className="flex flex-col gap-6">
         {canOpenMessages ? (
-          <MessageTemplatesSection
-            onRegisterPrimaryAction={registerOpen}
-            readOnly={!access.canManageMessageTemplates}
-          />
+          <>
+            <MessageTemplatesSection
+              onRegisterPrimaryAction={registerOpen}
+              readOnly={!access.canManageMessageTemplates}
+            />
+            <CustomTemplatesSection readOnly={!access.canManageMessageTemplates} />
+          </>
         ) : (
           <p className="mb-4 text-sm text-muted-foreground">{t("messages.staffHistoryIntro")}</p>
         )}
         <SendingHistorySection />
+        {canOpenMessages ? <CustomTemplatesHistorySection /> : null}
         </div>
       </PageShell>
     </AppShell>

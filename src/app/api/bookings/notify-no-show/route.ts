@@ -5,6 +5,7 @@ import {
   notifyNoShowFollowUp,
   type NoShowFollowUpLanguage,
 } from "@/lib/notifications/no-show-follow-up-server"
+import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
 import type { Tables } from "@/types/database"
 
@@ -73,6 +74,11 @@ export async function POST(req: Request) {
   const language: NoShowFollowUpLanguage = body.language === "en" ? "en" : "pl"
   try {
     const { notice } = await notifyNoShowFollowUp({ booking, business: profile, language })
+    try {
+      await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "no_show" })
+    } catch {
+      // własne szablony nie blokują follow-upu
+    }
     return NextResponse.json({ ok: true, notice })
   } catch {
     return NextResponse.json({ ok: true, notice: "skipped" as const, reason: "send_error" })

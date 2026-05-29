@@ -19,6 +19,7 @@ import {
   getTemplateRuntime,
   type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
+import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -27,7 +28,6 @@ export const runtime = "nodejs"
 
 const BATCH_SIZE = 20
 const MAX_ATTEMPTS = 3
-const DEFAULT_SMS_MONTHLY_LIMIT = 100
 
 /**
  * Cron wysyłający przypomnienia (e-mail oraz SMS) z kolejki `appointment_reminders`.
@@ -132,19 +132,6 @@ function getPublicAppOrigin(): string {
   return "http://localhost:3000"
 }
 
-/**
- * Limit faktycznie wysłanych SMS-ów per firma per kalendarzowy miesiąc.
- * Konfigurowalny przez env `SMS_MONTHLY_INCLUDED_LIMIT`; fallback 100.
- * Negatywne / niesensowne wartości spadają do fallbacku.
- */
-function getSmsMonthlyLimit(): number {
-  const raw = process.env.SMS_MONTHLY_INCLUDED_LIMIT?.trim()
-  if (!raw) return DEFAULT_SMS_MONTHLY_LIMIT
-  const parsed = Number(raw)
-  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_SMS_MONTHLY_LIMIT
-  return Math.floor(parsed)
-}
-
 /** Tylko `SMS_REMINDERS_ENABLED=true` włącza pobieranie i wysyłkę SMS z kolejki. */
 function areSmsRemindersEnabled(): boolean {
   return process.env.SMS_REMINDERS_ENABLED?.trim() === "true"
@@ -167,37 +154,6 @@ function parseSmsAllowedBusinessIds(): string[] | null {
   const valid = parts.filter((id) => SMS_ALLOWED_BUSINESS_UUID_RE.test(id))
   if (valid.length === 0) return []
   return valid
-}
-
-/**
- * Zwraca UTC ISO odpowiadający początkowi bieżącego miesiąca w strefie
- * Europe/Warsaw. Używamy go jako dolnej granicy zliczania SMS-ów `sent`
- * w bieżącym kalendarzowym miesiącu firmy.
- */
-function startOfMonthInWarsawIso(now: Date): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Warsaw",
-    year: "numeric",
-    month: "2-digit",
-  }).formatToParts(now)
-  const yearStr = parts.find((p) => p.type === "year")?.value
-  const monthStr = parts.find((p) => p.type === "month")?.value
-  if (!yearStr || !monthStr) {
-    return new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0)
-    ).toISOString()
-  }
-  // Probe: 1st of that month at 00:00 UTC. The Warsaw hour of this instant
-  // equals the current Warsaw offset (1 = CET, 2 = CEST).
-  const probe = new Date(`${yearStr}-${monthStr}-01T00:00:00Z`)
-  const hourStr = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Warsaw",
-    hour: "2-digit",
-    hour12: false,
-  }).format(probe)
-  const offsetHours = Number.parseInt(hourStr, 10)
-  const safeOffset = Number.isFinite(offsetHours) ? offsetHours : 1
-  return new Date(probe.getTime() - safeOffset * 3_600_000).toISOString()
 }
 
 async function handle(req: NextRequest) {
@@ -690,28 +646,20 @@ async function processSmsReminder(
       return "skipped"
     }
 
-    // Limit miesięczny SMS-ów per firma (status='sent', sent_at w bieżącym
-    // miesiącu kalendarzowym Europe/Warsaw). Liczone jest faktyczne wysłanie.
-    // Pendings / processing / failed / skipped NIE wchodzą do liczenia.
-    const monthlyLimit = getSmsMonthlyLimit()
-    const monthStartIso = startOfMonthInWarsawIso(new Date())
-
-    const { count: usedRaw, error: countError } = await admin
-      .from("appointment_reminders")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", item.business_id)
-      .eq("channel", "sms")
-      .eq("status", "sent")
-      .gte("sent_at", monthStartIso)
-
-    if (countError) {
+    // Wspólny miesięczny limit SMS-ów per firma (status='sent', sent_at w bieżącym
+    // miesiącu kalendarzowym Europe/Warsaw). Liczone jest faktyczne wysłanie z OBU
+    // źródeł: przypomnień (`appointment_reminders`) i własnych szablonów
+    // (`custom_template_sends`). Pendings / processing / failed / skipped NIE wchodzą.
+    const quota = await getSmsQuotaStatus(admin, item.business_id)
+    if (quota.countFailed) {
       // Nie potrafimy policzyć — bezpieczniej traktować jak błąd techniczny
       // i pozwolić cronowi spróbować ponownie. Inaczej moglibyśmy nieświadomie
       // przekroczyć limit firmy.
-      return await recordFailure(admin, item, `sms_quota_count_failed: ${countError.message}`)
+      return await recordFailure(admin, item, "sms_quota_count_failed")
     }
-    const used = usedRaw ?? 0
-    if (used >= monthlyLimit) {
+    const monthlyLimit = quota.limit
+    const used = quota.used
+    if (!quota.allowed) {
       // To NIE jest błąd techniczny — to decyzja biznesowa, więc:
       //   • status = 'skipped',
       //   • last_error = 'sms_monthly_limit_reached',

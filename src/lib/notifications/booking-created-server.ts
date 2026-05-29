@@ -3,6 +3,7 @@ import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-re
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
+import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import {
   buildTransactionalEmailHtml,
@@ -601,6 +602,13 @@ export async function sendBookingCreatedNotifications(
         })
       }
     }
+  }
+
+  // Własne szablony typu „zdarzenie" dla utworzenia rezerwacji (dedup chroni przed dublami).
+  try {
+    await dispatchCustomTemplatesForEvent({ bookingId: booking.id, eventKey: "created" })
+  } catch {
+    // brak wpływu na wynik wbudowanego potwierdzenia
   }
 
   return {

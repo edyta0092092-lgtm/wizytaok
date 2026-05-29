@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 
 import { AppointmentRowActions } from "@/components/appointments/appointment-row-actions"
+import { SendCustomMessageButton } from "@/components/appointments/send-custom-message-button"
 import { AppointmentStaffCaption } from "@/components/shared/appointment-staff-caption"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
@@ -321,6 +322,9 @@ export function AppointmentListRow({
             allowAppointmentDelete={allowAppointmentDelete}
             onDelete={onDeleteRequest}
           />
+          {row.id.startsWith("sb-") && row.status !== "cancelled" ? (
+            <SendCustomMessageButton appointmentId={row.id} />
+          ) : null}
         </div>
       </div>
 
