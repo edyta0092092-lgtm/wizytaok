@@ -417,7 +417,9 @@ export function buildStatisticsDataset({
     }
   })
 
-  const statusCounts = appointmentsInMonth.reduce<Record<AppointmentStatus, number>>(
+  // All-time status totals (cumulative across every appointment, independent of
+  // the selected range / current month).
+  const statusCounts = appointments.reduce<Record<AppointmentStatus, number>>(
     (acc, appointment) => {
       acc[appointment.status] += 1
       return acc
@@ -438,11 +440,12 @@ export function buildStatisticsDataset({
 
   return {
     kpis: {
-      visitsToday,
-      visitsThisMonth: appointmentsInMonth.length,
+      totalVisits: appointments.length,
       completed: statusCounts.completed,
       cancelled: statusCounts.cancelled,
       noShow: statusCounts.no_show,
+      visitsToday,
+      visitsThisMonth: appointmentsInMonth.length,
       newClients,
     },
     chart,

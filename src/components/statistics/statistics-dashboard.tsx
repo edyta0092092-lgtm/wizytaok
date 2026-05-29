@@ -30,10 +30,13 @@ const COPY = {
     kpis: {
       visitsToday: "Wizyty dzisiaj",
       visitsThisMonth: "Wizyty w tym miesiącu",
+      totalVisits: "Wszystkie wizyty",
       completed: "Zrealizowane",
       cancelled: "Anulowane",
       noShow: "Nieobecność klienta",
       newClients: "Nowi klienci",
+      groupAllTime: "Łącznie (cały czas)",
+      groupThisMonth: "Ten miesiąc",
     },
     chart: {
       title: "Trend wizyt",
@@ -114,10 +117,13 @@ const COPY = {
     kpis: {
       visitsToday: "Visits today",
       visitsThisMonth: "Visits this month",
+      totalVisits: "All visits",
       completed: "Completed",
       cancelled: "Cancelled",
       noShow: "Client did not attend",
       newClients: "New clients",
+      groupAllTime: "Total (all time)",
+      groupThisMonth: "This month",
     },
     chart: {
       title: "Visit trend",

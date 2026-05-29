@@ -14,10 +14,13 @@ import type { StatisticsKpis } from "@/lib/statistics/statistics-types"
 type KpiCopy = {
   visitsToday: string
   visitsThisMonth: string
+  totalVisits: string
   completed: string
   cancelled: string
   noShow: string
   newClients: string
+  groupAllTime: string
+  groupThisMonth: string
 }
 
 type KpiCardProps = {
@@ -57,15 +60,10 @@ export function StatisticsKpiGrid({
   kpis: StatisticsKpis
   copy: KpiCopy
 }) {
-  const cards: KpiCardProps[] = [
+  const allTimeCards: KpiCardProps[] = [
     {
-      label: copy.visitsToday,
-      value: String(kpis.visitsToday),
-      icon: CalendarClock,
-    },
-    {
-      label: copy.visitsThisMonth,
-      value: String(kpis.visitsThisMonth),
+      label: copy.totalVisits,
+      value: String(kpis.totalVisits),
       icon: CalendarCheck2,
     },
     {
@@ -83,6 +81,19 @@ export function StatisticsKpiGrid({
       value: String(kpis.noShow),
       icon: CircleSlash,
     },
+  ]
+
+  const monthCards: KpiCardProps[] = [
+    {
+      label: copy.visitsToday,
+      value: String(kpis.visitsToday),
+      icon: CalendarClock,
+    },
+    {
+      label: copy.visitsThisMonth,
+      value: String(kpis.visitsThisMonth),
+      icon: CalendarCheck2,
+    },
     {
       label: copy.newClients,
       value: String(kpis.newClients),
@@ -91,10 +102,27 @@ export function StatisticsKpiGrid({
   ]
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => (
-        <KpiCard key={card.label} {...card} />
-      ))}
-    </section>
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {copy.groupAllTime}
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {allTimeCards.map((card) => (
+            <KpiCard key={card.label} {...card} />
+          ))}
+        </div>
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {copy.groupThisMonth}
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {monthCards.map((card) => (
+            <KpiCard key={card.label} {...card} />
+          ))}
+        </div>
+      </section>
+    </div>
   )
 }

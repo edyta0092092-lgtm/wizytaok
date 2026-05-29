@@ -14,11 +14,14 @@ export type StatisticsChartPoint = {
 }
 
 export type StatisticsKpis = {
-  visitsToday: number
-  visitsThisMonth: number
+  // All-time totals (cumulative, regardless of the selected range / month).
+  totalVisits: number
   completed: number
   cancelled: number
   noShow: number
+  // Current-month metrics.
+  visitsToday: number
+  visitsThisMonth: number
   newClients: number
 }
 
