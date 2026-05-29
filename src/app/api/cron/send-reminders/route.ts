@@ -571,8 +571,10 @@ async function processEmailReminder(
       item.business_id,
       reminderTemplateTypeFromKind(item.reminder_kind)
     )
-    // Szablon istnieje, ale e-mail jest w nim wyłączony → nie wysyłamy.
-    if (runtime.emailExists && !runtime.emailEnabled) {
+    // E-mail wysyłamy tylko, gdy szablon przypomnienia ma WŁĄCZONY ten kanał.
+    // Brak zapisanego szablonu lub kanał wyłączony (status draft) = nie wysyłamy,
+    // tak jak pokazuje przełącznik „off" w kafelku szablonu.
+    if (!runtime.emailEnabled) {
       await markSkipped(admin, item.id, "template_email_disabled")
       return "skipped"
     }
@@ -679,9 +681,11 @@ async function processSmsReminder(
       item.business_id,
       reminderTemplateTypeFromKind(item.reminder_kind)
     )
-    // Szablon istnieje, ale SMS jest w nim wyłączony → nie wysyłamy
-    // (przed liczeniem limitu, żeby wyłączony kanał nie zużywał kwoty).
-    if (runtime.smsExists && !runtime.smsEnabled) {
+    // SMS wysyłamy tylko, gdy szablon przypomnienia ma WŁĄCZONY ten kanał.
+    // Brak zapisanego szablonu lub kanał wyłączony (status draft) = nie wysyłamy,
+    // tak jak pokazuje przełącznik „off" w kafelku szablonu. Sprawdzamy to przed
+    // liczeniem limitu, żeby wyłączony kanał nie zużywał kwoty SMS.
+    if (!runtime.smsEnabled) {
       await markSkipped(admin, item.id, "template_sms_disabled")
       return "skipped"
     }
