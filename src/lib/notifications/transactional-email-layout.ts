@@ -75,6 +75,42 @@ export function buildTransactionalEmailText(input: {
  * biała karta i stopka. Dzięki temu maile z edytowalnych szablonów wyglądają
  * spójnie zamiast renderować się jako goły tekst.
  */
+function inferCtaLabel(url: string, lang: "pl" | "en"): string {
+  const u = url.toLowerCase()
+  if (/\/rezerwacje\/|\/rezerwacja|book|booking/.test(u)) {
+    return lang === "en" ? "Book a visit" : "Umów wizytę"
+  }
+  if (/\/confirm\/|confirm|potwierdz|anuluj|cancel|manage|zarz[aą]dz/.test(u)) {
+    return lang === "en" ? "Manage visit" : "Zarządzaj wizytą"
+  }
+  return lang === "en" ? "Open" : "Otwórz"
+}
+
+function ctaButtonHtml(url: string, label: string): string {
+  const safeHref = url.replace(/"/g, "%22")
+  return `
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 16px 0;">
+              <tr>
+                <td align="center" style="background-color:${BRAND_GREEN}; border-radius:10px;">
+                  <a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="display:inline-block; padding:13px 26px; font-family:${FONT_STACK}; font-size:15px; line-height:1.2; color:#ffffff; text-decoration:none; font-weight:600;">${escapeHtml(label)}</a>
+                </td>
+              </tr>
+            </table>`
+}
+
+function linkifyInline(raw: string): string {
+  const parts = raw.split(/(https?:\/\/[^\s<]+)/g)
+  return parts
+    .map((part, idx) => {
+      if (idx % 2 === 1) {
+        const safeHref = part.replace(/"/g, "%22")
+        return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer" style="color:${BRAND_GREEN}; text-decoration:underline; word-break:break-all;">${escapeHtml(part)}</a>`
+      }
+      return escapeHtml(part)
+    })
+    .join("")
+}
+
 export function buildBrandedBodyEmailHtml(
   body: string,
   opts?: { subject?: string; preheader?: string; footerNote?: string; lang?: "pl" | "en" },
@@ -82,13 +118,34 @@ export function buildBrandedBodyEmailHtml(
   const lang = opts?.lang ?? "pl"
   const normalized = body.replace(/\r\n/g, "\n").trim()
   if (!normalized) return ""
-  const paragraphsHtml = normalized
-    .split(/\n{2,}/)
-    .map(
-      (paragraph) =>
-        `<p style="margin:0 0 16px 0; font-family:${FONT_STACK}; font-size:15px; line-height:1.6; color:#0f1f1c;">${escapeHtml(paragraph).replace(/\n/g, "<br/>")}</p>`,
+  // Renderuj treść linia po linii: samodzielny link w osobnej linii → przycisk,
+  // a linki w tekście → klikalne odnośniki. Puste linie rozdzielają akapity.
+  const urlOnly = /^https?:\/\/\S+$/
+  const blocks: string[] = []
+  let para: string[] = []
+  const flushPara = () => {
+    if (para.length === 0) return
+    const inner = para.map(linkifyInline).join("<br/>")
+    blocks.push(
+      `<p style="margin:0 0 16px 0; font-family:${FONT_STACK}; font-size:15px; line-height:1.6; color:#0f1f1c;">${inner}</p>`,
     )
-    .join("")
+    para = []
+  }
+  for (const rawLine of normalized.split("\n")) {
+    const trimmed = rawLine.trim()
+    if (trimmed === "") {
+      flushPara()
+      continue
+    }
+    if (urlOnly.test(trimmed)) {
+      flushPara()
+      blocks.push(ctaButtonHtml(trimmed, inferCtaLabel(trimmed, lang)))
+      continue
+    }
+    para.push(rawLine)
+  }
+  flushPara()
+  const paragraphsHtml = blocks.join("")
   const subject = opts?.subject?.trim() || "WizytaOK"
   const preheader = opts?.preheader?.trim() || normalized.replace(/\s+/g, " ").slice(0, 120)
   const footerNote = opts?.footerNote ?? defaultFooter(lang)
