@@ -77,11 +77,13 @@ export function buildTransactionalEmailText(input: {
  */
 function inferCtaLabel(url: string, lang: "pl" | "en"): string {
   const u = url.toLowerCase()
-  if (/\/rezerwacje\/|\/rezerwacja|book|booking/.test(u)) {
-    return lang === "en" ? "Book a visit" : "Umów wizytę"
-  }
-  if (/\/confirm\/|confirm|potwierdz|anuluj|cancel|manage|zarz[aą]dz/.test(u)) {
+  // Najpierw zarządzanie/anulowanie (link do konkretnej wizyty), bo URL potwierdzenia
+  // to /confirm/{token}?source=booking — substring „booking" nie może go przekwalifikować.
+  if (/\/confirm\/|\/wizyta\/|\/potwierd|\/anuluj|\/manage|\/cancel/.test(u)) {
     return lang === "en" ? "Manage visit" : "Zarządzaj wizytą"
+  }
+  if (/\/rezerwacje\/|\/rezerwacja\/|\/booking\/|\/book\//.test(u)) {
+    return lang === "en" ? "Book a visit" : "Umów wizytę"
   }
   return lang === "en" ? "Open" : "Otwórz"
 }
