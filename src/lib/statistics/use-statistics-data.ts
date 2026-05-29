@@ -233,16 +233,34 @@ export function useStatisticsData({
   ])
 
   const availableMonths = React.useMemo(() => {
-    const months = new Set<string>()
     const now = new Date()
-    months.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
-    for (const appointment of appointments) {
-      const startMonth = monthKeyFromValue(appointment.startsAt)
-      if (startMonth) months.add(startMonth)
-      const createdMonth = monthKeyFromValue(appointmentMeta.get(appointment.id)?.createdAt)
-      if (createdMonth) months.add(createdMonth)
+    const currentIndex = now.getFullYear() * 12 + now.getMonth()
+    // Always offer at least the last 12 months, even without data, so new
+    // months become selectable as soon as they start.
+    let minIndex = currentIndex - 11
+    let maxIndex = currentIndex
+
+    const considerMonth = (value: string | null | undefined) => {
+      const key = monthKeyFromValue(value)
+      if (!key) return
+      const [year, month] = key.split("-").map((part) => Number(part))
+      const index = year * 12 + (month - 1)
+      if (index < minIndex) minIndex = index
+      if (index > maxIndex) maxIndex = index
     }
-    return [...months].sort((a, b) => b.localeCompare(a))
+
+    for (const appointment of appointments) {
+      considerMonth(appointment.startsAt)
+      considerMonth(appointmentMeta.get(appointment.id)?.createdAt)
+    }
+
+    const months: string[] = []
+    for (let index = maxIndex; index >= minIndex; index -= 1) {
+      const year = Math.floor(index / 12)
+      const month = (index % 12) + 1
+      months.push(`${year}-${String(month).padStart(2, "0")}`)
+    }
+    return months
   }, [appointments, appointmentMeta])
 
   return {
