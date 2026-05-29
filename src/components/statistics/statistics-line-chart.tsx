@@ -13,9 +13,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type {
   StatisticsChartPoint,
+  StatisticsPresetRange,
   StatisticsRange,
 } from "@/lib/statistics/statistics-types"
 import { cn } from "@/lib/utils"
+
+export type StatisticsMonthOption = { value: StatisticsRange; label: string }
 
 type SeriesKey = "confirmed" | "completed" | "cancelled" | "noShow"
 
@@ -42,28 +45,33 @@ function xAxisTickInterval(pointCount: number): number {
 type ChartCopy = {
   title: string
   subtitle: string
-  ranges: Record<StatisticsRange, string>
+  ranges: Record<StatisticsPresetRange, string>
   series: Record<SeriesKey, string>
   total: string
   empty: string
+  monthPlaceholder: string
+  monthHint: string
   axes: {
     x: string
     y: string
   }
-  periodHint: Record<StatisticsRange, string>
+  periodHint: Record<StatisticsPresetRange, string>
 }
 
 export function StatisticsLineChart({
   points,
   range,
   onRangeChange,
+  monthOptions,
   copy,
 }: {
   points: StatisticsChartPoint[]
   range: StatisticsRange
   onRangeChange: (range: StatisticsRange) => void
+  monthOptions: StatisticsMonthOption[]
   copy: ChartCopy
 }) {
+  const isMonthRange = range.startsWith("month:")
   const chartData = points.map((point) => ({
     label: point.label,
     confirmed: point.confirmed,
@@ -80,10 +88,12 @@ export function StatisticsLineChart({
         <div>
           <CardTitle className="text-base">{copy.title}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{copy.subtitle}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{copy.periodHint[range]}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {isMonthRange ? copy.monthHint : copy.periodHint[range as StatisticsPresetRange]}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(copy.ranges) as StatisticsRange[]).map((item) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(Object.keys(copy.ranges) as StatisticsPresetRange[]).map((item) => (
             <button
               key={item}
               type="button"
@@ -98,6 +108,27 @@ export function StatisticsLineChart({
               {copy.ranges[item]}
             </button>
           ))}
+          {monthOptions.length > 0 ? (
+            <select
+              value={isMonthRange ? range : ""}
+              onChange={(event) => {
+                if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
+              }}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                isMonthRange
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <option value="">{copy.monthPlaceholder}</option>
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="px-5 pb-5">

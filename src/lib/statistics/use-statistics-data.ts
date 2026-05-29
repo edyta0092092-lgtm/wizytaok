@@ -24,7 +24,15 @@ type StatisticsState = {
   loadError: boolean
   dataset: StatisticsDataset | null
   statuses: StatisticsStatusItem[] | null
+  availableMonths: string[]
   appointmentsReady: boolean
+}
+
+function monthKeyFromValue(value: string | null | undefined): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
 }
 
 function normalizeChannel(value: unknown): "sms" | "email" {
@@ -224,11 +232,25 @@ export function useStatisticsData({
     staff,
   ])
 
+  const availableMonths = React.useMemo(() => {
+    const months = new Set<string>()
+    const now = new Date()
+    months.add(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`)
+    for (const appointment of appointments) {
+      const startMonth = monthKeyFromValue(appointment.startsAt)
+      if (startMonth) months.add(startMonth)
+      const createdMonth = monthKeyFromValue(appointmentMeta.get(appointment.id)?.createdAt)
+      if (createdMonth) months.add(createdMonth)
+    }
+    return [...months].sort((a, b) => b.localeCompare(a))
+  }, [appointments, appointmentMeta])
+
   return {
     ready: appointmentsReady && detailsReady,
     loadError: appointmentsLoadError || loadError,
     dataset,
     statuses,
+    availableMonths,
     appointmentsReady,
   }
 }

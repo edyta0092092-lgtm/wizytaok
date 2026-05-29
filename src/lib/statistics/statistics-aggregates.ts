@@ -96,6 +96,28 @@ function buildRangeBuckets(
   })
   const end = addDays(startOfDay(today), 1)
 
+  if (range.startsWith("month:")) {
+    const [year, month] = range
+      .slice("month:".length)
+      .split("-")
+      .map((value) => Number(value))
+    const monthStart = new Date(year, (month || 1) - 1, 1)
+    const monthEnd = new Date(year, month || 1, 1)
+    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
+    let cursor = monthStart
+    while (cursor < monthEnd) {
+      const bucketEnd = addDays(cursor, 1)
+      buckets.push({
+        key: dayKey(cursor),
+        label: dayFormatter.format(cursor),
+        start: cursor,
+        end: bucketEnd,
+      })
+      cursor = bucketEnd
+    }
+    return buckets
+  }
+
   if (range === "12m") {
     const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
     for (let i = 11; i >= 0; i -= 1) {

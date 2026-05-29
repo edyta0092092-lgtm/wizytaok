@@ -5,7 +5,10 @@ import { AlertCircle, BarChart3 } from "lucide-react"
 
 import { StatisticsHeatmap } from "@/components/statistics/statistics-heatmap"
 import { StatisticsKpiGrid } from "@/components/statistics/statistics-kpi-grid"
-import { StatisticsLineChart } from "@/components/statistics/statistics-line-chart"
+import {
+  StatisticsLineChart,
+  type StatisticsMonthOption,
+} from "@/components/statistics/statistics-line-chart"
 import { StatisticsNotificationsCard } from "@/components/statistics/statistics-notifications-card"
 import { StatisticsProgressList } from "@/components/statistics/statistics-progress-list"
 import { StatisticsSkeleton } from "@/components/statistics/statistics-skeleton"
@@ -49,6 +52,8 @@ const COPY = {
         noShow: "Nieobecność klienta",
       },
       total: "Razem",
+      monthPlaceholder: "Miesiąc…",
+      monthHint: "Każdy słupek to jeden dzień wybranego miesiąca.",
       empty: "Brak wizyt w tym zakresie.",
       axes: {
         x: "Data",
@@ -123,6 +128,8 @@ const COPY = {
         noShow: "Client did not attend",
       },
       total: "Total",
+      monthPlaceholder: "Month…",
+      monthHint: "Each bar is one day of the selected month.",
       empty: "No visits in this range.",
       axes: {
         x: "Date",
@@ -172,11 +179,26 @@ export function StatisticsDashboard() {
   const [range, setRange] = React.useState<StatisticsRange>("30d")
   const [statusRange, setStatusRange] = React.useState<StatisticsRange>("30d")
   const copy = COPY[language] ?? COPY.pl
-  const { ready, loadError, dataset, statuses } = useStatisticsData({
+  const { ready, loadError, dataset, statuses, availableMonths } = useStatisticsData({
     range,
     statusRange,
     locale: language,
   })
+
+  const monthOptions = React.useMemo<StatisticsMonthOption[]>(() => {
+    const formatter = new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
+      month: "long",
+      year: "numeric",
+    })
+    return availableMonths.map((month) => {
+      const [year, monthNumber] = month.split("-").map((value) => Number(value))
+      const label = formatter.format(new Date(year, (monthNumber || 1) - 1, 1))
+      return {
+        value: `month:${month}` as StatisticsRange,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+      }
+    })
+  }, [availableMonths, language])
 
   return (
     <div className="space-y-6">
@@ -226,6 +248,7 @@ export function StatisticsDashboard() {
             points={dataset.chart}
             range={range}
             onRangeChange={setRange}
+            monthOptions={monthOptions}
             copy={copy.chart}
           />
           <div className="grid gap-6 lg:grid-cols-2">
@@ -252,6 +275,8 @@ export function StatisticsDashboard() {
             range={statusRange}
             ranges={copy.chart.ranges}
             onRangeChange={setStatusRange}
+            monthOptions={monthOptions}
+            monthPlaceholder={copy.chart.monthPlaceholder}
           />
           <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
             <StatisticsNotificationsCard

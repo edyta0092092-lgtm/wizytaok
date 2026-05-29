@@ -11,8 +11,10 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import type { StatisticsMonthOption } from "@/components/statistics/statistics-line-chart"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import type {
+  StatisticsPresetRange,
   StatisticsRange,
   StatisticsStatusItem,
 } from "@/lib/statistics/statistics-types"
@@ -48,6 +50,8 @@ export function StatisticsStatusChart({
   range,
   ranges,
   onRangeChange,
+  monthOptions,
+  monthPlaceholder,
 }: {
   title: string
   subtitle: string
@@ -55,10 +59,13 @@ export function StatisticsStatusChart({
   empty: string
   axisY: string
   range: StatisticsRange
-  ranges: Record<StatisticsRange, string>
+  ranges: Record<StatisticsPresetRange, string>
   onRangeChange: (range: StatisticsRange) => void
+  monthOptions: StatisticsMonthOption[]
+  monthPlaceholder: string
 }) {
   const { t, language } = useTranslations()
+  const isMonthRange = range.startsWith("month:")
   const visibleItems = items.filter((item) => item.count > 0)
   const chartData = visibleItems.map((item) => ({
     status: item.status,
@@ -75,8 +82,8 @@ export function StatisticsStatusChart({
           <CardTitle className="text-base">{title}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {(Object.keys(ranges) as StatisticsRange[]).map((item) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(Object.keys(ranges) as StatisticsPresetRange[]).map((item) => (
             <button
               key={item}
               type="button"
@@ -91,6 +98,27 @@ export function StatisticsStatusChart({
               {ranges[item]}
             </button>
           ))}
+          {monthOptions.length > 0 ? (
+            <select
+              value={isMonthRange ? range : ""}
+              onChange={(event) => {
+                if (event.target.value) onRangeChange(event.target.value as StatisticsRange)
+              }}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                isMonthRange
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <option value="">{monthPlaceholder}</option>
+              {monthOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="px-5 pb-5">
