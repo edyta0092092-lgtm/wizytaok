@@ -12,9 +12,12 @@ import {
 } from "@/lib/notifications/appointment-reminder-sms"
 import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-reminder-email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { sendReminderEmail } from "@/lib/notifications/email"
+import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import {
   applyTemplateVariables,
   getTemplateRuntime,
+  type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -404,7 +407,7 @@ function resolveBusinessName(business: BusinessRow | null): string {
 }
 
 /** Mapuje rodzaj przypomnienia z kolejki na typ edytowalnego szablonu. */
-function smsTemplateTypeFromKind(kind: string): string {
+function reminderTemplateTypeFromKind(kind: string): string {
   const k = kind.trim().toLowerCase()
   if (k === "second" || k === "appointment_reminder_short") return "reminder_before_visit"
   return "reminder_24h"
@@ -436,27 +439,28 @@ function buildReminderTemplateVars(
   }
 }
 
+/** Dokleja adres firmy do treści, jeśli jeszcze go nie zawiera. */
+function appendAddress(body: string, address: string, separator: string): string {
+  const base = body.trim()
+  if (!address || base.toLowerCase().includes(address.toLowerCase())) return base
+  return `${base}${separator}Adres: ${address}`
+}
+
 /**
  * Treść SMS przypomnienia: jeśli firma ma zapisany własny szablon (smsBody),
  * używamy go (z podstawieniem zmiennych), w przeciwnym razie domyślnej treści.
  */
 async function resolveReminderSms(
-  admin: AdminClient,
-  item: DueReminderRow,
+  runtime: NotificationTemplateRuntime,
   booking: BookingRow,
   business: BusinessRow | null,
   phone: string,
   manageUrl: string
 ): Promise<AppointmentReminderSmsResult> {
-  const templateType = smsTemplateTypeFromKind(item.reminder_kind)
-  const runtime = await getTemplateRuntime(admin, item.business_id, templateType)
   if (runtime.smsBody && runtime.smsBody.trim().length > 0) {
     const vars = buildReminderTemplateVars(booking, business, manageUrl)
-    let body = applyTemplateVariables(runtime.smsBody, vars).trim()
     const address = (business?.business_address ?? "").trim()
-    if (address && !body.toLowerCase().includes(address.toLowerCase())) {
-      body = `${body} Adres: ${address}`
-    }
+    const body = appendAddress(applyTemplateVariables(runtime.smsBody, vars), address, " ")
     if (body.length > 0) {
       return sendAppointmentReminderSmsPlainText({ to: phone, body })
     }
@@ -469,6 +473,59 @@ async function resolveReminderSms(
     appointmentDate: booking.appointment_date,
     appointmentTime: booking.appointment_time,
     manageUrl,
+  })
+}
+
+/**
+ * Treść e-mail przypomnienia: jeśli firma ma zapisany własny szablon (emailBody),
+ * używamy go (temat + treść + HTML z podstawieniem zmiennych), w przeciwnym razie
+ * domyślnego, sformatowanego maila.
+ */
+async function resolveReminderEmail(
+  runtime: NotificationTemplateRuntime,
+  booking: BookingRow,
+  business: BusinessRow | null,
+  recipient: string,
+  manageUrl: string | null,
+  replyTo: string | null
+): Promise<AppointmentReminderEmailResult> {
+  if (runtime.emailBody && runtime.emailBody.trim().length > 0) {
+    const vars = buildReminderTemplateVars(booking, business, manageUrl ?? "")
+    const address = (business?.business_address ?? "").trim()
+    const text = appendAddress(
+      applyTemplateVariables(runtime.emailBody, vars),
+      address,
+      "\n\n"
+    )
+    const subject =
+      runtime.emailSubject && runtime.emailSubject.trim().length > 0
+        ? applyTemplateVariables(runtime.emailSubject, vars)
+        : "Przypomnienie o wizycie"
+    const result = await sendReminderEmail({
+      to: recipient,
+      subject,
+      textBody: text,
+      htmlBody: plainTextEmailToHtml(text),
+    })
+    if (result.ok) {
+      return { ok: true, provider: "resend", messageId: result.messageId ?? null }
+    }
+    // `simulated_dev` (brak klucza w devie) traktujemy jak brak konfiguracji,
+    // żeby rekord wrócił do pending bez zliczania próby (jak w domyślnej ścieżce).
+    const code = result.code === "failed" ? "failed" : "not_configured"
+    return { ok: false, code, error: result.error ?? "email_send_failed" }
+  }
+  return sendAppointmentReminderEmail({
+    to: recipient,
+    businessName: resolveBusinessName(business),
+    businessAddress: business?.business_address ?? null,
+    appointmentDate: booking.appointment_date,
+    appointmentTime: booking.appointment_time,
+    serviceName: booking.service_name,
+    staffName: booking.staff_name,
+    clientName: booking.client_name,
+    manageUrl,
+    replyTo,
   })
 }
 
@@ -509,7 +566,17 @@ async function processEmailReminder(
       return "skipped"
     }
 
-    const businessName = resolveBusinessName(business)
+    const runtime = await getTemplateRuntime(
+      admin,
+      item.business_id,
+      reminderTemplateTypeFromKind(item.reminder_kind)
+    )
+    // Szablon istnieje, ale e-mail jest w nim wyłączony → nie wysyłamy.
+    if (runtime.emailExists && !runtime.emailEnabled) {
+      await markSkipped(admin, item.id, "template_email_disabled")
+      return "skipped"
+    }
+
     const replyTo =
       business?.email && business.email.trim().length > 0 ? business.email.trim() : null
     const manageUrl = resolveManageUrl(booking)
@@ -519,18 +586,14 @@ async function processEmailReminder(
       return "skipped"
     }
 
-    const emailResult: AppointmentReminderEmailResult = await sendAppointmentReminderEmail({
-      to: recipient,
-      businessName,
-      businessAddress: business?.business_address ?? null,
-      appointmentDate: booking.appointment_date,
-      appointmentTime: booking.appointment_time,
-      serviceName: booking.service_name,
-      staffName: booking.staff_name,
-      clientName: booking.client_name,
+    const emailResult: AppointmentReminderEmailResult = await resolveReminderEmail(
+      runtime,
+      booking,
+      business,
+      recipient,
       manageUrl,
-      replyTo,
-    })
+      replyTo
+    )
 
     if (emailResult.ok) {
       const { error: updateError } = await admin
@@ -611,6 +674,18 @@ async function processSmsReminder(
       return "skipped"
     }
 
+    const runtime = await getTemplateRuntime(
+      admin,
+      item.business_id,
+      reminderTemplateTypeFromKind(item.reminder_kind)
+    )
+    // Szablon istnieje, ale SMS jest w nim wyłączony → nie wysyłamy
+    // (przed liczeniem limitu, żeby wyłączony kanał nie zużywał kwoty).
+    if (runtime.smsExists && !runtime.smsEnabled) {
+      await markSkipped(admin, item.id, "template_sms_disabled")
+      return "skipped"
+    }
+
     // Limit miesięczny SMS-ów per firma (status='sent', sent_at w bieżącym
     // miesiącu kalendarzowym Europe/Warsaw). Liczone jest faktyczne wysłanie.
     // Pendings / processing / failed / skipped NIE wchodzą do liczenia.
@@ -670,8 +745,7 @@ async function processSmsReminder(
       return "skipped"
     }
     const smsResult: AppointmentReminderSmsResult = await resolveReminderSms(
-      admin,
-      item,
+      runtime,
       booking,
       business,
       phone,
