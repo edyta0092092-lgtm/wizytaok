@@ -2451,8 +2451,8 @@ Pozdrawiamy,
     statistics: {
       statusTitle: "Statusy wizyt",
       statusSubtitle:
-        "Ile wizyt w bieżącym miesiącu ma dany status końcowy lub aktywny.",
-      statusEmpty: "Brak wizyt z rozpoznawalnym statusem w tym miesiącu.",
+        "Ile wizyt w wybranym zakresie ma dany status końcowy lub aktywny.",
+      statusEmpty: "Brak wizyt z rozpoznawalnym statusem w wybranym zakresie.",
       statusAxisY: "Liczba wizyt",
       statusHint: {
         confirmed:
@@ -4866,8 +4866,8 @@ Regards,
     },
     statistics: {
       statusTitle: "Visit statuses",
-      statusSubtitle: "How many visits in the current month have each status.",
-      statusEmpty: "No visits with a recognized status this month.",
+      statusSubtitle: "How many visits in the selected range have each status.",
+      statusEmpty: "No visits with a recognized status in the selected range.",
       statusAxisY: "Visit count",
       statusHint: {
         confirmed: "Confirmed — active visit (upcoming or client confirmed).",

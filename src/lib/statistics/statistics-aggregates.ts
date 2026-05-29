@@ -357,6 +357,9 @@ export function buildStatisticsDataset({
   const appointmentsInRange = appointments.filter((appointment) =>
     inRange(parseDate(appointment.startsAt), rangeStart, rangeEnd)
   )
+  const appointmentsCreatedInRange = appointments.filter((appointment) =>
+    inRange(appointmentCreatedAt(appointment, appointmentMeta), rangeStart, rangeEnd)
+  )
   const visitsToday = appointments.filter(
     (appointment) =>
       isSameDay(parseDate(appointment.startsAt), todayStart) &&
@@ -423,7 +426,7 @@ export function buildStatisticsDataset({
     chart,
     topServices: buildTopServices(appointmentsInRange, services),
     topStaff: buildTopStaff(appointmentsInRange, staff, locale),
-    statuses: buildStatuses(appointmentsInMonth),
+    statuses: buildStatuses(appointmentsCreatedInRange),
     notifications: buildNotificationStats(notificationSources, appointmentsInRange),
     busyDays: heatmap.busyDays,
     busyHours: heatmap.busyHours,
