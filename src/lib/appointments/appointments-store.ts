@@ -17,6 +17,10 @@ import {
   unwrapPublicAppointmentId,
 } from "@/lib/bookings/public-bookings"
 import {
+  APPOINTMENTS_PANEL_DISMISSED_EVENT,
+  filterDismissedAppointments,
+} from "@/lib/appointments/appointments-panel-dismissed"
+import {
   getCachedMergedAppointments,
   invalidateMergedAppointmentsCache,
   mergedAppointmentsCacheKey,
@@ -199,8 +203,9 @@ export async function fetchMergedAppointments(
     (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
   )
   const withOverrides = applyStatusOverrides(merged)
-  setCachedMergedAppointments(cacheKey, withOverrides)
-  return withOverrides
+  const visible = filterDismissedAppointments(withOverrides, options.businessId)
+  setCachedMergedAppointments(cacheKey, visible)
+  return visible
 }
 
 export { invalidateMergedAppointmentsCache }
@@ -284,10 +289,12 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
 
     const onBookings = () => scheduleSync(true)
     const onLocal = () => scheduleSync(true)
+    const onDismissed = () => scheduleSync(true)
     window.addEventListener("pw-public-bookings", onLocal)
     window.addEventListener("pw-manual-appointments", onLocal)
     window.addEventListener("pw-appointments-overrides", onLocal)
     window.addEventListener("pw-bookings", onBookings)
+    window.addEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
 
     const bid = businessId?.trim()
     if (bid && isSupabaseConfigured()) {
@@ -302,6 +309,7 @@ export function useAppointmentsStore(businessId?: string | null): AppointmentsSt
       window.removeEventListener("pw-manual-appointments", onLocal)
       window.removeEventListener("pw-appointments-overrides", onLocal)
       window.removeEventListener("pw-bookings", onBookings)
+      window.removeEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
     }
   }, [businessId])
 

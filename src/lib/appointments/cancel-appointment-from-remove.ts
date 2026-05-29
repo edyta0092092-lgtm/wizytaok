@@ -1,4 +1,8 @@
-import { updateAppointmentStatus } from "@/lib/appointments/appointments-store"
+import { dismissAppointmentFromPanel } from "@/lib/appointments/appointments-panel-dismissed"
+import {
+  invalidateMergedAppointmentsCache,
+  updateAppointmentStatus,
+} from "@/lib/appointments/appointments-store"
 import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appointments/manual-appointments"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
@@ -9,10 +13,22 @@ import type { TablesUpdate } from "@/types/database"
 /**
  * Anuluje wizytę po żądaniu usunięcia wiersza (publiczna / manualna / Supabase po API).
  */
+function finishRemoveFromPanel(
+  appointmentId: string,
+  businessId?: string | null,
+): void {
+  dismissAppointmentFromPanel(appointmentId, businessId)
+  invalidateMergedAppointmentsCache()
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("pw-bookings"))
+  }
+}
+
 export async function cancelAppointmentFromRemove(
   appointmentId: string,
   language: "en" | "pl",
   notifyClient = false,
+  businessId?: string | null,
 ): Promise<{ ok: boolean; error?: string; data?: unknown; notice?: string }> {
   const tid = typeof appointmentId === "string" ? appointmentId.trim() : ""
   if (!tid) {
@@ -30,7 +46,9 @@ export async function cancelAppointmentFromRemove(
       updatedAt: now,
       lastStatusChangeSource: "manual",
     })
-    return updated ? { ok: true } : { ok: false, error: "local_update_failed" }
+    if (!updated) return { ok: false, error: "local_update_failed" }
+    finishRemoveFromPanel(tid, businessId)
+    return { ok: true }
   }
 
   const rawMa = unwrapManualAppointmentId(tid)
@@ -42,7 +60,9 @@ export async function cancelAppointmentFromRemove(
       updatedAt: now,
       lastStatusChangeSource: "manual",
     })
-    return updated ? { ok: true } : { ok: false, error: "local_update_failed" }
+    if (!updated) return { ok: false, error: "local_update_failed" }
+    finishRemoveFromPanel(tid, businessId)
+    return { ok: true }
   }
 
   const bookingUuid = resolveSupabaseBookingRowUuidFromUiId(tid)
@@ -50,7 +70,7 @@ export async function cancelAppointmentFromRemove(
     if (notifyClient) {
       const apiResult = await fetchCancelBookingByCompany(tid, language, true)
       if (apiResult.ok) {
-        window.dispatchEvent(new Event("pw-bookings"))
+        finishRemoveFromPanel(tid, businessId)
         return { ok: true, notice: apiResult.notice }
       }
     }
@@ -120,7 +140,7 @@ export async function cancelAppointmentFromRemove(
         data = minimal.data
       }
       if (notifyClient) void fetchCancelBookingByCompany(tid, language, true)
-      window.dispatchEvent(new Event("pw-bookings"))
+      finishRemoveFromPanel(tid, businessId)
       return { ok: true, data }
     }
 
@@ -128,7 +148,7 @@ export async function cancelAppointmentFromRemove(
     if (!apiResult.ok) {
       return { ok: false, error: apiResult.errorMessage }
     }
-    window.dispatchEvent(new Event("pw-bookings"))
+    finishRemoveFromPanel(tid, businessId)
     return { ok: true }
   }
 
@@ -136,5 +156,7 @@ export async function cancelAppointmentFromRemove(
     lastUpdatedBy: "business",
     lastStatusChangeSource: "manual",
   })
-  return mockOk ? { ok: true } : { ok: false, error: "unknown_appointment_id" }
+  if (!mockOk) return { ok: false, error: "unknown_appointment_id" }
+  finishRemoveFromPanel(tid, businessId)
+  return { ok: true }
 }

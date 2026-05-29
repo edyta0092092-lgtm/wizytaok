@@ -2,7 +2,9 @@
 
 import * as React from "react"
 
+import { dismissAppointmentFromPanel } from "@/lib/appointments/appointments-panel-dismissed"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
+import { invalidateMergedAppointmentsCache } from "@/lib/appointments/appointments-store"
 import type { Appointment } from "@/types/domain"
 
 export function useConfirmDeleteAppointmentHandler(args: {
@@ -11,6 +13,7 @@ export function useConfirmDeleteAppointmentHandler(args: {
   setIsDeletingAppointment: React.Dispatch<React.SetStateAction<boolean>>
   allowAppointmentDelete: boolean
   appointments: Appointment[]
+  businessId?: string | null
   language: "en" | "pl"
   t: (key: string) => string
   setActionNotice: React.Dispatch<React.SetStateAction<string>>
@@ -21,13 +24,13 @@ export function useConfirmDeleteAppointmentHandler(args: {
     isDeletingAppointment,
     setIsDeletingAppointment,
     allowAppointmentDelete,
-    appointments: _appointments,
+    appointments,
+    businessId,
     language,
     t,
     setActionNotice,
     setConfirmDeleteAppointmentId,
   } = args
-  void _appointments
 
   return React.useCallback(() => {
     const deletingId = (confirmDeleteAppointmentIdRef.current ?? "").trim()
@@ -35,7 +38,24 @@ export function useConfirmDeleteAppointmentHandler(args: {
     void (async () => {
       setIsDeletingAppointment(true)
       try {
-        const result = await cancelAppointmentFromRemove(deletingId, language, false)
+        const row = appointments.find((a) => a.id === deletingId)
+        if (row?.status === "cancelled") {
+          dismissAppointmentFromPanel(deletingId, businessId)
+          invalidateMergedAppointmentsCache()
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("pw-bookings"))
+          }
+          setActionNotice(t("appointments.appointmentRemovedFromList"))
+          setConfirmDeleteAppointmentId(null)
+          return
+        }
+
+        const result = await cancelAppointmentFromRemove(
+          deletingId,
+          language,
+          false,
+          businessId,
+        )
         if (!result.ok) {
           const detail =
             result.error && result.error.trim().length > 0
@@ -46,7 +66,7 @@ export function useConfirmDeleteAppointmentHandler(args: {
           )
           return
         }
-        setActionNotice(t("appointments.appointmentCancelledFromRemove"))
+        setActionNotice(t("appointments.appointmentRemovedFromList"))
         setConfirmDeleteAppointmentId(null)
       } finally {
         setIsDeletingAppointment(false)
@@ -54,8 +74,11 @@ export function useConfirmDeleteAppointmentHandler(args: {
     })()
   }, [
     allowAppointmentDelete,
+    appointments,
+    businessId,
     confirmDeleteAppointmentIdRef,
     isDeletingAppointment,
+    language,
     setActionNotice,
     setConfirmDeleteAppointmentId,
     setIsDeletingAppointment,

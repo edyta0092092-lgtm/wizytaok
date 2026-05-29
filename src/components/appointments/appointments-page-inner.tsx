@@ -77,6 +77,7 @@ export function AppointmentsPageInner() {
   } = useAppointmentsDeleteFlow({
     allowAppointmentDelete,
     appointments,
+    businessId,
     language: uiLang,
     t,
     setActionNotice,

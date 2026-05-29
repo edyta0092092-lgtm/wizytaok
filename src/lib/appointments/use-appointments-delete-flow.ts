@@ -9,11 +9,12 @@ import type { Appointment } from "@/types/domain"
 export function useAppointmentsDeleteFlow(input: {
   allowAppointmentDelete: boolean
   appointments: Appointment[]
+  businessId?: string | null
   language: "en" | "pl"
   t: (key: string) => string
   setActionNotice: React.Dispatch<React.SetStateAction<string>>
 }) {
-  const { allowAppointmentDelete, appointments, language, t, setActionNotice } = input
+  const { allowAppointmentDelete, appointments, businessId, language, t, setActionNotice } = input
 
   const [confirmDeleteAppointmentId, setConfirmDeleteAppointmentId] =
     React.useState<string | null>(null)
@@ -31,6 +32,7 @@ export function useAppointmentsDeleteFlow(input: {
     setIsDeletingAppointment,
     allowAppointmentDelete,
     appointments,
+    businessId,
     language,
     t,
     setActionNotice,
