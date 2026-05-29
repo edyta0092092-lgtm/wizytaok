@@ -838,7 +838,7 @@ export const dictionaries = {
       appointmentCancelFromRemoveMissingIdDetail: "brak ID wizyty",
       deleteConfirmTitle: "Czy na pewno chcesz usunąć tę wizytę?",
       deleteConfirmDescription:
-        "Wizyta zniknie z panelu. W statystykach nadal będzie widoczna jako anulowana.",
+        "Wizyta zniknie z panelu. W statystykach nadal będzie liczona zgodnie ze swoim statusem.",
       deleteConfirmCancel: "Anuluj",
       deleteConfirmAction: "Tak, usuń wizytę",
       deleteConfirmActionLoading: "Usuwanie...",
@@ -3294,7 +3294,7 @@ Pozdrawiamy,
       appointmentCancelFromRemoveMissingIdDetail: "missing appointment ID",
       deleteConfirmTitle: "Are you sure you want to delete this appointment?",
       deleteConfirmDescription:
-        "The appointment will disappear from this panel. It will still appear as cancelled in statistics.",
+        "The appointment will disappear from this panel. It will still be counted in statistics according to its status.",
       deleteConfirmCancel: "Cancel",
       deleteConfirmAction: "Yes, delete appointment",
       deleteConfirmActionLoading: "Deleting...",

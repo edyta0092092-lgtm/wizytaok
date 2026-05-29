@@ -3,7 +3,6 @@
 import * as React from "react"
 
 import { dismissAppointmentFromPanel } from "@/lib/appointments/appointments-panel-dismissed"
-import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { invalidateMergedAppointmentsCache } from "@/lib/appointments/appointments-store"
 import type { Appointment } from "@/types/domain"
 
@@ -24,9 +23,7 @@ export function useConfirmDeleteAppointmentHandler(args: {
     isDeletingAppointment,
     setIsDeletingAppointment,
     allowAppointmentDelete,
-    appointments,
     businessId,
-    language,
     t,
     setActionNotice,
     setConfirmDeleteAppointmentId,
@@ -38,24 +35,9 @@ export function useConfirmDeleteAppointmentHandler(args: {
     void (async () => {
       setIsDeletingAppointment(true)
       try {
-        const row = appointments.find((a) => a.id === deletingId)
-
-        // Wizyta już anulowana: tylko chowamy ją z panelu. Status w bazie się nie
-        // zmienia, więc statystyki nadal liczą ją jako anulowaną.
-        if (row?.status !== "cancelled") {
-          const result = await cancelAppointmentFromRemove(deletingId, language, false)
-          if (!result.ok) {
-            const detail =
-              result.error && result.error.trim().length > 0
-                ? result.error
-                : t("appointments.appointmentCancelFromRemoveMissingIdDetail")
-            setActionNotice(
-              t("appointments.appointmentCancelFromRemoveFailed").replace("{detail}", detail),
-            )
-            return
-          }
-        }
-
+        // „Usuń" wyłącznie chowa wizytę z panelu — NIE zmienia jej statusu w bazie.
+        // Dzięki temu każdy status (zrealizowana, potwierdzona, anulowana,
+        // nieobecność) nadal zasila statystyki.
         dismissAppointmentFromPanel(deletingId, businessId)
         invalidateMergedAppointmentsCache()
         setActionNotice(t("appointments.appointmentRemovedFromList"))
@@ -66,11 +48,9 @@ export function useConfirmDeleteAppointmentHandler(args: {
     })()
   }, [
     allowAppointmentDelete,
-    appointments,
     businessId,
     confirmDeleteAppointmentIdRef,
     isDeletingAppointment,
-    language,
     setActionNotice,
     setConfirmDeleteAppointmentId,
     setIsDeletingAppointment,
