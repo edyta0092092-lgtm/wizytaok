@@ -1,16 +1,14 @@
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-}
+import { buildBrandedBodyEmailHtml } from "@/lib/notifications/transactional-email-layout"
 
-export function plainTextEmailToHtml(body: string): string {
+/**
+ * Renderuje wolny tekst szablonu jako pełny, brandowany HTML maila (tło,
+ * nagłówek WizytaOK, biała karta, stopka) — spójnie z pozostałymi mailami.
+ */
+export function plainTextEmailToHtml(
+  body: string,
+  opts?: { subject?: string; lang?: "pl" | "en" },
+): string {
   const normalized = body.replace(/\r\n/g, "\n").trim()
   if (!normalized) return ""
-  return normalized
-    .split(/\n{2,}/)
-    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br/>")}</p>`)
-    .join("")
+  return buildBrandedBodyEmailHtml(normalized, opts)
 }

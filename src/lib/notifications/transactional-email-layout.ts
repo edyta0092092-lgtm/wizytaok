@@ -69,6 +69,69 @@ export function buildTransactionalEmailText(input: {
   return lines.join("\n")
 }
 
+/**
+ * Owija dowolny, wolny tekst szablonu (np. własna treść użytkownika) w tę samą
+ * brandowaną „kopertę" co pozostałe maile transakcyjne: tło, nagłówek WizytaOK,
+ * biała karta i stopka. Dzięki temu maile z edytowalnych szablonów wyglądają
+ * spójnie zamiast renderować się jako goły tekst.
+ */
+export function buildBrandedBodyEmailHtml(
+  body: string,
+  opts?: { subject?: string; preheader?: string; footerNote?: string; lang?: "pl" | "en" },
+): string {
+  const lang = opts?.lang ?? "pl"
+  const normalized = body.replace(/\r\n/g, "\n").trim()
+  if (!normalized) return ""
+  const paragraphsHtml = normalized
+    .split(/\n{2,}/)
+    .map(
+      (paragraph) =>
+        `<p style="margin:0 0 16px 0; font-family:${FONT_STACK}; font-size:15px; line-height:1.6; color:#0f1f1c;">${escapeHtml(paragraph).replace(/\n/g, "<br/>")}</p>`,
+    )
+    .join("")
+  const subject = opts?.subject?.trim() || "WizytaOK"
+  const preheader = opts?.preheader?.trim() || normalized.replace(/\s+/g, " ").slice(0, 120)
+  const footerNote = opts?.footerNote ?? defaultFooter(lang)
+
+  return `<!doctype html>
+<html lang="${lang}">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="x-apple-disable-message-reformatting" />
+<meta name="color-scheme" content="light only" />
+<meta name="supported-color-schemes" content="light" />
+<title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F6FAF9; width:100%;">
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; visibility:hidden; opacity:0; color:transparent; height:0; width:0;">${escapeHtml(preheader)}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#F6FAF9;">
+  <tr>
+    <td align="center" style="padding:40px 16px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;">
+        <tr>
+          <td style="padding:0 4px 18px 4px; font-family:${FONT_STACK}; font-size:13px; line-height:1.3; color:${BRAND_GREEN}; letter-spacing:0.08em; text-transform:uppercase; font-weight:700;">
+            WizytaOK
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#ffffff; border:1px solid #DDEDEA; border-radius:16px; padding:36px 32px;">
+            ${paragraphsHtml}
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:20px 4px 0 4px; font-family:${FONT_STACK}; font-size:12px; line-height:1.5; color:#7a8a87;">
+            ${escapeHtml(footerNote)}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`
+}
+
 export function buildTransactionalEmailHtml(input: BuildTransactionalEmailInput): string {
   const lang = input.lang ?? "pl"
   const detailsHeading = input.detailsHeading ?? defaultDetailsHeading(lang)
