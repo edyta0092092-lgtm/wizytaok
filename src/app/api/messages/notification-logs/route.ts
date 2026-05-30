@@ -34,7 +34,7 @@ export async function GET() {
     .select("*")
     .eq("business_id", resolution.businessId)
     .order("created_at", { ascending: false })
-    .limit(200)
+    .limit(500)
 
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })

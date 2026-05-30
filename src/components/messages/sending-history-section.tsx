@@ -94,6 +94,91 @@ type LegacyPlannedReminderRow = {
   reminder_status: string | null
 }
 
+function mapLegacyPlannedReminderRow(row: LegacyPlannedReminderRow): PlannedReminderRow {
+  return {
+    id: row.id,
+    client_name: row.client_name,
+    client_phone: row.client_phone,
+    client_email: row.client_email,
+    appointment_date: row.appointment_date,
+    appointment_time: row.appointment_time,
+    first_reminder_due_at: null,
+    first_reminder_sent_at: row.reminder_sent_at ?? null,
+    first_reminder_status: row.reminder_status ?? null,
+    second_reminder_due_at: null,
+    second_reminder_sent_at: null,
+    second_reminder_status: "sent",
+  }
+}
+
+async function loadNotificationLogRows(
+  client: NonNullable<ReturnType<typeof getBrowserClient>>,
+  businessId: string,
+): Promise<{ rows: NotificationLogRow[]; error: string | null }> {
+  const logsRes = await fetch("/api/messages/notification-logs", {
+    cache: "no-store",
+    credentials: "include",
+  })
+  const logsJson = (await logsRes.json().catch(() => ({}))) as {
+    ok?: boolean
+    rows?: NotificationLogRow[]
+    error?: string
+  }
+  if (logsRes.ok && logsJson.ok === true) {
+    return { rows: logsJson.rows ?? [], error: null }
+  }
+
+  const { data, error } = await client
+    .from("notification_logs")
+    .select("*")
+    .eq("business_id", businessId)
+    .order("created_at", { ascending: false })
+    .limit(200)
+  if (!error) {
+    return { rows: (data ?? []) as NotificationLogRow[], error: null }
+  }
+
+  return {
+    rows: [],
+    error: logsJson.error ?? error.message ?? `http_${logsRes.status}`,
+  }
+}
+
+async function loadSentReminderHistoryRows(
+  client: NonNullable<ReturnType<typeof getBrowserClient>>,
+  businessId: string,
+): Promise<PlannedReminderRow[]> {
+  const { data: historyData, error: historyErr } = await client
+    .from("bookings")
+    .select(
+      "id,client_name,client_phone,client_email,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
+    )
+    .eq("business_id", businessId)
+    .or("first_reminder_sent_at.not.is.null,second_reminder_sent_at.not.is.null")
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (!historyErr) {
+    return (historyData ?? []) as PlannedReminderRow[]
+  }
+  if (!isMissingColumnInBookingsQuery(historyErr.message)) {
+    return []
+  }
+
+  const { data: legacyHistory, error: legacyHistoryErr } = await client
+    .from("bookings")
+    .select(
+      "id,client_name,client_phone,client_email,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
+    )
+    .eq("business_id", businessId)
+    .not("reminder_sent_at", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(200)
+  if (legacyHistoryErr) {
+    return []
+  }
+  return ((legacyHistory ?? []) as LegacyPlannedReminderRow[]).map(mapLegacyPlannedReminderRow)
+}
+
 function isMissingColumnInBookingsQuery(message: string | null | undefined): boolean {
   const m = String(message ?? "")
   return (
@@ -204,9 +289,11 @@ function mergeEntries(
     const secondStatus = String(row.second_reminder_status ?? "").trim().toLowerCase()
     const firstPending =
       row.first_reminder_sent_at == null &&
+      firstStatus !== "sent" &&
       (firstStatus === "" || firstStatus === "pending" || firstStatus === "queued" || firstStatus === "scheduled")
     const secondPending =
       row.second_reminder_sent_at == null &&
+      secondStatus !== "sent" &&
       (secondStatus === "" || secondStatus === "pending" || secondStatus === "queued" || secondStatus === "scheduled")
     if (firstPending) {
       if (row.client_phone?.trim()) {
@@ -413,7 +500,7 @@ function listTypeLine(
 
 function previewAsMerged(p: PreviewTarget): MergedEntry {
   if (p.kind === "db") {
-    return { kind: "db", sortAt: p.row.created_at, row: p.row }
+    return { kind: "db", sortAt: p.row.sent_at ?? p.row.created_at, row: p.row }
   }
   if (p.kind === "planned") {
     return { kind: "planned", sortAt: p.row.first_reminder_due_at ?? p.row.appointment_date, row: p.row, channel: p.channel, reminderType: p.reminderType }
@@ -677,23 +764,12 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const [logsRes, { data: templateRows }] = await Promise.all([
-        fetch("/api/messages/notification-logs", { cache: "no-store" }),
+      const [logsLoad, { data: templateRows }] = await Promise.all([
+        loadNotificationLogRows(client, bid),
         client.from("message_templates").select("type").eq("business_id", bid),
       ])
-      let logRows: NotificationLogRow[] = []
-      let qErr: string | null = null
-      if (!logsRes.ok) {
-        const errJson = (await logsRes.json().catch(() => ({}))) as { error?: string }
-        qErr = errJson.error ?? `http_${logsRes.status}`
-      } else {
-        const logsJson = (await logsRes.json()) as { ok?: boolean; rows?: NotificationLogRow[] }
-        if (logsJson.ok !== true) {
-          qErr = "load_failed"
-        } else {
-          logRows = logsJson.rows ?? []
-        }
-      }
+      const logRows = logsLoad.rows
+      const qErr = logsLoad.error
 
       const { data: planData, error: planErr } = await client
         .from("bookings")
@@ -716,20 +792,7 @@ export function SendingHistorySection() {
           .eq("business_id", bid)
           .in("status", ["booked", "pending", "confirmed"])
         if (!legacyPlanErr) {
-          plannedRowsResolved = ((legacyPlanData ?? []) as LegacyPlannedReminderRow[]).map((row) => ({
-            id: row.id,
-            client_name: row.client_name,
-            client_phone: row.client_phone,
-            client_email: row.client_email,
-            appointment_date: row.appointment_date,
-            appointment_time: row.appointment_time,
-            first_reminder_due_at: null,
-            first_reminder_sent_at: row.reminder_sent_at ?? null,
-            first_reminder_status: row.reminder_status ?? null,
-            second_reminder_due_at: null,
-            second_reminder_sent_at: null,
-            second_reminder_status: "sent",
-          }))
+          plannedRowsResolved = ((legacyPlanData ?? []) as LegacyPlannedReminderRow[]).map(mapLegacyPlannedReminderRow)
           plannedError = null
         } else {
           plannedError = legacyPlanErr
@@ -768,31 +831,18 @@ export function SendingHistorySection() {
       }
 
       if (!plannedError) {
-        const { data: historyData, error: historyErr } = await client
-          .from("bookings")
-          .select(
-            "id,client_name,client_phone,client_email,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
-          )
-          .eq("business_id", bid)
-          .or("first_reminder_sent_at.not.is.null,second_reminder_sent_at.not.is.null")
-          .order("updated_at", { ascending: false })
-          .limit(200)
-        if (!historyErr) {
-          plannedRowsResolved = mergeBookingReminderRows(
-            plannedRowsResolved,
-            (historyData ?? []) as PlannedReminderRow[],
-          )
+        const historyRows = await loadSentReminderHistoryRows(client, bid)
+        if (historyRows.length > 0) {
+          plannedRowsResolved = mergeBookingReminderRows(plannedRowsResolved, historyRows)
         }
       }
 
       if (cancelled) return
-      if (qErr) {
+      if (qErr && logRows.length === 0) {
         setLoadError(qErr)
         setRows([])
-        setPlannedRows([])
-        setTemplateTypes([])
       } else {
-        setLoadError(null)
+        setLoadError(qErr && logRows.length > 0 ? qErr : null)
         setRows(logRows)
         if (!plannedError) {
           setPlannedRows(plannedRowsResolved)
@@ -812,11 +862,12 @@ export function SendingHistorySection() {
             businessId: bid,
             count: logRows.length,
             plannedCount: plannedRowsResolved.length,
-            error: plannedError?.message ?? null,
+            error: qErr,
+            plannedError: plannedError?.message ?? null,
           })
         }
       }
-      if (process.env.NODE_ENV === "development" && qErr) {
+      if (process.env.NODE_ENV === "development" && qErr && logRows.length === 0) {
         console.info("[notifications.logs.load]", {
           businessId: bid,
           count: 0,

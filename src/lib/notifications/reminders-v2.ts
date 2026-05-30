@@ -147,11 +147,10 @@ async function insertNotificationLog(
     sent_at: string | null
   }
 ) {
-  void persistNotificationLog(admin, { ...row, type: row.type }, "[reminders-v2.notify.log]").then((result) => {
-    if (!result.ok) {
-      console.error("[reminders-v2.notify.log]", result.message)
-    }
-  })
+  const result = await persistNotificationLog(admin, { ...row, type: row.type }, "[reminders-v2.notify.log]")
+  if (!result.ok) {
+    console.error("[reminders-v2.notify.log]", result.message)
+  }
 }
 
 async function updateBookingReminderStatus(
