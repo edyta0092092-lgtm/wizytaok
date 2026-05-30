@@ -20,6 +20,7 @@ import {
   type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
 import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
+import { upsertReminderNotificationLog } from "@/lib/notifications/reminder-notification-log"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -132,9 +133,12 @@ function getPublicAppOrigin(): string {
   return "http://localhost:3000"
 }
 
-/** Tylko `SMS_REMINDERS_ENABLED=true` włącza pobieranie i wysyłkę SMS z kolejki. */
+/** Włącza SMS z kolejki gdy `SMS_REMINDERS_ENABLED=true` lub skonfigurowany token (jak potwierdzenia). */
 function areSmsRemindersEnabled(): boolean {
-  return process.env.SMS_REMINDERS_ENABLED?.trim() === "true"
+  const explicit = process.env.SMS_REMINDERS_ENABLED?.trim().toLowerCase()
+  if (explicit === "false") return false
+  if (explicit === "true") return true
+  return Boolean(process.env.SMSAPI_TOKEN?.trim() || process.env.SZYBKISMS_TOKEN?.trim())
 }
 
 const SMS_ALLOWED_BUSINESS_UUID_RE =
@@ -509,8 +513,9 @@ async function processEmailReminder(
       }
       await markSkipped(
         admin,
-        item.id,
-        load.reason === "not_found" ? "booking_not_found" : "booking_cancelled"
+        item,
+        load.reason === "not_found" ? "booking_not_found" : "booking_cancelled",
+        null,
       )
       return "skipped"
     }
@@ -518,7 +523,7 @@ async function processEmailReminder(
 
     const recipient = (booking.client_email ?? "").trim()
     if (recipient.length === 0) {
-      await markSkipped(admin, item.id, "no_email")
+      await markSkipped(admin, item, "no_email", booking)
       return "skipped"
     }
 
@@ -531,7 +536,7 @@ async function processEmailReminder(
     // zapisała szablon i wyłączyła w nim ten kanał (status draft) — tak jak
     // pokazuje przełącznik „off" w kafelku szablonu.
     if (runtime.emailExists && !runtime.emailEnabled) {
-      await markSkipped(admin, item.id, "template_email_disabled")
+      await markSkipped(admin, item, "template_email_disabled", booking, recipient)
       return "skipped"
     }
 
@@ -540,7 +545,7 @@ async function processEmailReminder(
     const manageUrl = resolveManageUrl(booking)
 
     if (await isBookingCancelledNow(admin, booking.id)) {
-      await markSkipped(admin, item.id, "booking_cancelled_race")
+      await markSkipped(admin, item, "booking_cancelled_race", booking, recipient)
       return "skipped"
     }
 
@@ -554,11 +559,12 @@ async function processEmailReminder(
     )
 
     if (emailResult.ok) {
+      const sentAt = new Date().toISOString()
       const { error: updateError } = await admin
         .from("appointment_reminders")
         .update({
           status: "sent",
-          sent_at: new Date().toISOString(),
+          sent_at: sentAt,
           provider: emailResult.provider,
           provider_message_id: emailResult.messageId,
           locked_at: null,
@@ -573,6 +579,29 @@ async function processEmailReminder(
           message: updateError.message,
         })
       }
+      const emailSubject =
+        runtime.emailSubject && runtime.emailSubject.trim().length > 0
+          ? applyTemplateVariables(
+              runtime.emailSubject,
+              buildReminderTemplateVars(booking, business, manageUrl ?? ""),
+            )
+          : "Przypomnienie o wizytie"
+      await upsertReminderNotificationLog(
+        admin,
+        {
+          businessId: item.business_id,
+          bookingId: booking.id,
+          reminderKind: item.reminder_kind,
+          channel: "email",
+          status: "sent",
+          recipient,
+          subject: emailSubject,
+          provider: emailResult.provider,
+          providerMessageId: emailResult.messageId,
+          sentAt,
+        },
+        "[cron/send-reminders.log]",
+      )
       return "sent"
     }
 
@@ -612,8 +641,9 @@ async function processSmsReminder(
       }
       await markSkipped(
         admin,
-        item.id,
-        load.reason === "not_found" ? "booking_not_found" : "booking_cancelled"
+        item,
+        load.reason === "not_found" ? "booking_not_found" : "booking_cancelled",
+        null,
       )
       return "skipped"
     }
@@ -621,14 +651,14 @@ async function processSmsReminder(
 
     const phone = (booking.client_phone ?? "").trim()
     if (phone.length === 0) {
-      await markSkipped(admin, item.id, "no_phone")
+      await markSkipped(admin, item, "no_phone", booking)
       return "skipped"
     }
 
     const manageUrl = resolveManageUrl(booking)
     if (!manageUrl) {
       // Bez tokena nie ma sensownego SMS-a transakcyjnego — pomijamy.
-      await markSkipped(admin, item.id, "no_manage_url")
+      await markSkipped(admin, item, "no_manage_url", booking)
       return "skipped"
     }
 
@@ -642,7 +672,7 @@ async function processSmsReminder(
     // przełącznik „off" w kafelku. Sprawdzamy przed liczeniem limitu, żeby
     // wyłączony kanał nie zużywał kwoty SMS.
     if (runtime.smsExists && !runtime.smsEnabled) {
-      await markSkipped(admin, item.id, "template_sms_disabled")
+      await markSkipped(admin, item, "template_sms_disabled", booking, phone)
       return "skipped"
     }
 
@@ -693,7 +723,7 @@ async function processSmsReminder(
     }
 
     if (await isBookingCancelledNow(admin, booking.id)) {
-      await markSkipped(admin, item.id, "booking_cancelled_race")
+      await markSkipped(admin, item, "booking_cancelled_race", booking, phone)
       return "skipped"
     }
     const smsResult: AppointmentReminderSmsResult = await resolveReminderSms(
@@ -705,11 +735,12 @@ async function processSmsReminder(
     )
 
     if (smsResult.ok) {
+      const sentAt = new Date().toISOString()
       const { error: updateError } = await admin
         .from("appointment_reminders")
         .update({
           status: "sent",
-          sent_at: new Date().toISOString(),
+          sent_at: sentAt,
           provider: smsResult.provider,
           provider_message_id: smsResult.messageId,
           locked_at: null,
@@ -724,6 +755,21 @@ async function processSmsReminder(
           message: updateError.message,
         })
       }
+      await upsertReminderNotificationLog(
+        admin,
+        {
+          businessId: item.business_id,
+          bookingId: booking.id,
+          reminderKind: item.reminder_kind,
+          channel: "sms",
+          status: "sent",
+          recipient: phone,
+          provider: smsResult.provider,
+          providerMessageId: smsResult.messageId,
+          sentAt,
+        },
+        "[cron/send-reminders.log]",
+      )
       return "sent"
     }
 
@@ -744,7 +790,7 @@ async function processSmsReminder(
       // Telefon istniał w bazie, ale nie potrafimy go znormalizować do MSISDN.
       // To trwała wada danych — `skipped` (a nie retry), żeby nie napierać na
       // SMSAPI z każdym uruchomieniem crona.
-      await markSkipped(admin, item.id, smsResult.error || "invalid_phone")
+      await markSkipped(admin, item, smsResult.error || "invalid_phone", booking, phone)
       return "skipped"
     }
 
@@ -760,8 +806,10 @@ async function processSmsReminder(
 // ---------------------------------------------------------------------------
 async function markSkipped(
   admin: AdminClient,
-  reminderId: string,
-  reason: string
+  item: DueReminderRow,
+  reason: string,
+  booking: BookingRow | null,
+  recipient?: string | null,
 ): Promise<void> {
   const { error } = await admin
     .from("appointment_reminders")
@@ -771,12 +819,28 @@ async function markSkipped(
       locked_at: null,
       last_error: reason,
     })
-    .eq("id", reminderId)
+    .eq("id", item.id)
   if (error) {
     console.error("[cron/send-reminders] mark_skipped_failed", {
-      reminderId,
+      reminderId: item.id,
       message: error.message,
     })
+  }
+  if (booking?.id) {
+    await upsertReminderNotificationLog(
+      admin,
+      {
+        businessId: item.business_id,
+        bookingId: booking.id,
+        reminderKind: item.reminder_kind,
+        channel: item.channel === "sms" ? "sms" : "email",
+        status: "skipped",
+        recipient: recipient ?? null,
+        errorMessage: reason,
+        sentAt: new Date().toISOString(),
+      },
+      "[cron/send-reminders.log]",
+    )
   }
 }
 

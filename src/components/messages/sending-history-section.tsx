@@ -21,6 +21,7 @@ import {
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
+import { reminderLogTypeFromKind } from "@/lib/notifications/reminder-notification-log"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -179,6 +180,72 @@ async function loadSentReminderHistoryRows(
   return ((legacyHistory ?? []) as LegacyPlannedReminderRow[]).map(mapLegacyPlannedReminderRow)
 }
 
+async function loadSentAppointmentReminderLogRows(
+  client: NonNullable<ReturnType<typeof getBrowserClient>>,
+  businessId: string,
+): Promise<NotificationLogRow[]> {
+  const { data, error } = await client
+    .from("appointment_reminders")
+    .select(
+      "id,business_id,appointment_id,channel,reminder_kind,status,sent_at,created_at,last_error,provider,provider_message_id",
+    )
+    .eq("business_id", businessId)
+    .in("status", ["sent", "failed", "skipped"])
+    .order("sent_at", { ascending: false })
+    .limit(200)
+  if (error || !data) return []
+
+  return (data as Array<{
+    id: string
+    business_id: string
+    appointment_id: string
+    channel: string
+    reminder_kind: string
+    status: string
+    sent_at: string | null
+    created_at: string
+    last_error: string | null
+    provider: string | null
+    provider_message_id: string | null
+  }>).map((row) => ({
+    id: `queue-${row.id}`,
+    business_id: row.business_id,
+    booking_id: row.appointment_id,
+    channel: row.channel,
+    type: reminderLogTypeFromKind(row.reminder_kind),
+    recipient: null,
+    status: row.status,
+    subject: null,
+    body: null,
+    provider: row.provider,
+    provider_message_id: row.provider_message_id,
+    error_message: row.last_error,
+    sent_at: row.sent_at,
+    created_at: row.sent_at ?? row.created_at,
+  })) as NotificationLogRow[]
+}
+
+function mergeLogRowsWithQueueHistory(
+  logRows: NotificationLogRow[],
+  queueRows: NotificationLogRow[],
+): NotificationLogRow[] {
+  if (queueRows.length === 0) return logRows
+  const existingKeys = buildLogDedupKeys(logRows)
+  const merged = [...logRows]
+  for (const row of queueRows) {
+    if (!row.booking_id) {
+      merged.push(row)
+      continue
+    }
+    const key = `${row.booking_id}:${canonicalNotificationType(String(row.type ?? ""))}:${dbChannel(row)}`
+    if (!existingKeys.has(key)) {
+      merged.push(row)
+      existingKeys.add(key)
+    }
+  }
+  return merged
+}
+
 function isMissingColumnInBookingsQuery(message: string | null | undefined): boolean {
   const m = String(message ?? "")
   return (
@@ -297,42 +364,54 @@ function mergeEntries(
       (secondStatus === "" || secondStatus === "pending" || secondStatus === "queued" || secondStatus === "scheduled")
     if (firstPending) {
       if (row.client_phone?.trim()) {
-        out.push({
-          kind: "planned",
-          sortAt: firstDue,
-          row,
-          channel: "sms",
-          reminderType: "reminder_24h",
-        })
+        const key = `${row.id}:reminder_24h:sms`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "planned",
+            sortAt: firstDue,
+            row,
+            channel: "sms",
+            reminderType: "reminder_24h",
+          })
+        }
       }
       if (row.client_email?.trim()) {
-        out.push({
-          kind: "planned",
-          sortAt: firstDue,
-          row,
-          channel: "email",
-          reminderType: "reminder_24h",
-        })
+        const key = `${row.id}:reminder_24h:email`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "planned",
+            sortAt: firstDue,
+            row,
+            channel: "email",
+            reminderType: "reminder_24h",
+          })
+        }
       }
     }
     if (secondPending) {
       if (row.client_phone?.trim()) {
-        out.push({
-          kind: "planned",
-          sortAt: secondDue,
-          row,
-          channel: "sms",
-          reminderType: "reminder_before_visit",
-        })
+        const key = `${row.id}:reminder_before_visit:sms`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "planned",
+            sortAt: secondDue,
+            row,
+            channel: "sms",
+            reminderType: "reminder_before_visit",
+          })
+        }
       }
       if (row.client_email?.trim()) {
-        out.push({
-          kind: "planned",
-          sortAt: secondDue,
-          row,
-          channel: "email",
-          reminderType: "reminder_before_visit",
-        })
+        const key = `${row.id}:reminder_before_visit:email`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "planned",
+            sortAt: secondDue,
+            row,
+            channel: "email",
+            reminderType: "reminder_before_visit",
+          })
+        }
       }
     }
     if (!firstPending) {
@@ -764,11 +843,12 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const [logsLoad, { data: templateRows }] = await Promise.all([
+      const [logsLoad, { data: templateRows }, queueLogRows] = await Promise.all([
         loadNotificationLogRows(client, bid),
         client.from("message_templates").select("type").eq("business_id", bid),
+        loadSentAppointmentReminderLogRows(client, bid),
       ])
-      const logRows = logsLoad.rows
+      const logRows = mergeLogRowsWithQueueHistory(logsLoad.rows, queueLogRows)
       const qErr = logsLoad.error
 
       const { data: planData, error: planErr } = await client
