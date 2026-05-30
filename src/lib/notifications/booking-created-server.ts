@@ -257,7 +257,7 @@ async function claimChannelSend(
       booking_id: booking.id,
       channel,
     })
-    return "claimed"
+    return "in_flight"
   }
   if (!claimInsert.duplicate) {
     return "claimed"
@@ -326,7 +326,17 @@ function mapLogRowStatus(status: string | null | undefined): BookingCreatedChann
   if (status === "sent") return "sent"
   if (status === "failed") return "failed"
   if (status === "skipped") return "skipped"
+  if (status === "queued" || status === "pending") return "already_sent"
   return "failed"
+}
+
+function channelSendSettled(status: BookingCreatedChannelStatus): boolean {
+  return (
+    status === "sent" ||
+    status === "already_sent" ||
+    status === "skipped" ||
+    status === "missing"
+  )
 }
 
 export async function getBookingCreatedNotifyStatus(
@@ -429,6 +439,16 @@ export async function sendBookingCreatedNotifications(
     }
   }
 
+  const existing = await getBookingCreatedNotifyStatus(booking.id)
+  if (
+    (existing.email.status === "sent" && existing.sms.status === "sent") ||
+    existing.email.status === "already_sent" ||
+    existing.sms.status === "already_sent" ||
+    (channelSendSettled(existing.email.status) && channelSendSettled(existing.sms.status))
+  ) {
+    return { ok: true, email: existing.email, sms: existing.sms }
+  }
+
   const { data: businessRaw } = await admin
     .from("business_profiles")
     .select("slug,business_name,phone,contact_phone,business_address")
@@ -477,10 +497,14 @@ export async function sendBookingCreatedNotifications(
   const wantSms = templateRuntime.smsExists ? templateRuntime.smsEnabled : true
   const nowIso = new Date().toISOString()
 
-  let emailResult: BookingCreatedChannelDetail = channelDetail("missing")
+  let emailResult = existing.email
+  let smsResult = existing.sms
+  let dispatchedCustomTemplates = false
+
   const email = booking.client_email ?? ""
-  if (!wantEmail) {
-    emailResult = channelDetail("skipped")
+  if (existing.email.status !== "sent") {
+    if (!wantEmail) {
+      emailResult = channelDetail("skipped")
     if (email) {
       // Zapis „skipped" w historii — żeby było widać, że kanał jest wyłączony.
       await insertNotificationLog(
@@ -553,6 +577,9 @@ export async function sendBookingCreatedNotifications(
           error_message: errorMessage,
           sent_at: sent.ok ? nowIso : null,
         })
+        if (sent.ok) {
+          dispatchedCustomTemplates = true
+        }
         if (!sent.ok) {
           console.error("[booking-created.notify.email]", sent.code, sent.error ?? "")
         }
@@ -570,12 +597,13 @@ export async function sendBookingCreatedNotifications(
       }
     }
   }
+  }
 
-  let smsResult: BookingCreatedChannelDetail = channelDetail("missing")
   const phone = booking.client_phone ?? ""
   const smsProvider = getActiveSmsReminderProvider()
-  if (!wantSms) {
-    smsResult = channelDetail("skipped")
+  if (existing.sms.status !== "sent") {
+    if (!wantSms) {
+      smsResult = channelDetail("skipped")
     if (phone) {
       await insertNotificationLog(
         admin,
@@ -642,6 +670,9 @@ export async function sendBookingCreatedNotifications(
           error_message: errorMessage,
           sent_at: sent.ok ? nowIso : null,
         })
+        if (sent.ok) {
+          dispatchedCustomTemplates = true
+        }
         if (!sent.ok) {
           console.error("[booking-created.notify.sms]", {
             code: sent.code,
@@ -671,12 +702,15 @@ export async function sendBookingCreatedNotifications(
       }
     }
   }
+  }
 
-  // Własne szablony typu „zdarzenie" dla utworzenia rezerwacji (dedup chroni przed dublami).
-  try {
-    await dispatchCustomTemplatesForEvent({ bookingId: booking.id, eventKey: "created" })
-  } catch {
-    // brak wpływu na wynik wbudowanego potwierdzenia
+  // Własne szablony typu „zdarzenie" tylko przy pierwszej udanej wysyłce wbudowanego potwierdzenia.
+  if (dispatchedCustomTemplates) {
+    try {
+      await dispatchCustomTemplatesForEvent({ bookingId: booking.id, eventKey: "created" })
+    } catch {
+      // brak wpływu na wynik wbudowanego potwierdzenia
+    }
   }
 
   return {

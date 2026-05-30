@@ -11,7 +11,6 @@ import {
   getPublicBookings,
   updatePublicBooking,
 } from "@/lib/bookings/public-bookings"
-import { ensureBookingCreatedNotifications } from "@/lib/bookings/notify-booking-created-client"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
@@ -108,7 +107,6 @@ export default function PublicBookingSuccessPage() {
   const [cancelError, setCancelError] = React.useState<string | null>(null)
   const popstateHandlingRef = React.useRef(false)
   const popstateReadyRef = React.useRef(false)
-  const notifyFallbackStartedRef = React.useRef(false)
 
   const confirmationToken = React.useMemo(() => {
     const fromQuery = tokenFromQuery.trim()
@@ -118,29 +116,6 @@ export default function PublicBookingSuccessPage() {
 
   const isCancelled =
     publicBooking?.status === "cancelled" || cancelPhase === "done"
-
-  React.useEffect(() => {
-    if (!tokenFromQuery || !isSupabaseConfigured()) return
-    if (notifyFallbackStartedRef.current) return
-    notifyFallbackStartedRef.current = true
-
-    let cancelled = false
-    void (async () => {
-      try {
-        const result = await ensureBookingCreatedNotifications(tokenFromQuery, language)
-        if (cancelled) return
-        if (result.email.status === "failed" || result.sms.status === "failed") {
-          console.warn("[booking.success.notify]", result)
-        }
-      } catch (err) {
-        console.error("[booking.success.notify]", err)
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [tokenFromQuery, language])
 
   React.useEffect(() => {
     if (loading) return

@@ -72,7 +72,12 @@ function parseNotifyResponse(json: Record<string, unknown>): BookingCreatedNotif
 }
 
 function channelDone(detail: BookingCreatedChannelDetail): boolean {
-  return detail.status === "sent" || detail.status === "already_sent"
+  return (
+    detail.status === "sent" ||
+    detail.status === "already_sent" ||
+    detail.status === "skipped" ||
+    detail.status === "missing"
+  )
 }
 
 export function isBookingCreatedNotifyComplete(result: BookingCreatedNotifyApiResult): boolean {

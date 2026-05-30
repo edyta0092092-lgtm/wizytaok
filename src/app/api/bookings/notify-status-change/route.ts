@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import { getBookingCreatedNotifyStatus } from "@/lib/notifications/booking-created-server"
 import { notifyBookingConfirmedForBooking } from "@/lib/notifications/booking-confirmed-server"
 import { notifyBookingCancelledByCompany } from "@/lib/notifications/booking-cancelled-by-company-server"
 import {
@@ -85,6 +86,19 @@ export async function POST(req: Request) {
 
   try {
     if (eventKey === "confirmed" && booking.status === "confirmed") {
+      const createdStatus = await getBookingCreatedNotifyStatus(bookingUuid)
+      if (
+        createdStatus.email.status === "sent" ||
+        createdStatus.sms.status === "sent" ||
+        createdStatus.email.status === "already_sent" ||
+        createdStatus.sms.status === "already_sent"
+      ) {
+        return NextResponse.json({
+          ok: true,
+          standardNotice: "skipped",
+          reason: "booking_created_already_sent",
+        })
+      }
       const result = await notifyBookingConfirmedForBooking({
         booking,
         business: profile,
