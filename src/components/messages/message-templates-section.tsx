@@ -1,21 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Check, Pencil } from "lucide-react"
+import { Check, ChevronDown, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
@@ -206,6 +200,31 @@ function formatTimingLabel(minutes: number | null): string {
   return `${min}min`
 }
 
+function NativeSelect({
+  value,
+  onChange,
+  className,
+  children,
+}: {
+  value: string
+  onChange: (value: string) => void
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 w-full appearance-none rounded-xl border border-input bg-card pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/20"
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    </div>
+  )
+}
+
 const REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 15, label: "15 min przed" },
   { value: 30, label: "30 min przed" },
@@ -302,7 +321,6 @@ export function MessageTemplatesSection({
   const [form, setForm] = React.useState<GroupedTemplate | null>(null)
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
-  const dialogRef = React.useRef<HTMLDivElement | null>(null)
 
   const openCreate = React.useCallback(() => {
     if (readOnly) return
@@ -390,21 +408,12 @@ export function MessageTemplatesSection({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSheetOpen(false)
     }
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (!target) return
-      if (dialogRef.current && !dialogRef.current.contains(target)) {
-        setSheetOpen(false)
-      }
-    }
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
     window.addEventListener("keydown", onKeyDown)
-    window.addEventListener("pointerdown", onPointerDown)
     return () => {
       document.body.style.overflow = prevOverflow
       window.removeEventListener("keydown", onKeyDown)
-      window.removeEventListener("pointerdown", onPointerDown)
     }
   }, [sheetOpen, readOnly])
 
@@ -607,7 +616,6 @@ export function MessageTemplatesSection({
           aria-label={editingType ? TEMPLATE_LABELS[editingType] : "Szablon"}
         >
           <div
-            ref={dialogRef}
             className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl"
           >
             <div className="flex items-center justify-between gap-3 border-b border-border/70 px-6 py-5">
@@ -667,25 +675,21 @@ export function MessageTemplatesSection({
                 {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
                   <div className="space-y-2">
                     <Label>Wyślij ile czasu przed wizytą</Label>
-                    <Select
+                    <NativeSelect
+                      className="w-full sm:max-w-xs"
                       value={String(form?.timingMinutesBefore ?? "")}
-                      onValueChange={(v) => {
+                      onChange={(v) => {
                         const parsed = Number(v)
                         if (Number.isNaN(parsed)) return
                         setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
                       }}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Wybierz czas przypomnienia" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REMINDER_TIMING_OPTIONS.map((opt) => (
-                          <SelectItem key={opt.value} value={String(opt.value)}>
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      {REMINDER_TIMING_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
                   </div>
                 ) : null}
                 <div className="text-xs text-muted-foreground">
