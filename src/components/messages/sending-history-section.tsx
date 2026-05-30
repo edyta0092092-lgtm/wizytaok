@@ -677,15 +677,23 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const [{ data, error: qErr }, { data: templateRows }] = await Promise.all([
-        client
-          .from("notification_logs")
-          .select("*")
-          .eq("business_id", bid)
-          .order("created_at", { ascending: false })
-          .limit(200),
+      const [logsRes, { data: templateRows }] = await Promise.all([
+        fetch("/api/messages/notification-logs", { cache: "no-store" }),
         client.from("message_templates").select("type").eq("business_id", bid),
       ])
+      let logRows: NotificationLogRow[] = []
+      let qErr: string | null = null
+      if (!logsRes.ok) {
+        const errJson = (await logsRes.json().catch(() => ({}))) as { error?: string }
+        qErr = errJson.error ?? `http_${logsRes.status}`
+      } else {
+        const logsJson = (await logsRes.json()) as { ok?: boolean; rows?: NotificationLogRow[] }
+        if (logsJson.ok !== true) {
+          qErr = "load_failed"
+        } else {
+          logRows = logsJson.rows ?? []
+        }
+      }
 
       const { data: planData, error: planErr } = await client
         .from("bookings")
@@ -779,13 +787,13 @@ export function SendingHistorySection() {
 
       if (cancelled) return
       if (qErr) {
-        setLoadError(qErr.message)
+        setLoadError(qErr)
         setRows([])
         setPlannedRows([])
         setTemplateTypes([])
       } else {
         setLoadError(null)
-        setRows((data ?? []) as NotificationLogRow[])
+        setRows(logRows)
         if (!plannedError) {
           setPlannedRows(plannedRowsResolved)
         } else {
@@ -802,7 +810,7 @@ export function SendingHistorySection() {
         if (process.env.NODE_ENV === "development") {
           console.info("[notifications.logs.load]", {
             businessId: bid,
-            count: (data ?? []).length,
+            count: logRows.length,
             plannedCount: plannedRowsResolved.length,
             error: plannedError?.message ?? null,
           })
@@ -812,7 +820,7 @@ export function SendingHistorySection() {
         console.info("[notifications.logs.load]", {
           businessId: bid,
           count: 0,
-          error: qErr.message,
+          error: qErr,
         })
       }
       setBusinessSlugNorm(slugNorm)

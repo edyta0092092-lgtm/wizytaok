@@ -2,6 +2,7 @@ import { sendReminderEmail } from "@/lib/notifications/email"
 import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import { upsertNotificationLog } from "@/lib/notifications/notification-log-update"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
@@ -225,30 +226,40 @@ async function claimChannelSend(
   channel: "email" | "sms",
   recipient: string,
 ): Promise<ClaimResult> {
-  const ins = await admin.from("notification_logs").insert({
+  const insertBase = {
     business_id: booking.business_id,
     booking_id: booking.id,
     channel,
-    type: "booking_created",
-    status: "queued",
+    type: "booking_created" as const,
     recipient,
     subject: null,
     body: null,
     provider: null,
     provider_message_id: null,
-    error_message: null,
     sent_at: null,
-  })
-  if (!ins.error) return "claimed"
-  // 23505 = naruszenie unikalnego indeksu → wiersz już istnieje.
-  if (ins.error.code !== "23505") {
+  }
+
+  let claimInsert = await insertNotificationLog(
+    admin,
+    { ...insertBase, status: "queued" },
+    "[booking-created.notify.log]",
+  )
+  if (!claimInsert.ok && /notification_logs_status_chk|check constraint.*status/i.test(claimInsert.message)) {
+    claimInsert = await insertNotificationLog(
+      admin,
+      { ...insertBase, status: "pending" },
+      "[booking-created.notify.log]",
+    )
+  }
+  if (!claimInsert.ok) {
     console.error("[booking-created.notify.log] claim_insert_failed", {
-      code: ins.error.code,
-      message: ins.error.message,
+      message: claimInsert.message,
       booking_id: booking.id,
       channel,
     })
-    // Wysyłamy mimo błędu logu — finalize/insert po wysyłce spróbuje zapisać ponownie.
+    return "claimed"
+  }
+  if (!claimInsert.duplicate) {
     return "claimed"
   }
 
@@ -261,14 +272,15 @@ async function claimChannelSend(
     .maybeSingle()
   const status = data?.status ?? ""
   if (status === "sent") return "already_sent"
-  if (status === "queued") return "in_flight"
+  if (status === "queued" || status === "pending") return "in_flight"
 
-  await admin
-    .from("notification_logs")
-    .update({ status: "queued", error_message: null })
-    .eq("booking_id", booking.id)
-    .eq("type", "booking_created")
-    .eq("channel", channel)
+  await upsertNotificationLog(
+    admin,
+    { booking_id: booking.id, type: "booking_created", channel },
+    { ...insertBase, status: "queued" },
+    { status: "queued", recipient },
+    "[booking-created.notify.log]",
+  )
   return "claimed"
 }
 
@@ -288,30 +300,9 @@ async function finalizeChannelLog(
     sent_at?: string | null
   },
 ): Promise<void> {
-  const { data, error } = await admin
-    .from("notification_logs")
-    .update({
-      status: patch.status,
-      subject: patch.subject,
-      body: patch.body,
-      provider: patch.provider ?? null,
-      provider_message_id: patch.provider_message_id ?? null,
-      error_message: patch.error_message ?? null,
-      sent_at: patch.sent_at ?? null,
-    })
-    .eq("booking_id", booking.id)
-    .eq("type", "booking_created")
-    .eq("channel", channel)
-    .select("id")
-    .maybeSingle()
-  if (error) {
-    console.error("[booking-created.notify.log] finalize_failed", { channel, message: error.message })
-    return
-  }
-  if (data?.id) return
-
-  const inserted = await insertNotificationLog(
+  await upsertNotificationLog(
     admin,
+    { booking_id: booking.id, type: "booking_created", channel },
     {
       business_id: booking.business_id,
       booking_id: booking.id,
@@ -326,14 +317,9 @@ async function finalizeChannelLog(
       error_message: patch.error_message ?? null,
       sent_at: patch.sent_at ?? null,
     },
+    { ...patch, recipient },
     "[booking-created.notify.log]",
   )
-  if (!inserted.ok) {
-    console.error("[booking-created.notify.log] finalize_insert_failed", {
-      channel,
-      message: inserted.message,
-    })
-  }
 }
 
 function mapLogRowStatus(status: string | null | undefined): BookingCreatedChannelStatus {

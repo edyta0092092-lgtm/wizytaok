@@ -24,14 +24,39 @@ export async function insertNotificationLog(
   admin: SupabaseClient<Database>,
   row: NotificationLogInsertInput,
   logTag = "[notification.log]",
-): Promise<{ ok: true } | { ok: false; message: string; code?: string }> {
+): Promise<{ ok: true; duplicate?: boolean } | { ok: false; message: string; code?: string }> {
   const payload = toNotificationLogInsertRow(row)
   const { error } = await admin.from("notification_logs").insert(payload)
   if (!error) {
     return { ok: true }
   }
   if (error.code === "23505") {
-    return { ok: true }
+    return { ok: true, duplicate: true }
+  }
+  if (isMissingErrorMessageColumn(error.message)) {
+    const { error_message, ...rest } = payload
+    const legacyPayload = {
+      ...rest,
+      error: error_message ?? null,
+    }
+    const legacy = await admin
+      .from("notification_logs")
+      .insert(legacyPayload as NotificationLogInsert)
+    if (!legacy.error) {
+      return { ok: true }
+    }
+    if (legacy.error.code === "23505") {
+      return { ok: true, duplicate: true }
+    }
+    console.error(logTag, {
+      code: legacy.error.code,
+      message: legacy.error.message,
+      channel: row.channel,
+      type: row.type,
+      status: row.status,
+      booking_id: row.booking_id,
+    })
+    return { ok: false, message: legacy.error.message, code: legacy.error.code ?? undefined }
   }
   console.error(logTag, {
     code: error.code,
@@ -44,4 +69,9 @@ export async function insertNotificationLog(
     booking_id: row.booking_id,
   })
   return { ok: false, message: error.message, code: error.code ?? undefined }
+}
+
+function isMissingErrorMessageColumn(message: string): boolean {
+  const m = message.toLowerCase()
+  return m.includes("error_message") && (m.includes("does not exist") || m.includes("schema cache"))
 }
