@@ -261,7 +261,9 @@ function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean 
   })()
   if (filter === "sent") return c === "sent"
   if (filter === "scheduled") return entry.kind === "planned" && c === "scheduled"
-  if (filter === "skipped") return isMissingContactSkip
+  if (filter === "skipped") {
+    return c === "skipped" || c === "not_configured" || isMissingContactSkip
+  }
   return true
 }
 
@@ -394,6 +396,19 @@ function plannedAtIso(entry: { row: PlannedReminderRow; reminderType: "reminder_
   return Number.isNaN(startMs) ? startIso : new Date(startMs - 60 * 60 * 1000).toISOString()
 }
 
+function humanizeSkipReason(raw: string): string {
+  switch (raw.trim()) {
+    case "template_disabled":
+      return "Szablon wyłączony dla tego kanału"
+    case "booking_cancelled":
+      return "Wizyta anulowana przed wysyłką"
+    case "Missing client contact details":
+      return "Brak danych kontaktowych klienta"
+    default:
+      return raw
+  }
+}
+
 function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string | null {
   if (entry.kind === "planned") return null
   if (entry.kind === "db") {
@@ -403,7 +418,8 @@ function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string
       st === "skipped" ||
       st === "not_configured"
     ) {
-      return entry.row.error_message?.trim() || null
+      const raw = entry.row.error_message?.trim()
+      return raw ? humanizeSkipReason(raw) : null
     }
     return null
   }

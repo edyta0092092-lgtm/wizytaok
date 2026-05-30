@@ -287,6 +287,20 @@ async function processSingleReminder(
   const wantEmail = (ch === "email" || ch === "both") && runtime.emailEnabled
   const wantSms = (ch === "sms" || ch === "both") && runtime.smsEnabled
   if (!wantEmail && !wantSms) {
+    await insertNotificationLog(admin, {
+      business_id: row.business_id,
+      booking_id: row.id,
+      channel: hasEmail ? "email" : "sms",
+      type,
+      status: "skipped",
+      recipient: hasEmail ? row.client_email!.trim() : hasPhone ? row.client_phone!.trim() : null,
+      subject: message.subject,
+      body: hasEmail ? message.text : message.sms,
+      provider: null,
+      provider_message_id: null,
+      error: "template_disabled",
+      sent_at: nowIso,
+    })
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "template_disabled", false)
     return "skipped"
   }
@@ -299,6 +313,20 @@ async function processSingleReminder(
     .eq("id", row.id)
     .maybeSingle()
   if ((currentBooking?.status ?? "") === "cancelled") {
+    await insertNotificationLog(admin, {
+      business_id: row.business_id,
+      booking_id: row.id,
+      channel: hasEmail ? "email" : "sms",
+      type,
+      status: "skipped",
+      recipient: hasEmail ? row.client_email!.trim() : hasPhone ? row.client_phone!.trim() : null,
+      subject: message.subject,
+      body: hasEmail ? message.text : message.sms,
+      provider: null,
+      provider_message_id: null,
+      error: "booking_cancelled",
+      sent_at: nowIso,
+    })
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "booking_cancelled", false)
     return "skipped"
   }
