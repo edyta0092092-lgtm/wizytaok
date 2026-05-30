@@ -12,11 +12,12 @@ import { useOpenManualAppointmentCreateSheet } from "@/lib/appointments/use-open
 export function useManualAppointmentCreateSheet(input: {
   businessId: string | null
   hasActiveTeamMembers: boolean
+  language?: "pl" | "en"
   t: (key: string) => string
   setActionNotice: (v: string) => void
   setShowAdded: (v: boolean) => void
 }) {
-  const { businessId, hasActiveTeamMembers, t, setActionNotice, setShowAdded } = input
+  const { businessId, hasActiveTeamMembers, language = "pl", t, setActionNotice, setShowAdded } = input
 
   const [sheetOpen, setSheetOpen] = React.useState(false)
   const [isSaving, setIsSaving] = React.useState(false)
@@ -49,6 +50,7 @@ export function useManualAppointmentCreateSheet(input: {
     selectedService: selectedServiceForManual,
     manualStaffForService,
     hasActiveTeamMembers,
+    language,
     t,
     setActionNotice,
     setIsSaving,

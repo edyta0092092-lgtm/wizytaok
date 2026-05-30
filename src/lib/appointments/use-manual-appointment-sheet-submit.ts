@@ -27,6 +27,7 @@ export type UseManualAppointmentSheetSubmitParams = {
   selectedService: Service | null
   manualStaffForService: StaffMember[]
   hasActiveTeamMembers: boolean
+  language?: "pl" | "en"
   t: (key: string) => string
   setActionNotice: (v: string) => void
   setIsSaving: (v: boolean) => void
@@ -43,6 +44,7 @@ export function useManualAppointmentSheetSubmit(
     selectedService,
     manualStaffForService,
     hasActiveTeamMembers,
+    language,
     t,
     setActionNotice,
     setIsSaving,
@@ -62,6 +64,7 @@ export function useManualAppointmentSheetSubmit(
             selectedService,
             manualStaffForService,
             hasActiveTeamMembers,
+            language,
           })
           if (!result.ok) {
             setActionNotice(failureReasonToMessage(result.reason, t))
@@ -82,6 +85,7 @@ export function useManualAppointmentSheetSubmit(
       selectedService,
       manualStaffForService,
       hasActiveTeamMembers,
+      language,
       t,
       setActionNotice,
       setIsSaving,

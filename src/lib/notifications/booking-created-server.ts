@@ -104,6 +104,13 @@ function formatProviderFailure(code: string, detail?: string): string {
   return d || c || "send_failed"
 }
 
+function mapProviderLogStatus(ok: boolean, code?: string): string {
+  if (ok) return "sent"
+  const c = (code ?? "").trim()
+  if (c === "simulated_dev" || c === "not_configured" || c === "skipped") return c
+  return "failed"
+}
+
 function smsEnvDiagnostics(): Record<string, unknown> {
   const provider = getActiveSmsReminderProvider()
   return {
@@ -241,7 +248,8 @@ async function claimChannelSend(
       booking_id: booking.id,
       channel,
     })
-    return "in_flight"
+    // Wysyłamy mimo błędu logu — finalize/insert po wysyłce spróbuje zapisać ponownie.
+    return "claimed"
   }
 
   const { data } = await admin
@@ -480,6 +488,24 @@ export async function sendBookingCreatedNotifications(
     }
   } else if (!email) {
     emailResult = channelDetail("missing")
+    await insertNotificationLog(
+      admin,
+      {
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        channel: "email",
+        type: "booking_created",
+        recipient: "",
+        status: "skipped",
+        subject: null,
+        body: null,
+        provider: null,
+        provider_message_id: null,
+        error: "missing_email",
+        sent_at: null,
+      },
+      "[booking-created.notify.log]",
+    )
   } else {
     const claim = await claimChannelSend(admin, booking, "email", email)
     if (claim !== "claimed") {
@@ -492,7 +518,7 @@ export async function sendBookingCreatedNotifications(
           textBody: messages.emailText,
           htmlBody: messages.emailHtml,
         })
-        const logStatus = sent.ok ? "sent" : "failed"
+        const logStatus = mapProviderLogStatus(sent.ok, sent.ok ? undefined : sent.code)
         const errorMessage = sent.ok ? null : formatProviderFailure(sent.code, sent.error)
         emailResult = sent.ok
           ? channelDetail("sent", { provider: sent.provider })
@@ -556,6 +582,24 @@ export async function sendBookingCreatedNotifications(
     }
   } else if (!phone) {
     smsResult = channelDetail("missing")
+    await insertNotificationLog(
+      admin,
+      {
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        channel: "sms",
+        type: "booking_created",
+        recipient: "",
+        status: "skipped",
+        subject: null,
+        body: null,
+        provider: null,
+        provider_message_id: null,
+        error: "missing_phone",
+        sent_at: null,
+      },
+      "[booking-created.notify.log]",
+    )
   } else {
     const claim = await claimChannelSend(admin, booking, "sms", phone)
     if (claim !== "claimed") {
@@ -563,7 +607,7 @@ export async function sendBookingCreatedNotifications(
     } else {
       try {
         const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
-        const logStatus = sent.ok ? "sent" : "failed"
+        const logStatus = mapProviderLogStatus(sent.ok, sent.ok ? undefined : sent.code)
         const errorMessage = sent.ok ? null : formatProviderFailure(sent.code, sent.error)
         smsResult = sent.ok
           ? channelDetail("sent", { provider: sent.provider })

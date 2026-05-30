@@ -1,5 +1,6 @@
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
 import { manualAppointmentFormPhoneE164 } from "@/lib/appointments/can-submit-manual-appointment"
+import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import { createOnlineBooking, updateBooking } from "@/lib/bookings/bookings-store"
 import { MANUAL_BOOKING_ANY_STAFF, resolveManualBookingStaffSelection } from "@/lib/bookings/manual-booking-staff"
 import { saveManualAppointment, type ManualAppointment } from "@/lib/appointments/manual-appointments"
@@ -27,8 +28,9 @@ export async function submitManualAppointmentSheet(input: {
   selectedService: Service | null
   manualStaffForService: StaffMember[]
   hasActiveTeamMembers: boolean
+  language?: "pl" | "en"
 }): Promise<SubmitManualSheetResult> {
-  const { businessId, form, selectedService: svc, manualStaffForService, hasActiveTeamMembers } = input
+  const { businessId, form, selectedService: svc, manualStaffForService, hasActiveTeamMembers, language = "pl" } = input
   const clientName = [form.clientFirstName.trim(), form.clientLastName.trim()].filter(Boolean).join(" ")
 
   if (!form.date.trim() || !form.time.trim()) {
@@ -122,6 +124,19 @@ export async function submitManualAppointmentSheet(input: {
     const patched = await updateBooking(client, bid, created.id, patch)
     if (!patched.ok) {
       return { ok: false, reason: { code: "create_failed", error: "other" } }
+    }
+    if (created.confirmationToken) {
+      try {
+        const notifyResult = await notifyBookingCreatedViaApi(created.confirmationToken, language)
+        if (
+          notifyResult.email.status === "failed" ||
+          notifyResult.sms.status === "failed"
+        ) {
+          console.error("[manual-appointment.notify]", notifyResult)
+        }
+      } catch (err) {
+        console.error("[manual-appointment.notify]", err)
+      }
     }
     return { ok: true }
   }

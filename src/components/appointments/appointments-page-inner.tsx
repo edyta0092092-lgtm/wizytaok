@@ -6,6 +6,8 @@ import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
+import { ManualAppointmentSheet } from "@/components/appointments/manual-appointment-sheet"
+import { Button } from "@/components/ui/button"
 import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
 import {
   APPOINTMENTS_PANEL_DISMISSED_EVENT,
@@ -20,8 +22,7 @@ import { useStaffByServiceCacheForAppointments } from "@/lib/appointments/use-st
 import { useAppointmentsTransientBanners } from "@/lib/appointments/use-appointments-transient-banners"
 import { useAppointmentsDeleteFlow } from "@/lib/appointments/use-appointments-delete-flow"
 import { useAppointmentsPageListController } from "@/lib/appointments/use-appointments-page-list-controller"
-import { EMPTY_MANUAL_APPOINTMENT_FORM } from "@/lib/appointments/manual-appointment-form-defaults"
-import { useManualAppointmentSheetData } from "@/lib/appointments/use-manual-appointment-sheet-data"
+import { useManualAppointmentCreateSheet } from "@/lib/appointments/use-manual-appointment-create-sheet"
 import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -78,14 +79,27 @@ export function AppointmentsPageInner() {
   )
 
   const uiLang = appointmentsUiLanguage(language)
-  const [, setManualFormStub] = React.useState(EMPTY_MANUAL_APPOINTMENT_FORM)
-  const { manualServiceOptions } = useManualAppointmentSheetData(
+  const [, setShowAddedBanner] = React.useState(false)
+  const {
+    sheetOpen,
+    setSheetOpen,
+    form: manualForm,
+    setForm: setManualForm,
+    isSaving: isSavingManualAppointment,
+    manualServiceOptions,
+    manualStaffForService,
+    manualAvailableStaffIds,
+    canSubmitManual,
+    openCreate: openManualAppointmentCreate,
+    saveManual,
+  } = useManualAppointmentCreateSheet({
     businessId,
-    "",
-    "",
-    "",
-    setManualFormStub,
-  )
+    hasActiveTeamMembers,
+    language: uiLang,
+    t,
+    setActionNotice,
+    setShowAdded: setShowAddedBanner,
+  })
 
   const {
     setConfirmDeleteAppointmentId,
@@ -200,7 +214,15 @@ export function AppointmentsPageInner() {
   })
 
   return (
-    <AppShell title={t("navigation.appointments")} pageDescription={t("appointments.description")}>
+    <AppShell
+      title={t("navigation.appointments")}
+      pageDescription={t("appointments.description")}
+      primaryAction={
+        <Button type="button" size="sm" className="h-9 rounded-xl" onClick={openManualAppointmentCreate}>
+          {t("common.addAppointment")}
+        </Button>
+      }
+    >
       <PageShell>
         <AppointmentsPageBanners actionNotice={actionNotice} />
         <AppointmentsFiltersAndListSection
@@ -208,6 +230,20 @@ export function AppointmentsPageInner() {
           list={appointmentsListBundles}
         />
       </PageShell>
+      <ManualAppointmentSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        form={manualForm}
+        setForm={setManualForm}
+        manualServiceOptions={manualServiceOptions}
+        manualStaffForService={manualStaffForService}
+        manualAvailableStaffIds={manualAvailableStaffIds}
+        hasActiveTeamMembers={hasActiveTeamMembers}
+        canSubmitManualAppointment={canSubmitManual}
+        isSaving={isSavingManualAppointment}
+        language={uiLang}
+        onSubmit={saveManual}
+      />
     </AppShell>
   )
 }
