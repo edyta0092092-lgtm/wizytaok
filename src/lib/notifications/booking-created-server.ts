@@ -234,7 +234,15 @@ async function claimChannelSend(
   })
   if (!ins.error) return "claimed"
   // 23505 = naruszenie unikalnego indeksu → wiersz już istnieje.
-  if (ins.error.code !== "23505") return "claimed"
+  if (ins.error.code !== "23505") {
+    console.error("[booking-created.notify.log] claim_insert_failed", {
+      code: ins.error.code,
+      message: ins.error.message,
+      booking_id: booking.id,
+      channel,
+    })
+    return "in_flight"
+  }
 
   const { data } = await admin
     .from("notification_logs")

@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server"
 
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import { notifyBookingConfirmedForBooking } from "@/lib/notifications/booking-confirmed-server"
+import { notifyBookingCancelledByCompany } from "@/lib/notifications/booking-cancelled-by-company-server"
 import {
   dispatchCustomTemplatesForEvent,
   type CustomTemplateEventKey,
 } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
+import type { Tables } from "@/types/database"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -13,6 +16,7 @@ export const runtime = "nodejs"
 type Body = {
   bookingId?: string
   status?: string
+  language?: "pl" | "en"
 }
 
 const STATUS_TO_EVENT: Record<string, CustomTemplateEventKey> = {
@@ -23,8 +27,8 @@ const STATUS_TO_EVENT: Record<string, CustomTemplateEventKey> = {
 }
 
 /**
- * Wyzwala własne szablony typu „zdarzenie" po zmianie statusu wizyty z panelu.
- * Status jest już ustawiony po stronie klienta — tu tylko ewentualne powiadomienia.
+ * Po zmianie statusu wizyty z panelu: standardowe powiadomienie (SMS/e-mail + log)
+ * oraz własne szablony typu „zdarzenie".
  */
 export async function POST(req: Request) {
   let body: Body
@@ -57,10 +61,63 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 })
   }
 
+  const { data: bookingRow, error: bookingErr } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingUuid)
+    .maybeSingle()
+  if (bookingErr || !bookingRow) {
+    return NextResponse.json({ ok: false, error: "booking_not_found" }, { status: 404 })
+  }
+  const booking = bookingRow as Tables<"bookings">
+
+  const { data: profile, error: profErr } = await supabase
+    .from("business_profiles")
+    .select("id, slug, phone, contact_phone, business_name, business_address")
+    .eq("id", booking.business_id)
+    .maybeSingle()
+  if (profErr || !profile) {
+    return NextResponse.json({ ok: true, notice: "skipped" as const, reason: "no_business" })
+  }
+
+  const language = body.language === "en" ? "en" : "pl"
+  let standardNotice: string | null = null
+
   try {
-    const result = await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey })
-    return NextResponse.json({ ok: true, ...result })
+    if (eventKey === "confirmed" && booking.status === "confirmed") {
+      const result = await notifyBookingConfirmedForBooking({
+        booking,
+        business: profile,
+        language,
+      })
+      standardNotice = result.email === "sent" || result.sms === "sent" ? "sent" : "queued"
+      return NextResponse.json({ ok: true, standardNotice })
+    }
+    if (eventKey === "cancelled" && booking.status === "cancelled") {
+      const { notice } = await notifyBookingCancelledByCompany({
+        booking,
+        business: profile,
+        language,
+      })
+      standardNotice = notice
+    }
   } catch {
-    return NextResponse.json({ ok: true, notice: "skipped" as const, reason: "dispatch_error" })
+    standardNotice = "skipped"
+  }
+
+  try {
+    const custom = await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey })
+    return NextResponse.json({
+      ok: true,
+      standardNotice,
+      customTemplates: custom,
+    })
+  } catch {
+    return NextResponse.json({
+      ok: true,
+      standardNotice: standardNotice ?? "skipped",
+      notice: "skipped" as const,
+      reason: "dispatch_error",
+    })
   }
 }

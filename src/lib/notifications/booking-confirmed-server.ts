@@ -5,7 +5,7 @@ import { sendReminderSms } from "@/lib/notifications/sms"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
-import type { TablesInsert } from "@/types/database"
+import type { Tables, TablesInsert } from "@/types/database"
 
 type BookingPayload = {
   id: string
@@ -182,6 +182,49 @@ export async function confirmBookingAndNotify(
     businessRaw && typeof businessRaw === "object"
       ? (businessRaw as BusinessProfileRow)
       : null
+
+  const { sms, email } = await sendBookingConfirmedNotifications(admin, booking, business, language)
+
+  return { ok: true, sms, email }
+}
+
+function bookingPayloadFromRow(row: Tables<"bookings">): BookingPayload {
+  return {
+    id: String(row.id),
+    business_id: String(row.business_id),
+    confirmation_token: String(row.confirmation_token ?? row.id),
+    business_slug: "",
+    service_name: String(row.service_name ?? ""),
+    appointment_date: String(row.appointment_date),
+    appointment_time: String(row.appointment_time),
+    client_name: String(row.client_name ?? ""),
+    client_phone: typeof row.client_phone === "string" ? row.client_phone : null,
+    client_email: typeof row.client_email === "string" ? row.client_email : null,
+  }
+}
+
+/** Potwierdzenie wizyty z panelu (status już ustawiony) — wysyłka + log. */
+export async function notifyBookingConfirmedForBooking(args: {
+  booking: Tables<"bookings">
+  business: BusinessProfileRow
+  language: "pl" | "en"
+}): Promise<{ sms: string; email: string }> {
+  const admin = getServiceRoleClient()
+  if (!admin) return { sms: "failed", email: "failed" }
+  return sendBookingConfirmedNotifications(
+    admin,
+    bookingPayloadFromRow(args.booking),
+    args.business,
+    args.language,
+  )
+}
+
+async function sendBookingConfirmedNotifications(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  booking: BookingPayload,
+  business: BusinessProfileRow | null,
+  language: "pl" | "en",
+): Promise<{ sms: string; email: string }> {
   const businessAddress = (business?.business_address ?? "").trim()
 
   const confirmUrl = `${getPublicAppOrigin()}/confirm/${encodeURIComponent(booking.confirmation_token || booking.id)}`
@@ -268,5 +311,5 @@ export async function confirmBookingAndNotify(
     // brak wpływu na wynik potwierdzenia
   }
 
-  return { ok: true, sms: smsStatus, email: emailStatus }
+  return { sms: smsStatus, email: emailStatus }
 }

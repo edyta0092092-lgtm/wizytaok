@@ -37,11 +37,26 @@ type TypeFilter = "all" | string
 type MergedEntry =
   | { kind: "db"; sortAt: string; row: NotificationLogRow }
   | { kind: "planned"; sortAt: string; row: PlannedReminderRow; channel: "sms" | "email"; reminderType: "reminder_24h" | "reminder_before_visit" }
+  | {
+      kind: "reminderOutcome"
+      sortAt: string
+      row: PlannedReminderRow
+      channel: "sms" | "email"
+      reminderType: "reminder_24h" | "reminder_before_visit"
+      outcomeStatus: string
+    }
   | { kind: "local"; sortAt: string; msg: NotificationMessage }
 
 type PreviewTarget =
   | { kind: "db"; row: NotificationLogRow }
   | { kind: "planned"; row: PlannedReminderRow; channel: "sms" | "email"; reminderType: "reminder_24h" | "reminder_before_visit" }
+  | {
+      kind: "reminderOutcome"
+      row: PlannedReminderRow
+      channel: "sms" | "email"
+      reminderType: "reminder_24h" | "reminder_before_visit"
+      outcomeStatus: string
+    }
   | { kind: "local"; msg: NotificationMessage }
 
 type PlannedReminderRow = {
@@ -128,12 +143,45 @@ function typeLabel(canonicalType: string, t: (key: string) => string): string {
   return canonicalType
 }
 
+function buildLogDedupKeys(rows: NotificationLogRow[]): Set<string> {
+  const keys = new Set<string>()
+  for (const row of rows) {
+    if (!row.booking_id) continue
+    const type = canonicalNotificationType(String(row.type ?? "").trim())
+    keys.add(`${row.booking_id}:${type}:${dbChannel(row)}`)
+  }
+  return keys
+}
+
+function normalizeOutcomeStatus(raw: string | null | undefined, hasSentAt: boolean): string {
+  const s = String(raw ?? "").trim().toLowerCase()
+  if (s === "sent") return "sent"
+  if (s === "skipped") return "skipped"
+  if (s === "failed") return "failed"
+  if (s === "not_configured") return "not_configured"
+  if (s === "simulated_dev" || s === "simulated") return "simulated_dev"
+  if (hasSentAt) return "sent"
+  return s || "pending"
+}
+
+function mergeBookingReminderRows(
+  active: PlannedReminderRow[],
+  history: PlannedReminderRow[],
+): PlannedReminderRow[] {
+  const byId = new Map<string, PlannedReminderRow>()
+  for (const row of [...active, ...history]) {
+    byId.set(row.id, row)
+  }
+  return Array.from(byId.values())
+}
+
 function mergeEntries(
   rows: NotificationLogRow[],
   local: NotificationMessage[],
   planned: PlannedReminderRow[]
 ): MergedEntry[] {
   const out: MergedEntry[] = []
+  const logKeys = buildLogDedupKeys(rows)
   for (const row of rows) {
     out.push({ kind: "db", sortAt: row.created_at, row })
   }
@@ -200,6 +248,66 @@ function mergeEntries(
         })
       }
     }
+    if (!firstPending) {
+      const sortAt = row.first_reminder_sent_at?.trim() || firstDue
+      const outcomeStatus = normalizeOutcomeStatus(row.first_reminder_status, Boolean(row.first_reminder_sent_at))
+      if (row.client_email?.trim()) {
+        const key = `${row.id}:reminder_24h:email`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "reminderOutcome",
+            sortAt,
+            row,
+            channel: "email",
+            reminderType: "reminder_24h",
+            outcomeStatus,
+          })
+        }
+      }
+      if (row.client_phone?.trim()) {
+        const key = `${row.id}:reminder_24h:sms`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "reminderOutcome",
+            sortAt,
+            row,
+            channel: "sms",
+            reminderType: "reminder_24h",
+            outcomeStatus,
+          })
+        }
+      }
+    }
+    if (!secondPending) {
+      const sortAt = row.second_reminder_sent_at?.trim() || secondDue
+      const outcomeStatus = normalizeOutcomeStatus(row.second_reminder_status, Boolean(row.second_reminder_sent_at))
+      if (row.client_email?.trim()) {
+        const key = `${row.id}:reminder_before_visit:email`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "reminderOutcome",
+            sortAt,
+            row,
+            channel: "email",
+            reminderType: "reminder_before_visit",
+            outcomeStatus,
+          })
+        }
+      }
+      if (row.client_phone?.trim()) {
+        const key = `${row.id}:reminder_before_visit:sms`
+        if (!logKeys.has(key)) {
+          out.push({
+            kind: "reminderOutcome",
+            sortAt,
+            row,
+            channel: "sms",
+            reminderType: "reminder_before_visit",
+            outcomeStatus,
+          })
+        }
+      }
+    }
   }
   for (const msg of local) {
     out.push({ kind: "local", sortAt: msg.createdAt, msg })
@@ -213,6 +321,7 @@ function mergeEntries(
 
 function canonicalStatus(entry: MergedEntry): string {
   if (entry.kind === "planned") return "scheduled"
+  if (entry.kind === "reminderOutcome") return entry.outcomeStatus
   if (entry.kind === "db") {
     return entry.row.status.trim().toLowerCase()
   }
@@ -274,12 +383,12 @@ function listTypeLine(
   const rawType =
     entry.kind === "db"
       ? String(entry.row.type ?? "").trim()
-      : entry.kind === "planned"
+      : entry.kind === "planned" || entry.kind === "reminderOutcome"
         ? entry.reminderType
       : entry.msg.type
   const type = canonicalNotificationType(rawType)
   const channel =
-    entry.kind === "db" ? dbChannel(entry.row) : entry.kind === "planned" ? entry.channel : entry.msg.channel
+    entry.kind === "db" ? dbChannel(entry.row) : entry.kind === "planned" || entry.kind === "reminderOutcome" ? entry.channel : entry.msg.channel
 
   if (rawType === "manual_reminder") {
     return channel === "email"
@@ -298,6 +407,20 @@ function previewAsMerged(p: PreviewTarget): MergedEntry {
   }
   if (p.kind === "planned") {
     return { kind: "planned", sortAt: p.row.first_reminder_due_at ?? p.row.appointment_date, row: p.row, channel: p.channel, reminderType: p.reminderType }
+  }
+  if (p.kind === "reminderOutcome") {
+    const sortAt =
+      p.reminderType === "reminder_24h"
+        ? p.row.first_reminder_sent_at ?? p.row.first_reminder_due_at ?? p.row.appointment_date
+        : p.row.second_reminder_sent_at ?? p.row.second_reminder_due_at ?? p.row.appointment_date
+    return {
+      kind: "reminderOutcome",
+      sortAt,
+      row: p.row,
+      channel: p.channel,
+      reminderType: p.reminderType,
+      outcomeStatus: p.outcomeStatus,
+    }
   }
   return { kind: "local", sortAt: p.msg.createdAt, msg: p.msg }
 }
@@ -358,7 +481,7 @@ function recipientDisplay(entry: PreviewTarget): string {
     if (bits.length) return bits.join(" · ")
     return "-"
   }
-  if (entry.kind === "planned") {
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") {
     const v = entry.channel === "email" ? entry.row.client_email : entry.row.client_phone
     return v?.trim() || "-"
   }
@@ -366,7 +489,7 @@ function recipientDisplay(entry: PreviewTarget): string {
 }
 
 function bodyForPreview(entry: PreviewTarget): string | null {
-  if (entry.kind === "planned") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
   if (entry.kind === "db") {
     const b = entry.row.body?.trim()
     return b || null
@@ -376,7 +499,7 @@ function bodyForPreview(entry: PreviewTarget): string | null {
 }
 
 function subjectForPreview(entry: PreviewTarget): string | null {
-  if (entry.kind === "planned") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
   if (entry.kind === "db") {
     const s = entry.row.subject?.trim()
     return s || null
@@ -410,7 +533,7 @@ function humanizeSkipReason(raw: string): string {
 }
 
 function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string | null {
-  if (entry.kind === "planned") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
     if (
@@ -620,6 +743,24 @@ export function SendingHistorySection() {
         }
       }
 
+      if (!plannedError) {
+        const { data: historyData, error: historyErr } = await client
+          .from("bookings")
+          .select(
+            "id,client_name,client_phone,client_email,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
+          )
+          .eq("business_id", bid)
+          .or("first_reminder_sent_at.not.is.null,second_reminder_sent_at.not.is.null")
+          .order("updated_at", { ascending: false })
+          .limit(200)
+        if (!historyErr) {
+          plannedRowsResolved = mergeBookingReminderRows(
+            plannedRowsResolved,
+            (historyData ?? []) as PlannedReminderRow[],
+          )
+        }
+      }
+
       if (cancelled) return
       if (qErr) {
         setLoadError(qErr.message)
@@ -698,7 +839,7 @@ export function SendingHistorySection() {
       const raw =
         entry.kind === "db"
           ? String(entry.row.type ?? "").trim()
-          : entry.kind === "planned"
+          : entry.kind === "planned" || entry.kind === "reminderOutcome"
             ? entry.reminderType
             : String(entry.msg.type ?? "").trim()
       return canonicalNotificationType(raw)
@@ -724,7 +865,7 @@ export function SendingHistorySection() {
       .filter((e) => entryMatchesFilter(e, filter))
       .filter((e) => {
         if (channelFilter === "all") return true
-        const c = e.kind === "db" ? dbChannel(e.row) : e.kind === "planned" ? e.channel : e.msg.channel
+        const c = e.kind === "db" ? dbChannel(e.row) : e.kind === "planned" || e.kind === "reminderOutcome" ? e.channel : e.msg.channel
         return c === channelFilter
       })
       .filter((e) => {
@@ -736,7 +877,7 @@ export function SendingHistorySection() {
         const resolvedType =
           e.kind === "db"
             ? String(e.row.type ?? "").trim()
-            : e.kind === "planned"
+            : e.kind === "planned" || e.kind === "reminderOutcome"
               ? e.reminderType
               : String(e.msg.type)
         return canonicalNotificationType(resolvedType) === typeFilter
@@ -773,7 +914,7 @@ export function SendingHistorySection() {
   const bookingIdForPreview =
     preview?.kind === "db"
       ? preview.row.booking_id
-      : preview?.kind === "planned"
+      : preview?.kind === "planned" || preview?.kind === "reminderOutcome"
         ? preview.row.id
       : preview?.kind === "local"
         ? preview.msg.bookingId
@@ -955,6 +1096,8 @@ export function SendingHistorySection() {
                     ? `db:${entry.row.id}`
                     : entry.kind === "planned"
                       ? `planned:${entry.row.id}:${entry.reminderType}:${entry.channel}`
+                      : entry.kind === "reminderOutcome"
+                        ? `outcome:${entry.row.id}:${entry.reminderType}:${entry.channel}`
                       : `local:${entry.msg.id}`
                 const canon = canonicalStatus(entry)
                 return (
@@ -990,6 +1133,14 @@ export function SendingHistorySection() {
                               ? { kind: "db", row: entry.row }
                               : entry.kind === "planned"
                                 ? { kind: "planned", row: entry.row, channel: entry.channel, reminderType: entry.reminderType }
+                                : entry.kind === "reminderOutcome"
+                                  ? {
+                                      kind: "reminderOutcome",
+                                      row: entry.row,
+                                      channel: entry.channel,
+                                      reminderType: entry.reminderType,
+                                      outcomeStatus: entry.outcomeStatus,
+                                    }
                               : { kind: "local", msg: entry.msg }
                           )
                         }}
@@ -1046,7 +1197,7 @@ export function SendingHistorySection() {
                     <dd className="mt-0.5 text-foreground">
                       {(preview.kind === "db"
                         ? dbChannel(preview.row)
-                        : preview.kind === "planned"
+                        : preview.kind === "planned" || preview.kind === "reminderOutcome"
                           ? preview.channel
                         : preview.msg.channel) === "email"
                         ? t("messages.email")
@@ -1060,7 +1211,7 @@ export function SendingHistorySection() {
                     <dd className="mt-0.5 text-foreground">
                       {preview.kind === "local"
                         ? preview.msg.recipientName || "-"
-                        : preview.kind === "planned"
+                        : preview.kind === "planned" || preview.kind === "reminderOutcome"
                           ? preview.row.client_name || "-"
                           : preview.kind === "db" &&
                               (!preview.row.booking_id ||
@@ -1094,6 +1245,13 @@ export function SendingHistorySection() {
                         ? safeFormatDate(preview.row.created_at, dateFmt)
                         : preview.kind === "planned"
                           ? safeFormatDate(plannedAtIso(preview), dateFmt)
+                        : preview.kind === "reminderOutcome"
+                          ? safeFormatDate(
+                              preview.reminderType === "reminder_24h"
+                                ? preview.row.first_reminder_sent_at ?? preview.row.first_reminder_due_at
+                                : preview.row.second_reminder_sent_at ?? preview.row.second_reminder_due_at,
+                              dateFmt,
+                            )
                         : safeFormatDate(preview.msg.createdAt, dateFmt)}
                     </dd>
                   </div>
@@ -1106,6 +1264,13 @@ export function SendingHistorySection() {
                         ? safeFormatDate(preview.row.sent_at, dateFmt)
                         : preview.kind === "planned"
                           ? safeFormatDate(plannedAtIso(preview), dateFmt)
+                        : preview.kind === "reminderOutcome"
+                          ? safeFormatDate(
+                              preview.reminderType === "reminder_24h"
+                                ? preview.row.first_reminder_sent_at
+                                : preview.row.second_reminder_sent_at,
+                              dateFmt,
+                            )
                         : preview.msg.sentAt
                           ? safeFormatDate(preview.msg.sentAt, dateFmt)
                           : safeFormatDate(preview.msg.scheduledFor, dateFmt)}
