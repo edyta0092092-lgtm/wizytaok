@@ -136,7 +136,7 @@ function canonicalNotificationType(raw: string): string {
 function typeLabel(canonicalType: string, t: (key: string) => string): string {
   if (canonicalType === "reminder_24h") return t("notifications.reminder24hType")
   if (canonicalType === "reminder_before_visit") return t("notifications.secondReminderType")
-  if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmedType")
+  if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmationType")
   if (canonicalType === "booking_cancelled_by_company") return "Anulowanie wizyty"
   if (canonicalType === "no_show_follow_up") return "Follow-up po nieobecności"
   if (canonicalType === "integration_test") return t("messagesLog.integrationTestLine")
@@ -183,7 +183,7 @@ function mergeEntries(
   const out: MergedEntry[] = []
   const logKeys = buildLogDedupKeys(rows)
   for (const row of rows) {
-    out.push({ kind: "db", sortAt: row.created_at, row })
+    out.push({ kind: "db", sortAt: row.sent_at ?? row.created_at, row })
   }
   for (const row of planned) {
     const startIso = `${row.appointment_date}T${String(row.appointment_time).slice(0, 5)}:00`
@@ -323,7 +323,17 @@ function canonicalStatus(entry: MergedEntry): string {
   if (entry.kind === "planned") return "scheduled"
   if (entry.kind === "reminderOutcome") return entry.outcomeStatus
   if (entry.kind === "db") {
-    return entry.row.status.trim().toLowerCase()
+    const st = entry.row.status.trim().toLowerCase()
+    if (st === "sent") return "sent"
+    if (
+      entry.row.sent_at?.trim() &&
+      st !== "failed" &&
+      st !== "skipped" &&
+      st !== "not_configured"
+    ) {
+      return "sent"
+    }
+    return st
   }
   if (entry.msg.status === "simulated") return "simulated_dev"
   return entry.msg.status
@@ -618,10 +628,16 @@ export function SendingHistorySection() {
         setLocalMessages(getNotificationMessages())
       })
     }
+    function refreshDb() {
+      historyLoadedRef.current = false
+      setLogRefreshTick((n) => n + 1)
+    }
     refresh()
     window.addEventListener("pw-notification-messages", refresh)
+    window.addEventListener("pw-bookings", refreshDb)
     return () => {
       window.removeEventListener("pw-notification-messages", refresh)
+      window.removeEventListener("pw-bookings", refreshDb)
     }
   }, [])
 

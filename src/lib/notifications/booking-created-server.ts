@@ -277,6 +277,7 @@ async function finalizeChannelLog(
   admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
   booking: BookingRow,
   channel: "email" | "sms",
+  recipient: string,
   patch: {
     status: string
     subject: string | null
@@ -287,7 +288,7 @@ async function finalizeChannelLog(
     sent_at?: string | null
   },
 ): Promise<void> {
-  const { error } = await admin
+  const { data, error } = await admin
     .from("notification_logs")
     .update({
       status: patch.status,
@@ -301,8 +302,37 @@ async function finalizeChannelLog(
     .eq("booking_id", booking.id)
     .eq("type", "booking_created")
     .eq("channel", channel)
+    .select("id")
+    .maybeSingle()
   if (error) {
     console.error("[booking-created.notify.log] finalize_failed", { channel, message: error.message })
+    return
+  }
+  if (data?.id) return
+
+  const inserted = await insertNotificationLog(
+    admin,
+    {
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      channel,
+      type: "booking_created",
+      recipient,
+      status: patch.status,
+      subject: patch.subject,
+      body: patch.body,
+      provider: patch.provider ?? null,
+      provider_message_id: patch.provider_message_id ?? null,
+      error_message: patch.error_message ?? null,
+      sent_at: patch.sent_at ?? null,
+    },
+    "[booking-created.notify.log]",
+  )
+  if (!inserted.ok) {
+    console.error("[booking-created.notify.log] finalize_insert_failed", {
+      channel,
+      message: inserted.message,
+    })
   }
 }
 
@@ -528,7 +558,7 @@ export async function sendBookingCreatedNotifications(
               provider: "resend",
             })
 
-        await finalizeChannelLog(admin, booking, "email", {
+        await finalizeChannelLog(admin, booking, "email", email, {
           status: logStatus,
           subject: messages.emailSubject,
           body: messages.emailText,
@@ -544,7 +574,7 @@ export async function sendBookingCreatedNotifications(
         const errMsg = err instanceof Error ? err.message : "unknown_error"
         console.error("[booking-created.notify.email]", errMsg)
         emailResult = channelDetail("failed", { error_message: errMsg })
-        await finalizeChannelLog(admin, booking, "email", {
+        await finalizeChannelLog(admin, booking, "email", email, {
           status: "failed",
           subject: messages.emailSubject,
           body: messages.emailText,
@@ -617,7 +647,7 @@ export async function sendBookingCreatedNotifications(
               provider: smsProvider,
             })
 
-        await finalizeChannelLog(admin, booking, "sms", {
+        await finalizeChannelLog(admin, booking, "sms", phone, {
           status: logStatus,
           subject: null,
           body: messages.sms,
@@ -645,7 +675,7 @@ export async function sendBookingCreatedNotifications(
           error_message: errMsg,
           provider: smsProvider,
         })
-        await finalizeChannelLog(admin, booking, "sms", {
+        await finalizeChannelLog(admin, booking, "sms", phone, {
           status: "failed",
           subject: null,
           body: messages.sms,
