@@ -1,13 +1,11 @@
 import type {
   BookingCreatedChannelDetail,
   BookingCreatedChannelStatus,
+  BookingCreatedNotifyResult,
 } from "@/lib/notifications/booking-created-server"
+import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
 
-export type BookingCreatedNotifyApiResult = {
-  ok: boolean
-  email: BookingCreatedChannelDetail
-  sms: BookingCreatedChannelDetail
-}
+export type BookingCreatedNotifyApiResult = BookingCreatedNotifyResult
 
 function isChannelStatus(value: unknown): value is BookingCreatedChannelStatus {
   return (
@@ -72,17 +70,14 @@ function parseNotifyResponse(json: Record<string, unknown>): BookingCreatedNotif
 }
 
 function channelDone(detail: BookingCreatedChannelDetail): boolean {
-  return (
-    detail.status === "sent" ||
-    detail.status === "already_sent" ||
-    detail.status === "skipped"
-  )
+  return detail.status === "sent" || detail.status === "already_sent" || detail.status === "skipped"
 }
 
 export function isBookingCreatedNotifyComplete(result: BookingCreatedNotifyApiResult): boolean {
   return channelDone(result.email) && channelDone(result.sms)
 }
 
+/** Natychmiastowe potwierdzenie po rezerwacji — server action (bez pośredniego fetch z klienta). */
 export async function notifyBookingCreatedViaApi(
   token: string,
   language: "pl" | "en",
@@ -96,22 +91,9 @@ export async function notifyBookingCreatedViaApi(
     }
   }
   try {
-    const res = await fetch("/api/public/notify-booking-created", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: trimmed, language }),
-    })
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
-    if (!res.ok) {
-      return {
-        ok: false,
-        email: { status: "failed", error_message: typeof json.error === "string" ? json.error : "http_error" },
-        sms: { status: "failed", error_message: typeof json.error === "string" ? json.error : "http_error" },
-      }
-    }
-    return parseNotifyResponse(json)
+    return await notifyBookingCreatedAfterOnlineBooking(trimmed, language)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "network_error"
+    const msg = err instanceof Error ? err.message : "server_action_error"
     return {
       ok: false,
       email: { status: "failed", error_message: msg },

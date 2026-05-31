@@ -272,7 +272,29 @@ async function claimChannelSend(
     .maybeSingle()
   const status = data?.status ?? ""
   if (status === "sent") return "already_sent"
-  if (status === "queued" || status === "pending") return "in_flight"
+  if (status === "queued" || status === "pending") {
+    // Another handler may be mid-flight; allow reclaim when the row looks stale.
+    const { data: meta } = await admin
+      .from("notification_logs")
+      .select("created_at")
+      .eq("booking_id", booking.id)
+      .eq("type", "booking_created")
+      .eq("channel", channel)
+      .maybeSingle()
+    const createdAt = meta?.created_at ? Date.parse(String(meta.created_at)) : NaN
+    const staleMs = 45_000
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt > staleMs) {
+      await upsertNotificationLog(
+        admin,
+        { booking_id: booking.id, type: "booking_created", channel },
+        { ...insertBase, status: "queued", recipient },
+        { status: "queued", recipient },
+        "[booking-created.notify.log]",
+      )
+      return "claimed"
+    }
+    return "in_flight"
+  }
 
   await upsertNotificationLog(
     admin,
@@ -326,12 +348,13 @@ function mapLogRowStatus(status: string | null | undefined): BookingCreatedChann
   if (status === "sent") return "sent"
   if (status === "failed") return "failed"
   if (status === "skipped") return "skipped"
-  if (status === "queued" || status === "pending") return "already_sent"
+  // Stale claim rows (queued/pending) or unknown states should allow a resend attempt.
+  if (status === "queued" || status === "pending") return "failed"
   return "failed"
 }
 
 function channelSendSettled(status: BookingCreatedChannelStatus): boolean {
-  return status === "sent" || status === "already_sent" || status === "skipped"
+  return status === "sent" || status === "skipped"
 }
 
 function channelNeedsSendAttempt(status: BookingCreatedChannelStatus): boolean {
@@ -543,8 +566,10 @@ export async function sendBookingCreatedNotifications(
     )
   } else {
     const claim = await claimChannelSend(admin, booking, "email", email)
-    if (claim !== "claimed") {
+    if (claim === "already_sent") {
       emailResult = channelDetail("already_sent")
+    } else if (claim !== "claimed") {
+      emailResult = channelDetail("failed", { error_message: "send_in_progress" })
     } else {
       try {
         const sent = await sendReminderEmail({
@@ -641,8 +666,13 @@ export async function sendBookingCreatedNotifications(
     )
   } else {
     const claim = await claimChannelSend(admin, booking, "sms", phone)
-    if (claim !== "claimed") {
+    if (claim === "already_sent") {
       smsResult = channelDetail("already_sent", { provider: smsProvider })
+    } else if (claim !== "claimed") {
+      smsResult = channelDetail("failed", {
+        error_message: "send_in_progress",
+        provider: smsProvider,
+      })
     } else {
       try {
         const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })

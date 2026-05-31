@@ -237,14 +237,17 @@ export default function PublicBookingSuccessPage() {
   React.useEffect(() => {
     if (!tokenFromQuery || !usesSupabase || loading) return
     let cancelled = false
-    void ensureBookingCreatedNotifications(tokenFromQuery, language).then((result) => {
-      if (cancelled) return
-      if (result.email.status === "failed" || result.sms.status === "failed") {
-        console.error("[booking.success.notify]", result)
-      }
-    })
+    const timer = window.setTimeout(() => {
+      void ensureBookingCreatedNotifications(tokenFromQuery, language).then((result) => {
+        if (cancelled) return
+        if (result.email.status === "failed" || result.sms.status === "failed") {
+          console.error("[booking.success.notify]", result)
+        }
+      })
+    }, 2500)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
     }
   }, [tokenFromQuery, usesSupabase, loading, language])
 
