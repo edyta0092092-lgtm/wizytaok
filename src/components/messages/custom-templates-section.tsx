@@ -463,7 +463,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                           <SelectTrigger className="w-36">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-[80]" position="popper">
                             <SelectItem value="minutes">minut</SelectItem>
                             <SelectItem value="hours">godzin</SelectItem>
                             <SelectItem value="days">dni</SelectItem>
@@ -488,7 +488,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                         <SelectTrigger className="w-full sm:w-72">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[80]" position="popper">
                           {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
                             <SelectItem key={k} value={k}>
                               {EVENT_LABELS[k]}

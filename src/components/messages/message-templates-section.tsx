@@ -622,7 +622,7 @@ export function MessageTemplatesSection({
                       <SelectTrigger className="w-full sm:max-w-xs">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[80]" position="popper">
                         {(form?.type === "reminder_before_visit"
                           ? SECOND_REMINDER_TIMING_OPTIONS
                           : FIRST_REMINDER_TIMING_OPTIONS
