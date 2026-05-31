@@ -12,8 +12,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
 import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
@@ -546,39 +544,175 @@ export default function SettingsPage() {
         ) : null}
 
         <form id="settings-form" onSubmit={(e) => void saveAll(e)} className="space-y-6">
-          {/* Dwie osobne kolumny-flex – brak współdzielonej wysokości rzędu siatki między kartami */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+            {/* Lewa kolumna: dane firmy + eksport */}
             <div className="flex min-w-0 flex-col gap-6">
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardHeader className="border-b border-border/70 py-4">
-              <CardTitle className="text-sm font-semibold">{t("settings.dataExportTitle")}</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">
-                {t("settings.dataExportDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2 pt-4 sm:flex-row sm:flex-wrap">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 shrink-0 justify-center gap-2 rounded-xl border-border/90"
-                disabled={Boolean(exportBusy)}
-                onClick={exportAppointmentsCsv}
+              <Card
+                data-tour="settings-company"
+                className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
               >
-                <Download className="size-4 shrink-0" aria-hidden />
-                {exportBusy === "appointments" ? "..." : t("settings.exportAppointmentsCsvBtn")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 shrink-0 justify-center gap-2 rounded-xl border-border/90"
-                disabled={Boolean(exportBusy)}
-                onClick={exportClientsCsv}
-              >
-                <Download className="size-4 shrink-0" aria-hidden />
-                {exportBusy === "clients" ? "..." : t("settings.exportClientsCsvBtn")}
-              </Button>
-            </CardContent>
-          </Card>
+                <CardHeader className="border-b border-border/70 py-4">
+                  <CardTitle className="text-sm font-semibold">{t("settings.business")}</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {t("settings.businessCardDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid min-w-0 gap-4 pt-4 sm:grid-cols-2">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="businessName">{t("settings.businessNameLabel")}</Label>
+                    <Input
+                      id="businessName"
+                      autoComplete="organization"
+                      value={form.businessName}
+                      onChange={(e) => setForm((f) => ({ ...f, businessName: e.target.value }))}
+                      placeholder={t("settings.placeholderBusinessExample")}
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="businessAddress">{t("settings.businessAddressLabel")}</Label>
+                    <BusinessAddressAutocomplete
+                      id="businessAddress"
+                      value={form.businessAddress}
+                      placeId={form.businessAddressPlaceId}
+                      onValueChange={(businessAddress) =>
+                        setForm((f) => ({ ...f, businessAddress }))
+                      }
+                      onPlaceIdChange={(businessAddressPlaceId) =>
+                        setForm((f) => ({ ...f, businessAddressPlaceId }))
+                      }
+                      onPlaceSelected={() => setAddressSaveError(false)}
+                      placeholder={t("settings.businessAddressPlaceholder")}
+                      pickFromListHint={t("settings.businessAddressPickFromList")}
+                      manualEntryHint={t("settings.businessAddressManualHint")}
+                      mapsLoadErrorHint={t("settings.businessAddressMapsError")}
+                    />
+                    {addressSaveError ? (
+                      <p className="text-xs text-destructive">{t("settings.businessAddressRequired")}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">{t("settings.businessAddressHint")}</p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Button type="button" variant="outline" size="sm" asChild>
+                      <Link
+                        href={
+                          form.publicSlug
+                            ? `/rezerwacje?firma=${encodeURIComponent(form.publicSlug)}`
+                            : "/rezerwacje"
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {t("settings.openBookingPage")}
+                      </Link>
+                    </Button>
+                  </div>
+                  <InternationalPhoneFieldGroup
+                    className="sm:col-span-2"
+                    label={t("settings.phoneLabel")}
+                    dialCode={form.phoneDialCode}
+                    nationalDigits={form.phoneNational}
+                    onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
+                    onNationalChange={(digits) => setForm((f) => ({ ...f, phoneNational: digits }))}
+                    dialSelectId="settings-phone-dial"
+                    nationalInputId="settings-phone-national"
+                  />
+                  <div className="space-y-2 sm:col-span-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <Label
+                        htmlFor="tax-id"
+                        className={cn(!form.taxIdEntryEnabled && "text-muted-foreground")}
+                      >
+                        {t("settings.taxIdLabel")}
+                      </Label>
+                      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={form.taxIdEntryEnabled}
+                          onChange={(e) => {
+                            const on = e.target.checked
+                            setTaxIdEmptySaveError(false)
+                            setForm((f) => ({
+                              ...f,
+                              taxIdEntryEnabled: on,
+                              taxId: on ? f.taxId : "",
+                            }))
+                          }}
+                          className="size-4 shrink-0 rounded border border-input bg-background accent-primary"
+                        />
+                        <span>{t("settings.taxIdProvideToggle")}</span>
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("settings.taxIdHint")}</p>
+                    <Input
+                      id="tax-id"
+                      autoComplete="off"
+                      value={form.taxId}
+                      onChange={(e) => {
+                        setTaxIdEmptySaveError(false)
+                        setForm((f) => ({ ...f, taxId: e.target.value }))
+                      }}
+                      placeholder={t("settings.taxIdPlaceholder")}
+                      disabled={!form.taxIdEntryEnabled}
+                      aria-invalid={Boolean(taxIdFieldError)}
+                      className={cn(
+                        "h-11 rounded-xl",
+                        !form.taxIdEntryEnabled && "opacity-60",
+                        taxIdFieldError ? "border-destructive focus-visible:ring-destructive/30" : null,
+                      )}
+                    />
+                    {taxIdFieldError ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {taxIdFieldError}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="settings-email">{t("settings.emailLabel")}</Label>
+                    <Input
+                      id="settings-email"
+                      type="email"
+                      autoComplete="email"
+                      value={form.email}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="kontakt@twojadomena.pl"
+                      className="h-11 rounded-xl"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+                <CardHeader className="border-b border-border/70 py-4">
+                  <CardTitle className="text-sm font-semibold">{t("settings.dataExportTitle")}</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {t("settings.dataExportDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2 pt-4 sm:flex-row sm:flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 shrink-0 justify-center gap-2 rounded-xl border-border/90"
+                    disabled={Boolean(exportBusy)}
+                    onClick={exportAppointmentsCsv}
+                  >
+                    <Download className="size-4 shrink-0" aria-hidden />
+                    {exportBusy === "appointments" ? "..." : t("settings.exportAppointmentsCsvBtn")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 shrink-0 justify-center gap-2 rounded-xl border-border/90"
+                    disabled={Boolean(exportBusy)}
+                    onClick={exportClientsCsv}
+                  >
+                    <Download className="size-4 shrink-0" aria-hidden />
+                    {exportBusy === "clients" ? "..." : t("settings.exportClientsCsvBtn")}
+                  </Button>
+                </CardContent>
+              </Card>
 
               <div className="space-y-1 text-xs text-muted-foreground">
                 <p>{t("settings.changesApplyAfterSave")}</p>
@@ -586,272 +720,67 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Prawa kolumna: subskrypcja, onboarding, informacje prawne */}
             <div className="flex min-w-0 flex-col gap-6">
-              <Card
-            data-tour="settings-company"
-            className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
-          >
-            <CardHeader className="border-b border-border/70 py-4">
-              <CardTitle className="text-sm font-semibold">
-                {t("settings.business")}
-              </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">
-                {t("settings.businessCardDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid min-w-0 gap-4 pt-4 sm:grid-cols-2">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="businessName">{t("settings.businessNameLabel")}</Label>
-                <Input
-                  id="businessName"
-                  autoComplete="organization"
-                  value={form.businessName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, businessName: e.target.value }))
-                  }
-                  placeholder={t("settings.placeholderBusinessExample")}
-                  className="h-11 rounded-xl"
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="businessAddress">{t("settings.businessAddressLabel")}</Label>
-                <BusinessAddressAutocomplete
-                  id="businessAddress"
-                  value={form.businessAddress}
-                  placeId={form.businessAddressPlaceId}
-                  onValueChange={(businessAddress) =>
-                    setForm((f) => ({ ...f, businessAddress }))
-                  }
-                  onPlaceIdChange={(businessAddressPlaceId) =>
-                    setForm((f) => ({ ...f, businessAddressPlaceId }))
-                  }
-                  onPlaceSelected={() => setAddressSaveError(false)}
-                  placeholder={t("settings.businessAddressPlaceholder")}
-                  pickFromListHint={t("settings.businessAddressPickFromList")}
-                  manualEntryHint={t("settings.businessAddressManualHint")}
-                  mapsLoadErrorHint={t("settings.businessAddressMapsError")}
-                />
-                {addressSaveError ? (
-                  <p className="text-xs text-destructive">{t("settings.businessAddressRequired")}</p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">{t("settings.businessAddressHint")}</p>
-                )}
-              </div>
-              <div className="sm:col-span-2">
-                <Button type="button" variant="outline" size="sm" asChild>
-                  <Link
-                    href={
-                      form.publicSlug
-                        ? `/rezerwacje?firma=${encodeURIComponent(form.publicSlug)}`
-                        : "/rezerwacje"
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {t("settings.openBookingPage")}
-                  </Link>
-                </Button>
-              </div>
-              <InternationalPhoneFieldGroup
-                className="sm:col-span-2"
-                label={t("settings.phoneLabel")}
-                dialCode={form.phoneDialCode}
-                nationalDigits={form.phoneNational}
-                onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
-                onNationalChange={(digits) =>
-                  setForm((f) => ({ ...f, phoneNational: digits }))
-                }
-                dialSelectId="settings-phone-dial"
-                nationalInputId="settings-phone-national"
-              />
-              <div className="space-y-2 sm:col-span-2">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                  <Label htmlFor="tax-id" className={cn(!form.taxIdEntryEnabled && "text-muted-foreground")}>
-                    {t("settings.taxIdLabel")}
-                  </Label>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={form.taxIdEntryEnabled}
-                      onChange={(e) => {
-                        const on = e.target.checked
-                        setTaxIdEmptySaveError(false)
-                        setForm((f) => ({
-                          ...f,
-                          taxIdEntryEnabled: on,
-                          taxId: on ? f.taxId : "",
-                        }))
-                      }}
-                      className="size-4 shrink-0 rounded border border-input bg-background accent-primary"
-                    />
-                    <span>{t("settings.taxIdProvideToggle")}</span>
-                  </label>
-                </div>
-                <p className="text-xs text-muted-foreground">{t("settings.taxIdHint")}</p>
-                <Input
-                  id="tax-id"
-                  autoComplete="off"
-                  value={form.taxId}
-                  onChange={(e) => {
-                    setTaxIdEmptySaveError(false)
-                    setForm((f) => ({ ...f, taxId: e.target.value }))
-                  }}
-                  placeholder={t("settings.taxIdPlaceholder")}
-                  disabled={!form.taxIdEntryEnabled}
-                  aria-invalid={Boolean(taxIdFieldError)}
-                  className={cn(
-                    "h-11 rounded-xl",
-                    !form.taxIdEntryEnabled && "opacity-60",
-                    taxIdFieldError ? "border-destructive focus-visible:ring-destructive/30" : null,
-                  )}
-                />
-                {taxIdFieldError ? (
-                  <p className="text-xs text-destructive" role="alert">
-                    {taxIdFieldError}
-                  </p>
-                ) : null}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="settings-email">{t("settings.emailLabel")}</Label>
-                <Input
-                  id="settings-email"
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                  placeholder="kontakt@twojadomena.pl"
-                  className="h-11 rounded-xl"
-                />
-              </div>
-            </CardContent>
-          </Card>
+              <TestBillingSettingsCard />
 
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardHeader className="border-b border-border/70 py-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="text-sm font-semibold">
-                  {t("settings.deposits")}
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="inline-flex items-center whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:border-amber-300/40 dark:bg-amber-400/10 dark:text-amber-200"
-                >
-                  {t("settings.stripeSoon")}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-0.5 pr-4">
-                  <Label
-                    htmlFor="deposit-required"
-                    className="text-sm font-medium text-foreground"
-                  >
-                    {t("settings.depositNewClientsLabel")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    {t("settings.depositNewClientsHint")}
-                  </p>
-                </div>
-                <Switch
-                  id="deposit-required"
-                  checked={form.depositForNewClients}
-                  onCheckedChange={(checked) =>
-                    setForm((f) => ({ ...f, depositForNewClients: Boolean(checked) }))
-                  }
-                  className="shrink-0"
-                  aria-label={t("settings.depositAria")}
-                />
-              </div>
-              <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-muted/20 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="space-y-0.5 pr-4">
-                  <Label htmlFor="deposit-all" className="text-sm font-medium text-foreground">
-                    {t("settings.depositAllClientsLabel")}
-                  </Label>
-                  <p className="text-xs text-muted-foreground">{t("settings.depositAllClientsHint")}</p>
-                </div>
-                <Switch
-                  id="deposit-all"
-                  checked={form.depositForAllClients}
-                  onCheckedChange={(checked) =>
-                    setForm((f) => ({ ...f, depositForAllClients: Boolean(checked) }))
-                  }
-                  className="shrink-0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="deposit-amount">{t("settings.depositAmountLabel")}</Label>
-                <Input
-                  id="deposit-amount"
-                  inputMode="decimal"
-                  value={form.depositAmount}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, depositAmount: e.target.value }))
-                  }
-                  placeholder={t("settings.placeholderDepositAmount")}
-                  disabled={!form.depositForNewClients && !form.depositForAllClients}
-                  className="h-11 max-w-xs rounded-xl"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("settings.depositAmountHint")}
-                </p>
-                <p className="text-xs text-muted-foreground">{t("settings.depositAfterPaymentsHint")}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <TestBillingSettingsCard />
-
-          <SettingsOnboardingCard />
+              <SettingsOnboardingCard />
 
               <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardHeader className="border-b border-border/70 py-4">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-sm font-semibold">
-                  {t("settings.legalInfoTitle")}
-                </CardTitle>
-                <Badge
-                  variant="outline"
-                  className="rounded-full border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
-                >
-                  {t("settings.betaBadge")}
-                </Badge>
-              </div>
-              <CardDescription className="text-xs text-muted-foreground">
-                {t("settings.legalInfoDescription")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-2 pt-4 sm:grid-cols-2 sm:gap-3">
-              <p className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                {t("settings.betaNotice")}
-              </p>
-              <Button
-                asChild
-                variant="outline"
-                className="h-11 w-full justify-center rounded-xl border-border/90"
-              >
-                <Link href="/terms">{t("footer.terms")}</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="h-11 w-full justify-center rounded-xl border-border/90"
-              >
-                <Link href="/developer-contact">{t("footer.developer")}</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="h-11 w-full justify-center rounded-xl border-border/90 sm:col-span-2"
-              >
-                <Link href="/privacy">{t("footer.privacy")}</Link>
-              </Button>
-            </CardContent>
-          </Card>
+                <CardHeader className="border-b border-border/70 py-4">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-sm font-semibold">
+                      {t("settings.legalInfoTitle")}
+                    </CardTitle>
+                    <Badge
+                      variant="outline"
+                      className="rounded-full border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
+                    >
+                      {t("settings.betaBadge")}
+                    </Badge>
+                  </div>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {t("settings.legalInfoDescription")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-2 pt-4 sm:grid-cols-2 sm:gap-3">
+                  <p className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+                    {t("settings.betaNotice")}
+                  </p>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="h-11 w-full justify-center rounded-xl border-border/90"
+                  >
+                    <Link href="/terms">{t("footer.terms")}</Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="h-11 w-full justify-center rounded-xl border-border/90"
+                  >
+                    <Link href="/developer-contact">{t("footer.developer")}</Link>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="h-11 w-full justify-center rounded-xl border-border/90 sm:col-span-2"
+                  >
+                    <Link href="/privacy">{t("footer.privacy")}</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
+
+          {/*
+            Depozyty (ukryte do czasu integracji Stripe):
+            - zaliczka przy rezerwacji online, żeby ograniczyć no-show,
+            - opcjonalnie tylko dla nowych klientów albo dla wszystkich,
+            - kwota pobierana przed wizytą, zwrot wg regulaminu firmy.
+            Po wdrożeniu płatności wróci karta z przełącznikami depositForNewClients,
+            depositForAllClients i polem depositAmount.
+          */}
 
           <div className="flex sm:hidden">
             <Button
