@@ -2,7 +2,12 @@ import { getAppToday } from "@/lib/date/current-date"
 
 export type AppointmentGroupKey = "past" | "today" | "tomorrow" | "upcoming"
 
-export const APPOINTMENT_GROUP_ORDER: AppointmentGroupKey[] = ["past", "today", "tomorrow", "upcoming"]
+export const APPOINTMENT_GROUP_ORDER: AppointmentGroupKey[] = [
+  "today",
+  "tomorrow",
+  "upcoming",
+  "past",
+]
 
 function startOfLocalDay(d: Date) {
   const x = new Date(d)

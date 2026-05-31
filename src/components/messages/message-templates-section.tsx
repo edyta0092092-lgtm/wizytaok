@@ -612,7 +612,21 @@ export function MessageTemplatesSection({
                   <div className="space-y-2">
                     <Label>Wyślij ile czasu przed wizytą</Label>
                     <Select
-                      value={String(form?.timingMinutesBefore ?? "")}
+                      value={(() => {
+                        const timing = form?.timingMinutesBefore
+                        const options =
+                          form?.type === "reminder_before_visit"
+                            ? SECOND_REMINDER_TIMING_OPTIONS
+                            : FIRST_REMINDER_TIMING_OPTIONS
+                        if (timing != null && options.some((opt) => opt.value === timing)) {
+                          return String(timing)
+                        }
+                        return String(
+                          form?.type === "reminder_before_visit"
+                            ? DEFAULT_SECOND_REMINDER_MINUTES
+                            : DEFAULT_FIRST_REMINDER_MINUTES,
+                        )
+                      })()}
                       onValueChange={(v) => {
                         const parsed = Number(v)
                         if (Number.isNaN(parsed)) return
