@@ -77,9 +77,11 @@ export async function getSmsQuotaStatus(admin: Admin, businessId: string): Promi
       .gte("sent_at", monthStartIso),
   ])
 
-  if (reminders.error || custom.error) {
+  if (reminders.error && custom.error) {
     return { used: 0, limit, allowed: false, countFailed: true }
   }
-  const used = (reminders.count ?? 0) + (custom.count ?? 0)
+  const reminderCount = reminders.error ? 0 : (reminders.count ?? 0)
+  const customCount = custom.error ? 0 : (custom.count ?? 0)
+  const used = reminderCount + customCount
   return { used, limit, allowed: used < limit, countFailed: false }
 }

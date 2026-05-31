@@ -322,7 +322,8 @@ async function claimBookingCreatedChannel(
 
   const current = await loadChannelLogRow(admin, booking.id, channel)
   if (isGenuineSentLog(current)) return "skip"
-  if (current?.status === "pending") return "skip"
+  // Pending bez provider_message_id = niedokończona poprzednia próba (crash) — ponów wysyłkę.
+  if (current?.status === "pending") return "send"
 
   await persistChannelLog(admin, booking, channel, recipient, {
     status: "pending",

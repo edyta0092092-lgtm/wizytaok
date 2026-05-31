@@ -45,8 +45,6 @@ const STALE_PROCESSING_MS = 10 * 60 * 1000
  *   - SMSAPI_TOKEN / SZYBKISMS_TOKEN — gdy skonfigurowany, cron bierze SMS z kolejki
  *     (tak jak potwierdzenia wizyty). `SMS_REMINDERS_ENABLED=false` nie blokuje SMS,
  *     jeśli token jest ustawiony.
- *   - SMS_REMINDERS_ALLOWED_BUSINESS_IDS — opcjonalna allowlista `uuid,uuid,...`.
- *     Pusta / nieustawiona = wszystkie firmy. Niepoprawne UUID w env = ignorowane.
  *   - SMS_PROVIDER                 — `smsapi` (domyślnie) albo `szybkisms`.
  *   - SMSAPI_TOKEN, SMSAPI_FROM    — gdy dostawca SMSAPI.
  *   - SZYBKISMS_TOKEN, SZYBKISMS_FROM — gdy dostawca SzybkiSMS; opcjonalnie
@@ -147,24 +145,6 @@ function areSmsRemindersEnabled(): boolean {
   return process.env.SMS_REMINDERS_ENABLED?.trim().toLowerCase() === "true"
 }
 
-const SMS_ALLOWED_BUSINESS_UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-/**
- * Allowlista firm dla SMS.
- * - `null` — brak env / brak poprawnych UUID → SMS dla wszystkich firm.
- * - niepusta tablica — tylko te `business_id`.
- */
-function parseSmsAllowedBusinessIds(): string[] | null {
-  const raw = process.env.SMS_REMINDERS_ALLOWED_BUSINESS_IDS?.trim()
-  if (!raw) return null
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean)
-  if (parts.length === 0) return null
-  const valid = parts.filter((id) => SMS_ALLOWED_BUSINESS_UUID_RE.test(id))
-  if (valid.length === 0) return null
-  return valid
-}
-
 async function recoverStaleProcessingReminders(admin: AdminClient, nowIso: string): Promise<number> {
   const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString()
   const { data, error } = await admin
@@ -189,7 +169,6 @@ async function fetchDueChannelBatch(
   channel: ReminderChannel,
   limit: number,
   nowIso: string,
-  smsAllowedBusinessIds: string[] | null,
 ): Promise<DueReminderRow[]> {
   let query = admin
     .from("appointment_reminders")
@@ -200,10 +179,6 @@ async function fetchDueChannelBatch(
     .lt("attempts", MAX_ATTEMPTS)
     .order("scheduled_for", { ascending: true })
     .limit(limit)
-
-  if (channel === "sms" && smsAllowedBusinessIds !== null && smsAllowedBusinessIds.length > 0) {
-    query = query.in("business_id", smsAllowedBusinessIds)
-  }
 
   const { data, error } = await query
   if (error) {
@@ -228,7 +203,6 @@ async function handle(req: NextRequest) {
 
   const nowIso = new Date().toISOString()
   const smsRemindersEnabled = areSmsRemindersEnabled()
-  const smsAllowedBusinessIds = smsRemindersEnabled ? parseSmsAllowedBusinessIds() : null
 
   await recoverStaleProcessingReminders(admin, nowIso)
 
@@ -237,9 +211,9 @@ async function handle(req: NextRequest) {
   let smsDue: DueReminderRow[] = []
   try {
     ;[emailDue, smsDue] = await Promise.all([
-      fetchDueChannelBatch(admin, "email", EMAIL_BATCH_SIZE, nowIso, null),
+      fetchDueChannelBatch(admin, "email", EMAIL_BATCH_SIZE, nowIso),
       smsRemindersEnabled
-        ? fetchDueChannelBatch(admin, "sms", SMS_BATCH_SIZE, nowIso, smsAllowedBusinessIds)
+        ? fetchDueChannelBatch(admin, "sms", SMS_BATCH_SIZE, nowIso)
         : Promise.resolve([]),
     ])
   } catch (err) {
@@ -293,11 +267,6 @@ async function handle(req: NextRequest) {
     ...counts,
     sms_reminders_enabled: smsRemindersEnabled,
     sms_provider_token: hasSmsProviderToken(),
-    sms_allowed_business_ids: !smsRemindersEnabled
-      ? "n/a"
-      : smsAllowedBusinessIds === null
-        ? "all"
-        : smsAllowedBusinessIds.join(","),
   })
 
   let sent = 0
@@ -754,10 +723,7 @@ async function processSmsReminder(
       item.business_id,
       reminderTemplateTypeFromKind(item.reminder_kind)
     )
-    // Przypomnienia są domyślnie WŁĄCZONE. Pomijamy tylko, gdy firma sama
-    // zapisała szablon i wyłączyła w nim SMS (status draft) — tak jak pokazuje
-    // przełącznik „off" w kafelku. Sprawdzamy przed liczeniem limitu, żeby
-    // wyłączony kanał nie zużywał kwoty SMS.
+    // Pomijamy tylko, gdy firma zapisała szablon SMS i wyłączyła go (status draft).
     if (runtime.smsExists && !runtime.smsEnabled) {
       await markSkipped(admin, item, "template_sms_disabled", booking, phone)
       return "skipped"
