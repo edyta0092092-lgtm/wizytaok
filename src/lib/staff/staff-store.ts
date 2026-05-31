@@ -1097,7 +1097,10 @@ export async function saveStaffAvailabilityRules(
   }
 
   const byWeekday = new Map<number, StaffAvailabilityRuleInput>()
-  for (const r of rules) byWeekday.set(r.weekday, r)
+  for (const r of rules) {
+    if (!r.isAvailable) continue
+    byWeekday.set(r.weekday, r)
+  }
   const uniqueRules = [...byWeekday.values()]
   if (uniqueRules.length === 0) return { ok: false, error: "schedule_empty_payload" }
 
@@ -1105,9 +1108,9 @@ export async function saveStaffAvailabilityRules(
     business_id: bid,
     staff_id: sid,
     weekday: r.weekday,
-    is_available: r.isAvailable,
-    start_time: r.isAvailable ? r.startTime : null,
-    end_time: r.isAvailable ? r.endTime : null,
+    is_available: true,
+    start_time: r.startTime,
+    end_time: r.endTime,
   }))
 
   const fallbackPayload = uniqueRules.map((r) => ({
@@ -1115,9 +1118,9 @@ export async function saveStaffAvailabilityRules(
     staff_member_id: sid,
     staff_id: sid,
     day_of_week: r.weekday,
-    is_open: r.isAvailable,
-    start_time: r.isAvailable ? r.startTime : null,
-    end_time: r.isAvailable ? r.endTime : null,
+    is_open: true,
+    start_time: r.startTime,
+    end_time: r.endTime,
   }))
 
   if (isDev) {

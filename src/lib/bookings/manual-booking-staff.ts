@@ -43,39 +43,49 @@ export function applyStaffOverlayToWeek(
   staffRules: StaffAvailabilityRuleInput[],
   staffExceptions: StaffAvailabilityExceptionRecord[]
 ): AvailabilityDay[] {
+  const usesCustomStaffSchedule = staffRules.length > 0
   const key = toLocalDateKey(cellDate)
   const wd = cellDate.getDay()
   const staffRule = staffRules.find((x) => x.weekday === wd)
   const staffExc = staffExceptions.find((x) => x.exceptionDate === key)
   return days.map((day) => {
     if (day.weekday !== wd) return day
-    if (!day.isOpen) return day
     if (staffExc) {
       if (staffExc.isUnavailable) {
-        return { ...day, isOpen: false }
+        return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
       }
       if (staffExc.startTime && staffExc.endTime) {
+        if (!day.isOpen) return day
         const start = staffExc.startTime > day.startTime ? staffExc.startTime : day.startTime
         const end = staffExc.endTime < day.endTime ? staffExc.endTime : day.endTime
-        if (end <= start) return { ...day, isOpen: false }
+        if (end <= start) return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
         return {
           ...day,
           startTime: start,
           endTime: end,
+          breakStart: undefined,
+          breakEnd: undefined,
         }
       }
     }
-    if (!staffRule) return day
-    if (!staffRule.isAvailable) {
-      return { ...day, isOpen: false }
+    if (!staffRule) {
+      return usesCustomStaffSchedule
+        ? { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+        : day
     }
+    if (!staffRule.isAvailable) {
+      return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+    }
+    if (!day.isOpen) return day
     const start = staffRule.startTime > day.startTime ? staffRule.startTime : day.startTime
     const end = staffRule.endTime < day.endTime ? staffRule.endTime : day.endTime
-    if (end <= start) return { ...day, isOpen: false }
+    if (end <= start) return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
     return {
       ...day,
       startTime: start,
       endTime: end,
+      breakStart: undefined,
+      breakEnd: undefined,
     }
   })
 }

@@ -57,6 +57,10 @@ function intersectDayWithStaffHours(day: AvailabilityDay, staffStart: string, st
   return next
 }
 
+function closeAvailabilityDay(day: AvailabilityDay): AvailabilityDay {
+  return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+}
+
 /** Nakładka grafiku + wyjątków pojedynczej osoby na już wyliczone dni dostępności (firma/usługa). */
 export function applyStaffAvailabilityToDays(
   days: AvailabilityDay[],
@@ -64,6 +68,7 @@ export function applyStaffAvailabilityToDays(
   rules: StaffAvailabilityRuleInput[],
   exceptions: StaffAvailabilityExceptionRecord[],
 ): AvailabilityDay[] {
+  const usesCustomStaffSchedule = rules.length > 0
   const key = toLocalDateKey(d)
   const wd = d.getDay()
   const staffRule = rules.find((x) => x.weekday === wd)
@@ -72,7 +77,7 @@ export function applyStaffAvailabilityToDays(
     if (day.weekday !== wd) return day
     if (staffExc) {
       if (staffExc.isUnavailable) {
-        return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+        return closeAvailabilityDay(day)
       }
       if (staffExc.startTime && staffExc.endTime) {
         return intersectDayWithStaffHours(day, staffExc.startTime, staffExc.endTime)
@@ -81,9 +86,11 @@ export function applyStaffAvailabilityToDays(
       // If it has no explicit hours and is not closed, keep company/service day as-is.
       return day
     }
-    if (!staffRule) return day
+    if (!staffRule) {
+      return usesCustomStaffSchedule ? closeAvailabilityDay(day) : day
+    }
     if (!staffRule.isAvailable) {
-      return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+      return closeAvailabilityDay(day)
     }
     return intersectDayWithStaffHours(day, staffRule.startTime, staffRule.endTime)
   })

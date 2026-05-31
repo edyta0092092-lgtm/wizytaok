@@ -116,8 +116,6 @@ export default function PublicBookingPage() {
   const [selectedServiceId, setSelectedServiceId] = React.useState<string | null>(null)
   const [serviceStaff, setServiceStaff] = React.useState<StaffMember[]>([])
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null)
-  const [staffRules, setStaffRules] = React.useState<StaffAvailabilityRuleInput[]>([])
-  const [staffExceptions, setStaffExceptions] = React.useState<StaffAvailabilityExceptionRecord[]>([])
   const [selectedTime, setSelectedTime] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -370,6 +368,7 @@ export default function PublicBookingPage() {
         if (!cancelled) setStaffAvailById({})
         return
       }
+      if (!cancelled) setStaffAvailById({})
       const entries = await Promise.all(
         serviceStaff.map(async (m) => {
           const ctx = await getStaffAvailabilityForPublicSlug(client, normalizedSlug, m.id)
@@ -387,25 +386,22 @@ export default function PublicBookingPage() {
       setStaffAvailById(next)
     }
     void run()
+    const onStaff = () => {
+      void run()
+    }
+    window.addEventListener("pw-staff", onStaff)
     return () => {
       cancelled = true
+      window.removeEventListener("pw-staff", onStaff)
     }
   }, [normalizedSlug, serviceStaff])
 
-  React.useEffect(() => {
-    let cancelled = false
-    const run = async () => {
-      const client = getBrowserClient()
-      const ctx = await getStaffAvailabilityForPublicSlug(client, normalizedSlug, selectedStaffId)
-      if (cancelled) return
-      setStaffRules(ctx.rules)
-      setStaffExceptions(ctx.exceptions)
+  const staffAvailabilityReady = React.useMemo(() => {
+    if (!isSupabaseConfigured() || normalizedSlug === DEMO_BOOKING_SLUG || serviceStaff.length === 0) {
+      return true
     }
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [normalizedSlug, selectedStaffId])
+    return serviceStaff.every((member) => member.id in staffAvailById)
+  }, [normalizedSlug, serviceStaff, staffAvailById])
 
   React.useEffect(() => {
     let cancelled = false
@@ -488,16 +484,33 @@ export default function PublicBookingPage() {
     (d: Date) => {
       const days = resolveBaseDaysForDate(d)
       if (!selectedStaffId) return days
-      return applyStaffAvailabilityToDays(days, d, staffRules, staffExceptions)
+      const ctx = staffAvailById[selectedStaffId]
+      if (!ctx) {
+        const wd = d.getDay()
+        return days.map((day) =>
+          day.weekday === wd
+            ? { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+            : day,
+        )
+      }
+      return applyStaffAvailabilityToDays(days, d, ctx.rules, ctx.exceptions)
     },
-    [resolveBaseDaysForDate, selectedStaffId, staffRules, staffExceptions],
+    [resolveBaseDaysForDate, selectedStaffId, staffAvailById],
   )
 
   const resolveDaysForServiceStaffMember = React.useCallback(
     (staffMemberId: string, d: Date) => {
       const days = resolveBaseDaysForDate(d)
       const ctx = staffAvailById[staffMemberId]
-      return applyStaffAvailabilityToDays(days, d, ctx?.rules ?? [], ctx?.exceptions ?? [])
+      if (!ctx) {
+        const wd = d.getDay()
+        return days.map((day) =>
+          day.weekday === wd
+            ? { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+            : day,
+        )
+      }
+      return applyStaffAvailabilityToDays(days, d, ctx.rules, ctx.exceptions)
     },
     [resolveBaseDaysForDate, staffAvailById],
   )
@@ -543,7 +556,7 @@ export default function PublicBookingPage() {
   }, [blockedSlotKeys, publicBookedRows, selectedStaffId, selectedService?.durationMinutes])
 
   const defaultDayKey = React.useMemo(() => {
-    if (!clientToday || !availabilityReady) return null
+    if (!clientToday || !availabilityReady || !staffAvailabilityReady) return null
     const svc = catalog.find((s) => s.id === selectedServiceId)
     const duration = svc?.durationMinutes ?? 60
     if (useMergedAnyStaffSlots && svc) {
@@ -572,6 +585,7 @@ export default function PublicBookingPage() {
     bookingAvailability,
     availabilityStrict,
     availabilityReady,
+    staffAvailabilityReady,
     effectiveBlockedSlotKeys,
     resolveAvailabilityDaysForDate,
     serviceStaff,
@@ -1058,6 +1072,7 @@ export default function PublicBookingPage() {
                   </p>
                 ) : null}
                 {availabilityReady &&
+                staffAvailabilityReady &&
                 !availabilityLoadFailed &&
                 bookingAvailability.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t("bookingPublic.noSlotsInRange")}</p>
