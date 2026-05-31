@@ -18,6 +18,7 @@ import {
   formatTimingLabel,
   reminder24hTitleFromMinutes,
 } from "@/lib/messages/reminder-settings-from-templates"
+import { resyncAppointmentRemindersQueue } from "@/lib/messages/resync-appointment-reminders-queue"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
@@ -362,6 +363,9 @@ export function MessageTemplatesSection({
       }
       setBusinessId(bid)
       setLoading(false)
+      if (!cancelled && bid) {
+        void resyncAppointmentRemindersQueue(client, bid)
+      }
     })()
     return () => {
       cancelled = true
@@ -483,6 +487,12 @@ export function MessageTemplatesSection({
         return
       }
       setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], REMINDER_TIMING_DEFAULTS))
+      if (
+        submitFormData.type === "reminder_24h" ||
+        submitFormData.type === "reminder_before_visit"
+      ) {
+        await resyncAppointmentRemindersQueue(client, businessId)
+      }
       setShowSaved(true)
       setSheetOpen(false)
     })()

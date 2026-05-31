@@ -15,6 +15,7 @@ import {
   type AppointmentReminderQueueRow,
   type AppointmentReminderSection,
 } from "@/lib/appointments/appointment-reminder-panel-display"
+import { resyncAppointmentRemindersQueue } from "@/lib/messages/resync-appointment-reminders-queue"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
@@ -144,6 +145,7 @@ export function AppointmentsListWithRows({
       }
       const businessId = await getCurrentBusinessProfileIdForClient(client)
       if (!businessId) return
+      await resyncAppointmentRemindersQueue(client, businessId)
       const { data, error } = await client
         .from("appointment_reminders")
         .select("appointment_id,channel,reminder_kind,status")

@@ -1309,6 +1309,10 @@ export interface Database {
     }
     Views: Record<string, never>
     Functions: {
+      sync_appointment_reminders_for_business: {
+        Args: { p_business_id: string }
+        Returns: undefined
+      }
       get_business_profile_by_slug: {
         Args: { p_slug: string }
         Returns: {
