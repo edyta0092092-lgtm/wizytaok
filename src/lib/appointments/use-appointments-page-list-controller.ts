@@ -10,7 +10,7 @@ import {
   type AppointmentsListWithRowsBundlesParams,
 } from "@/lib/appointments/use-appointments-list-with-rows-bundles"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
-import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
+import type { AppointmentGroupKey, AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, StaffMember } from "@/types/domain"
 
@@ -21,6 +21,7 @@ export type UseAppointmentsPageListControllerParams = {
   filteredCount: number
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
+  dayGroupFilter: AppointmentsDayGroupFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
   listUiLanguage: "en" | "pl"
   staffByService: Record<string, StaffMember[]>
@@ -67,6 +68,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     filteredCount,
     staffFilter,
     listFilter,
+    dayGroupFilter,
     formatWhen,
     listUiLanguage,
     staffByService,
@@ -118,6 +120,7 @@ export function useAppointmentsPageListController(args: UseAppointmentsPageListC
     filteredCount,
     staffFilter,
     listFilter,
+    dayGroupFilter,
     formatWhen,
     reminderPanelLabels,
     listUiLanguage,

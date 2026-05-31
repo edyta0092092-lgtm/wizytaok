@@ -7,7 +7,7 @@ import { AppointmentsGroupedSections } from "@/components/appointments/appointme
 import { AppointmentsListEmpty } from "@/components/appointments/appointments-list-empty"
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
-import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
+import type { AppointmentsDayGroupFilter, AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
 import {
   buildAppointmentReminderSections,
   groupAppointmentReminderRowsByBookingId,
@@ -42,6 +42,7 @@ export type AppointmentsListPresentationBundle = {
   isEmpty: boolean
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
+  dayGroupFilter: AppointmentsDayGroupFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
   reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
@@ -107,6 +108,7 @@ export function AppointmentsListWithRows({
     isEmpty,
     staffFilter,
     listFilter,
+    dayGroupFilter,
     formatWhen,
     reminderPanelLabels,
     listUiLanguage,
@@ -219,7 +221,7 @@ export function AppointmentsListWithRows({
   } = propose
 
   if (isEmpty) {
-    return <AppointmentsListEmpty staffFilter={staffFilter} listFilter={listFilter} />
+    return <AppointmentsListEmpty staffFilter={staffFilter} listFilter={listFilter} dayGroupFilter={dayGroupFilter} />
   }
 
   return (

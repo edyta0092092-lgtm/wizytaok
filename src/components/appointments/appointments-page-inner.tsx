@@ -24,6 +24,7 @@ import { useAppointmentsDeleteFlow } from "@/lib/appointments/use-appointments-d
 import { useAppointmentsPageListController } from "@/lib/appointments/use-appointments-page-list-controller"
 import { useManualAppointmentCreateSheet } from "@/lib/appointments/use-manual-appointment-create-sheet"
 import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
+import type { AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -51,6 +52,7 @@ export function AppointmentsPageInner() {
     useAppointmentsStaffForFilters(appointments, staffFilter, setStaffFilterAndUrl)
   const [clientNameFilter, setClientNameFilter] = React.useState("")
   const [serviceFilter, setServiceFilter] = React.useState("")
+  const [dayGroupFilter, setDayGroupFilter] = React.useState<AppointmentsDayGroupFilter>("all")
   const serviceOptions = React.useMemo(() => {
     const unique = new Set<string>()
     for (const row of appointments) {
@@ -66,6 +68,7 @@ export function AppointmentsPageInner() {
     restrictToToday,
     clientNameFilter,
     serviceFilter,
+    dayGroupFilter,
     language,
   })
 
@@ -161,6 +164,7 @@ export function AppointmentsPageInner() {
     filteredCount: filtered.length,
     staffFilter,
     listFilter: filter,
+    dayGroupFilter,
     formatWhen,
     listUiLanguage: uiLang,
     staffByService,
@@ -211,6 +215,8 @@ export function AppointmentsPageInner() {
     serviceFilter,
     onServiceFilterChange: setServiceFilter,
     serviceOptions,
+    dayGroupFilter,
+    onDayGroupFilterChange: setDayGroupFilter,
   })
 
   return (

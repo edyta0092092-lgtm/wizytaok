@@ -6,8 +6,9 @@ import type { AppointmentsListFilter } from "@/lib/appointments/appointments-lis
 import {
   APPOINTMENT_GROUP_ORDER,
   groupAppointmentByDay,
+  type AppointmentGroupKey,
+  type AppointmentsDayGroupFilter,
 } from "@/lib/appointments/appointments-grouping"
-import type { AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
 import { appointmentRequiresPostVisitAction } from "@/lib/appointments/stats-rules"
 import { getAppToday, isSameAppDay } from "@/lib/date/current-date"
 import { bookingMatchesStaffFilter } from "@/lib/staff/staff-display"
@@ -21,6 +22,7 @@ export function useAppointmentsListPresentation(args: {
   restrictToToday: boolean
   clientNameFilter: string
   serviceFilter: string
+  dayGroupFilter: AppointmentsDayGroupFilter
   language: string
 }) {
   const {
@@ -30,6 +32,7 @@ export function useAppointmentsListPresentation(args: {
     restrictToToday,
     clientNameFilter,
     serviceFilter,
+    dayGroupFilter,
     language,
   } = args
 
@@ -86,6 +89,11 @@ export function useAppointmentsListPresentation(args: {
       .filter((a) =>
         qService ? String(a.serviceLabel ?? "").toLowerCase().includes(qService) : true
       )
+      .filter((a) =>
+        dayGroupFilter === "all"
+          ? true
+          : groupAppointmentByDay(a.startsAt, today) === dayGroupFilter,
+      )
   }, [
     appointments,
     filter,
@@ -93,6 +101,7 @@ export function useAppointmentsListPresentation(args: {
     restrictToToday,
     clientNameFilter,
     serviceFilter,
+    dayGroupFilter,
   ])
 
   const grouped = React.useMemo(() => {

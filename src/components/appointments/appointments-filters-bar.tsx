@@ -8,6 +8,11 @@ import {
   appointmentsStatusFilterLabel,
   type AppointmentsListFilter,
 } from "@/lib/appointments/appointments-list-filters"
+import {
+  APPOINTMENTS_DAY_GROUP_FILTERS,
+  appointmentsDayGroupFilterLabel,
+  type AppointmentsDayGroupFilter,
+} from "@/lib/appointments/appointments-grouping"
 import { type StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -30,6 +35,8 @@ export type AppointmentsFiltersBarProps = {
   serviceFilter: string
   onServiceFilterChange: (next: string) => void
   serviceOptions: string[]
+  dayGroupFilter: AppointmentsDayGroupFilter
+  onDayGroupFilterChange: (next: AppointmentsDayGroupFilter) => void
 }
 
 export function AppointmentsFiltersBar({
@@ -46,6 +53,8 @@ export function AppointmentsFiltersBar({
   serviceFilter,
   onServiceFilterChange,
   serviceOptions,
+  dayGroupFilter,
+  onDayGroupFilterChange,
 }: AppointmentsFiltersBarProps) {
   const { t } = useTranslations()
 
@@ -105,7 +114,7 @@ export function AppointmentsFiltersBar({
           />
         </div>
       </div>
-      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:max-w-md sm:items-end">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
         <div className="min-w-0">
           <label
             htmlFor="appointments-service-filter"
@@ -124,6 +133,29 @@ export function AppointmentsFiltersBar({
             {serviceOptions.map((serviceName) => (
               <option key={serviceName} value={serviceName}>
                 {serviceName}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="min-w-0">
+          <label
+            htmlFor="appointments-day-group-filter"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            {t("appointments.dayGroupFilterLabel")}
+          </label>
+          <NativeSelect
+            id="appointments-day-group-filter"
+            value={dayGroupFilter}
+            onChange={(e) =>
+              onDayGroupFilterChange(e.target.value as AppointmentsDayGroupFilter)
+            }
+            wrapperClassName="w-full"
+            className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+          >
+            {APPOINTMENTS_DAY_GROUP_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {appointmentsDayGroupFilterLabel(value, t)}
               </option>
             ))}
           </NativeSelect>

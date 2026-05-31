@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
+import type { AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { StaffMember } from "@/types/domain"
 
@@ -20,6 +21,8 @@ export type UseAppointmentsFiltersControllerParams = {
   serviceFilter: string
   onServiceFilterChange: (next: string) => void
   serviceOptions: string[]
+  dayGroupFilter: AppointmentsDayGroupFilter
+  onDayGroupFilterChange: (next: AppointmentsDayGroupFilter) => void
 }
 
 export function useAppointmentsFiltersController({
@@ -36,6 +39,8 @@ export function useAppointmentsFiltersController({
   serviceFilter,
   onServiceFilterChange,
   serviceOptions,
+  dayGroupFilter,
+  onDayGroupFilterChange,
 }: UseAppointmentsFiltersControllerParams) {
   return React.useMemo(
     () => ({
@@ -52,6 +57,8 @@ export function useAppointmentsFiltersController({
       serviceFilter,
       onServiceFilterChange,
       serviceOptions,
+      dayGroupFilter,
+      onDayGroupFilterChange,
     }),
     [
       staffFilter,
@@ -67,6 +74,8 @@ export function useAppointmentsFiltersController({
       serviceFilter,
       onServiceFilterChange,
       serviceOptions,
+      dayGroupFilter,
+      onDayGroupFilterChange,
     ],
   )
 }
