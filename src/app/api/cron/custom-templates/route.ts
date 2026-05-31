@@ -114,6 +114,10 @@ async function handle(req: NextRequest) {
         .eq("id", item.booking_id)
         .maybeSingle()
       if (!bookingRaw) continue
+      const bookingStatus = String((bookingRaw as { status?: string }).status ?? "").trim()
+      if (bookingStatus === "cancelled" || bookingStatus === "completed" || bookingStatus === "no_show") {
+        continue
+      }
       const booking = toBookingRow(bookingRaw as Tables<"bookings">)
       const outcomes = await sendCustomTemplateForBookingDedup(admin, { template, booking, business })
       sent += outcomes.filter((o) => o.status === "sent").length

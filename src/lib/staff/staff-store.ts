@@ -15,6 +15,36 @@ export type StaffAvailabilityRuleInput = {
   endTime: string
 }
 
+/** Kolejność dni w edytorze grafiku (pon–niedz). */
+export const STAFF_SCHEDULE_WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const
+
+/** Uzupełnia brakujące dni tygodnia (z bazy zapisujemy tylko otwarte dni). */
+export function normalizeStaffAvailabilityRulesForEditor(
+  rules: StaffAvailabilityRuleInput[],
+): StaffAvailabilityRuleInput[] {
+  const byWeekday = new Map<number, StaffAvailabilityRuleInput>()
+  for (const rule of rules) {
+    byWeekday.set(rule.weekday, rule)
+  }
+  return STAFF_SCHEDULE_WEEKDAYS.map((weekday) => {
+    const existing = byWeekday.get(weekday)
+    if (existing) {
+      return {
+        weekday: existing.weekday,
+        isAvailable: existing.isAvailable,
+        startTime: existing.startTime,
+        endTime: existing.endTime,
+      }
+    }
+    return {
+      weekday,
+      isAvailable: false,
+      startTime: "09:00",
+      endTime: "17:00",
+    }
+  })
+}
+
 type StaffRow = Pick<
   Database["public"]["Tables"]["staff_members"]["Row"],
   "id" | "business_id" | "name" | "role" | "email" | "phone" | "avatar_url" | "is_active"

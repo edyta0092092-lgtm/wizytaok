@@ -320,6 +320,12 @@ type ProcessOutcome = "sent" | "failed" | "skipped"
 
 type AdminClient = NonNullable<ReturnType<typeof getServiceRoleClient>>
 
+const TERMINAL_BOOKING_STATUSES = new Set(["cancelled", "completed", "no_show"])
+
+function isTerminalBookingStatus(status: string | null | undefined): boolean {
+  return TERMINAL_BOOKING_STATUSES.has((status ?? "").trim())
+}
+
 async function loadBookingAndBusiness(
   admin: AdminClient,
   item: DueReminderRow
@@ -340,7 +346,7 @@ async function loadBookingAndBusiness(
   }
   const booking = bookingRaw as BookingRow | null
   if (!booking) return { ok: false, reason: "not_found" }
-  if (booking.status === "cancelled") {
+  if (isTerminalBookingStatus(booking.status)) {
     return { ok: false, reason: "booking_cancelled" }
   }
 
@@ -488,13 +494,13 @@ async function resolveReminderEmail(
   })
 }
 
-async function isBookingCancelledNow(admin: AdminClient, bookingId: string): Promise<boolean> {
+async function isBookingTerminalNow(admin: AdminClient, bookingId: string): Promise<boolean> {
   const { data } = await admin
     .from("bookings")
     .select("status")
     .eq("id", bookingId)
     .maybeSingle()
-  return (data?.status ?? "") === "cancelled"
+  return isTerminalBookingStatus(data?.status)
 }
 
 /** Utrzymuje zgodność kolumn bookings.*_reminder_* z faktyczną wysyłką z kolejki. */
@@ -599,7 +605,7 @@ async function processEmailReminder(
       business?.email && business.email.trim().length > 0 ? business.email.trim() : null
     const manageUrl = resolveManageUrl(booking)
 
-    if (await isBookingCancelledNow(admin, booking.id)) {
+    if (await isBookingTerminalNow(admin, booking.id)) {
       await markSkipped(admin, item, "booking_cancelled_race", booking, recipient)
       return "skipped"
     }
@@ -753,7 +759,7 @@ async function processSmsReminder(
       return "skipped"
     }
 
-    if (await isBookingCancelledNow(admin, booking.id)) {
+    if (await isBookingTerminalNow(admin, booking.id)) {
       await markSkipped(admin, item, "booking_cancelled_race", booking, phone)
       return "skipped"
     }

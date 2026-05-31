@@ -37,6 +37,7 @@ import {
   getStaffMembers,
   getStaffServiceIds,
   normalizeStaffRole,
+  normalizeStaffAvailabilityRulesForEditor,
   saveStaffAvailabilityExceptions,
   saveStaffAvailabilityRules,
   type StaffAvailabilityExceptionInput,
@@ -769,6 +770,8 @@ export default function TeamPage() {
     )
     const splitName = splitPersonName(staff.name)
     const phoneParts = splitStoredPhoneIntoParts(staff.phone ?? "")
+    const normalizedRules =
+      rules.length > 0 ? normalizeStaffAvailabilityRulesForEditor(rules) : emptyForm().rules
     setForm({
       firstName: splitName.firstName,
       lastName: splitName.lastName,
@@ -778,13 +781,13 @@ export default function TeamPage() {
       isActive: staff.isActive,
       serviceIds,
       useBusinessHours: rules.length === 0,
-      rules: rules.length > 0 ? sortRulesByUiWeekdayOrder(rules) : emptyForm().rules,
+      rules: sortRulesByUiWeekdayOrder(normalizedRules),
       exceptions: groupedExceptionsForEditing.map((ex) => ({ ...ex })),
       panelMemberRole,
     })
     setSavedScheduleState({
       useBusinessHours: rules.length === 0,
-      rules: sortRulesByUiWeekdayOrder(rules.length > 0 ? rules : emptyForm().rules).map((r) => ({ ...r })),
+      rules: sortRulesByUiWeekdayOrder(normalizedRules).map((r) => ({ ...r })),
     })
     setSavedExceptionsState(groupedExceptionsForEditing.map((ex) => ({ ...ex })))
     setSavedProfileState({
