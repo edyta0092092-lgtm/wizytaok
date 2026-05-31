@@ -331,12 +331,11 @@ function mapLogRowStatus(status: string | null | undefined): BookingCreatedChann
 }
 
 function channelSendSettled(status: BookingCreatedChannelStatus): boolean {
-  return (
-    status === "sent" ||
-    status === "already_sent" ||
-    status === "skipped" ||
-    status === "missing"
-  )
+  return status === "sent" || status === "already_sent" || status === "skipped"
+}
+
+function channelNeedsSendAttempt(status: BookingCreatedChannelStatus): boolean {
+  return !channelSendSettled(status)
 }
 
 export async function getBookingCreatedNotifyStatus(
@@ -440,12 +439,7 @@ export async function sendBookingCreatedNotifications(
   }
 
   const existing = await getBookingCreatedNotifyStatus(booking.id)
-  if (
-    (existing.email.status === "sent" && existing.sms.status === "sent") ||
-    existing.email.status === "already_sent" ||
-    existing.sms.status === "already_sent" ||
-    (channelSendSettled(existing.email.status) && channelSendSettled(existing.sms.status))
-  ) {
+  if (!channelNeedsSendAttempt(existing.email.status) && !channelNeedsSendAttempt(existing.sms.status)) {
     return { ok: true, email: existing.email, sms: existing.sms }
   }
 
@@ -502,9 +496,10 @@ export async function sendBookingCreatedNotifications(
   let dispatchedCustomTemplates = false
 
   const email = booking.client_email ?? ""
-  if (existing.email.status !== "sent") {
-    if (!wantEmail) {
-      emailResult = channelDetail("skipped")
+  if (!channelNeedsSendAttempt(existing.email.status)) {
+    emailResult = existing.email
+  } else if (!wantEmail) {
+    emailResult = channelDetail("skipped")
     if (email) {
       // Zapis „skipped" w historii — żeby było widać, że kanał jest wyłączony.
       await insertNotificationLog(
@@ -597,13 +592,13 @@ export async function sendBookingCreatedNotifications(
       }
     }
   }
-  }
 
   const phone = booking.client_phone ?? ""
   const smsProvider = getActiveSmsReminderProvider()
-  if (existing.sms.status !== "sent") {
-    if (!wantSms) {
-      smsResult = channelDetail("skipped")
+  if (!channelNeedsSendAttempt(existing.sms.status)) {
+    smsResult = existing.sms
+  } else if (!wantSms) {
+    smsResult = channelDetail("skipped")
     if (phone) {
       await insertNotificationLog(
         admin,
@@ -701,7 +696,6 @@ export async function sendBookingCreatedNotifications(
         })
       }
     }
-  }
   }
 
   // Własne szablony typu „zdarzenie" tylko przy pierwszej udanej wysyłce wbudowanego potwierdzenia.

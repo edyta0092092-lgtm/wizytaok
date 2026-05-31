@@ -75,8 +75,7 @@ function channelDone(detail: BookingCreatedChannelDetail): boolean {
   return (
     detail.status === "sent" ||
     detail.status === "already_sent" ||
-    detail.status === "skipped" ||
-    detail.status === "missing"
+    detail.status === "skipped"
   )
 }
 
