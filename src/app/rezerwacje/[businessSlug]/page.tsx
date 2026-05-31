@@ -36,7 +36,6 @@ import {
 import { createOnlineBooking } from "@/lib/bookings/bookings-store"
 import {
   isBookingCreatedNotifyComplete,
-  isBookingCreatedNotifyInProgress,
   notifyBookingCreatedViaApi,
 } from "@/lib/bookings/notify-booking-created-client"
 import {
@@ -860,12 +859,7 @@ export default function PublicBookingPage() {
           try {
             let notifyResult = await notifyBookingCreatedViaApi(res.confirmationToken, language)
             if (!isBookingCreatedNotifyComplete(notifyResult)) {
-              const retryMs = isBookingCreatedNotifyInProgress(notifyResult) ? 5500 : 1200
-              await new Promise((resolve) => setTimeout(resolve, retryMs))
-              notifyResult = await notifyBookingCreatedViaApi(res.confirmationToken, language)
-            }
-            if (!isBookingCreatedNotifyComplete(notifyResult) && isBookingCreatedNotifyInProgress(notifyResult)) {
-              await new Promise((resolve) => setTimeout(resolve, 5500))
+              await new Promise((resolve) => setTimeout(resolve, 1500))
               notifyResult = await notifyBookingCreatedViaApi(res.confirmationToken, language)
             }
             if (notifyResult.email.status === "failed" || notifyResult.sms.status === "failed") {

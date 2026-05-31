@@ -15,7 +15,6 @@ import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-
 import {
   ensureBookingCreatedNotifications,
   isBookingCreatedNotifyComplete,
-  isBookingCreatedNotifyInProgress,
   notifyBookingCreatedViaApi,
 } from "@/lib/bookings/notify-booking-created-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
@@ -242,22 +241,19 @@ export default function PublicBookingSuccessPage() {
   React.useEffect(() => {
     if (!tokenFromQuery || !usesSupabase || loading) return
     let cancelled = false
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        let result = await ensureBookingCreatedNotifications(tokenFromQuery, language)
-        if (!isBookingCreatedNotifyComplete(result) && isBookingCreatedNotifyInProgress(result)) {
-          await new Promise((resolve) => setTimeout(resolve, 5500))
-          result = await notifyBookingCreatedViaApi(tokenFromQuery, language)
-        }
-        if (cancelled) return
-        if (result.email.status === "failed" || result.sms.status === "failed") {
-          console.error("[booking.success.notify]", result)
-        }
-      })()
-    }, 2500)
+    void (async () => {
+      let result = await ensureBookingCreatedNotifications(tokenFromQuery, language)
+      if (!isBookingCreatedNotifyComplete(result)) {
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        result = await notifyBookingCreatedViaApi(tokenFromQuery, language)
+      }
+      if (cancelled) return
+      if (result.email.status === "failed" || result.sms.status === "failed") {
+        console.error("[booking.success.notify]", result)
+      }
+    })()
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
     }
   }, [tokenFromQuery, usesSupabase, loading, language])
 

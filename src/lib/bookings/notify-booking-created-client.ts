@@ -72,17 +72,12 @@ function channelResolved(detail: BookingCreatedChannelDetail): boolean {
   return (
     detail.status === "sent" ||
     detail.status === "already_sent" ||
-    detail.status === "skipped" ||
-    detail.status === "missing"
+    detail.status === "skipped"
   )
 }
 
 export function isBookingCreatedNotifyComplete(result: BookingCreatedNotifyApiResult): boolean {
   return channelResolved(result.email) && channelResolved(result.sms)
-}
-
-function channelInProgress(detail: BookingCreatedChannelDetail): boolean {
-  return detail.status === "failed" && detail.error_message === "send_in_progress"
 }
 
 /** Natychmiastowe potwierdzenie po rezerwacji — POST na route handler (pewna wysyłka po stronie serwera). */
@@ -115,10 +110,6 @@ export async function notifyBookingCreatedViaApi(
       sms: { status: "failed", error_message: msg },
     }
   }
-}
-
-export function isBookingCreatedNotifyInProgress(result: BookingCreatedNotifyApiResult): boolean {
-  return channelInProgress(result.email) || channelInProgress(result.sms)
 }
 
 export async function fetchBookingCreatedNotifyStatus(
