@@ -47,6 +47,106 @@ export function formatPolishAppointmentLabel(
   return { dateLabel, timeLabel, longLabel }
 }
 
+const WARSAW_TZ = "Europe/Warsaw"
+const FIRST_REMINDER_SEND_GRACE_MS = 30 * 60 * 1000
+
+const warsawLocalFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: WARSAW_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+})
+
+function readWarsawLocalParts(ms: number): {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+} {
+  const parts = warsawLocalFormatter.formatToParts(new Date(ms))
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? NaN)
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day"),
+    hour: read("hour") % 24,
+    minute: read("minute"),
+  }
+}
+
+/** Unix ms momentu wizyty w Europe/Warsaw (zgodnie z triggerami DB). */
+export function parseWarsawAppointmentMs(
+  appointmentDate: string,
+  appointmentTime: string,
+): number | null {
+  const dateMatch = String(appointmentDate).trim().match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const timeMatch = String(appointmentTime).trim().match(/^(\d{1,2}):(\d{2})/)
+  if (!dateMatch || !timeMatch) return null
+  const target = {
+    year: Number(dateMatch[1]),
+    month: Number(dateMatch[2]),
+    day: Number(dateMatch[3]),
+    hour: Number(timeMatch[1]),
+    minute: Number(timeMatch[2]),
+  }
+  if (
+    !Number.isFinite(target.year) ||
+    !Number.isFinite(target.month) ||
+    !Number.isFinite(target.day) ||
+    !Number.isFinite(target.hour) ||
+    !Number.isFinite(target.minute)
+  ) {
+    return null
+  }
+
+  const compare = (ms: number): number => {
+    const p = readWarsawLocalParts(ms)
+    return (
+      p.year - target.year ||
+      p.month - target.month ||
+      p.day - target.day ||
+      p.hour - target.hour ||
+      p.minute - target.minute
+    )
+  }
+
+  let low = Date.UTC(target.year, target.month - 1, target.day - 1, 0, 0, 0)
+  let high = Date.UTC(target.year, target.month - 1, target.day + 1, 23, 59, 59)
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2)
+    const cmp = compare(mid)
+    if (cmp === 0) return mid
+    if (cmp < 0) low = mid + 60_000
+    else high = mid - 60_000
+  }
+  return null
+}
+
+/** Pierwsze przypomnienie (24h) — pomijamy, gdy okno wysyłki już minęło (wizyta zarezerwowana <24h wcześniej). */
+export function isFirstReminderWindowPassed(
+  reminderKind: string,
+  scheduledForIso: string,
+  appointmentDate: string,
+  appointmentTime: string,
+  nowMs: number = Date.now(),
+): boolean {
+  if (reminderKind.trim().toLowerCase() !== "first") return false
+  const appointmentMs = parseWarsawAppointmentMs(appointmentDate, appointmentTime)
+  if (appointmentMs == null) return false
+  const scheduledMs = new Date(scheduledForIso).getTime()
+  if (!Number.isFinite(scheduledMs)) return false
+  const leadMs = appointmentMs - scheduledMs
+  if (leadMs <= 0) return true
+  const timeUntilMs = appointmentMs - nowMs
+  return timeUntilMs < leadMs - FIRST_REMINDER_SEND_GRACE_MS
+}
+
 /**
  * WyciÄ…ga TYLKO pierwsze imiÄ™ klienta â€” do uĹĽycia w powitaniach maila / SMS.
  *

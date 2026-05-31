@@ -9,7 +9,7 @@ import {
   sendAppointmentReminderSmsPlainText,
   type AppointmentReminderSmsResult,
 } from "@/lib/notifications/appointment-reminder-sms"
-import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-reminder-email"
+import { formatPolishAppointmentLabel, isFirstReminderWindowPassed } from "@/lib/notifications/appointment-reminder-email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
@@ -610,6 +610,18 @@ async function processEmailReminder(
       return "skipped"
     }
 
+    if (
+      isFirstReminderWindowPassed(
+        item.reminder_kind,
+        item.scheduled_for,
+        booking.appointment_date,
+        booking.appointment_time,
+      )
+    ) {
+      await markSkipped(admin, item, "first_reminder_window_passed", booking, recipient)
+      return "skipped"
+    }
+
     const emailResult: AppointmentReminderEmailResult = await resolveReminderEmail(
       runtime,
       booking,
@@ -763,6 +775,19 @@ async function processSmsReminder(
       await markSkipped(admin, item, "booking_cancelled_race", booking, phone)
       return "skipped"
     }
+
+    if (
+      isFirstReminderWindowPassed(
+        item.reminder_kind,
+        item.scheduled_for,
+        booking.appointment_date,
+        booking.appointment_time,
+      )
+    ) {
+      await markSkipped(admin, item, "first_reminder_window_passed", booking, phone)
+      return "skipped"
+    }
+
     const smsResult: AppointmentReminderSmsResult = await resolveReminderSms(
       runtime,
       booking,
