@@ -853,6 +853,7 @@ export async function getBookingByConfirmationToken(
     reschedule_message: (o.reschedule_message as string | null) ?? null,
     internal_note: (o.internal_note as string | null) ?? null,
     accepted_proposal_at: (o.accepted_proposal_at as string | null) ?? null,
+    confirmed_at: (o.confirmed_at as string | null) ?? null,
     business_proposal_kind: (o.business_proposal_kind as string | null) ?? null,
     previous_service_duration_minutes:
       o.previous_service_duration_minutes != null

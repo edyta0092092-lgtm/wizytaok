@@ -24,6 +24,11 @@ import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { reminderLogTypeFromKind } from "@/lib/notifications/reminder-notification-log"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import {
+  loadNotificationPreviewDetails,
+  type NotificationPreviewDetails,
+  type NotificationPreviewTarget,
+} from "@/lib/messages/notification-history-preview"
 import { cn } from "@/lib/utils"
 import type { Tables } from "@/types/database"
 import type { NotificationMessage } from "@/types/domain"
@@ -81,6 +86,8 @@ type AppointmentReminderQueueRow = {
   reminder_kind: string
   status: string
   scheduled_for: string
+  sent_at: string | null
+  created_at: string | null
 }
 
 function queueLookupKey(
@@ -115,7 +122,7 @@ async function loadAppointmentReminderQueueRows(
 ): Promise<AppointmentReminderQueueRow[]> {
   const { data, error } = await client
     .from("appointment_reminders")
-    .select("appointment_id,channel,reminder_kind,status,scheduled_for")
+    .select("appointment_id,channel,reminder_kind,status,scheduled_for,sent_at,created_at")
     .eq("business_id", businessId)
   if (error || !data) return []
   return data as AppointmentReminderQueueRow[]
@@ -128,6 +135,20 @@ type PreviewBookingInfo = {
   appointmentDate: string
   appointmentTime: string
   status: string
+  createdAt: string | null
+  confirmedAt: string | null
+  updatedAt: string | null
+  lastStatusChangeSource: string | null
+  confirmationToken: string | null
+  staffName: string | null
+}
+
+type PreviewBusinessInfo = {
+  business_name: string | null
+  slug: string | null
+  phone: string | null
+  contact_phone: string | null
+  business_address: string | null
 }
 
 type LegacyPlannedReminderRow = {
@@ -809,6 +830,9 @@ export function SendingHistorySection() {
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("all")
   const [preview, setPreview] = React.useState<PreviewTarget | null>(null)
   const [previewBookingInfo, setPreviewBookingInfo] = React.useState<PreviewBookingInfo | null>(null)
+  const [previewBusinessInfo, setPreviewBusinessInfo] = React.useState<PreviewBusinessInfo | null>(null)
+  const [previewDetails, setPreviewDetails] = React.useState<NotificationPreviewDetails | null>(null)
+  const [previewDetailsLoading, setPreviewDetailsLoading] = React.useState(false)
   const [integrationFlags, setIntegrationFlags] = React.useState<{
     enableTestNotifications: boolean
     enableTestBilling: boolean
@@ -1146,48 +1170,125 @@ export function SendingHistorySection() {
         : null
 
   React.useEffect(() => {
-    if (!preview || !bookingIdForPreview) {
+    if (!preview) {
+      setPreviewBookingInfo(null)
+      setPreviewBusinessInfo(null)
+      setPreviewDetails(null)
+      setPreviewDetailsLoading(false)
       return
     }
     if (!isSupabaseConfigured()) {
       return
     }
     const client = getBrowserClient()
-    if (!client) {
+    const bid = access.businessId
+    if (!client || !bid) {
       return
     }
     let cancelled = false
+    setPreviewDetailsLoading(true)
     void (async () => {
-      const { data } = await client
-        .from("bookings")
-        .select("id,client_name,service_name,appointment_date,appointment_time,status")
-        .eq("id", bookingIdForPreview)
+      let bookingInfo: PreviewBookingInfo | null = null
+      let businessInfo: PreviewBusinessInfo | null = null
+
+      const { data: businessData } = await client
+        .from("business_profiles")
+        .select("business_name,slug,phone,contact_phone,business_address")
+        .eq("id", bid)
         .maybeSingle()
-      if (!cancelled) {
-        if (!data) {
-          setPreviewBookingInfo(null)
-          return
+
+      if (businessData) {
+        businessInfo = {
+          business_name:
+            typeof businessData.business_name === "string" ? businessData.business_name : null,
+          slug: typeof businessData.slug === "string" ? businessData.slug : null,
+          phone: typeof businessData.phone === "string" ? businessData.phone : null,
+          contact_phone:
+            typeof businessData.contact_phone === "string" ? businessData.contact_phone : null,
+          business_address:
+            typeof businessData.business_address === "string"
+              ? businessData.business_address
+              : null,
         }
-        setPreviewBookingInfo({
-          id: String(data.id ?? bookingIdForPreview),
-          clientName: typeof data.client_name === "string" ? data.client_name.trim() : "",
-          serviceName: typeof data.service_name === "string" ? data.service_name.trim() : "",
-          appointmentDate:
-            typeof data.appointment_date === "string"
-              ? String(data.appointment_date).slice(0, 10)
-              : "",
-          appointmentTime:
-            typeof data.appointment_time === "string"
-              ? String(data.appointment_time).slice(0, 5)
-              : "",
-          status: typeof data.status === "string" ? data.status.trim() : "",
-        })
       }
-    })()
+
+      if (bookingIdForPreview) {
+        const { data: bookingData } = await client
+          .from("bookings")
+          .select(
+            "id,client_name,service_name,appointment_date,appointment_time,status,created_at,confirmed_at,updated_at,last_status_change_source,confirmation_token,staff_name",
+          )
+          .eq("id", bookingIdForPreview)
+          .maybeSingle()
+
+        if (bookingData) {
+          bookingInfo = {
+            id: String(bookingData.id ?? bookingIdForPreview),
+            clientName:
+              typeof bookingData.client_name === "string" ? bookingData.client_name.trim() : "",
+            serviceName:
+              typeof bookingData.service_name === "string" ? bookingData.service_name.trim() : "",
+            appointmentDate:
+              typeof bookingData.appointment_date === "string"
+                ? String(bookingData.appointment_date).slice(0, 10)
+                : "",
+            appointmentTime:
+              typeof bookingData.appointment_time === "string"
+                ? String(bookingData.appointment_time).slice(0, 5)
+                : "",
+            status: typeof bookingData.status === "string" ? bookingData.status.trim() : "",
+            createdAt:
+              typeof bookingData.created_at === "string" ? bookingData.created_at : null,
+            confirmedAt:
+              typeof bookingData.confirmed_at === "string" ? bookingData.confirmed_at : null,
+            updatedAt:
+              typeof bookingData.updated_at === "string" ? bookingData.updated_at : null,
+            lastStatusChangeSource:
+              typeof bookingData.last_status_change_source === "string"
+                ? bookingData.last_status_change_source.trim()
+                : null,
+            confirmationToken:
+              typeof bookingData.confirmation_token === "string"
+                ? bookingData.confirmation_token.trim()
+                : null,
+            staffName:
+              typeof bookingData.staff_name === "string" ? bookingData.staff_name.trim() : null,
+          }
+        }
+      }
+
+      if (cancelled) return
+
+      setPreviewBookingInfo(bookingInfo)
+      setPreviewBusinessInfo(businessInfo)
+
+      const details = await loadNotificationPreviewDetails({
+        client,
+        businessId: bid,
+        target: preview as NotificationPreviewTarget,
+        booking: bookingInfo,
+        business: businessInfo,
+        queueByKey,
+        language: language === "en" ? "en" : "pl",
+        formatDateTime: (raw) => safeFormatDate(raw, dateFmt),
+        scheduledSendLabel: (dateTime) =>
+          t("messagesLog.scheduledSendAt").replace("{dateTime}", dateTime),
+      })
+
+      if (!cancelled) {
+        setPreviewDetails(details)
+        setPreviewDetailsLoading(false)
+      }
+    })().catch(() => {
+      if (!cancelled) {
+        setPreviewDetails(null)
+        setPreviewDetailsLoading(false)
+      }
+    })
     return () => {
       cancelled = true
     }
-  }, [preview, bookingIdForPreview])
+  }, [preview, bookingIdForPreview, access.businessId, queueByKey, dateFmt, language, t])
 
   const relatedStatusLabel = React.useMemo(() => {
     const raw = (previewBookingInfo?.status ?? "").toLowerCase()
@@ -1387,6 +1488,8 @@ export function SendingHistorySection() {
           if (!o) {
             setPreview(null)
             setPreviewBookingInfo(null)
+            setPreviewBusinessInfo(null)
+            setPreviewDetails(null)
           }
         }}
       >
@@ -1466,49 +1569,35 @@ export function SendingHistorySection() {
                       {t("messagesLog.fieldCreatedAt")}
                     </dt>
                     <dd className="mt-0.5 tabular-nums text-foreground">
-                      {preview.kind === "db"
-                        ? safeFormatDate(preview.row.created_at, dateFmt)
-                        : preview.kind === "planned"
-                          ? safeFormatDate(plannedAtIso(preview, queueByKey), dateFmt)
-                        : preview.kind === "reminderOutcome"
-                          ? safeFormatDate(
-                              preview.reminderType === "reminder_24h"
-                                ? preview.row.first_reminder_sent_at ?? preview.row.first_reminder_due_at
-                                : preview.row.second_reminder_sent_at ?? preview.row.second_reminder_due_at,
-                              dateFmt,
-                            )
-                        : safeFormatDate(preview.msg.createdAt, dateFmt)}
+                      {previewDetailsLoading
+                        ? t("messagesLog.loading")
+                        : safeFormatDate(previewDetails?.createdAtIso, dateFmt)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-medium text-muted-foreground">
                       {t("messagesLog.fieldSentAt")}
                     </dt>
-                    <dd className="mt-0.5 tabular-nums text-foreground">
-                      {preview.kind === "db"
-                        ? safeFormatDate(preview.row.sent_at, dateFmt)
-                        : preview.kind === "planned"
-                          ? safeFormatDate(plannedAtIso(preview, queueByKey), dateFmt)
-                        : preview.kind === "reminderOutcome"
-                          ? safeFormatDate(
-                              preview.reminderType === "reminder_24h"
-                                ? preview.row.first_reminder_sent_at
-                                : preview.row.second_reminder_sent_at,
-                              dateFmt,
-                            )
-                        : preview.msg.sentAt
-                          ? safeFormatDate(preview.msg.sentAt, dateFmt)
-                          : safeFormatDate(preview.msg.scheduledFor, dateFmt)}
+                    <dd className="mt-0.5 text-foreground">
+                      {previewDetailsLoading
+                        ? t("messagesLog.loading")
+                        : previewDetails?.sentAtLabel ?? "-"}
                     </dd>
                   </div>
                   {(preview.kind === "db" && dbChannel(preview.row) === "email") ||
-                  (preview.kind === "local" && preview.msg.channel === "email") ? (
+                  (preview.kind === "local" && preview.msg.channel === "email") ||
+                  (preview.kind === "planned" && preview.channel === "email") ||
+                  (preview.kind === "reminderOutcome" && preview.channel === "email") ? (
                     <div>
                       <dt className="text-xs font-medium text-muted-foreground">
                         {t("messagesLog.fieldSubject")}
                       </dt>
                       <dd className="mt-0.5 text-foreground">
-                        {subjectForPreview(preview) || "-"}
+                        {previewDetailsLoading
+                          ? t("messagesLog.loading")
+                          : previewDetails?.subject ||
+                            subjectForPreview(preview) ||
+                            "-"}
                       </dd>
                     </div>
                   ) : null}
@@ -1530,7 +1619,13 @@ export function SendingHistorySection() {
                       {t("messagesLog.fieldBody")}
                     </dt>
                     <dd className="mt-1 whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/30 p-3 text-foreground">
-                      {bodyForPreview(preview) ?? (
+                      {previewDetailsLoading ? (
+                        <span className="text-muted-foreground">{t("messagesLog.loading")}</span>
+                      ) : previewDetails?.body ? (
+                        previewDetails.body
+                      ) : bodyForPreview(preview) ? (
+                        bodyForPreview(preview)
+                      ) : (
                         <span className="text-muted-foreground">
                           {t("messagesLog.noSavedBody")}
                         </span>

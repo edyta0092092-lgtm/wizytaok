@@ -557,6 +557,7 @@ export interface Database {
           reschedule_message: string | null
           internal_note: string | null
           accepted_proposal_at: string | null
+          confirmed_at: string | null
           business_proposal_kind: string | null
           previous_service_duration_minutes: number | null
           previous_service_price: number | null
@@ -616,6 +617,7 @@ export interface Database {
           reschedule_message?: string | null
           internal_note?: string | null
           accepted_proposal_at?: string | null
+          confirmed_at?: string | null
           business_proposal_kind?: string | null
           previous_service_duration_minutes?: number | null
           previous_service_price?: number | null
@@ -675,6 +677,7 @@ export interface Database {
           reschedule_message?: string | null
           internal_note?: string | null
           accepted_proposal_at?: string | null
+          confirmed_at?: string | null
           business_proposal_kind?: string | null
           previous_service_duration_minutes?: number | null
           previous_service_price?: number | null
