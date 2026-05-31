@@ -248,7 +248,7 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "fetch_due_failed" }, { status: 500 })
   }
 
-  const items = [...emailDue, ...smsDue]
+  const items = [...smsDue, ...emailDue]
   if (items.length === 0) {
     console.info("[cron/send-reminders] no_due_reminders")
     return NextResponse.json({
@@ -549,6 +549,41 @@ async function syncBookingLegacyReminderSent(
   }
 }
 
+/** Legacy kolumny bookings ustawiamy dopiero, gdy wszystkie kanały tego przypomnienia są rozstrzygnięte. */
+async function syncBookingLegacyReminderSentIfComplete(
+  admin: AdminClient,
+  bookingId: string,
+  reminderKind: string,
+): Promise<void> {
+  const kind = reminderKind.trim().toLowerCase()
+  const { data, error } = await admin
+    .from("appointment_reminders")
+    .select("status, sent_at")
+    .eq("appointment_id", bookingId)
+    .eq("reminder_kind", kind)
+  if (error) {
+    console.warn("[cron/send-reminders] sync_booking_reminder_check", {
+      bookingId,
+      message: error.message,
+    })
+    return
+  }
+  const rows = data ?? []
+  if (rows.length === 0) return
+  const open = rows.some((row) => {
+    const status = (row.status ?? "").trim().toLowerCase()
+    return status === "pending" || status === "processing"
+  })
+  if (open) return
+  const sentAt = rows
+    .map((row) => row.sent_at?.trim())
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .at(-1)
+  if (!sentAt) return
+  await syncBookingLegacyReminderSent(admin, bookingId, reminderKind, sentAt)
+}
+
 // ---------------------------------------------------------------------------
 // EMAIL
 // ---------------------------------------------------------------------------
@@ -653,7 +688,7 @@ async function processEmailReminder(
         },
         "[cron/send-reminders.log]",
       )
-      await syncBookingLegacyReminderSent(admin, booking.id, item.reminder_kind, sentAt)
+      await syncBookingLegacyReminderSentIfComplete(admin, booking.id, item.reminder_kind)
       return "sent"
     }
 
@@ -800,7 +835,7 @@ async function processSmsReminder(
         },
         "[cron/send-reminders.log]",
       )
-      await syncBookingLegacyReminderSent(admin, booking.id, item.reminder_kind, sentAt)
+      await syncBookingLegacyReminderSentIfComplete(admin, booking.id, item.reminder_kind)
       return "sent"
     }
 
@@ -872,6 +907,7 @@ async function markSkipped(
       },
       "[cron/send-reminders.log]",
     )
+    await syncBookingLegacyReminderSentIfComplete(admin, booking.id, item.reminder_kind)
   }
 }
 
