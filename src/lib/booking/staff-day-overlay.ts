@@ -27,7 +27,7 @@ function intersectDayWithStaffHours(day: AvailabilityDay, staffStart: string, st
     return { ...day, breakStart: undefined, breakEnd: undefined }
   }
   if (e <= s) {
-    return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+    return closeAvailabilityDay(day)
   }
   const b1 = timeToMinutes(day.startTime)
   const b2 = timeToMinutes(day.endTime)
@@ -36,20 +36,56 @@ function intersectDayWithStaffHours(day: AvailabilityDay, staffStart: string, st
   const start = Math.max(b1, o1)
   const end = Math.min(b2, o2)
   if (end <= start) {
-    return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
+    return closeAvailabilityDay(day)
   }
+  return openAvailabilityDay(day, start, end)
+}
+
+/** Własny grafik osoby: może skrócić dzień firmy albo wydłużyć go (np. firma do 17:00, osoba do 20:00). */
+function applyCustomStaffHoursToDay(
+  day: AvailabilityDay,
+  staffStart: string,
+  staffEnd: string,
+): AvailabilityDay {
+  const s = String(staffStart).trim()
+  const e = String(staffEnd).trim()
+  if (e <= s) {
+    return closeAvailabilityDay(day)
+  }
+  const o1 = timeToMinutes(s)
+  const o2 = timeToMinutes(e)
+  if (!day.isOpen) {
+    return openAvailabilityDay(day, o1, o2, s, e)
+  }
+  const b1 = timeToMinutes(day.startTime)
+  const b2 = timeToMinutes(day.endTime)
+  const start = Math.max(b1, o1)
+  const end = o2 > b2 ? o2 : Math.min(b2, o2)
+  if (end <= start) {
+    return closeAvailabilityDay(day)
+  }
+  return openAvailabilityDay(day, start, end)
+}
+
+function openAvailabilityDay(
+  day: AvailabilityDay,
+  startM: number,
+  endM: number,
+  startTime = minutesToTime(startM),
+  endTime = minutesToTime(endM),
+): AvailabilityDay {
   const next: AvailabilityDay = {
     ...day,
     isOpen: true,
-    startTime: minutesToTime(start),
-    endTime: minutesToTime(end),
+    startTime,
+    endTime,
     breakStart: undefined,
     breakEnd: undefined,
   }
   if (day.breakStart && day.breakEnd) {
     const brS = timeToMinutes(day.breakStart)
     const brE = timeToMinutes(day.breakEnd)
-    if (brS >= start && brE <= end && brS < brE) {
+    if (brS >= startM && brE <= endM && brS < brE) {
       next.breakStart = day.breakStart
       next.breakEnd = day.breakEnd
     }
@@ -80,7 +116,9 @@ export function applyStaffAvailabilityToDays(
         return closeAvailabilityDay(day)
       }
       if (staffExc.startTime && staffExc.endTime) {
-        return intersectDayWithStaffHours(day, staffExc.startTime, staffExc.endTime)
+        return usesCustomStaffSchedule
+          ? applyCustomStaffHoursToDay(day, staffExc.startTime, staffExc.endTime)
+          : intersectDayWithStaffHours(day, staffExc.startTime, staffExc.endTime)
       }
       // Exception row exists, so treat it as day-level override.
       // If it has no explicit hours and is not closed, keep company/service day as-is.
@@ -92,6 +130,8 @@ export function applyStaffAvailabilityToDays(
     if (!staffRule.isAvailable) {
       return closeAvailabilityDay(day)
     }
-    return intersectDayWithStaffHours(day, staffRule.startTime, staffRule.endTime)
+    return usesCustomStaffSchedule
+      ? applyCustomStaffHoursToDay(day, staffRule.startTime, staffRule.endTime)
+      : intersectDayWithStaffHours(day, staffRule.startTime, staffRule.endTime)
   })
 }

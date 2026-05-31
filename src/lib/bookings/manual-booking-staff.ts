@@ -11,7 +11,7 @@ import {
   pickServiceRuleForWeekday,
   resolveBookingException,
 } from "@/lib/booking/effective-availability"
-import { getSlotsForSelectedDate, toLocalDateKey } from "@/lib/booking/availability-slots"
+import { getSlotsForSelectedDate } from "@/lib/booking/availability-slots"
 import { getAppToday } from "@/lib/date/current-date"
 import {
   hasStaffSchedulingIntervalOverlap,
@@ -22,6 +22,7 @@ import {
   type StaffAvailabilityExceptionRecord,
   type StaffAvailabilityRuleInput,
 } from "@/lib/staff/staff-store"
+import { applyStaffAvailabilityToDays } from "@/lib/booking/staff-day-overlay"
 import type { Database } from "@/types/database"
 import type { AvailabilityDay, Service, StaffMember } from "@/types/domain"
 
@@ -43,51 +44,7 @@ export function applyStaffOverlayToWeek(
   staffRules: StaffAvailabilityRuleInput[],
   staffExceptions: StaffAvailabilityExceptionRecord[]
 ): AvailabilityDay[] {
-  const usesCustomStaffSchedule = staffRules.length > 0
-  const key = toLocalDateKey(cellDate)
-  const wd = cellDate.getDay()
-  const staffRule = staffRules.find((x) => x.weekday === wd)
-  const staffExc = staffExceptions.find((x) => x.exceptionDate === key)
-  return days.map((day) => {
-    if (day.weekday !== wd) return day
-    if (staffExc) {
-      if (staffExc.isUnavailable) {
-        return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
-      }
-      if (staffExc.startTime && staffExc.endTime) {
-        if (!day.isOpen) return day
-        const start = staffExc.startTime > day.startTime ? staffExc.startTime : day.startTime
-        const end = staffExc.endTime < day.endTime ? staffExc.endTime : day.endTime
-        if (end <= start) return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
-        return {
-          ...day,
-          startTime: start,
-          endTime: end,
-          breakStart: undefined,
-          breakEnd: undefined,
-        }
-      }
-    }
-    if (!staffRule) {
-      return usesCustomStaffSchedule
-        ? { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
-        : day
-    }
-    if (!staffRule.isAvailable) {
-      return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
-    }
-    if (!day.isOpen) return day
-    const start = staffRule.startTime > day.startTime ? staffRule.startTime : day.startTime
-    const end = staffRule.endTime < day.endTime ? staffRule.endTime : day.endTime
-    if (end <= start) return { ...day, isOpen: false, breakStart: undefined, breakEnd: undefined }
-    return {
-      ...day,
-      startTime: start,
-      endTime: end,
-      breakStart: undefined,
-      breakEnd: undefined,
-    }
-  })
+  return applyStaffAvailabilityToDays(days, cellDate, staffRules, staffExceptions)
 }
 
 async function isManualBookingTimeInAllowedSlots(
