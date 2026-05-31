@@ -5,7 +5,6 @@ import {
   type AppointmentReminderEmailResult,
 } from "@/lib/notifications/appointment-reminder-email"
 import {
-  getActiveSmsReminderProvider,
   sendAppointmentReminderSms,
   sendAppointmentReminderSmsPlainText,
   type AppointmentReminderSmsResult,
@@ -27,8 +26,11 @@ import { getServiceRoleClient } from "@/lib/supabase/service-role"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-const BATCH_SIZE = 20
+const EMAIL_BATCH_SIZE = 15
+const SMS_BATCH_SIZE = 15
 const MAX_ATTEMPTS = 3
+/** Rekordy `processing` starsze niż ten próg wracają do `pending` (np. timeout crona). */
+const STALE_PROCESSING_MS = 10 * 60 * 1000
 
 /**
  * Cron wysyłający przypomnienia (e-mail oraz SMS) z kolejki `appointment_reminders`.
@@ -39,13 +41,12 @@ const MAX_ATTEMPTS = 3
  *   - RESEND_API_KEY
  *   - REMINDERS_FROM_EMAIL (opcjonalnie; fallback RESEND_FROM, a finalnie default w helperze)
  *
- * Dodatkowe envy (SMS, etap 2):
- *   - SMS_REMINDERS_ENABLED        — musi być dokładnie `true`, żeby cron w ogóle
- *     brał do paczki rekordy `channel='sms'`. Brak zmiennej / inna wartość = SMS
- *     pozostają `pending` (nigdy nie lockowane), e‑mail bez zmian. MVP produkcyjne.
- *   - SMS_REMINDERS_ALLOWED_BUSINESS_IDS — opcjonalnie, gdy SMS włączone: lista
- *     `uuid,uuid,...`; tylko te firmy mają SMS w paczce crona. Puste / nieustawione =
- *     wszystkie firmy. SMS spoza listy zostaje `pending` (bez locka, bez wysyłki).
+ * Dodatkowe envy (SMS):
+ *   - SMSAPI_TOKEN / SZYBKISMS_TOKEN — gdy skonfigurowany, cron bierze SMS z kolejki
+ *     (tak jak potwierdzenia wizyty). `SMS_REMINDERS_ENABLED=false` nie blokuje SMS,
+ *     jeśli token jest ustawiony.
+ *   - SMS_REMINDERS_ALLOWED_BUSINESS_IDS — opcjonalna allowlista `uuid,uuid,...`.
+ *     Pusta / nieustawiona = wszystkie firmy. Niepoprawne UUID w env = ignorowane.
  *   - SMS_PROVIDER                 — `smsapi` (domyślnie) albo `szybkisms`.
  *   - SMSAPI_TOKEN, SMSAPI_FROM    — gdy dostawca SMSAPI.
  *   - SZYBKISMS_TOKEN, SZYBKISMS_FROM — gdy dostawca SzybkiSMS; opcjonalnie
@@ -133,22 +134,26 @@ function getPublicAppOrigin(): string {
   return "http://localhost:3000"
 }
 
-/** Włącza SMS z kolejki gdy `SMS_REMINDERS_ENABLED=true` lub skonfigurowany token (jak potwierdzenia). */
-function areSmsRemindersEnabled(): boolean {
-  const explicit = process.env.SMS_REMINDERS_ENABLED?.trim().toLowerCase()
-  if (explicit === "false") return false
-  if (explicit === "true") return true
+function hasSmsProviderToken(): boolean {
   return Boolean(process.env.SMSAPI_TOKEN?.trim() || process.env.SZYBKISMS_TOKEN?.trim())
+}
+
+/**
+ * SMS z kolejki włączone, gdy jest token dostawcy (potwierdzenia już działają).
+ * `SMS_REMINDERS_ENABLED=false` nie wyłącza SMS przy skonfigurowanym tokenie.
+ */
+function areSmsRemindersEnabled(): boolean {
+  if (hasSmsProviderToken()) return true
+  return process.env.SMS_REMINDERS_ENABLED?.trim().toLowerCase() === "true"
 }
 
 const SMS_ALLOWED_BUSINESS_UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 /**
- * Allowlista firm dla SMS (gdy `SMS_REMINDERS_ENABLED=true`).
- * - `null` — zmienna pusta / nieustawiona / same puste tokeny → SMS dla wszystkich firm.
- * - niepusta tablica — tylko te `business_id` (SMS innych nie trafia do SELECT).
- * - `[]` — env niepuste, ale brak poprawnych UUID → w praktyce tylko e‑mail w paczce.
+ * Allowlista firm dla SMS.
+ * - `null` — brak env / brak poprawnych UUID → SMS dla wszystkich firm.
+ * - niepusta tablica — tylko te `business_id`.
  */
 function parseSmsAllowedBusinessIds(): string[] | null {
   const raw = process.env.SMS_REMINDERS_ALLOWED_BUSINESS_IDS?.trim()
@@ -156,8 +161,55 @@ function parseSmsAllowedBusinessIds(): string[] | null {
   const parts = raw.split(",").map((s) => s.trim()).filter(Boolean)
   if (parts.length === 0) return null
   const valid = parts.filter((id) => SMS_ALLOWED_BUSINESS_UUID_RE.test(id))
-  if (valid.length === 0) return []
+  if (valid.length === 0) return null
   return valid
+}
+
+async function recoverStaleProcessingReminders(admin: AdminClient, nowIso: string): Promise<number> {
+  const staleBefore = new Date(Date.now() - STALE_PROCESSING_MS).toISOString()
+  const { data, error } = await admin
+    .from("appointment_reminders")
+    .update({ status: "pending", locked_at: null })
+    .eq("status", "processing")
+    .lt("locked_at", staleBefore)
+    .select("id")
+  if (error) {
+    console.error("[cron/send-reminders] recover_stale_failed", { message: error.message })
+    return 0
+  }
+  const count = data?.length ?? 0
+  if (count > 0) {
+    console.info("[cron/send-reminders] recover_stale_processing", { count, nowIso })
+  }
+  return count
+}
+
+async function fetchDueChannelBatch(
+  admin: AdminClient,
+  channel: ReminderChannel,
+  limit: number,
+  nowIso: string,
+  smsAllowedBusinessIds: string[] | null,
+): Promise<DueReminderRow[]> {
+  let query = admin
+    .from("appointment_reminders")
+    .select("id, business_id, appointment_id, channel, reminder_kind, scheduled_for, attempts")
+    .eq("status", "pending")
+    .eq("channel", channel)
+    .lte("scheduled_for", nowIso)
+    .lt("attempts", MAX_ATTEMPTS)
+    .order("scheduled_for", { ascending: true })
+    .limit(limit)
+
+  if (channel === "sms" && smsAllowedBusinessIds !== null && smsAllowedBusinessIds.length > 0) {
+    query = query.in("business_id", smsAllowedBusinessIds)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    throw new Error(`fetch_due_${channel}_failed: ${error.message}`)
+  }
+  return (data ?? []) as DueReminderRow[]
 }
 
 async function handle(req: NextRequest) {
@@ -178,46 +230,25 @@ async function handle(req: NextRequest) {
   const smsRemindersEnabled = areSmsRemindersEnabled()
   const smsAllowedBusinessIds = smsRemindersEnabled ? parseSmsAllowedBusinessIds() : null
 
-  // 1. Wybieramy partię pending przypomnień gotowych do wysłania.
-  //    SMS: tylko przy SMS_REMINDERS_ENABLED=true; opcjonalnie dodatkowo allowlista
-  //    SMS_REMINDERS_ALLOWED_BUSINESS_IDS — inne SMS zostają pending (poza SELECT).
-  //    E‑mail zawsze w paczce (subject do tych samych filtrów czasu / attempts).
-  let dueQuery = admin
-    .from("appointment_reminders")
-    .select("id, business_id, appointment_id, channel, reminder_kind, scheduled_for, attempts")
-    .eq("status", "pending")
-    .lte("scheduled_for", nowIso)
-    .lt("attempts", MAX_ATTEMPTS)
-    .order("scheduled_for", { ascending: true })
-    .limit(BATCH_SIZE)
+  await recoverStaleProcessingReminders(admin, nowIso)
 
-  if (!smsRemindersEnabled) {
-    dueQuery = dueQuery.eq("channel", "email")
-  } else if (smsAllowedBusinessIds === null) {
-    dueQuery = dueQuery.in("channel", ["email", "sms"])
-  } else if (smsAllowedBusinessIds.length === 0) {
-    dueQuery = dueQuery.eq("channel", "email")
-  } else {
-    const inList = smsAllowedBusinessIds.join(",")
-    dueQuery = dueQuery.or(
-      `channel.eq.email,and(channel.eq.sms,business_id.in.(${inList}))`
-    )
+  // 1. Osobne paczki e-mail / SMS — e-maile nie wypierają SMS-ów z limitu batcha.
+  let emailDue: DueReminderRow[] = []
+  let smsDue: DueReminderRow[] = []
+  try {
+    ;[emailDue, smsDue] = await Promise.all([
+      fetchDueChannelBatch(admin, "email", EMAIL_BATCH_SIZE, nowIso, null),
+      smsRemindersEnabled
+        ? fetchDueChannelBatch(admin, "sms", SMS_BATCH_SIZE, nowIso, smsAllowedBusinessIds)
+        : Promise.resolve([]),
+    ])
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "fetch_due_failed"
+    console.error("[cron/send-reminders] fetch_due_failed", { message })
+    return NextResponse.json({ ok: false, error: "fetch_due_failed" }, { status: 500 })
   }
 
-  const { data: dueRows, error: dueError } = await dueQuery
-
-  if (dueError) {
-    console.error("[cron/send-reminders] fetch_due_failed", {
-      message: dueError.message,
-      code: dueError.code,
-    })
-    return NextResponse.json(
-      { ok: false, error: "fetch_due_failed" },
-      { status: 500 }
-    )
-  }
-
-  const items = (dueRows ?? []) as DueReminderRow[]
+  const items = [...emailDue, ...smsDue]
   if (items.length === 0) {
     console.info("[cron/send-reminders] no_due_reminders")
     return NextResponse.json({
@@ -261,13 +292,12 @@ async function handle(req: NextRequest) {
   console.info("[cron/send-reminders] batch_start", {
     ...counts,
     sms_reminders_enabled: smsRemindersEnabled,
+    sms_provider_token: hasSmsProviderToken(),
     sms_allowed_business_ids: !smsRemindersEnabled
       ? "n/a"
       : smsAllowedBusinessIds === null
         ? "all"
-        : smsAllowedBusinessIds.length === 0
-          ? "none_valid_uuid"
-          : smsAllowedBusinessIds.join(","),
+        : smsAllowedBusinessIds.join(","),
   })
 
   let sent = 0
@@ -690,35 +720,13 @@ async function processSmsReminder(
     const monthlyLimit = quota.limit
     const used = quota.used
     if (!quota.allowed) {
-      // To NIE jest błąd techniczny — to decyzja biznesowa, więc:
-      //   • status = 'skipped',
-      //   • last_error = 'sms_monthly_limit_reached',
-      //   • provider = aktywny SMS (smsapi | szybkisms),
-      //   • NIE zwiększamy attempts — kolejne uruchomienia crona i tak nie
-      //     spojrzą na ten rekord (status='skipped' jest poza WHERE w SELECT).
-      const { error: limitErr } = await admin
-        .from("appointment_reminders")
-        .update({
-          status: "skipped",
-          skipped_at: new Date().toISOString(),
-          locked_at: null,
-          last_error: "sms_monthly_limit_reached",
-          provider: getActiveSmsReminderProvider(),
-        })
-        .eq("id", item.id)
-      if (limitErr) {
-        console.error("[cron/send-reminders] sms_limit_mark_failed", {
-          id: item.id,
-          message: limitErr.message,
-        })
-      } else {
-        console.info("[cron/send-reminders] sms_limit_reached", {
-          id: item.id,
-          business_id: item.business_id,
-          used,
-          limit: monthlyLimit,
-        })
-      }
+      await markSkipped(admin, item, "sms_monthly_limit_reached", booking, phone)
+      console.info("[cron/send-reminders] sms_limit_reached", {
+        id: item.id,
+        business_id: item.business_id,
+        used,
+        limit: monthlyLimit,
+      })
       return "skipped"
     }
 
