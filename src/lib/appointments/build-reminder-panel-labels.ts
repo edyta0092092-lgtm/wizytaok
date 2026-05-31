@@ -1,7 +1,6 @@
 import type { AppointmentReminderPanelLabels } from "@/lib/appointments/appointment-reminder-panel-display"
 import type { BusinessReminderPanelSettings } from "@/lib/appointments/business-reminder-settings"
 import {
-  formatHoursBeforeVisit,
   formatMinutesBeforeVisit,
   type ReminderUiLanguage,
 } from "@/lib/appointments/reminder-duration-label"
@@ -13,7 +12,7 @@ export type ReminderPanelLabelsInput = {
 }
 
 export function buildRemindersAutomatedPolicyText(input: ReminderPanelLabelsInput): string {
-  const duration = formatHoursBeforeVisit(input.settings.defaultReminderHours, input.language)
+  const duration = formatMinutesBeforeVisit(input.settings.defaultReminderMinutes, input.language)
   if (input.language === "pl") {
     return `Przypomnienia są wysyłane automatycznie ${duration} przed wizytą.`
   }
@@ -21,7 +20,7 @@ export function buildRemindersAutomatedPolicyText(input: ReminderPanelLabelsInpu
 }
 
 export function buildFirstReminderSectionTitle(input: ReminderPanelLabelsInput): string {
-  const duration = formatHoursBeforeVisit(input.settings.defaultReminderHours, input.language)
+  const duration = formatMinutesBeforeVisit(input.settings.defaultReminderMinutes, input.language)
   if (input.language === "pl") {
     return `Przypomnienie ${duration} przed wizytą`
   }

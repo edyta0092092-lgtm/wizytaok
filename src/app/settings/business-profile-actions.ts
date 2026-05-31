@@ -28,9 +28,6 @@ export type SaveBusinessProfileInput = {
   phone: string
   /** Znormalizowany NIP lub null, gdy pusty. */
   taxId: string | null
-  defaultReminderHours: number
-  secondReminderMinutes: number
-  reminderChannel: "sms" | "email" | "both"
 }
 
 export type SaveBusinessProfileResult =
@@ -216,9 +213,6 @@ export async function saveBusinessProfileAction(
     company_tax_id_normalized: taxNormalized,
     contact_phone: phoneTrimmed || null,
     contact_phone_normalized: phoneNormalized,
-    default_reminder_hours: input.defaultReminderHours,
-    second_reminder_minutes: input.secondReminderMinutes,
-    reminder_channel: input.reminderChannel,
   }
 
   if (existing) {
@@ -240,9 +234,6 @@ export async function saveBusinessProfileAction(
       company_tax_id_normalized: patch.company_tax_id_normalized,
       contact_phone: patch.contact_phone,
       contact_phone_normalized: patch.contact_phone_normalized,
-      default_reminder_hours: patch.default_reminder_hours,
-      second_reminder_minutes: patch.second_reminder_minutes,
-      reminder_channel: patch.reminder_channel,
     })
     if (error?.code === "23505") return { ok: false, code: "slug_taken" }
     if (error) return { ok: false, code: "unknown", details: error.message }

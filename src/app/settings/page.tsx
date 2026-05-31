@@ -41,13 +41,6 @@ import {
   type AppointmentCsvHeaders,
   type ClientCsvHeaders,
 } from "@/lib/export/csv-export"
-import {
-  hoursToReminderLead,
-  minutesToSecondReminder,
-  reminderLeadToHours,
-  secondReminderToMinutes,
-  type SecondReminderSetting,
-} from "@/lib/settings/reminder-lead"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -59,13 +52,6 @@ import {
 } from "@/lib/validation/international-phone"
 import type { AppointmentStatus } from "@/types/domain"
 
-type ReminderLead = "2h" | "6h" | "12h" | "24h" | "48h"
-type SecondReminderLead = SecondReminderSetting
-type ReminderChannel = "sms" | "email" | "both"
-
-const REMINDER_LEAD_VALUES: ReminderLead[] = ["2h", "6h", "12h", "24h", "48h"]
-const SECOND_REMINDER_VALUES: SecondReminderLead[] = ["disabled", "30m", "1h", "2h", "3h"]
-const REMINDER_CHANNEL_VALUES: ReminderChannel[] = ["sms", "email", "both"]
 const SETTINGS_STORAGE_KEY = "pw_settings_form_v2"
 
 type SettingsForm = {
@@ -78,9 +64,6 @@ type SettingsForm = {
   phoneNational: string
   taxId: string
   taxIdEntryEnabled: boolean
-  reminderLead: ReminderLead
-  secondReminderLead: SecondReminderLead
-  reminderChannel: ReminderChannel
   depositForNewClients: boolean
   depositForAllClients: boolean
   depositAmount: string
@@ -96,9 +79,6 @@ const demoSettings: SettingsForm = {
   phoneNational: "600000000",
   taxId: "",
   taxIdEntryEnabled: false,
-  reminderLead: "24h",
-  secondReminderLead: "2h",
-  reminderChannel: "both",
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "50",
@@ -114,9 +94,6 @@ const emptySettings: SettingsForm = {
   phoneNational: "",
   taxId: "",
   taxIdEntryEnabled: false,
-  reminderLead: "24h",
-  secondReminderLead: "2h",
-  reminderChannel: "both",
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "",
@@ -284,17 +261,6 @@ export default function SettingsPage() {
         .maybeSingle()
         .then(({ data }) => {
           if (!data || cancelled) return
-          const ch = data.reminder_channel
-          const reminderChannel: ReminderChannel =
-            ch === "sms" || ch === "email" || ch === "both" ? ch : "both"
-          const hours =
-            typeof data.default_reminder_hours === "number" && Number.isFinite(data.default_reminder_hours)
-              ? data.default_reminder_hours
-              : 24
-          // Konta utworzone przez signup / start-trial mogą mieć NIP zapisany
-          // tylko w `company_tax_id` (kanonicznej kolumnie), a telefon tylko w
-          // `contact_phone` — bez kopii w legacy `tax_id`/`phone`. Czytamy obie
-          // kolumny i bierzemy pierwszą niepustą wartość.
           const pickString = (...vals: unknown[]) => {
             for (const v of vals) {
               if (typeof v === "string" && v.trim().length > 0) return v
@@ -319,13 +285,6 @@ export default function SettingsPage() {
             phoneNational: phoneParts.nationalDigits,
             taxId: taxIdFromDb,
             taxIdEntryEnabled: taxIdFromDb.replace(/[\s-]/g, "").trim().length > 0,
-            reminderLead: hoursToReminderLead(hours),
-            secondReminderLead: minutesToSecondReminder(
-              typeof data.second_reminder_minutes === "number" && Number.isFinite(data.second_reminder_minutes)
-                ? data.second_reminder_minutes
-                : 120
-            ),
-            reminderChannel,
           }))
         })
     })
@@ -339,37 +298,6 @@ export default function SettingsPage() {
     const tid = window.setTimeout(() => setShowSaved(false), 4500)
     return () => window.clearTimeout(tid)
   }, [showSaved])
-
-  const reminderLeadOptions = React.useMemo(
-    () =>
-      REMINDER_LEAD_VALUES.map((value) => ({
-        value,
-        label: t(`settings.reminderLead.${value}` as `settings.reminderLead.${ReminderLead}`),
-      })),
-    [t]
-  )
-
-  const reminderChannelOptions = React.useMemo(
-    () =>
-      REMINDER_CHANNEL_VALUES.map((value) => ({
-        value,
-        label: t(
-          `settings.reminderChannel.${value}` as `settings.reminderChannel.${ReminderChannel}`
-        ),
-      })),
-    [t]
-  )
-
-  const secondReminderOptions = React.useMemo(
-    () =>
-      SECOND_REMINDER_VALUES.map((value) => ({
-        value,
-        label: t(
-          `settings.secondReminder.${value}` as `settings.secondReminder.${SecondReminderLead}`
-        ),
-      })),
-    [t]
-  )
 
   const statusLabelLookup = React.useCallback(
     (status: AppointmentStatus) =>
@@ -485,9 +413,6 @@ export default function SettingsPage() {
           email: form.email,
           phone: buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational),
           taxId: form.taxIdEntryEnabled ? normalizeTaxIdPayload(form.taxId) : null,
-          defaultReminderHours: reminderLeadToHours(form.reminderLead),
-          secondReminderMinutes: secondReminderToMinutes(form.secondReminderLead),
-          reminderChannel: form.reminderChannel,
         })
         if (!result.ok) {
           if (result.code === "unauthorized") {
@@ -624,104 +549,6 @@ export default function SettingsPage() {
           {/* Dwie osobne kolumny-flex – brak współdzielonej wysokości rzędu siatki między kartami */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
             <div className="flex min-w-0 flex-col gap-6">
-          <Card
-            data-tour="settings-reminders"
-            className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
-          >
-            <CardHeader className="border-b border-border/70 py-4">
-              <CardTitle className="text-sm font-semibold">
-                {t("settings.reminders")}
-              </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">
-                {t("settings.remindersCardDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-4 pt-4 md:gap-6">
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="reminder-lead" className="flex min-h-10 items-end text-sm leading-snug">
-                  {t("settings.reminderLeadLabel")}
-                </Label>
-                <Select
-                  value={form.reminderLead}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      reminderLead: v as ReminderLead,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="reminder-lead" className="h-11 w-full min-w-0 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {reminderLeadOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex min-w-0 flex-col gap-2">
-                <Label
-                  htmlFor="reminder-channel"
-                  className="flex min-h-10 items-end text-sm leading-snug"
-                >
-                  {t("settings.reminderChannelLabel")}
-                </Label>
-                <Select
-                  value={form.reminderChannel}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      reminderChannel: v as ReminderChannel,
-                    }))
-                  }
-                >
-                  <SelectTrigger id="reminder-channel" className="h-11 w-full min-w-0 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {reminderChannelOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2 flex min-w-0 flex-col gap-2">
-                <Label htmlFor="second-reminder-lead" className="text-sm leading-snug">
-                  {t("settings.secondReminderLeadLabel")}
-                </Label>
-                <Select
-                  value={form.secondReminderLead}
-                  onValueChange={(v) =>
-                    setForm((f) => ({
-                      ...f,
-                      secondReminderLead: v as SecondReminderLead,
-                    }))
-                  }
-                >
-                  <SelectTrigger
-                    id="second-reminder-lead"
-                    className="h-11 w-full min-w-0 max-w-md rounded-xl"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {secondReminderOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">{t("settings.secondReminderHint")}</p>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
             <CardHeader className="border-b border-border/70 py-4">
               <CardTitle className="text-sm font-semibold">{t("settings.dataExportTitle")}</CardTitle>

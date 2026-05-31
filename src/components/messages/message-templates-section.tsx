@@ -11,6 +11,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import {
+  DEFAULT_FIRST_REMINDER_MINUTES,
+  DEFAULT_SECOND_REMINDER_MINUTES,
+  REMINDER_TIMING_OPTIONS,
+  formatTimingLabel,
+  reminder24hTitleFromMinutes,
+} from "@/lib/messages/reminder-settings-from-templates"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
@@ -38,6 +45,16 @@ type ReminderTimingDefaults = {
   firstReminderMinutes: number
   secondReminderMinutes: number
 }
+
+const REMINDER_TIMING_DEFAULTS: ReminderTimingDefaults = {
+  firstReminderMinutes: DEFAULT_FIRST_REMINDER_MINUTES,
+  secondReminderMinutes: DEFAULT_SECOND_REMINDER_MINUTES,
+}
+
+const SECOND_REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = [
+  { value: 0, label: "Wyłączone" },
+  ...REMINDER_TIMING_OPTIONS,
+]
 
 const TEMPLATE_ORDER: TemplateType[] = [
   "reminder_24h",
@@ -189,17 +206,6 @@ function defaultTiming(type: TemplateType, defaults: ReminderTimingDefaults): nu
   return null
 }
 
-function formatTimingLabel(minutes: number | null): string {
-  if (minutes == null || Number.isNaN(minutes)) return ""
-  const safe = Math.max(0, Math.floor(minutes))
-  if (safe === 0) return "0 min"
-  const h = Math.floor(safe / 60)
-  const min = safe % 60
-  if (h > 0 && min > 0) return `${h}h ${min}min`
-  if (h > 0) return `${h}h`
-  return `${min}min`
-}
-
 function NativeSelect({
   value,
   onChange,
@@ -225,18 +231,6 @@ function NativeSelect({
   )
 }
 
-const REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 15, label: "15 min przed" },
-  { value: 30, label: "30 min przed" },
-  { value: 60, label: "1 godzina przed" },
-  { value: 120, label: "2 godziny przed" },
-  { value: 180, label: "3 godziny przed" },
-  { value: 360, label: "6 godzin przed" },
-  { value: 720, label: "12 godzin przed" },
-  { value: 1440, label: "24 godziny przed" },
-  { value: 2880, label: "48 godzin przed" },
-]
-
 function withReadyContent(tpl: GroupedTemplate): GroupedTemplate {
   const defaults = TEMPLATE_DEFAULT_CONTENT[tpl.type]
   return {
@@ -245,14 +239,6 @@ function withReadyContent(tpl: GroupedTemplate): GroupedTemplate {
     emailSubject: tpl.emailSubject.trim() || defaults.emailSubject,
     emailBody: tpl.emailBody.trim() || defaults.emailBody,
   }
-}
-
-function reminder24hTitleFromMinutes(minutes: number | null): string {
-  const safe = typeof minutes === "number" && Number.isFinite(minutes) ? Math.max(0, Math.floor(minutes)) : 1440
-  if (safe > 0 && safe % 60 === 0) {
-    return `Przypomnienie ${Math.floor(safe / 60)}h przed wizytą`
-  }
-  return `Przypomnienie ${formatTimingLabel(safe)} przed wizytą`
 }
 
 function toGroupedTemplates(rows: Tables<"message_templates">[], defaults: ReminderTimingDefaults): GroupedTemplate[] {
@@ -345,7 +331,7 @@ export function MessageTemplatesSection({
       if (!client || !isSupabaseConfigured() || !bid) {
         if (!cancelled) {
           setTemplates(
-            toGroupedTemplates([], { firstReminderMinutes: 24 * 60, secondReminderMinutes: 120 }),
+            toGroupedTemplates([], REMINDER_TIMING_DEFAULTS),
           )
           setBusinessId(null)
           setLoadError(null)
@@ -353,41 +339,26 @@ export function MessageTemplatesSection({
         }
         return
       }
-      const [{ data, error }, { data: profileData }] = await Promise.all([
+      const [{ data, error }] = await Promise.all([
         client
           .from("message_templates")
           .select("*")
           .eq("business_id", bid)
           .order("updated_at", { ascending: false }),
-        client
-          .from("business_profiles")
-          .select("default_reminder_hours,second_reminder_minutes")
-          .eq("id", bid)
-          .maybeSingle(),
       ])
-      const nextDefaults: ReminderTimingDefaults = {
-        firstReminderMinutes:
-          typeof profileData?.default_reminder_hours === "number" && Number.isFinite(profileData.default_reminder_hours)
-            ? Math.max(1, Math.floor(profileData.default_reminder_hours)) * 60
-            : 24 * 60,
-        secondReminderMinutes:
-          typeof profileData?.second_reminder_minutes === "number" && Number.isFinite(profileData.second_reminder_minutes)
-            ? Math.max(0, Math.floor(profileData.second_reminder_minutes))
-            : 120,
-      }
       if (cancelled) return
       if (error) {
         if (isMissingMessageTemplatesTableError(error.message)) {
           setTemplatesUnavailable(true)
           setLoadError(null)
-          setTemplates(toGroupedTemplates([], nextDefaults))
+          setTemplates(toGroupedTemplates([], REMINDER_TIMING_DEFAULTS))
         } else {
           setLoadError(error.message)
         }
       } else {
         setTemplatesUnavailable(false)
         setLoadError(null)
-        setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], nextDefaults))
+        setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], REMINDER_TIMING_DEFAULTS))
       }
       setBusinessId(bid)
       setLoading(false)
@@ -502,39 +473,16 @@ export function MessageTemplatesSection({
           return
         }
       }
-      const [{ data, error }, { data: profileData, error: profileError }] = await Promise.all([
-        client
-          .from("message_templates")
-          .select("*")
-          .eq("business_id", businessId)
-          .order("updated_at", { ascending: false }),
-        client
-          .from("business_profiles")
-          .select("default_reminder_hours,second_reminder_minutes")
-          .eq("id", businessId)
-          .maybeSingle(),
-      ])
+      const { data, error } = await client
+        .from("message_templates")
+        .select("*")
+        .eq("business_id", businessId)
+        .order("updated_at", { ascending: false })
       if (error) {
         setSaveError(error.message)
         return
       }
-      if (profileError) {
-        setSaveError(profileError.message)
-        return
-      }
-      const nextDefaults: ReminderTimingDefaults = {
-        firstReminderMinutes:
-          typeof profileData?.default_reminder_hours === "number" &&
-          Number.isFinite(profileData.default_reminder_hours)
-            ? Math.max(1, Math.floor(profileData.default_reminder_hours)) * 60
-            : 24 * 60,
-        secondReminderMinutes:
-          typeof profileData?.second_reminder_minutes === "number" &&
-          Number.isFinite(profileData.second_reminder_minutes)
-            ? Math.max(0, Math.floor(profileData.second_reminder_minutes))
-            : 120,
-      }
-      setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], nextDefaults))
+      setTemplates(toGroupedTemplates((data ?? []) as Tables<"message_templates">[], REMINDER_TIMING_DEFAULTS))
       setShowSaved(true)
       setSheetOpen(false)
     })()
@@ -542,7 +490,7 @@ export function MessageTemplatesSection({
 
   return (
     <>
-      <section aria-labelledby="messages-templates-heading" className="min-w-0">
+      <section aria-labelledby="messages-templates-heading" className="min-w-0" data-tour="messages-templates">
         <h2
           id="messages-templates-heading"
           className="mb-3 text-base font-semibold text-foreground"
@@ -684,7 +632,10 @@ export function MessageTemplatesSection({
                         setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
                       }}
                     >
-                      {REMINDER_TIMING_OPTIONS.map((opt) => (
+                      {(form?.type === "reminder_before_visit"
+                        ? SECOND_REMINDER_TIMING_OPTIONS
+                        : REMINDER_TIMING_OPTIONS
+                      ).map((opt) => (
                         <option key={opt.value} value={String(opt.value)}>
                           {opt.label}
                         </option>

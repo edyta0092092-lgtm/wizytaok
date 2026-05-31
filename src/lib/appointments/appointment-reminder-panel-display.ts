@@ -79,15 +79,10 @@ function sectionFromRows(
 ): AppointmentReminderSection | null {
   if (rows.length === 0) return null
   const channels: AppointmentReminderChannelLine[] = []
-  const ch = labels.reminderChannel
-  if (ch === "email" || ch === "both") {
-    const email = channelLine(rows, "email", labels.channelEmail, labels)
-    if (email) channels.push(email)
-  }
-  if (ch === "sms" || ch === "both") {
-    const sms = channelLine(rows, "sms", labels.channelSms, labels)
-    if (sms) channels.push(sms)
-  }
+  const email = channelLine(rows, "email", labels.channelEmail, labels)
+  if (email) channels.push(email)
+  const sms = channelLine(rows, "sms", labels.channelSms, labels)
+  if (sms) channels.push(sms)
   if (channels.length === 0) return null
   return { title, channels }
 }

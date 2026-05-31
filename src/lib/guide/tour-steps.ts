@@ -12,7 +12,7 @@ export type TourStepConfig = {
  */
 export const TOUR_STEPS: TourStepConfig[] = [
   { id: "settings-company", path: "/settings", target: "settings-company" },
-  { id: "settings-reminders", path: "/settings", target: "settings-reminders" },
+  { id: "messages-templates", path: "/messages", target: "messages-templates" },
   { id: "clients-add", path: "/clients", target: "clients-add" },
   { id: "dashboard-today", path: "/dashboard", target: "dashboard-today" },
   { id: "appointments-statuses", path: "/appointments", target: "appointments-statuses" },
