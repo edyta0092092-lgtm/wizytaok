@@ -17,9 +17,9 @@ export const REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = 
   { value: 2880, label: "48 godzin przed" },
 ]
 
-/** First reminder (24h template): only long-notice windows, strictly above 12h. */
+/** First reminder (24h template): long-notice windows, from 12h upward. */
 export const FIRST_REMINDER_TIMING_OPTIONS = REMINDER_TIMING_OPTIONS.filter(
-  (opt) => opt.value > 12 * 60,
+  (opt) => opt.value >= 12 * 60,
 )
 
 /** Second reminder (before visit): short-notice windows, strictly below 12h. */
