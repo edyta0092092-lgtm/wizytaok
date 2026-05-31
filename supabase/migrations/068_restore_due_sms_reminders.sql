@@ -1,4 +1,5 @@
--- Przywróć due SMS w kolejce (anulowane / failed / skipped) gdy e-mail już poszedł lub termin minął.
+-- Przywróć due SMS w kolejce (anulowane / failed / skipped) gdy termin minął, wizyta w przyszłości.
+-- Uwaga: w UPDATE ... FROM nie można odwoływać się do aliasu tabeli docelowej (sms) w JOIN ON.
 
 update public.appointment_reminders sms
 set
@@ -8,10 +9,6 @@ set
   attempts = 0,
   updated_at = now()
 from public.bookings b
-left join public.appointment_reminders email
-  on email.appointment_id = sms.appointment_id
- and email.reminder_kind = sms.reminder_kind
- and email.channel = 'email'
 where sms.appointment_id = b.id
   and sms.channel = 'sms'
   and sms.sent_at is null
@@ -22,11 +19,33 @@ where sms.appointment_id = b.id
   and b.confirmation_token is not null
   and btrim(b.confirmation_token::text) <> ''
   and sms.scheduled_for <= now()
-  and ((b.appointment_date::timestamp + b.appointment_time) at time zone 'Europe/Warsaw') > now()
-  and (
-    email.id is null
-    or email.status in ('sent', 'pending', 'processing', 'failed')
-  );
+  and ((b.appointment_date::timestamp + b.appointment_time) at time zone 'Europe/Warsaw') > now();
+
+-- Przywróć SMS, gdy para e-mail dla tego samego przypomnienia już poszła.
+update public.appointment_reminders sms
+set
+  status = 'pending',
+  locked_at = null,
+  last_error = null,
+  attempts = 0,
+  updated_at = now()
+from public.appointment_reminders email,
+     public.bookings b
+where sms.appointment_id = email.appointment_id
+  and sms.appointment_id = b.id
+  and sms.channel = 'sms'
+  and email.channel = 'email'
+  and sms.reminder_kind = email.reminder_kind
+  and email.status = 'sent'
+  and sms.sent_at is null
+  and sms.status in ('cancelled', 'skipped', 'failed', 'pending')
+  and sms.scheduled_for <= now()
+  and b.status <> 'cancelled'
+  and b.client_phone is not null
+  and btrim(b.client_phone) <> ''
+  and b.confirmation_token is not null
+  and btrim(b.confirmation_token::text) <> ''
+  and ((b.appointment_date::timestamp + b.appointment_time) at time zone 'Europe/Warsaw') > now();
 
 insert into public.appointment_reminders
   (business_id, appointment_id, channel, reminder_kind, scheduled_for, status)
