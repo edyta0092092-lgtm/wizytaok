@@ -224,13 +224,14 @@ function mapLogRowStatus(row: ChannelLogRow | undefined): BookingCreatedChannelS
   const status = row.status ?? ""
   if (status === "skipped") return "skipped"
   if (status === "sent") return isGenuineSentLog(row) ? "sent" : "missing"
+  // In-flight claim — nie uruchamiaj drugiej wysyłki równoległej.
+  if (status === "queued" || status === "pending") return "already_sent"
   if (status === "failed") return "failed"
-  if (status === "queued" || status === "pending") return "failed"
   return "failed"
 }
 
 function channelSendSettled(status: BookingCreatedChannelStatus): boolean {
-  return status === "sent" || status === "skipped"
+  return status === "sent" || status === "skipped" || status === "already_sent"
 }
 
 async function persistChannelLog(
@@ -318,12 +319,13 @@ async function claimBookingCreatedChannel(
     "[booking-created.notify.log]",
   )
   if (claim.ok && !claim.duplicate) return "send"
-  if (!claim.ok) return "send"
 
   const current = await loadChannelLogRow(admin, booking.id, channel)
   if (isGenuineSentLog(current)) return "skip"
-  // Pending bez provider_message_id = niedokończona poprzednia próba (crash) — ponów wysyłkę.
-  if (current?.status === "pending") return "send"
+  // Inny równoległy request już claimuje ten kanał — nie wysyłaj drugi raz.
+  if (current?.status === "pending" || current?.status === "queued") return "skip"
+
+  if (!claim.ok) return "send"
 
   await persistChannelLog(admin, booking, channel, recipient, {
     status: "pending",

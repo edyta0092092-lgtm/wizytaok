@@ -12,7 +12,6 @@ import {
   updatePublicBooking,
 } from "@/lib/bookings/public-bookings"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
-import { ensureBookingCreatedNotifications } from "@/lib/bookings/notify-booking-created-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -227,15 +226,12 @@ export default function PublicBookingSuccessPage() {
         return
       }
       applyPublicBooking(b, true)
-      void ensureBookingCreatedNotifications(tokenFromQuery, language).catch((err) => {
-        console.error("[booking.success.notify]", err)
-      })
     }
     void run()
     return () => {
       cancelled = true
     }
-  }, [normalizedSlug, tokenFromQuery, language])
+  }, [normalizedSlug, tokenFromQuery])
 
   const refreshSupabaseBooking = React.useCallback(async () => {
     const client = getBrowserClient()
