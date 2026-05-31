@@ -1,12 +1,19 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronDown, Pencil, Plus, Trash2 } from "lucide-react"
+import { Check, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { cn } from "@/lib/utils"
@@ -120,31 +127,6 @@ function describeTrigger(row: Tables<"custom_templates">): string {
   const unitLabel = off.unit === "days" ? "dni" : off.unit === "hours" ? "godz." : "min"
   const direction = trigger === "schedule_before" ? "przed wizytą" : "po wizycie"
   return `${off.value} ${unitLabel} ${direction}`
-}
-
-function NativeSelect({
-  value,
-  onChange,
-  className,
-  children,
-}: {
-  value: string
-  onChange: (value: string) => void
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className={cn("relative", className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full appearance-none rounded-xl border border-input bg-card pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/20"
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-    </div>
-  )
 }
 
 export type CustomTemplatesSectionProps = {
@@ -472,17 +454,21 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                       </div>
                       <div className="space-y-1">
                         <Label className="text-xs">Jednostka</Label>
-                        <NativeSelect
-                          className="w-36"
+                        <Select
                           value={form.offsetUnit}
-                          onChange={(v) =>
+                          onValueChange={(v) =>
                             setForm((prev) => (prev ? { ...prev, offsetUnit: v as OffsetUnit } : prev))
                           }
                         >
-                          <option value="minutes">minut</option>
-                          <option value="hours">godzin</option>
-                          <option value="days">dni</option>
-                        </NativeSelect>
+                          <SelectTrigger className="w-36">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="minutes">minut</SelectItem>
+                            <SelectItem value="hours">godzin</SelectItem>
+                            <SelectItem value="days">dni</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                       <p className="pb-2 text-xs text-muted-foreground">
                         {form.triggerType === "schedule_before" ? "przed wizytą" : "po wizycie"}
@@ -493,19 +479,23 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                   {form.triggerType === "event" ? (
                     <div className="space-y-1">
                       <Label className="text-xs">Zdarzenie</Label>
-                      <NativeSelect
-                        className="w-full sm:w-72"
+                      <Select
                         value={form.eventKey}
-                        onChange={(v) =>
+                        onValueChange={(v) =>
                           setForm((prev) => (prev ? { ...prev, eventKey: v as EventKey } : prev))
                         }
                       >
-                        {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
-                          <option key={k} value={k}>
-                            {EVENT_LABELS[k]}
-                          </option>
-                        ))}
-                      </NativeSelect>
+                        <SelectTrigger className="w-full sm:w-72">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
+                            <SelectItem key={k} value={k}>
+                              {EVENT_LABELS[k]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   ) : null}
 

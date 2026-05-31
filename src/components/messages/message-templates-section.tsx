@@ -1,12 +1,19 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronDown, Pencil } from "lucide-react"
+import { Check, Pencil } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -14,7 +21,8 @@ import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import {
   DEFAULT_FIRST_REMINDER_MINUTES,
   DEFAULT_SECOND_REMINDER_MINUTES,
-  REMINDER_TIMING_OPTIONS,
+  FIRST_REMINDER_TIMING_OPTIONS,
+  SECOND_REMINDER_TIMING_OPTIONS,
   formatTimingLabel,
   reminder24hTitleFromMinutes,
 } from "@/lib/messages/reminder-settings-from-templates"
@@ -51,11 +59,6 @@ const REMINDER_TIMING_DEFAULTS: ReminderTimingDefaults = {
   firstReminderMinutes: DEFAULT_FIRST_REMINDER_MINUTES,
   secondReminderMinutes: DEFAULT_SECOND_REMINDER_MINUTES,
 }
-
-const SECOND_REMINDER_TIMING_OPTIONS: Array<{ value: number; label: string }> = [
-  { value: 0, label: "Wyłączone" },
-  ...REMINDER_TIMING_OPTIONS,
-]
 
 const TEMPLATE_ORDER: TemplateType[] = [
   "reminder_24h",
@@ -205,31 +208,6 @@ function defaultTiming(type: TemplateType, defaults: ReminderTimingDefaults): nu
   if (type === "reminder_24h") return defaults.firstReminderMinutes
   if (type === "reminder_before_visit") return defaults.secondReminderMinutes
   return null
-}
-
-function NativeSelect({
-  value,
-  onChange,
-  className,
-  children,
-}: {
-  value: string
-  onChange: (value: string) => void
-  className?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className={cn("relative", className)}>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full appearance-none rounded-xl border border-input bg-card pl-3 pr-9 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 dark:bg-input/20"
-      >
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-    </div>
-  )
 }
 
 function withReadyContent(tpl: GroupedTemplate): GroupedTemplate {
@@ -633,24 +611,28 @@ export function MessageTemplatesSection({
                 {form?.type === "reminder_24h" || form?.type === "reminder_before_visit" ? (
                   <div className="space-y-2">
                     <Label>Wyślij ile czasu przed wizytą</Label>
-                    <NativeSelect
-                      className="w-full sm:max-w-xs"
+                    <Select
                       value={String(form?.timingMinutesBefore ?? "")}
-                      onChange={(v) => {
+                      onValueChange={(v) => {
                         const parsed = Number(v)
                         if (Number.isNaN(parsed)) return
                         setForm((prev) => (prev ? { ...prev, timingMinutesBefore: Math.max(0, parsed) } : prev))
                       }}
                     >
-                      {(form?.type === "reminder_before_visit"
-                        ? SECOND_REMINDER_TIMING_OPTIONS
-                        : REMINDER_TIMING_OPTIONS
-                      ).map((opt) => (
-                        <option key={opt.value} value={String(opt.value)}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </NativeSelect>
+                      <SelectTrigger className="w-full sm:max-w-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(form?.type === "reminder_before_visit"
+                          ? SECOND_REMINDER_TIMING_OPTIONS
+                          : FIRST_REMINDER_TIMING_OPTIONS
+                        ).map((opt) => (
+                          <SelectItem key={opt.value} value={String(opt.value)}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 ) : null}
                 <div className="text-xs text-muted-foreground">
