@@ -528,6 +528,27 @@ async function isBookingCancelledNow(admin: AdminClient, bookingId: string): Pro
   return (data?.status ?? "") === "cancelled"
 }
 
+/** Utrzymuje zgodność kolumn bookings.*_reminder_* z faktyczną wysyłką z kolejki. */
+async function syncBookingLegacyReminderSent(
+  admin: AdminClient,
+  bookingId: string,
+  reminderKind: string,
+  sentAt: string,
+): Promise<void> {
+  const kind = reminderKind.trim().toLowerCase()
+  const patch =
+    kind === "second"
+      ? { second_reminder_sent_at: sentAt, second_reminder_status: "sent" }
+      : { first_reminder_sent_at: sentAt, first_reminder_status: "sent" }
+  const { error } = await admin.from("bookings").update(patch).eq("id", bookingId)
+  if (error) {
+    console.warn("[cron/send-reminders] sync_booking_reminder_columns", {
+      bookingId,
+      message: error.message,
+    })
+  }
+}
+
 // ---------------------------------------------------------------------------
 // EMAIL
 // ---------------------------------------------------------------------------
@@ -632,6 +653,7 @@ async function processEmailReminder(
         },
         "[cron/send-reminders.log]",
       )
+      await syncBookingLegacyReminderSent(admin, booking.id, item.reminder_kind, sentAt)
       return "sent"
     }
 
@@ -778,6 +800,7 @@ async function processSmsReminder(
         },
         "[cron/send-reminders.log]",
       )
+      await syncBookingLegacyReminderSent(admin, booking.id, item.reminder_kind, sentAt)
       return "sent"
     }
 

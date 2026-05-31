@@ -12,11 +12,6 @@ import {
   updatePublicBooking,
 } from "@/lib/bookings/public-bookings"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
-import {
-  ensureBookingCreatedNotifications,
-  isBookingCreatedNotifyComplete,
-  notifyBookingCreatedViaApi,
-} from "@/lib/bookings/notify-booking-created-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -237,25 +232,6 @@ export default function PublicBookingSuccessPage() {
       cancelled = true
     }
   }, [normalizedSlug, tokenFromQuery])
-
-  React.useEffect(() => {
-    if (!tokenFromQuery || !usesSupabase || loading) return
-    let cancelled = false
-    void (async () => {
-      let result = await ensureBookingCreatedNotifications(tokenFromQuery, language)
-      if (!isBookingCreatedNotifyComplete(result)) {
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-        result = await notifyBookingCreatedViaApi(tokenFromQuery, language)
-      }
-      if (cancelled) return
-      if (result.email.status === "failed" || result.sms.status === "failed") {
-        console.error("[booking.success.notify]", result)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [tokenFromQuery, usesSupabase, loading, language])
 
   const refreshSupabaseBooking = React.useCallback(async () => {
     const client = getBrowserClient()

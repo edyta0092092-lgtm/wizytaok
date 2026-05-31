@@ -75,6 +75,52 @@ type PlannedReminderRow = {
   second_reminder_status: string | null
 }
 
+type AppointmentReminderQueueRow = {
+  appointment_id: string
+  channel: string
+  reminder_kind: string
+  status: string
+  scheduled_for: string
+}
+
+function queueLookupKey(
+  appointmentId: string,
+  reminderType: "reminder_24h" | "reminder_before_visit",
+  channel: "sms" | "email",
+): string {
+  const kind = reminderType === "reminder_24h" ? "first" : "second"
+  return `${appointmentId}:${kind}:${channel}`
+}
+
+function buildQueueStatusMap(rows: AppointmentReminderQueueRow[]): Map<string, AppointmentReminderQueueRow> {
+  const map = new Map<string, AppointmentReminderQueueRow>()
+  for (const row of rows) {
+    const kind = row.reminder_kind.trim().toLowerCase()
+    const reminderType = kind === "second" ? "reminder_before_visit" : "reminder_24h"
+    const channel = row.channel.trim().toLowerCase() === "email" ? "email" : "sms"
+    map.set(queueLookupKey(row.appointment_id, reminderType, channel), row)
+  }
+  return map
+}
+
+function isQueueChannelSettled(row: AppointmentReminderQueueRow | undefined): boolean {
+  if (!row) return false
+  const status = row.status.trim().toLowerCase()
+  return status === "sent" || status === "skipped" || status === "failed"
+}
+
+async function loadAppointmentReminderQueueRows(
+  client: NonNullable<ReturnType<typeof getBrowserClient>>,
+  businessId: string,
+): Promise<AppointmentReminderQueueRow[]> {
+  const { data, error } = await client
+    .from("appointment_reminders")
+    .select("appointment_id,channel,reminder_kind,status,scheduled_for")
+    .eq("business_id", businessId)
+  if (error || !data) return []
+  return data as AppointmentReminderQueueRow[]
+}
+
 type PreviewBookingInfo = {
   id: string
   clientName: string
@@ -330,7 +376,8 @@ function mergeBookingReminderRows(
 function mergeEntries(
   rows: NotificationLogRow[],
   local: NotificationMessage[],
-  planned: PlannedReminderRow[]
+  planned: PlannedReminderRow[],
+  queueByKey: Map<string, AppointmentReminderQueueRow>,
 ): MergedEntry[] {
   const out: MergedEntry[] = []
   const logKeys = buildLogDedupKeys(rows)
@@ -365,10 +412,10 @@ function mergeEntries(
     if (firstPending) {
       if (row.client_phone?.trim()) {
         const key = `${row.id}:reminder_24h:sms`
-        if (!logKeys.has(key)) {
+        if (!logKeys.has(key) && !isQueueChannelSettled(queueByKey.get(queueLookupKey(row.id, "reminder_24h", "sms")))) {
           out.push({
             kind: "planned",
-            sortAt: firstDue,
+            sortAt: queueByKey.get(queueLookupKey(row.id, "reminder_24h", "sms"))?.scheduled_for ?? firstDue,
             row,
             channel: "sms",
             reminderType: "reminder_24h",
@@ -377,10 +424,10 @@ function mergeEntries(
       }
       if (row.client_email?.trim()) {
         const key = `${row.id}:reminder_24h:email`
-        if (!logKeys.has(key)) {
+        if (!logKeys.has(key) && !isQueueChannelSettled(queueByKey.get(queueLookupKey(row.id, "reminder_24h", "email")))) {
           out.push({
             kind: "planned",
-            sortAt: firstDue,
+            sortAt: queueByKey.get(queueLookupKey(row.id, "reminder_24h", "email"))?.scheduled_for ?? firstDue,
             row,
             channel: "email",
             reminderType: "reminder_24h",
@@ -391,10 +438,10 @@ function mergeEntries(
     if (secondPending) {
       if (row.client_phone?.trim()) {
         const key = `${row.id}:reminder_before_visit:sms`
-        if (!logKeys.has(key)) {
+        if (!logKeys.has(key) && !isQueueChannelSettled(queueByKey.get(queueLookupKey(row.id, "reminder_before_visit", "sms")))) {
           out.push({
             kind: "planned",
-            sortAt: secondDue,
+            sortAt: queueByKey.get(queueLookupKey(row.id, "reminder_before_visit", "sms"))?.scheduled_for ?? secondDue,
             row,
             channel: "sms",
             reminderType: "reminder_before_visit",
@@ -403,10 +450,10 @@ function mergeEntries(
       }
       if (row.client_email?.trim()) {
         const key = `${row.id}:reminder_before_visit:email`
-        if (!logKeys.has(key)) {
+        if (!logKeys.has(key) && !isQueueChannelSettled(queueByKey.get(queueLookupKey(row.id, "reminder_before_visit", "email")))) {
           out.push({
             kind: "planned",
-            sortAt: secondDue,
+            sortAt: queueByKey.get(queueLookupKey(row.id, "reminder_before_visit", "email"))?.scheduled_for ?? secondDue,
             row,
             channel: "email",
             reminderType: "reminder_before_visit",
@@ -684,7 +731,19 @@ function subjectForPreview(entry: PreviewTarget): string | null {
   return s || null
 }
 
-function plannedAtIso(entry: { row: PlannedReminderRow; reminderType: "reminder_24h" | "reminder_before_visit" }): string {
+function plannedAtIso(
+  entry: {
+    row: PlannedReminderRow
+    reminderType: "reminder_24h" | "reminder_before_visit"
+    channel?: "sms" | "email"
+  },
+  queueByKey?: Map<string, AppointmentReminderQueueRow>,
+): string {
+  if (entry.channel && queueByKey) {
+    const scheduled = queueByKey.get(queueLookupKey(entry.row.id, entry.reminderType, entry.channel))
+      ?.scheduled_for
+    if (scheduled?.trim()) return scheduled
+  }
   const startIso = `${entry.row.appointment_date}T${String(entry.row.appointment_time).slice(0, 5)}:00`
   const startMs = new Date(startIso).getTime()
   if (entry.reminderType === "reminder_24h") {
@@ -738,6 +797,9 @@ export function SendingHistorySection() {
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [loadingDb, setLoadingDb] = React.useState(true)
   const [plannedRows, setPlannedRows] = React.useState<PlannedReminderRow[]>([])
+  const [appointmentReminderQueue, setAppointmentReminderQueue] = React.useState<
+    AppointmentReminderQueueRow[]
+  >([])
   const [templateTypes, setTemplateTypes] = React.useState<string[]>([])
   const [localMessages, setLocalMessages] = React.useState<NotificationMessage[]>([])
   const [businessSlugNorm, setBusinessSlugNorm] = React.useState<string | null>(null)
@@ -843,10 +905,12 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const [logsLoad, { data: templateRows }, queueLogRows] = await Promise.all([
+      const [logsLoad, { data: templateRows }, queueLogRows, appointmentQueueRows] =
+        await Promise.all([
         loadNotificationLogRows(client, bid),
         client.from("message_templates").select("type").eq("business_id", bid),
         loadSentAppointmentReminderLogRows(client, bid),
+        loadAppointmentReminderQueueRows(client, bid),
       ])
       const logRows = mergeLogRowsWithQueueHistory(logsLoad.rows, queueLogRows)
       const qErr = logsLoad.error
@@ -929,6 +993,7 @@ export function SendingHistorySection() {
         } else {
           setPlannedRows([])
         }
+        setAppointmentReminderQueue(appointmentQueueRows)
         const nextTemplateTypes = Array.from(
           new Set(
             (templateRows ?? [])
@@ -984,9 +1049,14 @@ export function SendingHistorySection() {
     return localMessages
   }, [localMessages, businessSlugNorm])
 
+  const queueByKey = React.useMemo(
+    () => buildQueueStatusMap(appointmentReminderQueue),
+    [appointmentReminderQueue],
+  )
+
   const merged = React.useMemo(
-    () => mergeEntries(rows, scopedLocal, plannedRows),
-    [rows, scopedLocal, plannedRows]
+    () => mergeEntries(rows, scopedLocal, plannedRows, queueByKey),
+    [rows, scopedLocal, plannedRows, queueByKey],
   )
 
   const availableTypeFilters = React.useMemo(() => {
@@ -1399,7 +1469,7 @@ export function SendingHistorySection() {
                       {preview.kind === "db"
                         ? safeFormatDate(preview.row.created_at, dateFmt)
                         : preview.kind === "planned"
-                          ? safeFormatDate(plannedAtIso(preview), dateFmt)
+                          ? safeFormatDate(plannedAtIso(preview, queueByKey), dateFmt)
                         : preview.kind === "reminderOutcome"
                           ? safeFormatDate(
                               preview.reminderType === "reminder_24h"
@@ -1418,7 +1488,7 @@ export function SendingHistorySection() {
                       {preview.kind === "db"
                         ? safeFormatDate(preview.row.sent_at, dateFmt)
                         : preview.kind === "planned"
-                          ? safeFormatDate(plannedAtIso(preview), dateFmt)
+                          ? safeFormatDate(plannedAtIso(preview, queueByKey), dateFmt)
                         : preview.kind === "reminderOutcome"
                           ? safeFormatDate(
                               preview.reminderType === "reminder_24h"

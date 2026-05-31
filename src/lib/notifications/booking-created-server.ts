@@ -1,6 +1,7 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { getActiveSmsReminderProvider } from "@/lib/notifications/appointment-reminder-sms"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
+import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { upsertNotificationLog } from "@/lib/notifications/notification-log-update"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
@@ -273,6 +274,66 @@ function channelNeedsSendAttempt(status: BookingCreatedChannelStatus): boolean {
   return !channelSendSettled(status)
 }
 
+async function loadChannelLogRow(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  bookingId: string,
+  channel: "email" | "sms",
+): Promise<ChannelLogRow | undefined> {
+  const { data } = await admin
+    .from("notification_logs")
+    .select("status, error_message, provider, provider_message_id")
+    .eq("booking_id", bookingId)
+    .eq("type", "booking_created")
+    .eq("channel", channel)
+    .maybeSingle()
+  return data ?? undefined
+}
+
+/** Jedno równoległe wywołanie na kanał — bez podwójnej wysyłki (strona rezerwacji + sukces). */
+async function claimBookingCreatedChannel(
+  admin: NonNullable<ReturnType<typeof getServiceRoleClient>>,
+  booking: BookingRow,
+  channel: "email" | "sms",
+  recipient: string,
+): Promise<"send" | "skip"> {
+  const existing = await loadChannelLogRow(admin, booking.id, channel)
+  if (isGenuineSentLog(existing)) return "skip"
+
+  const insertBase = {
+    business_id: booking.business_id,
+    booking_id: booking.id,
+    channel,
+    type: "booking_created" as const,
+    recipient,
+    subject: null,
+    body: null,
+    provider: null,
+    provider_message_id: null,
+    sent_at: null,
+  }
+
+  const claim = await insertNotificationLog(
+    admin,
+    { ...insertBase, status: "pending" },
+    "[booking-created.notify.log]",
+  )
+  if (claim.ok && !claim.duplicate) return "send"
+  if (!claim.ok) return "send"
+
+  const current = await loadChannelLogRow(admin, booking.id, channel)
+  if (isGenuineSentLog(current)) return "skip"
+  if (current?.status === "pending") return "skip"
+
+  await persistChannelLog(admin, booking, channel, recipient, {
+    status: "pending",
+    subject: null,
+    body: null,
+    error_message: null,
+    sent_at: null,
+  })
+  return "send"
+}
+
 export async function getBookingCreatedNotifyStatus(
   bookingId: string,
 ): Promise<BookingCreatedNotifyResult> {
@@ -456,8 +517,12 @@ export async function sendBookingCreatedNotifications(
       sent_at: null,
     })
   } else {
-    try {
-      const sent = await sendReminderEmail({
+    const claim = await claimBookingCreatedChannel(admin, booking, "email", email)
+    if (claim === "skip") {
+      emailResult = channelDetail("already_sent", { provider: "resend" })
+    } else {
+      try {
+        const sent = await sendReminderEmail({
         to: email,
         subject: messages.emailSubject,
         textBody: messages.emailText,
@@ -488,17 +553,18 @@ export async function sendBookingCreatedNotifications(
       if (!sent.ok) {
         console.error("[booking-created.notify.email]", sent.code, sent.error ?? "")
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "unknown_error"
-      console.error("[booking-created.notify.email]", errMsg)
-      emailResult = channelDetail("failed", { error_message: errMsg })
-      await persistChannelLog(admin, booking, "email", email, {
-        status: "failed",
-        subject: messages.emailSubject,
-        body: messages.emailText,
-        error_message: errMsg,
-        sent_at: null,
-      })
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "unknown_error"
+        console.error("[booking-created.notify.email]", errMsg)
+        emailResult = channelDetail("failed", { error_message: errMsg })
+        await persistChannelLog(admin, booking, "email", email, {
+          status: "failed",
+          subject: messages.emailSubject,
+          body: messages.emailText,
+          error_message: errMsg,
+          sent_at: null,
+        })
+      }
     }
   }
 
@@ -527,8 +593,12 @@ export async function sendBookingCreatedNotifications(
       sent_at: null,
     })
   } else {
-    try {
-      const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
+    const claim = await claimBookingCreatedChannel(admin, booking, "sms", phone)
+    if (claim === "skip") {
+      smsResult = channelDetail("already_sent", { provider: smsProvider })
+    } else {
+      try {
+        const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
       const logStatus = mapProviderLogStatus(sent.ok, sent.ok ? undefined : sent.code)
       const errorMessage = sent.ok ? null : formatProviderFailure(sent.code, sent.error)
       smsResult = sent.ok
@@ -559,24 +629,25 @@ export async function sendBookingCreatedNotifications(
           ...smsEnvDiagnostics(),
         })
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : "unknown_error"
-      console.error("[booking-created.notify.sms]", {
-        error: errMsg,
-        recipient: phone,
-        ...smsEnvDiagnostics(),
-      })
-      smsResult = channelDetail("failed", {
-        error_message: errMsg,
-        provider: smsProvider,
-      })
-      await persistChannelLog(admin, booking, "sms", phone, {
-        status: "failed",
-        subject: null,
-        body: messages.sms,
-        error_message: errMsg,
-        sent_at: null,
-      })
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "unknown_error"
+        console.error("[booking-created.notify.sms]", {
+          error: errMsg,
+          recipient: phone,
+          ...smsEnvDiagnostics(),
+        })
+        smsResult = channelDetail("failed", {
+          error_message: errMsg,
+          provider: smsProvider,
+        })
+        await persistChannelLog(admin, booking, "sms", phone, {
+          status: "failed",
+          subject: null,
+          body: messages.sms,
+          error_message: errMsg,
+          sent_at: null,
+        })
+      }
     }
   }
 
