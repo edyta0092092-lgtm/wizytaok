@@ -137,6 +137,21 @@ function toMinutes(hm: string): number {
   return Number(h) * 60 + Number(m)
 }
 
+function isScheduleTimeRangeValid(startTime: string, endTime: string): boolean {
+  const start = startTime.trim()
+  const end = endTime.trim()
+  if (!start || !end) return false
+  return toMinutes(end) > toMinutes(start)
+}
+
+function findInvalidScheduleRule(rules: StaffAvailabilityRuleInput[]): StaffAvailabilityRuleInput | null {
+  for (const rule of rules) {
+    if (!rule.isAvailable) continue
+    if (!isScheduleTimeRangeValid(rule.startTime, rule.endTime)) return rule
+  }
+  return null
+}
+
 function weekdayLabelKey(weekday: number): string {
   const keys = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const
   return `availability.${keys[weekday] ?? "monday"}`
@@ -909,7 +924,27 @@ export default function TeamPage() {
       setNoticeDetail(null)
       return false
     }
-    return validateScheduleExceptionsList(form.exceptions)
+    return true
+  }
+
+  const validateScheduleRulesForSave = (): boolean => {
+    if (form.useBusinessHours) return true
+    for (const rule of form.rules) {
+      if (!rule.isAvailable) continue
+      if (!rule.startTime?.trim() || !rule.endTime?.trim()) {
+        setFormTab("schedule")
+        setNotice(t("team.fillAvailableDayHours"))
+        setNoticeDetail(null)
+        return false
+      }
+      if (!isScheduleTimeRangeValid(rule.startTime, rule.endTime)) {
+        setFormTab("schedule")
+        setNotice(t("team.invalidTimeRange"))
+        setNoticeDetail(null)
+        return false
+      }
+    }
+    return true
   }
 
   const saveScheduleExceptionsAndCollapse = async () => {
@@ -971,30 +1006,23 @@ export default function TeamPage() {
   const performSave = async () => {
     setNoticeDetail(null)
     if (!validateForm()) return
+    if (!validateScheduleRulesForSave()) return
     const name = joinPersonName(form.firstName, form.lastName)
     const emailTrim = form.email.trim()
     const phoneForSave = buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational)
-    if (!form.useBusinessHours) {
-      for (const r of form.rules) {
-        if (!r.isAvailable) continue
-        if (!r.startTime?.trim() || !r.endTime?.trim()) {
-          setNotice(t("team.fillAvailableDayHours"))
-          setNoticeDetail(null)
-          return
-        }
-        if (toMinutes(r.endTime) <= toMinutes(r.startTime)) {
-          setNotice(t("team.invalidTimeRange"))
-          setNoticeDetail(null)
-          return
-        }
-      }
-    }
     setSaving(true)
     try {
       const isDev = process.env.NODE_ENV === "development"
       const mapScheduleSaveError = (raw?: string) => {
+        const normalized = (raw ?? "").trim().toLowerCase()
         if (raw === "schedule_empty_payload") return t("team.scheduleEmptyPayloadError")
         if (raw === "schedule_not_persisted_in_db") return t("team.scheduleNotPersistedError")
+        if (
+          normalized.includes("staff_availability_rules_time_chk") ||
+          (normalized.includes("end_time") && normalized.includes("start_time"))
+        ) {
+          return t("team.invalidTimeRange")
+        }
         return t("team.scheduleSaveError")
       }
       const client = getBrowserClient()
@@ -1076,10 +1104,19 @@ export default function TeamPage() {
           form.useBusinessHours ? [] : form.rules,
         )
         if (!rulesOutCreate.ok) {
+          setFormTab("schedule")
+          setIsScheduleEditing(true)
           partialNotices = [...partialNotices, mapScheduleSaveError(rulesOutCreate.error)]
-          if (process.env.NODE_ENV === "development" && rulesOutCreate.error?.trim()) {
+          if (rulesOutCreate.error?.trim() && mapScheduleSaveError(rulesOutCreate.error) === t("team.scheduleSaveError")) {
             setNoticeDetail(`${t("team.errorDetailsPrefix")} ${rulesOutCreate.error.trim()}`)
+          } else {
+            setNoticeDetail(null)
           }
+        }
+        if (!validateScheduleExceptionsList(form.exceptions)) {
+          setFormTab("exceptions")
+          setSaving(false)
+          return
         }
         const excOut = await saveStaffAvailabilityExceptions(client, bid, newStaffId, form.exceptions)
         if (!excOut.ok) {
@@ -1236,6 +1273,7 @@ export default function TeamPage() {
         editing.id,
         form.useBusinessHours ? [] : form.rules,
       )
+      let scheduleSavedOk = rulesOut.ok
       if (isDev) {
         console.debug("[team.schedule.save.call] edit", {
           staffId: editing.id,
@@ -1246,10 +1284,19 @@ export default function TeamPage() {
         })
       }
       if (!rulesOut.ok) {
+        setFormTab("schedule")
+        setIsScheduleEditing(true)
         partialNotices = [...partialNotices, mapScheduleSaveError(rulesOut.error)]
-        if (process.env.NODE_ENV === "development" && rulesOut.error?.trim()) {
+        if (rulesOut.error?.trim() && mapScheduleSaveError(rulesOut.error) === t("team.scheduleSaveError")) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${rulesOut.error.trim()}`)
+        } else {
+          setNoticeDetail(null)
         }
+      }
+      if (!validateScheduleExceptionsList(form.exceptions)) {
+        setFormTab("exceptions")
+        setSaving(false)
+        return
       }
       const excOut = await saveStaffAvailabilityExceptions(client, bid, editing.id, form.exceptions)
       if (!excOut.ok) {
@@ -1378,7 +1425,11 @@ export default function TeamPage() {
             }
           : prev,
       )
-      setIsScheduleEditing(false)
+      if (scheduleSavedOk) {
+        setIsScheduleEditing(false)
+      } else {
+        setIsScheduleEditing(true)
+      }
       setIsExceptionsEditing(false)
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error"
@@ -1994,10 +2045,16 @@ export default function TeamPage() {
                             {!form.useBusinessHours ? (
                               <div className="overflow-hidden rounded-xl border border-border/70">
                                 <ul className="divide-y divide-border/70">
-                                  {sortRulesByUiWeekdayOrder(form.rules).map((rule) => (
+                                  {sortRulesByUiWeekdayOrder(form.rules).map((rule) => {
+                                    const rowInvalid =
+                                      rule.isAvailable &&
+                                      !isScheduleTimeRangeValid(rule.startTime, rule.endTime)
+                                    return (
                                     <li
                                       key={rule.weekday}
-                                      className="grid min-w-0 grid-cols-[2.75rem_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2 px-3 py-2 sm:py-2.5"
+                                      className={`grid min-w-0 grid-cols-[2.75rem_auto_minmax(0,1fr)] items-center gap-x-2 gap-y-2 px-3 py-2 sm:py-2.5 ${
+                                        rowInvalid ? "bg-destructive/5" : ""
+                                      }`}
                                     >
                                       <span
                                         className="text-sm font-semibold text-foreground"
@@ -2013,33 +2070,44 @@ export default function TeamPage() {
                                         aria-label={t(weekdayLabelKey(rule.weekday))}
                                       />
                                       {rule.isAvailable ? (
-                                        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                                          <Input
-                                            id={`start-${rule.weekday}`}
-                                            type="time"
-                                            value={rule.startTime}
-                                            onChange={(e) =>
-                                              updateRule(rule.weekday, { startTime: e.target.value })
-                                            }
-                                            aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeFrom")}`}
-                                            className="h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums"
-                                          />
-                                          <span
-                                            className="shrink-0 text-xs text-muted-foreground"
-                                            aria-hidden
-                                          >
-                                            –
-                                          </span>
-                                          <Input
-                                            id={`end-${rule.weekday}`}
-                                            type="time"
-                                            value={rule.endTime}
-                                            onChange={(e) =>
-                                              updateRule(rule.weekday, { endTime: e.target.value })
-                                            }
-                                            aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeTo")}`}
-                                            className="h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums"
-                                          />
+                                        <div className="min-w-0 space-y-1">
+                                          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                                            <Input
+                                              id={`start-${rule.weekday}`}
+                                              type="time"
+                                              value={rule.startTime}
+                                              onChange={(e) =>
+                                                updateRule(rule.weekday, { startTime: e.target.value })
+                                              }
+                                              aria-invalid={rowInvalid}
+                                              aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeFrom")}`}
+                                              className={`h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums ${
+                                                rowInvalid ? "border-destructive" : ""
+                                              }`}
+                                            />
+                                            <span
+                                              className="shrink-0 text-xs text-muted-foreground"
+                                              aria-hidden
+                                            >
+                                              –
+                                            </span>
+                                            <Input
+                                              id={`end-${rule.weekday}`}
+                                              type="time"
+                                              value={rule.endTime}
+                                              onChange={(e) =>
+                                                updateRule(rule.weekday, { endTime: e.target.value })
+                                              }
+                                              aria-invalid={rowInvalid}
+                                              aria-label={`${t(weekdayLabelKey(rule.weekday))} — ${t("team.timeTo")}`}
+                                              className={`h-9 min-w-0 flex-1 max-w-[7.25rem] rounded-lg px-2 text-sm tabular-nums ${
+                                                rowInvalid ? "border-destructive" : ""
+                                              }`}
+                                            />
+                                          </div>
+                                          {rowInvalid ? (
+                                            <p className="text-xs text-destructive">{t("team.invalidTimeRange")}</p>
+                                          ) : null}
                                         </div>
                                       ) : (
                                         <p className="text-right text-xs text-muted-foreground sm:text-left">
@@ -2047,7 +2115,8 @@ export default function TeamPage() {
                                         </p>
                                       )}
                                     </li>
-                                  ))}
+                                    )
+                                  })}
                                 </ul>
                               </div>
                             ) : null}
