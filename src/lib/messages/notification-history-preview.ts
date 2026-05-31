@@ -129,6 +129,48 @@ function plannedAtIso(
   return entry.row.second_reminder_due_at?.trim() || null
 }
 
+function bookingContextFromPlannedRow(
+  row: PlannedReminderPreviewRow,
+  partial?: Partial<PreviewBookingContext>,
+): PreviewBookingContext {
+  return {
+    id: row.id,
+    clientName: row.client_name?.trim() || partial?.clientName || "",
+    serviceName: partial?.serviceName ?? "",
+    appointmentDate: String(row.appointment_date ?? partial?.appointmentDate ?? "").slice(0, 10),
+    appointmentTime: String(row.appointment_time ?? partial?.appointmentTime ?? "").slice(0, 5),
+    status: partial?.status ?? "confirmed",
+    createdAt: partial?.createdAt ?? null,
+    confirmedAt: partial?.confirmedAt ?? null,
+    updatedAt: partial?.updatedAt ?? null,
+    lastStatusChangeSource: partial?.lastStatusChangeSource ?? null,
+    confirmationToken: partial?.confirmationToken ?? null,
+    staffName: partial?.staffName ?? null,
+  }
+}
+
+function resolvePreviewBooking(
+  target: NotificationPreviewTarget,
+  booking: PreviewBookingContext | null,
+): PreviewBookingContext | null {
+  if (booking) return booking
+  if (target.kind === "planned" || target.kind === "reminderOutcome") {
+    return bookingContextFromPlannedRow(target.row)
+  }
+  return null
+}
+
+function queueCreatedAtIso(
+  target: NotificationPreviewTarget,
+  queueByKey: Map<string, PreviewQueueRow>,
+): string | null {
+  if (target.kind !== "planned" && target.kind !== "reminderOutcome") return null
+  return (
+    queueByKey.get(queueLookupKey(target.row.id, target.reminderType, target.channel))?.created_at?.trim() ||
+    null
+  )
+}
+
 function bookingConfirmedAtIso(booking: PreviewBookingContext | null): string | null {
   if (!booking) return null
   if (booking.confirmedAt?.trim()) return booking.confirmedAt
@@ -221,7 +263,8 @@ async function renderPreviewMessage(args: {
   business: PreviewBusinessContext | null
   language: "pl" | "en"
 }): Promise<{ body: string | null; subject: string | null }> {
-  const { client, businessId, target, booking, business, language } = args
+  const { client, businessId, target, business, language } = args
+  const booking = resolvePreviewBooking(target, args.booking)
   const channel = previewChannel(target)
 
   if (target.kind === "local") {
@@ -261,7 +304,21 @@ async function renderPreviewMessage(args: {
     const body =
       runtime.emailBody && runtime.emailBody.trim().length > 0
         ? applyTemplateVariables(runtime.emailBody, vars)
-        : null
+        : templateType === "reminder_24h" || templateType === "reminder_before_visit"
+          ? applyTemplateVariables(
+              language === "en"
+                ? "Hello {{imie}}, this is a reminder about your appointment on {{data}} at {{godzina}} ({{usluga}})."
+                : "Cześć {{imie}}, przypominamy o wizycie {{data}} o {{godzina}} ({{usluga}}).",
+              vars,
+            )
+          : templateType === "booking_confirmation"
+            ? applyTemplateVariables(
+                language === "en"
+                  ? "Appointment confirmed: {{usluga}}, {{data}} at {{godzina}}."
+                  : "Wizyta potwierdzona: {{usluga}}, {{data}} o {{godzina}}.",
+                vars,
+              )
+            : null
     return { body, subject }
   }
 
@@ -347,17 +404,20 @@ export async function loadNotificationPreviewDetails(args: {
   const { client, businessId, target, booking, business, queueByKey, formatDateTime, scheduledSendLabel } =
     args
 
+  const effectiveBooking = resolvePreviewBooking(target, booking)
+
   const message = await renderPreviewMessage({
     client,
     businessId,
     target,
-    booking,
+    booking: effectiveBooking,
     business,
     language: args.language,
   })
 
   const createdAtIso =
-    bookingConfirmedAtIso(booking) ??
+    bookingConfirmedAtIso(effectiveBooking) ??
+    queueCreatedAtIso(target, queueByKey) ??
     (target.kind === "db" ? target.row.created_at : null) ??
     (target.kind === "local" ? target.msg.createdAt ?? null : null)
 

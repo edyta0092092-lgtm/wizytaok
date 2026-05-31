@@ -313,6 +313,69 @@ function mergeLogRowsWithQueueHistory(
   return merged
 }
 
+function mapPreviewBookingRow(
+  bookingData: Record<string, unknown>,
+  bookingId: string,
+): PreviewBookingInfo {
+  return {
+    id: String(bookingData.id ?? bookingId),
+    clientName:
+      typeof bookingData.client_name === "string" ? bookingData.client_name.trim() : "",
+    serviceName:
+      typeof bookingData.service_name === "string" ? bookingData.service_name.trim() : "",
+    appointmentDate:
+      typeof bookingData.appointment_date === "string"
+        ? String(bookingData.appointment_date).slice(0, 10)
+        : "",
+    appointmentTime:
+      typeof bookingData.appointment_time === "string"
+        ? String(bookingData.appointment_time).slice(0, 5)
+        : "",
+    status: typeof bookingData.status === "string" ? bookingData.status.trim() : "",
+    createdAt: typeof bookingData.created_at === "string" ? bookingData.created_at : null,
+    confirmedAt: typeof bookingData.confirmed_at === "string" ? bookingData.confirmed_at : null,
+    updatedAt: typeof bookingData.updated_at === "string" ? bookingData.updated_at : null,
+    lastStatusChangeSource:
+      typeof bookingData.last_status_change_source === "string"
+        ? bookingData.last_status_change_source.trim()
+        : null,
+    confirmationToken:
+      typeof bookingData.confirmation_token === "string"
+        ? bookingData.confirmation_token.trim()
+        : null,
+    staffName:
+      typeof bookingData.staff_name === "string" ? bookingData.staff_name.trim() : null,
+  }
+}
+
+async function loadPreviewBookingInfo(
+  client: NonNullable<ReturnType<typeof getBrowserClient>>,
+  bookingId: string,
+): Promise<PreviewBookingInfo | null> {
+  const selects = [
+    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,updated_at,last_status_change_source,confirmation_token,staff_name",
+    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,confirmation_token,staff_name",
+    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,staff_name",
+  ]
+
+  for (const select of selects) {
+    const { data, error } = await client
+      .from("bookings")
+      .select(select)
+      .eq("id", bookingId)
+      .maybeSingle()
+
+    if (!error && data) {
+      return mapPreviewBookingRow(data as unknown as Record<string, unknown>, bookingId)
+    }
+    if (!isMissingColumnInBookingsQuery(error?.message)) {
+      break
+    }
+  }
+
+  return null
+}
+
 function isMissingColumnInBookingsQuery(message: string | null | undefined): boolean {
   const m = String(message ?? "")
   return (
@@ -1213,48 +1276,7 @@ export function SendingHistorySection() {
       }
 
       if (bookingIdForPreview) {
-        const { data: bookingData } = await client
-          .from("bookings")
-          .select(
-            "id,client_name,service_name,appointment_date,appointment_time,status,created_at,confirmed_at,updated_at,last_status_change_source,confirmation_token,staff_name",
-          )
-          .eq("id", bookingIdForPreview)
-          .maybeSingle()
-
-        if (bookingData) {
-          bookingInfo = {
-            id: String(bookingData.id ?? bookingIdForPreview),
-            clientName:
-              typeof bookingData.client_name === "string" ? bookingData.client_name.trim() : "",
-            serviceName:
-              typeof bookingData.service_name === "string" ? bookingData.service_name.trim() : "",
-            appointmentDate:
-              typeof bookingData.appointment_date === "string"
-                ? String(bookingData.appointment_date).slice(0, 10)
-                : "",
-            appointmentTime:
-              typeof bookingData.appointment_time === "string"
-                ? String(bookingData.appointment_time).slice(0, 5)
-                : "",
-            status: typeof bookingData.status === "string" ? bookingData.status.trim() : "",
-            createdAt:
-              typeof bookingData.created_at === "string" ? bookingData.created_at : null,
-            confirmedAt:
-              typeof bookingData.confirmed_at === "string" ? bookingData.confirmed_at : null,
-            updatedAt:
-              typeof bookingData.updated_at === "string" ? bookingData.updated_at : null,
-            lastStatusChangeSource:
-              typeof bookingData.last_status_change_source === "string"
-                ? bookingData.last_status_change_source.trim()
-                : null,
-            confirmationToken:
-              typeof bookingData.confirmation_token === "string"
-                ? bookingData.confirmation_token.trim()
-                : null,
-            staffName:
-              typeof bookingData.staff_name === "string" ? bookingData.staff_name.trim() : null,
-          }
-        }
+        bookingInfo = await loadPreviewBookingInfo(client, bookingIdForPreview)
       }
 
       if (cancelled) return
@@ -1290,8 +1312,29 @@ export function SendingHistorySection() {
     }
   }, [preview, bookingIdForPreview, access.businessId, queueByKey, dateFmt, language, t])
 
+  const relatedAppointmentInfo = React.useMemo((): PreviewBookingInfo | null => {
+    if (previewBookingInfo) return previewBookingInfo
+    if (preview?.kind === "planned" || preview?.kind === "reminderOutcome") {
+      return {
+        id: preview.row.id,
+        clientName: preview.row.client_name?.trim() || "",
+        serviceName: "",
+        appointmentDate: String(preview.row.appointment_date ?? "").slice(0, 10),
+        appointmentTime: String(preview.row.appointment_time ?? "").slice(0, 5),
+        status: "",
+        createdAt: null,
+        confirmedAt: null,
+        updatedAt: null,
+        lastStatusChangeSource: null,
+        confirmationToken: null,
+        staffName: null,
+      }
+    }
+    return null
+  }, [previewBookingInfo, preview])
+
   const relatedStatusLabel = React.useMemo(() => {
-    const raw = (previewBookingInfo?.status ?? "").toLowerCase()
+    const raw = (relatedAppointmentInfo?.status ?? "").toLowerCase()
     if (!raw) return "-"
     if (raw === "booked") return "Zarezerwowana"
     if (raw === "pending") return "Do potwierdzenia"
@@ -1300,7 +1343,7 @@ export function SendingHistorySection() {
     if (raw === "completed") return "Zrealizowana"
     if (raw === "no_show") return "Nieobecność"
     return raw
-  }, [previewBookingInfo?.status])
+  }, [relatedAppointmentInfo?.status])
 
   const previewOpen = Boolean(preview)
 
@@ -1655,9 +1698,12 @@ export function SendingHistorySection() {
                           {t("messagesLog.relatedAppointmentLink")}
                         </Link>
                         <p className="text-xs text-muted-foreground">
-                          {previewBookingInfo?.appointmentDate || "-"} {previewBookingInfo?.appointmentTime || ""}
+                          {relatedAppointmentInfo?.appointmentDate || "-"}
+                          {relatedAppointmentInfo?.appointmentTime
+                            ? ` ${relatedAppointmentInfo.appointmentTime}`
+                            : ""}
                           {" · "}
-                          {previewBookingInfo?.serviceName || "-"}
+                          {relatedAppointmentInfo?.serviceName || "-"}
                         </p>
                         <p className="text-xs text-muted-foreground">Status: {relatedStatusLabel}</p>
                       </dd>
