@@ -12,7 +12,12 @@ import {
   updatePublicBooking,
 } from "@/lib/bookings/public-bookings"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
-import { ensureBookingCreatedNotifications } from "@/lib/bookings/notify-booking-created-client"
+import {
+  ensureBookingCreatedNotifications,
+  isBookingCreatedNotifyComplete,
+  isBookingCreatedNotifyInProgress,
+  notifyBookingCreatedViaApi,
+} from "@/lib/bookings/notify-booking-created-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { parseLocalDateKey } from "@/components/booking/public-booking-calendar"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -238,12 +243,17 @@ export default function PublicBookingSuccessPage() {
     if (!tokenFromQuery || !usesSupabase || loading) return
     let cancelled = false
     const timer = window.setTimeout(() => {
-      void ensureBookingCreatedNotifications(tokenFromQuery, language).then((result) => {
+      void (async () => {
+        let result = await ensureBookingCreatedNotifications(tokenFromQuery, language)
+        if (!isBookingCreatedNotifyComplete(result) && isBookingCreatedNotifyInProgress(result)) {
+          await new Promise((resolve) => setTimeout(resolve, 5500))
+          result = await notifyBookingCreatedViaApi(tokenFromQuery, language)
+        }
         if (cancelled) return
         if (result.email.status === "failed" || result.sms.status === "failed") {
           console.error("[booking.success.notify]", result)
         }
-      })
+      })()
     }, 2500)
     return () => {
       cancelled = true

@@ -3,7 +3,6 @@ import type {
   BookingCreatedChannelStatus,
   BookingCreatedNotifyResult,
 } from "@/lib/notifications/booking-created-server"
-import { notifyBookingCreatedAfterOnlineBooking } from "@/lib/bookings/notify-booking-created-action"
 
 export type BookingCreatedNotifyApiResult = BookingCreatedNotifyResult
 
@@ -69,15 +68,24 @@ function parseNotifyResponse(json: Record<string, unknown>): BookingCreatedNotif
   }
 }
 
-function channelDone(detail: BookingCreatedChannelDetail): boolean {
-  return detail.status === "sent" || detail.status === "already_sent" || detail.status === "skipped"
+function channelResolved(detail: BookingCreatedChannelDetail): boolean {
+  return (
+    detail.status === "sent" ||
+    detail.status === "already_sent" ||
+    detail.status === "skipped" ||
+    detail.status === "missing"
+  )
 }
 
 export function isBookingCreatedNotifyComplete(result: BookingCreatedNotifyApiResult): boolean {
-  return channelDone(result.email) && channelDone(result.sms)
+  return channelResolved(result.email) && channelResolved(result.sms)
 }
 
-/** Natychmiastowe potwierdzenie po rezerwacji — server action (bez pośredniego fetch z klienta). */
+function channelInProgress(detail: BookingCreatedChannelDetail): boolean {
+  return detail.status === "failed" && detail.error_message === "send_in_progress"
+}
+
+/** Natychmiastowe potwierdzenie po rezerwacji — POST na route handler (pewna wysyłka po stronie serwera). */
 export async function notifyBookingCreatedViaApi(
   token: string,
   language: "pl" | "en",
@@ -91,15 +99,26 @@ export async function notifyBookingCreatedViaApi(
     }
   }
   try {
-    return await notifyBookingCreatedAfterOnlineBooking(trimmed, language)
+    const res = await fetch("/api/public/notify-booking-created", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: trimmed, language }),
+      cache: "no-store",
+    })
+    const json = (await res.json()) as Record<string, unknown>
+    return parseNotifyResponse(json)
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "server_action_error"
+    const msg = err instanceof Error ? err.message : "notify_request_failed"
     return {
       ok: false,
       email: { status: "failed", error_message: msg },
       sms: { status: "failed", error_message: msg },
     }
   }
+}
+
+export function isBookingCreatedNotifyInProgress(result: BookingCreatedNotifyApiResult): boolean {
+  return channelInProgress(result.email) || channelInProgress(result.sms)
 }
 
 export async function fetchBookingCreatedNotifyStatus(

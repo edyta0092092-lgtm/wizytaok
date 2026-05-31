@@ -282,7 +282,7 @@ async function claimChannelSend(
       .eq("channel", channel)
       .maybeSingle()
     const createdAt = meta?.created_at ? Date.parse(String(meta.created_at)) : NaN
-    const staleMs = 45_000
+    const staleMs = 5_000
     if (!Number.isFinite(createdAt) || Date.now() - createdAt > staleMs) {
       await upsertNotificationLog(
         admin,
