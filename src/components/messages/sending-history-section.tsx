@@ -24,6 +24,7 @@ import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { reminderLogTypeFromKind } from "@/lib/notifications/reminder-notification-log"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { formatDeliveryError } from "@/lib/messages/delivery-error-label"
 import {
   loadNotificationPreviewDetails,
   type NotificationPreviewDetails,
@@ -817,26 +818,17 @@ function plannedAtIso(
   return Number.isNaN(startMs) ? startIso : new Date(startMs - 60 * 60 * 1000).toISOString()
 }
 
-function humanizeDeliveryError(raw: string, t: (key: string) => string): string {
-  const trimmed = raw.trim()
-  if (!trimmed) return trimmed
-  const code = trimmed.split(":")[0]?.trim() ?? trimmed
-  const dictKey = `messagesLog.deliveryErrorReason.${code}`
-  const translated = t(dictKey)
-  if (translated !== dictKey) return translated
-  if (trimmed === "Missing client contact details") {
-    return t("notifications.failureReasonMissingPhone")
-  }
-  return trimmed
-}
-
-function entryErrorDetail(entry: MergedEntry, t: (key: string) => string): string | null {
+function entryErrorDetail(
+  entry: MergedEntry,
+  t: (key: string) => string,
+  language: "pl" | "en",
+): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
     if (st === "failed" || st === "skipped" || st === "not_configured") {
       const raw = entry.row.error_message?.trim()
-      return raw ? humanizeDeliveryError(raw, t) : null
+      return raw ? formatDeliveryError(raw, t, language) : null
     }
     return null
   }
@@ -846,7 +838,11 @@ function entryErrorDetail(entry: MergedEntry, t: (key: string) => string): strin
   return null
 }
 
-function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string | null {
+function errorForPreview(
+  entry: PreviewTarget,
+  t: (k: string) => string,
+  language: "pl" | "en",
+): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
@@ -856,7 +852,7 @@ function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string
       st === "not_configured"
     ) {
       const raw = entry.row.error_message?.trim()
-      return raw ? humanizeDeliveryError(raw, t) : null
+      return raw ? formatDeliveryError(raw, t, language) : null
     }
     return null
   }
@@ -1469,7 +1465,7 @@ export function SendingHistorySection() {
                         ? `outcome:${entry.row.id}:${entry.reminderType}:${entry.channel}`
                       : `local:${entry.msg.id}`
                 const canon = canonicalStatus(entry)
-                const errorDetail = entryErrorDetail(entry, t)
+                const errorDetail = entryErrorDetail(entry, t, language)
                 return (
                   <li key={key} className="min-h-[4.5rem] px-3 py-3 sm:px-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -1681,13 +1677,13 @@ export function SendingHistorySection() {
                       )}
                     </dd>
                   </div>
-                  {errorForPreview(preview, t) ? (
+                  {errorForPreview(preview, t, language) ? (
                     <div>
                       <dt className="text-xs font-medium text-destructive">
                         {t("messagesLog.fieldError")}
                       </dt>
                       <dd className="mt-0.5 whitespace-pre-wrap text-destructive">
-                        {errorForPreview(preview, t)}
+                        {errorForPreview(preview, t, language)}
                       </dd>
                     </div>
                   ) : null}

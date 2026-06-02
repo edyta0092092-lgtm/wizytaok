@@ -423,6 +423,12 @@ export const dictionaries = {
         not_configured: "Brak konfiguracji dostawcy wiadomości",
         send_failed: "Wysyłka nie powiodła się",
         service_role_missing: "Brak uprawnień serwera do wysyłki",
+        empty_message: "Pusta treść wiadomości",
+        provider_http_error: "Błąd połączenia z dostawcą wiadomości",
+        smsapi_insufficient_credits:
+          "Brak środków na koncie SMS — doładuj konto u dostawcy i spróbuj ponownie.",
+        smsapi_unsupported_number: "Numer odbiorcy nie jest obsługiwany przez dostawcę SMS.",
+        smsapi_rejected: "Dostawca SMS odrzucił wiadomość.",
       },
     },
     auth: {
@@ -2905,6 +2911,12 @@ Pozdrawiamy,
         not_configured: "Message provider not configured",
         send_failed: "Send failed",
         service_role_missing: "Server lacks permission to send",
+        empty_message: "Empty message body",
+        provider_http_error: "Could not reach the message provider",
+        smsapi_insufficient_credits:
+          "Insufficient SMS account balance — top up your provider account and try again.",
+        smsapi_unsupported_number: "The recipient number is not supported by the SMS provider.",
+        smsapi_rejected: "The SMS provider rejected the message.",
       },
     },
     auth: {
