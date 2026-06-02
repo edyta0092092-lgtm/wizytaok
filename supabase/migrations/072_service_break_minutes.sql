@@ -35,6 +35,11 @@ set service_break_minutes = coalesce(
   0
 );
 
+-- PostgreSQL nie pozwala CREATE OR REPLACE, gdy zmienia się zestaw kolumn RETURNS TABLE.
+drop function if exists public.get_business_profile_by_slug(text);
+drop function if exists public.get_active_services_by_business_slug(text);
+drop function if exists public.get_active_services_by_business_id(uuid);
+
 create or replace function public.get_business_profile_by_slug (p_slug text)
 returns table (
   id uuid,
