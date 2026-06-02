@@ -654,31 +654,10 @@ function statusTone(
 function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean {
   if (filter === "all") return true
   const c = canonicalStatus(entry)
-  const isMissingContactSkip = (() => {
-    if (entry.kind === "db") {
-      const err = String(entry.row.error_message ?? "").toLowerCase()
-      return (
-        (c === "skipped" || c === "failed") &&
-        (err.includes("missing client contact") ||
-          err.includes("missing phone") ||
-          err.includes("missing email") ||
-          err.includes("brak numeru") ||
-          err.includes("brak telefonu") ||
-          err.includes("brak e-mail"))
-      )
-    }
-    if (entry.kind === "local") {
-      return (
-        entry.msg.status === "failed" &&
-        (entry.msg.failureReason === "missing_phone" || entry.msg.failureReason === "missing_email")
-      )
-    }
-    return false
-  })()
   if (filter === "sent") return c === "sent"
   if (filter === "scheduled") return entry.kind === "planned" && c === "scheduled"
   if (filter === "skipped") {
-    return c === "skipped" || c === "not_configured" || isMissingContactSkip
+    return c === "skipped" || c === "not_configured" || c === "failed"
   }
   return true
 }
@@ -838,17 +817,33 @@ function plannedAtIso(
   return Number.isNaN(startMs) ? startIso : new Date(startMs - 60 * 60 * 1000).toISOString()
 }
 
-function humanizeSkipReason(raw: string): string {
-  switch (raw.trim()) {
-    case "template_disabled":
-      return "Szablon wyłączony dla tego kanału"
-    case "booking_cancelled":
-      return "Wizyta anulowana przed wysyłką"
-    case "Missing client contact details":
-      return "Brak danych kontaktowych klienta"
-    default:
-      return raw
+function humanizeDeliveryError(raw: string, t: (key: string) => string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return trimmed
+  const code = trimmed.split(":")[0]?.trim() ?? trimmed
+  const dictKey = `messagesLog.deliveryErrorReason.${code}`
+  const translated = t(dictKey)
+  if (translated !== dictKey) return translated
+  if (trimmed === "Missing client contact details") {
+    return t("notifications.failureReasonMissingPhone")
   }
+  return trimmed
+}
+
+function entryErrorDetail(entry: MergedEntry, t: (key: string) => string): string | null {
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "db") {
+    const st = entry.row.status.trim().toLowerCase()
+    if (st === "failed" || st === "skipped" || st === "not_configured") {
+      const raw = entry.row.error_message?.trim()
+      return raw ? humanizeDeliveryError(raw, t) : null
+    }
+    return null
+  }
+  if (entry.msg.status === "failed") {
+    return localFailureDetail(entry.msg, t)
+  }
+  return null
 }
 
 function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string | null {
@@ -861,7 +856,7 @@ function errorForPreview(entry: PreviewTarget, t: (k: string) => string): string
       st === "not_configured"
     ) {
       const raw = entry.row.error_message?.trim()
-      return raw ? humanizeSkipReason(raw) : null
+      return raw ? humanizeDeliveryError(raw, t) : null
     }
     return null
   }
@@ -1411,6 +1406,11 @@ export function SendingHistorySection() {
               </Button>
             ))}
           </div>
+          {filter === "skipped" ? (
+            <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+              {t("messagesLog.filterHintSkipped")}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2">
             <FilterSelect
               aria-label="Filtr kanału"
@@ -1469,6 +1469,7 @@ export function SendingHistorySection() {
                         ? `outcome:${entry.row.id}:${entry.reminderType}:${entry.channel}`
                       : `local:${entry.msg.id}`
                 const canon = canonicalStatus(entry)
+                const errorDetail = entryErrorDetail(entry, t)
                 return (
                   <li key={key} className="min-h-[4.5rem] px-3 py-3 sm:px-4">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -1488,6 +1489,11 @@ export function SendingHistorySection() {
                           <span className="tabular-nums">
                             {safeFormatDate(entry.sortAt, dateFmt)}
                           </span>
+                          {errorDetail ? (
+                            <span className="text-amber-800 dark:text-amber-200/95">
+                              {errorDetail}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                       <Button
