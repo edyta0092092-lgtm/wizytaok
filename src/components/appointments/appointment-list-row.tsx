@@ -19,7 +19,7 @@ import {
   useAppointmentAttachments,
   type AppointmentAttachment,
 } from "@/lib/appointments/appointment-attachments"
-import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
+import { bookingNeedsAction, getBookingActionReason } from "@/lib/bookings/booking-needs-action"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
 import type { AppointmentReminderSection } from "@/lib/appointments/appointment-reminder-panel-display"
@@ -312,7 +312,7 @@ export function AppointmentListRow({
 
         <div className="flex min-w-0 flex-col gap-2 md:max-w-full md:items-end">
           <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-            <StatusBadge status={row.status} />
+            <StatusBadge status={row.status} needsAction={bookingNeedsAction(row)} />
           </div>
           <AppointmentRowActions
             status={row.status}

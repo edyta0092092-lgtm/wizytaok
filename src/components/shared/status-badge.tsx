@@ -23,11 +23,20 @@ const statusTone: Record<
 
 type StatusBadgeProps = {
   status: AppointmentStatus | "scheduled"
+  /** Gdy wizyta wymaga reakcji firmy — badge zastępuje status bazowy (np. Potwierdzona). */
+  needsAction?: boolean
   className?: string
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, needsAction, className }: StatusBadgeProps) {
   const { t } = useTranslations()
+  if (needsAction) {
+    return (
+      <span className={semanticStatusBadgeClass("warning", className)}>
+        {t("labels.appointmentStatus.needs_action")}
+      </span>
+    )
+  }
   const key = normalizeStatus(status)
   const label = t(`labels.appointmentStatus.${key}` as "labels.appointmentStatus.booked")
   const description =

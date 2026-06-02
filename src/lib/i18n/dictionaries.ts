@@ -1468,6 +1468,7 @@ export const dictionaries = {
         cancelled: "Anulowana",
         completed: "Zrealizowana",
         no_show: "Nieobecność klienta",
+        needs_action: "Wymaga działania",
       },
       appointmentStatusDescription: {
         no_show: "Klient nie pojawił się na umówionej wizycie.",
@@ -3917,6 +3918,7 @@ Pozdrawiamy,
         cancelled: "Cancelled",
         completed: "Completed",
         no_show: "Client did not attend",
+        needs_action: "Needs action",
       },
       appointmentStatusDescription: {
         no_show: "The client did not attend the scheduled appointment.",
