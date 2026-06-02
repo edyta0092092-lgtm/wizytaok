@@ -77,9 +77,15 @@ export function useAppointmentsListPresentation(args: {
     } else if (filter === "all") {
       stage = base
     } else if (filter === "unconfirmed") {
-      stage = base.filter((a) => a.status === "booked" || a.status === "pending")
+      stage = base.filter(
+        (a) =>
+          (a.status === "booked" || a.status === "pending") &&
+          !appointmentRequiresPostVisitAction(a),
+      )
     } else {
-      stage = base.filter((a) => a.status === filter)
+      stage = base.filter(
+        (a) => a.status === filter && !appointmentRequiresPostVisitAction(a),
+      )
     }
     return stage
       .filter((a) => bookingMatchesStaffFilter(a, staffFilter))
