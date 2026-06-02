@@ -4,6 +4,9 @@
 alter table public.services
   add column if not exists break_minutes integer;
 
+alter table public.services
+  add column if not exists uses_default_availability boolean not null default true;
+
 alter table public.business_profiles
   add column if not exists default_break_minutes integer;
 
