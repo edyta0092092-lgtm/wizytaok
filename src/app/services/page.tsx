@@ -32,6 +32,7 @@ type ServiceFormState = {
   name: string
   description: string
   durationMinutes: string
+  breakMinutes: string
   price: string
   isActive: boolean
 }
@@ -40,6 +41,7 @@ const emptyForm = (): ServiceFormState => ({
   name: "",
   description: "",
   durationMinutes: "60",
+  breakMinutes: "",
   price: "",
   isActive: true,
 })
@@ -49,6 +51,10 @@ function formFromService(service: Service): ServiceFormState {
     name: service.name,
     description: service.description ?? "",
     durationMinutes: String(service.durationMinutes),
+    breakMinutes:
+      service.breakMinutes != null && Number.isFinite(Number(service.breakMinutes))
+        ? String(service.breakMinutes)
+        : "",
     price: String(service.price),
     isActive: service.isActive,
   }
@@ -143,6 +149,17 @@ export default function ServicesPage() {
       return
     }
 
+    const breakRaw = form.breakMinutes.trim()
+    let breakMinutes: number | null = null
+    if (breakRaw !== "") {
+      const parsedBreak = Number(breakRaw)
+      if (!Number.isFinite(parsedBreak) || parsedBreak < 0) {
+        setActionNotice(t("services.invalidBreakMinutes"))
+        return
+      }
+      breakMinutes = Math.floor(parsedBreak)
+    }
+
     const price = Number(form.price)
     if (!Number.isFinite(price) || price < 0) {
       setActionNotice(t("services.invalidPrice"))
@@ -172,6 +189,7 @@ export default function ServicesPage() {
           name,
           description: form.description.trim() || undefined,
           durationMinutes: Math.floor(durationMinutes),
+          breakMinutes,
           price,
           currency: "PLN",
           isActive: form.isActive,
@@ -191,6 +209,7 @@ export default function ServicesPage() {
           name,
           description: form.description.trim() || undefined,
           durationMinutes: Math.floor(durationMinutes),
+          breakMinutes,
           price,
           currency: "PLN",
           isActive: form.isActive,
@@ -345,31 +364,42 @@ export default function ServicesPage() {
                     onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   />
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="service-duration">{t("services.durationMinutesLabel")}</Label>
-                    <Input
-                      id="service-duration"
-                      type="number"
-                      min={1}
-                      step={1}
-                      placeholder={t("services.placeholderDuration")}
-                      value={form.durationMinutes}
-                      onChange={(event) => setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="service-price">{t("services.priceLabel")}</Label>
-                    <Input
-                      id="service-price"
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder={t("services.placeholderPrice")}
-                      value={form.price}
-                      onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-                    />
-                  </div>
+                <div className="space-y-1.5 sm:max-w-xs">
+                  <Label htmlFor="service-duration">{t("services.durationMinutesLabel")}</Label>
+                  <Input
+                    id="service-duration"
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder={t("services.placeholderDuration")}
+                    value={form.durationMinutes}
+                    onChange={(event) => setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1.5 sm:max-w-xs">
+                  <Label htmlFor="service-break">{t("services.breakMinutesLabel")}</Label>
+                  <Input
+                    id="service-break"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder={t("services.placeholderBreakMinutes")}
+                    value={form.breakMinutes}
+                    onChange={(event) => setForm((prev) => ({ ...prev, breakMinutes: event.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">{t("services.breakMinutesHint")}</p>
+                </div>
+                <div className="space-y-1.5 sm:max-w-xs">
+                  <Label htmlFor="service-price">{t("services.priceLabel")}</Label>
+                  <Input
+                    id="service-price"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder={t("services.placeholderPrice")}
+                    value={form.price}
+                    onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
+                  />
                 </div>
                 <div className="grid gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
                   <div className="flex items-center justify-between gap-2">

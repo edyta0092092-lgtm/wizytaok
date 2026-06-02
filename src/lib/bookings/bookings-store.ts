@@ -612,6 +612,7 @@ export type CreateManualBookingInput = {
   staffId?: string | null
   staffName?: string | null
   serviceDurationMinutes?: number | null
+  serviceBreakMinutes?: number | null
   servicePrice?: number | null
   serviceCurrency?: string | null
   appointmentDate: string
@@ -635,6 +636,7 @@ export async function createManualBooking(
       ? input.staffId.trim()
       : null
   const durationMin = Math.max(1, Math.floor(Number(input.serviceDurationMinutes ?? 0) || 0))
+  const breakMin = Math.max(0, Math.floor(Number(input.serviceBreakMinutes ?? 0) || 0))
   if (staffScope) {
     const overlap = await hasStaffSchedulingIntervalOverlap(
       client!,
@@ -643,6 +645,7 @@ export async function createManualBooking(
       input.appointmentTime.trim(),
       durationMin,
       staffScope,
+      { breakMinutes: breakMin },
     )
     if (overlap) {
       return { ok: false, error: "slot_taken" }
@@ -681,6 +684,7 @@ export async function createManualBooking(
       0,
       Math.floor(Number(input.serviceDurationMinutes ?? 0) || 0)
     ),
+    service_break_minutes: breakMin,
     service_price: Number.isFinite(Number(input.servicePrice))
       ? Math.max(0, Number(input.servicePrice))
       : 0,
@@ -818,6 +822,7 @@ export async function getBookingByConfirmationToken(
     client_email: (o.client_email as string | null) ?? null,
     service_name: String(o.service_name ?? ""),
     service_duration_minutes: Number(o.service_duration_minutes ?? 0),
+    service_break_minutes: Number(o.service_break_minutes ?? 0),
     service_price: Number(o.service_price ?? 0),
     service_currency: String(o.service_currency ?? "PLN"),
     staff_id: (o.staff_id as string | null) ?? null,

@@ -13,9 +13,12 @@ import {
 } from "@/lib/booking/effective-availability"
 import { getSlotsForSelectedDate } from "@/lib/booking/availability-slots"
 import { getAppToday } from "@/lib/date/current-date"
+import { resolveBreakMinutes } from "@/lib/bookings/break-minutes"
 import {
   hasStaffSchedulingIntervalOverlap,
   normalizeSlotTimeLabel,
+  toBlockedSlotKeySetForStaff,
+  getBookedSlotsForBusiness,
 } from "@/lib/bookings/slot-availability"
 import {
   getStaffAvailabilityContextForBusiness,
@@ -50,14 +53,16 @@ export function applyStaffOverlayToWeek(
 async function isManualBookingTimeInAllowedSlots(
   client: PanelClient,
   businessId: string,
-  service: Pick<Service, "id" | "durationMinutes" | "usesDefaultAvailability">,
+  service: Pick<Service, "id" | "durationMinutes" | "breakMinutes" | "usesDefaultAvailability">,
   appointmentDate: string,
   appointmentTimeHm: string,
-  staffId: string | null
+  staffId: string | null,
+  defaultBreakMinutes?: number | null,
 ): Promise<boolean> {
   const dayKey = appointmentDate.trim().slice(0, 10)
   const cellDate = parseYmd(dayKey)
   const duration = Math.max(1, Math.floor(service.durationMinutes || 0))
+  const breakMinutes = resolveBreakMinutes(service.breakMinutes, defaultBreakMinutes)
 
   const [bookingAvailability, exceptions, serviceRules] = await Promise.all([
     getAvailabilityRules(client, businessId),
@@ -84,13 +89,20 @@ async function isManualBookingTimeInAllowedSlots(
   }
 
   const asOf = getAppToday()
+  const bookedRows = await getBookedSlotsForBusiness(client, businessId, dayKey, dayKey)
+  const blocked = toBlockedSlotKeySetForStaff(
+    bookedRows,
+    staffId?.trim() ?? null,
+    duration,
+    breakMinutes,
+  )
   const slots = getSlotsForSelectedDate(
     cellDate,
     asOf,
     asOf,
     duration,
     days,
-    new Set()
+    blocked,
   )
   const want = normalizeSlotTimeLabel(appointmentTimeHm)
   return slots.some((s) => normalizeSlotTimeLabel(s) === want)
@@ -99,12 +111,13 @@ async function isManualBookingTimeInAllowedSlots(
 export type ResolveManualStaffInput = {
   client: PanelClient
   businessId: string
-  service: Pick<Service, "id" | "durationMinutes" | "usesDefaultAvailability">
+  service: Pick<Service, "id" | "durationMinutes" | "breakMinutes" | "usesDefaultAvailability">
   appointmentDate: string
   appointmentTime: string
   staffChoice: string
   candidates: StaffMember[]
   hasActiveTeam: boolean
+  defaultBreakMinutes?: number | null
   /** Przy edycji / propozycji zmiany — pomija kolizję z tą samą wizytą. */
   excludeBookingId?: string | null
   /**
@@ -136,6 +149,7 @@ export async function resolveManualBookingStaffSelection(
   }
 
   const durationMin = Math.max(1, Math.floor(Number(input.service.durationMinutes ?? 0) || 0))
+  const breakMin = resolveBreakMinutes(input.service.breakMinutes, input.defaultBreakMinutes)
   const ex = input.excludeBookingId?.trim()
 
   const sorted = [...input.candidates].sort((a, b) =>
@@ -151,7 +165,7 @@ export async function resolveManualBookingStaffSelection(
       time,
       durationMin,
       only.id,
-      { excludeBookingId: ex },
+      { excludeBookingId: ex, breakMinutes: breakMin },
     )
     if (overlap) {
       return { ok: false, errorKey: "appointments.proposeStaffUnavailableSlot" }
@@ -163,6 +177,7 @@ export async function resolveManualBookingStaffSelection(
       date,
       time,
       only.id,
+      input.defaultBreakMinutes,
     )
     if (!okSlot) {
       return { ok: false, errorKey: "appointments.proposeStaffUnavailableSlot" }
@@ -179,7 +194,7 @@ export async function resolveManualBookingStaffSelection(
         time,
         durationMin,
         member.id,
-        { excludeBookingId: ex },
+        { excludeBookingId: ex, breakMinutes: breakMin },
       )
       if (overlap) continue
       const okSlot = await isManualBookingTimeInAllowedSlots(
@@ -189,6 +204,7 @@ export async function resolveManualBookingStaffSelection(
         date,
         time,
         member.id,
+        input.defaultBreakMinutes,
       )
       if (!okSlot) continue
       return { ok: true, staffId: member.id, staffName: member.name }
@@ -214,7 +230,7 @@ export async function resolveManualBookingStaffSelection(
     time,
     durationMin,
     picked.id,
-    { excludeBookingId: ex },
+    { excludeBookingId: ex, breakMinutes: breakMin },
   )
   if (overlap) {
     return { ok: false, errorKey: "appointments.proposeStaffUnavailableSlot" }
@@ -227,6 +243,7 @@ export async function resolveManualBookingStaffSelection(
     date,
     time,
     picked.id,
+    input.defaultBreakMinutes,
   )
   if (!okSlot) {
     return { ok: false, errorKey: "appointments.proposeStaffUnavailableSlot" }
@@ -242,12 +259,14 @@ export async function isStaffAvailableForSlot(input: {
   client: PanelClient
   businessId: string
   staffId: string
-  service: Pick<Service, "id" | "durationMinutes" | "usesDefaultAvailability">
+  service: Pick<Service, "id" | "durationMinutes" | "breakMinutes" | "usesDefaultAvailability">
   date: string
   startTime: string
   excludeBookingId?: string | null
+  defaultBreakMinutes?: number | null
 }): Promise<boolean> {
   const durationMin = Math.max(1, Math.floor(Number(input.service.durationMinutes ?? 0) || 0))
+  const breakMin = resolveBreakMinutes(input.service.breakMinutes, input.defaultBreakMinutes)
   const overlap = await hasStaffSchedulingIntervalOverlap(
     input.client,
     input.businessId,
@@ -255,7 +274,7 @@ export async function isStaffAvailableForSlot(input: {
     input.startTime,
     durationMin,
     input.staffId.trim(),
-    { excludeBookingId: input.excludeBookingId?.trim() },
+    { excludeBookingId: input.excludeBookingId?.trim(), breakMinutes: breakMin },
   )
   if (overlap) return false
   return isManualBookingTimeInAllowedSlots(
@@ -265,5 +284,6 @@ export async function isStaffAvailableForSlot(input: {
     input.date.trim(),
     input.startTime.trim(),
     input.staffId.trim(),
+    input.defaultBreakMinutes,
   )
 }

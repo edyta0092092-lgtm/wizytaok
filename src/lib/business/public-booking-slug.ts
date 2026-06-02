@@ -11,6 +11,7 @@ export type ResolvedPublicBookingBusinessProfile = {
   businessId: string | null
   businessName?: string | null
   phone?: string | null
+  defaultBreakMinutes?: number | null
   /** Łączny błąd dopiero gdy nie udało się ustalić profilu. */
   rpcFailed: boolean
   /** Komunikat z RPC lub z fallback SELECT (np. diagnostyka). */
@@ -24,19 +25,31 @@ type RpcProfileRow = {
   business_name?: unknown
   slug?: unknown
   phone?: unknown
+  default_break_minutes?: unknown
+}
+
+function readDefaultBreakMinutes(raw: unknown): number | null {
+  if (raw == null || !Number.isFinite(Number(raw))) return null
+  return Math.max(0, Math.floor(Number(raw)))
 }
 
 async function tryBusinessProfileSelectBySlug(
   client: SupabaseClient<Database>,
   normalizedSlug: string
 ): Promise<
-  | { mode: "found"; id: string; businessName: string | null; phone: string | null }
+  | {
+      mode: "found"
+      id: string
+      businessName: string | null
+      phone: string | null
+      defaultBreakMinutes: number | null
+    }
   | { mode: "not_found" }
   | { mode: "error"; message: string }
 > {
   const { data, error } = await client
     .from("business_profiles")
-    .select("id,business_name,phone")
+    .select("id,business_name,phone,default_break_minutes")
     .eq("slug", normalizedSlug)
     .maybeSingle()
   if (error) return { mode: "error", message: error.message }
@@ -45,7 +58,13 @@ async function tryBusinessProfileSelectBySlug(
   if (!id) return { mode: "not_found" }
   const businessName = typeof data.business_name === "string" ? data.business_name : null
   const phone = typeof data.phone === "string" && data.phone.trim() ? data.phone.trim() : null
-  return { mode: "found", id, businessName, phone }
+  return {
+    mode: "found",
+    id,
+    businessName,
+    phone,
+    defaultBreakMinutes: readDefaultBreakMinutes(data.default_break_minutes),
+  }
 }
 
 /**
@@ -81,7 +100,13 @@ export async function resolvePublicBookingBusinessProfile(
             : null
         const phone =
           typeof row.phone === "string" && row.phone.trim().length > 0 ? row.phone.trim() : null
-        return { businessId: id, businessName, phone, rpcFailed: false }
+        return {
+          businessId: id,
+          businessName,
+          phone,
+          defaultBreakMinutes: readDefaultBreakMinutes(row.default_break_minutes),
+          rpcFailed: false,
+        }
       }
     }
   } else {
@@ -94,6 +119,7 @@ export async function resolvePublicBookingBusinessProfile(
       businessId: fb.id,
       businessName: fb.businessName,
       phone: fb.phone,
+      defaultBreakMinutes: fb.defaultBreakMinutes,
       rpcFailed: false,
       usedTableFallback: true,
       message: rpcMessage ? `rpc:${rpcMessage}; table fallback ok` : undefined,

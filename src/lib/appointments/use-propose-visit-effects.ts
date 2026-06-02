@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { coerceServiceIdValue } from "@/lib/bookings/coerce-service-id"
+import { fetchDefaultBreakMinutesForBusiness, resolveBreakMinutes } from "@/lib/bookings/break-minutes"
 import { MANUAL_BOOKING_ANY_STAFF, isStaffAvailableForSlot } from "@/lib/bookings/manual-booking-staff"
 import {
   hasStaffSchedulingIntervalOverlap,
@@ -238,6 +239,7 @@ export function useProposeAvailableStaffLoadEffect(args: {
       const svc =
         manualServiceOptions.find((s) => publicBookingServiceIdsMatch(s.id, serviceKey)) ?? null
       const duration = Math.max(1, Math.floor(Number(svc?.durationMinutes ?? 60) || 60))
+      const defaultBreakMinutes = await fetchDefaultBreakMinutesForBusiness(client, bid)
       const uuidSbForOverlap = unwrapSupabaseBookingAppointmentId(row.id)
       const checks = await Promise.all(
         candidates.map(async (member) => {
@@ -264,7 +266,10 @@ export function useProposeAvailableStaffLoadEffect(args: {
               proposeTime.trim(),
               duration,
               member.id,
-              { excludeBookingId: uuidSbForOverlap ?? null }
+              {
+                excludeBookingId: uuidSbForOverlap ?? null,
+                breakMinutes: resolveBreakMinutes(svc?.breakMinutes, defaultBreakMinutes),
+              }
             )
             if (overlaps) {
               reasons.add("conflicting_booking")
@@ -276,11 +281,13 @@ export function useProposeAvailableStaffLoadEffect(args: {
                 service: {
                   id: serviceKey,
                   durationMinutes: duration,
+                  breakMinutes: svc?.breakMinutes,
                   usesDefaultAvailability: member.usesDefaultAvailability,
                 },
                 date: proposeDate.trim(),
                 startTime: proposeTime.trim(),
                 excludeBookingId: uuidSbForOverlap ?? null,
+                defaultBreakMinutes,
               })
               if (!available) {
                 let exceptionBlocked = false

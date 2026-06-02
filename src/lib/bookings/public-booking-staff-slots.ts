@@ -12,12 +12,18 @@ export function mergeSlotsForAnyAssignedStaff(
   staffMembers: StaffMember[],
   resolveDaysForStaff: (staffId: string, d: Date) => AvailabilityDay[],
   bookedRows: readonly BookedAppointmentSlot[],
+  breakMinutes = 0,
 ): string[] {
   if (staffMembers.length === 0) return []
   const uniq = new Set<string>()
   for (const m of staffMembers) {
     const dayModel = resolveDaysForStaff(m.id, cellDate)
-    const blocked = toBlockedSlotKeySetForStaff(bookedRows, m.id, Math.max(1, durationMinutes))
+    const blocked = toBlockedSlotKeySetForStaff(
+      bookedRows,
+      m.id,
+      Math.max(1, durationMinutes),
+      Math.max(0, breakMinutes),
+    )
     const slots = getSlotsForSelectedDate(
       cellDate,
       clientToday,
@@ -39,6 +45,7 @@ export function dayHasMergedStaffSlot(
   staffMembers: StaffMember[],
   resolveDaysForStaff: (staffId: string, d: Date) => AvailabilityDay[],
   bookedRows: readonly BookedAppointmentSlot[],
+  breakMinutes = 0,
 ): boolean {
   const key = toLocalDateKey(cellDate)
   let slots = mergeSlotsForAnyAssignedStaff(
@@ -49,6 +56,7 @@ export function dayHasMergedStaffSlot(
     staffMembers,
     resolveDaysForStaff,
     bookedRows,
+    breakMinutes,
   )
   if (key === toLocalDateKey(clientToday)) {
     slots = filterSlotsNotInPast(slots, key, asOf)
@@ -63,6 +71,7 @@ export function findFirstDateKeyWithMergedStaffSlots(
   staffMembers: StaffMember[],
   resolveDaysForStaff: (staffId: string, d: Date) => AvailabilityDay[],
   bookedRows: readonly BookedAppointmentSlot[],
+  breakMinutes = 0,
 ): string | null {
   for (let i = 0; i < 400; i += 1) {
     const cellDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)
@@ -75,6 +84,7 @@ export function findFirstDateKeyWithMergedStaffSlots(
         staffMembers,
         resolveDaysForStaff,
         bookedRows,
+        breakMinutes,
       )
     ) {
       return toLocalDateKey(cellDate)

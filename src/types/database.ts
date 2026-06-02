@@ -127,6 +127,7 @@ export interface Database {
           business_address_place_id: string | null
           default_reminder_hours: number
           second_reminder_minutes: number
+          default_break_minutes: number | null
           reminder_channel: string
           created_at: string
           updated_at: string
@@ -167,6 +168,7 @@ export interface Database {
           business_address_place_id?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
+          default_break_minutes?: number | null
           reminder_channel?: string
           created_at?: string
           updated_at?: string
@@ -207,6 +209,7 @@ export interface Database {
           business_address_place_id?: string | null
           default_reminder_hours?: number
           second_reminder_minutes?: number
+          default_break_minutes?: number | null
           reminder_channel?: string
           created_at?: string
           updated_at?: string
@@ -236,6 +239,7 @@ export interface Database {
           name: string
           description: string
           duration_minutes: number
+          break_minutes: number | null
           price: number
           currency: string
           is_active: boolean
@@ -250,6 +254,7 @@ export interface Database {
           name: string
           description?: string
           duration_minutes?: number
+          break_minutes?: number | null
           price?: number
           currency?: string
           is_active?: boolean
@@ -264,6 +269,7 @@ export interface Database {
           name?: string
           description?: string
           duration_minutes?: number
+          break_minutes?: number | null
           price?: number
           currency?: string
           is_active?: boolean
@@ -529,6 +535,7 @@ export interface Database {
           client_email: string | null
           service_name: string
           service_duration_minutes: number
+          service_break_minutes: number
           service_price: number
           service_currency: string
           staff_id: string | null
@@ -589,6 +596,7 @@ export interface Database {
           client_email?: string | null
           service_name: string
           service_duration_minutes?: number
+          service_break_minutes?: number
           service_price?: number
           service_currency?: string
           staff_id?: string | null
@@ -649,6 +657,7 @@ export interface Database {
           client_email?: string | null
           service_name?: string
           service_duration_minutes?: number
+          service_break_minutes?: number
           service_price?: number
           service_currency?: string
           staff_id?: string | null
@@ -1337,6 +1346,7 @@ export interface Database {
           name: string
           description: string
           duration_minutes: number
+          break_minutes: number | null
           price: number
           currency: string
           is_active: boolean
@@ -1352,6 +1362,7 @@ export interface Database {
           name: string
           description: string
           duration_minutes: number
+          break_minutes: number | null
           price: number
           currency: string
           is_active: boolean

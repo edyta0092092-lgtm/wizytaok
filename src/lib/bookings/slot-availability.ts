@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { schedulingBlockedMinutes } from "@/lib/bookings/break-minutes"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Database } from "@/types/database"
 
@@ -22,6 +23,8 @@ export type BookedAppointmentSlot = {
   staff_id?: string | null
   /** Czas trwania zapisany przy rezerwacji — do wykrywania nakładających się wizyt. */
   service_duration_minutes?: number
+  /** Przerwa po usłudze zapisana przy rezerwacji (min). */
+  service_break_minutes?: number
 }
 
 export function getBlockingStatuses(): readonly BlockingBookingStatus[] {
@@ -62,7 +65,7 @@ function intervalsOverlapDay(
 
 /**
  * Czy dla wskazanego pracownika istnieje **inna** wizyta (status blokujący) nachodząca czasowo
- * na przedział [start, start + duration), z wyłączeniem `excludeBookingId`.
+ * na przedział [start, start + duration + break), z wyłączeniem `excludeBookingId`.
  */
 export async function hasStaffSchedulingIntervalOverlap(
   client: SlotsAvailabilityClient,
@@ -71,14 +74,14 @@ export async function hasStaffSchedulingIntervalOverlap(
   appointmentStartTime: string,
   durationMinutes: number,
   staffId: string,
-  options?: { excludeBookingId?: string | null }
+  options?: { excludeBookingId?: string | null; breakMinutes?: number }
 ): Promise<boolean> {
   const sid = staffId.trim()
   if (!sid) return false
   const day = appointmentDate.trim().slice(0, 10)
-  const dur = Math.max(1, Math.floor(durationMinutes || 0))
+  const newBreak = Math.max(0, Math.floor(Number(options?.breakMinutes ?? 0) || 0))
   const newStart = appointmentStartToMinutesSinceMidnight(appointmentStartTime)
-  const newEnd = newStart + dur
+  const newEnd = newStart + schedulingBlockedMinutes(durationMinutes, newBreak)
   const rows = await getBookedSlotsForBusiness(client, businessId, day, day)
   const ex = options?.excludeBookingId?.trim()
   for (const r of rows) {
@@ -91,8 +94,9 @@ export async function hasStaffSchedulingIntervalOverlap(
       1,
       Math.floor(Number(r.service_duration_minutes ?? 60) || 60)
     )
+    const oBreak = Math.max(0, Math.floor(Number(r.service_break_minutes ?? 0) || 0))
     const oStart = appointmentStartToMinutesSinceMidnight(r.appointment_time)
-    const oEnd = oStart + oDur
+    const oEnd = oStart + schedulingBlockedMinutes(oDur, oBreak)
     if (intervalsOverlapDay(newStart, newEnd, oStart, oEnd)) return true
   }
   return false
@@ -143,9 +147,11 @@ export function toBlockedSlotKeySet(rows: readonly BookedAppointmentSlot[]): Set
 function appendOverlappingBlockedKeys(
   out: Set<string>,
   booking: BookedAppointmentSlot,
-  selectedDurationMinutes: number
+  selectedDurationMinutes: number,
+  selectedBreakMinutes: number
 ) {
   const candidateDur = Math.max(1, Math.floor(selectedDurationMinutes || 0))
+  const candidateBreak = Math.max(0, Math.floor(selectedBreakMinutes || 0))
   if (!candidateDur) return
   const day = String(booking.appointment_date).slice(0, 10)
   const existingStart = appointmentStartToMinutesSinceMidnight(booking.appointment_time)
@@ -159,9 +165,11 @@ function appendOverlappingBlockedKeys(
       ) || Math.max(60, candidateDur)
     )
   )
-  const existingEnd = existingStart + existingDur
+  const existingBreak = Math.max(0, Math.floor(Number(booking.service_break_minutes ?? 0) || 0))
+  const existingEnd = existingStart + schedulingBlockedMinutes(existingDur, existingBreak)
+  const candidateSpan = schedulingBlockedMinutes(candidateDur, candidateBreak)
   for (let candidateStart = 0; candidateStart < 24 * 60; candidateStart += 15) {
-    const candidateEnd = candidateStart + candidateDur
+    const candidateEnd = candidateStart + candidateSpan
     if (intervalsOverlapDay(candidateStart, candidateEnd, existingStart, existingEnd)) {
       out.add(blockedSlotKey(day, `${String(Math.floor(candidateStart / 60)).padStart(2, "0")}:${String(candidateStart % 60).padStart(2, "0")}`))
     }
@@ -171,17 +179,19 @@ function appendOverlappingBlockedKeys(
 export function toBlockedSlotKeySetForStaff(
   rows: readonly BookedAppointmentSlot[],
   staffId: string | null,
-  selectedDurationMinutes?: number
+  selectedDurationMinutes?: number,
+  selectedBreakMinutes?: number
 ): Set<string> {
   const set = new Set<string>()
   const useOverlapModel = Number.isFinite(Number(selectedDurationMinutes)) && Number(selectedDurationMinutes) > 0
+  const candidateBreak = Math.max(0, Math.floor(Number(selectedBreakMinutes ?? 0) || 0))
   for (const b of rows) {
     if (!isBookingBlockingSlot(b.status)) continue
     if (!staffId) {
       // In public booking view, already reserved hours should not be selectable.
       // For "any staff" mode we therefore block all booked starts.
       if (useOverlapModel) {
-        appendOverlappingBlockedKeys(set, b, Number(selectedDurationMinutes))
+        appendOverlappingBlockedKeys(set, b, Number(selectedDurationMinutes), candidateBreak)
       } else {
         set.add(blockedSlotKey(String(b.appointment_date).slice(0, 10), b.appointment_time))
       }
@@ -195,7 +205,7 @@ export function toBlockedSlotKeySetForStaff(
     //   so occupied hours are never exposed as available.
     if (rowStaffId !== null && rowStaffId !== staffId) continue
     if (useOverlapModel) {
-      appendOverlappingBlockedKeys(set, b, Number(selectedDurationMinutes))
+      appendOverlappingBlockedKeys(set, b, Number(selectedDurationMinutes), candidateBreak)
     } else {
       set.add(blockedSlotKey(String(b.appointment_date).slice(0, 10), b.appointment_time))
     }
@@ -217,7 +227,7 @@ export async function getBookedSlotsForBusiness(
   const to = dateTo.trim().slice(0, 10)
   const { data, error } = await client
     .from("bookings")
-    .select("id, appointment_date, appointment_time, status, staff_id, service_duration_minutes")
+    .select("id, appointment_date, appointment_time, status, staff_id, service_duration_minutes, service_break_minutes")
     .eq("business_id", businessId)
     .gte("appointment_date", from)
     .lte("appointment_date", to)
@@ -326,6 +336,10 @@ export async function fetchBookedSlotsForPublicSlug(
           o.service_duration_minutes != null
             ? Math.max(1, Math.floor(Number(o.service_duration_minutes) || 0))
             : undefined,
+        service_break_minutes:
+          o.service_break_minutes != null
+            ? Math.max(0, Math.floor(Number(o.service_break_minutes) || 0))
+            : undefined,
         staff_id:
           typeof o.staff_id === "string" && o.staff_id.trim().length > 0
             ? o.staff_id
@@ -343,6 +357,10 @@ export async function fetchBookedSlotsForPublicSlug(
         service_duration_minutes:
           o.service_duration_minutes != null
             ? Math.max(1, Math.floor(Number(o.service_duration_minutes) || 0))
+            : undefined,
+        service_break_minutes:
+          o.service_break_minutes != null
+            ? Math.max(0, Math.floor(Number(o.service_break_minutes) || 0))
             : undefined,
         staff_id:
           typeof o.staff_id === "string" && o.staff_id.trim().length > 0

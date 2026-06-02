@@ -65,6 +65,7 @@ type SettingsForm = {
   depositForNewClients: boolean
   depositForAllClients: boolean
   depositAmount: string
+  defaultBreakMinutes: string
 }
 
 const demoSettings: SettingsForm = {
@@ -80,6 +81,7 @@ const demoSettings: SettingsForm = {
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "50",
+  defaultBreakMinutes: "",
 }
 
 const emptySettings: SettingsForm = {
@@ -95,6 +97,7 @@ const emptySettings: SettingsForm = {
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "",
+  defaultBreakMinutes: "",
 }
 
 function initialSettingsForm(): SettingsForm {
@@ -283,6 +286,10 @@ export default function SettingsPage() {
             phoneNational: phoneParts.nationalDigits,
             taxId: taxIdFromDb,
             taxIdEntryEnabled: taxIdFromDb.replace(/[\s-]/g, "").trim().length > 0,
+            defaultBreakMinutes:
+              data.default_break_minutes != null && Number.isFinite(Number(data.default_break_minutes))
+                ? String(Math.max(0, Math.floor(Number(data.default_break_minutes))))
+                : "",
           }))
         })
     })
@@ -458,6 +465,29 @@ export default function SettingsPage() {
               : t("common.saveError")
           setSaveError(fallbackError)
           return
+        }
+
+        const breakRaw = form.defaultBreakMinutes.trim()
+        if (breakRaw !== "" && (!Number.isFinite(Number(breakRaw)) || Number(breakRaw) < 0)) {
+          setSaveError(t("settings.defaultBreakMinutesInvalid"))
+          return
+        }
+        const breakClient = getBrowserClient()
+        const breakUser = breakClient ? (await breakClient.auth.getUser()).data.user : null
+        if (breakClient && breakUser) {
+          const breakValue =
+            breakRaw === "" ? null : Math.max(0, Math.floor(Number(breakRaw)))
+          const { error: breakError } = await breakClient
+            .from("business_profiles")
+            .update({ default_break_minutes: breakValue })
+            .eq("owner_id", breakUser.id)
+          if (breakError) {
+            const missingColumn = String(breakError.message ?? "").includes("default_break_minutes")
+            if (!missingColumn) {
+              setSaveError(t("common.saveError"))
+              return
+            }
+          }
         }
       }
 
@@ -679,6 +709,39 @@ export default function SettingsPage() {
                       placeholder="kontakt@twojadomena.pl"
                       className="h-11 rounded-xl"
                     />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+                <CardHeader className="border-b border-border/70 py-4">
+                  <CardTitle className="text-sm font-semibold">
+                    {t("settings.onlineBookingTitle")}
+                  </CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {t("settings.onlineBookingDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4 pt-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="default-break-minutes">
+                      {t("settings.defaultBreakMinutesLabel")}
+                    </Label>
+                    <Input
+                      id="default-break-minutes"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="0"
+                      value={form.defaultBreakMinutes}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, defaultBreakMinutes: e.target.value }))
+                      }
+                      className="h-11 max-w-xs rounded-xl"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings.defaultBreakMinutesHint")}
+                    </p>
                   </div>
                 </CardContent>
               </Card>

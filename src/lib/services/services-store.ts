@@ -141,7 +141,9 @@ type ServiceRowMapping = Pick<
   | "currency"
   | "is_active"
   | "uses_default_availability"
->
+> & {
+  break_minutes?: number | null
+}
 
 function mapDbRowToService(row: ServiceRowMapping): Service {
   const desc = row.description?.trim()
@@ -152,6 +154,10 @@ function mapDbRowToService(row: ServiceRowMapping): Service {
     name: row.name.trim(),
     description: desc && desc.length > 0 ? desc : undefined,
     durationMinutes: Math.max(0, Math.floor(Number(row.duration_minutes))),
+    breakMinutes:
+      row.break_minutes != null && Number.isFinite(Number(row.break_minutes))
+        ? Math.max(0, Math.floor(Number(row.break_minutes)))
+        : null,
     price: Math.max(0, Number(row.price)),
     currency: cur,
     isActive: row.is_active,
@@ -167,6 +173,10 @@ function rpcRowToBookingService(r: PublicActiveServiceRow): Service {
     name: r.name,
     description: r.description ?? null,
     duration_minutes: Math.max(1, Math.floor(Number(r.duration_minutes) || 0)),
+    break_minutes:
+      r.break_minutes != null && Number.isFinite(Number(r.break_minutes))
+        ? Math.max(0, Math.floor(Number(r.break_minutes)))
+        : null,
     price: Math.max(0, Number(r.price) || 0),
     currency: typeof r.currency === "string" && r.currency.trim() ? r.currency.trim() : "PLN",
     is_active: Boolean(r.is_active),
@@ -195,6 +205,10 @@ async function fetchPublicBookingServicesDirect(
           name: String(raw.name ?? ""),
           description: typeof raw.description === "string" ? raw.description : "",
           duration_minutes: Math.max(1, Math.floor(Number(raw.duration_minutes) || 0)),
+          break_minutes:
+            raw.break_minutes != null && Number.isFinite(Number(raw.break_minutes))
+              ? Math.max(0, Math.floor(Number(raw.break_minutes)))
+              : null,
           price: Math.max(0, Number(raw.price) || 0),
           currency: typeof raw.currency === "string" && raw.currency.trim() ? raw.currency.trim() : "PLN",
           is_active: typeof raw.is_active === "boolean" ? raw.is_active : true,
@@ -220,9 +234,9 @@ async function fetchPublicBookingServicesDirect(
   }
 
   const fullCols =
-    "id, business_id, name, description, duration_minutes, price, currency, is_active, sort_order, uses_default_availability, created_at"
+    "id, business_id, name, description, duration_minutes, break_minutes, price, currency, is_active, sort_order, uses_default_availability, created_at"
   const minActiveCols =
-    "id, business_id, name, description, duration_minutes, price, currency, is_active, created_at"
+    "id, business_id, name, description, duration_minutes, break_minutes, price, currency, is_active, created_at"
 
   const attempts = [
     { cols: fullCols, filterActiveInDb: true, dualOrder: true },
@@ -271,7 +285,7 @@ export async function getServices(
   const { data, error } = await c
     .from("services")
     .select(
-      "id, business_id, name, description, duration_minutes, price, currency, is_active, sort_order, uses_default_availability"
+      "id, business_id, name, description, duration_minutes, break_minutes, price, currency, is_active, sort_order, uses_default_availability"
     )
     .eq("business_id", bid)
     .order("sort_order", { ascending: true })
@@ -283,7 +297,7 @@ export async function getServices(
 
     const { data: fallbackData, error: fallbackError } = await c
       .from("services")
-      .select("id, business_id, name, description, duration_minutes, price, currency, is_active")
+      .select("id, business_id, name, description, duration_minutes, break_minutes, price, currency, is_active")
       .eq("business_id", bid)
       .order("created_at", { ascending: true })
     if (fallbackError) throw new Error(fallbackError.message)
@@ -380,6 +394,7 @@ export type ServiceInput = {
   name: string
   description?: string
   durationMinutes: number
+  breakMinutes?: number | null
   price: number
   isActive: boolean
   currency?: string
@@ -398,6 +413,10 @@ export async function addService(
       name: input.name.trim(),
       description: input.description?.trim() || undefined,
       durationMinutes: Math.max(5, Math.floor(input.durationMinutes)),
+      breakMinutes:
+        input.breakMinutes != null && Number.isFinite(Number(input.breakMinutes))
+          ? Math.max(0, Math.floor(Number(input.breakMinutes)))
+          : null,
       price: Math.max(0, input.price),
       currency: "PLN",
       isActive: input.isActive,
@@ -413,6 +432,10 @@ export async function addService(
     name: input.name.trim(),
     description: input.description?.trim() || undefined,
     duration_minutes: Math.max(1, Math.floor(input.durationMinutes)),
+    break_minutes:
+      input.breakMinutes != null && Number.isFinite(Number(input.breakMinutes))
+        ? Math.max(0, Math.floor(Number(input.breakMinutes)))
+        : null,
     price: Math.max(0, input.price),
     currency: "PLN",
     is_active: input.isActive,
@@ -472,6 +495,12 @@ export async function updateService(
                   ? updates.description?.trim() || undefined
                   : s.description,
               durationMinutes: updates.durationMinutes !== undefined ? Math.max(1, Math.floor(updates.durationMinutes)) : s.durationMinutes,
+              breakMinutes:
+                updates.breakMinutes !== undefined
+                  ? updates.breakMinutes != null
+                    ? Math.max(0, Math.floor(Number(updates.breakMinutes)))
+                    : null
+                  : s.breakMinutes,
               price: updates.price !== undefined ? Math.max(0, updates.price) : s.price,
               currency: "PLN",
               isActive: updates.isActive !== undefined ? updates.isActive : s.isActive,
@@ -491,6 +520,12 @@ export async function updateService(
   if (updates.description !== undefined) patch.description = updates.description?.trim() ?? ""
   if (updates.durationMinutes !== undefined) {
     patch.duration_minutes = Math.max(1, Math.floor(updates.durationMinutes))
+  }
+  if (updates.breakMinutes !== undefined) {
+    patch.break_minutes =
+      updates.breakMinutes != null && Number.isFinite(Number(updates.breakMinutes))
+        ? Math.max(0, Math.floor(Number(updates.breakMinutes)))
+        : null
   }
   if (updates.price !== undefined) patch.price = Math.max(0, updates.price)
   patch.currency = "PLN"

@@ -33,6 +33,7 @@ import {
   getAvailabilityForBusinessSlug,
   getServiceAvailabilityForBusinessSlug,
 } from "@/lib/availability/availability-store"
+import { resolveBreakMinutes } from "@/lib/bookings/break-minutes"
 import { createOnlineBooking } from "@/lib/bookings/bookings-store"
 import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import {
@@ -136,6 +137,7 @@ export default function PublicBookingPage() {
     >
   >({})
   const [businessProfileIdForSlug, setBusinessProfileIdForSlug] = React.useState<string | null>(null)
+  const [defaultBreakMinutes, setDefaultBreakMinutes] = React.useState<number | null>(null)
   const [availabilityExceptions, setAvailabilityExceptions] = React.useState<
     AvailabilityExceptionRecord[]
   >([])
@@ -156,6 +158,7 @@ export default function PublicBookingPage() {
         setBusinessTitle(defaultTitle)
         setBusinessNotFound(false)
         setBusinessProfileIdForSlug(null)
+        setDefaultBreakMinutes(null)
       })
       return
     }
@@ -165,6 +168,7 @@ export default function PublicBookingPage() {
         setBusinessTitle(defaultTitle)
         setBusinessNotFound(false)
         setBusinessProfileIdForSlug(null)
+        setDefaultBreakMinutes(null)
       })
       return
     }
@@ -175,6 +179,7 @@ export default function PublicBookingPage() {
         setBusinessTitle(defaultTitle)
         setBusinessNotFound(false)
         setBusinessProfileIdForSlug(null)
+        setDefaultBreakMinutes(null)
       })
       return
     }
@@ -184,6 +189,7 @@ export default function PublicBookingPage() {
       if (cancelled) return
       if (r.businessId) {
         setBusinessProfileIdForSlug(r.businessId)
+        setDefaultBreakMinutes(r.defaultBreakMinutes ?? null)
         setBusinessTitle((r.businessName && r.businessName.trim()) || defaultTitle)
         setBusinessNotFound(false)
         return
@@ -301,7 +307,13 @@ export default function PublicBookingPage() {
           1,
           catalog.find((s) => s.id === selectedServiceId)?.durationMinutes ?? 0
         )
-        setBlockedSlotKeys(toBlockedSlotKeySetForStaff(rows, selectedStaffId, selectedDuration))
+        const selectedBreak = resolveBreakMinutes(
+          catalog.find((s) => s.id === selectedServiceId)?.breakMinutes,
+          defaultBreakMinutes,
+        )
+        setBlockedSlotKeys(
+          toBlockedSlotKeySetForStaff(rows, selectedStaffId, selectedDuration, selectedBreak),
+        )
       }
     }
     void loadBlocked()
@@ -313,7 +325,7 @@ export default function PublicBookingPage() {
       cancelled = true
       window.removeEventListener("pw-bookings", onBookings)
     }
-  }, [normalizedSlug, clientToday, selectedStaffId, selectedServiceId, catalog])
+  }, [normalizedSlug, clientToday, selectedStaffId, selectedServiceId, catalog, defaultBreakMinutes])
 
   React.useEffect(() => {
     let cancelled = false
@@ -452,6 +464,11 @@ export default function PublicBookingPage() {
     [catalog, selectedServiceId]
   )
 
+  const selectedBreakMinutes = React.useMemo(
+    () => resolveBreakMinutes(selectedService?.breakMinutes, defaultBreakMinutes),
+    [selectedService?.breakMinutes, defaultBreakMinutes],
+  )
+
   /** Supabase: bez przypisanego staffu nie pokazuj kalendarza (terminy bez sensu). */
   const blockCalendarForNoStaff = React.useMemo(
     () =>
@@ -534,6 +551,7 @@ export default function PublicBookingPage() {
         serviceStaff,
         resolveDaysForServiceStaffMember,
         publicBookedRows,
+        selectedBreakMinutes,
       )
     },
     [
@@ -543,22 +561,29 @@ export default function PublicBookingPage() {
       serviceStaff,
       resolveDaysForServiceStaffMember,
       publicBookedRows,
+      selectedBreakMinutes,
     ],
   )
 
   const effectiveBlockedSlotKeys = React.useMemo(() => {
     const duration = Math.max(1, selectedService?.durationMinutes ?? 60)
-    const derived = toBlockedSlotKeySetForStaff(publicBookedRows, selectedStaffId, duration)
+    const derived = toBlockedSlotKeySetForStaff(
+      publicBookedRows,
+      selectedStaffId,
+      duration,
+      selectedBreakMinutes,
+    )
     if (blockedSlotKeys.size === 0) return derived
     const merged = new Set<string>(blockedSlotKeys)
     for (const k of derived) merged.add(k)
     return merged
-  }, [blockedSlotKeys, publicBookedRows, selectedStaffId, selectedService?.durationMinutes])
+  }, [blockedSlotKeys, publicBookedRows, selectedStaffId, selectedService?.durationMinutes, selectedBreakMinutes])
 
   const defaultDayKey = React.useMemo(() => {
     if (!clientToday || !availabilityReady || !staffAvailabilityReady) return null
     const svc = catalog.find((s) => s.id === selectedServiceId)
     const duration = svc?.durationMinutes ?? 60
+    const breakMinutes = resolveBreakMinutes(svc?.breakMinutes, defaultBreakMinutes)
     if (useMergedAnyStaffSlots && svc) {
       const first = findFirstDateKeyWithMergedStaffSlots(
         clientToday,
@@ -567,6 +592,7 @@ export default function PublicBookingPage() {
         serviceStaff,
         resolveDaysForServiceStaffMember,
         publicBookedRows,
+        breakMinutes,
       )
       if (first) return first
     }
@@ -592,6 +618,7 @@ export default function PublicBookingPage() {
     useMergedAnyStaffSlots,
     resolveDaysForServiceStaffMember,
     publicBookedRows,
+    defaultBreakMinutes,
   ])
 
   const selectedDayKey = dayOverride ?? defaultDayKey
@@ -606,7 +633,8 @@ export default function PublicBookingPage() {
       const staffBlocked = toBlockedSlotKeySetForStaff(
         publicBookedRows,
         member.id,
-        Math.max(1, selectedService.durationMinutes)
+        Math.max(1, selectedService.durationMinutes),
+        selectedBreakMinutes,
       )
       const slots = getSlotsForSelectedDate(
         d,
@@ -626,6 +654,7 @@ export default function PublicBookingPage() {
     serviceStaff,
     resolveDaysForServiceStaffMember,
     publicBookedRows,
+    selectedBreakMinutes,
   ])
 
   React.useEffect(() => {
@@ -792,6 +821,7 @@ export default function PublicBookingPage() {
           staffChoice,
           candidates: serviceStaff,
           hasActiveTeam: serviceStaff.length > 0,
+          defaultBreakMinutes,
         })
         if (!resolved.ok) {
           setError(t(resolved.errorKey))

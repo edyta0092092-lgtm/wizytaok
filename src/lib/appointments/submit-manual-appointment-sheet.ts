@@ -2,6 +2,7 @@ import type { ManualAppointmentFormState } from "@/components/appointments/manua
 import { manualAppointmentFormPhoneE164 } from "@/lib/appointments/can-submit-manual-appointment"
 import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import { createOnlineBooking, updateBooking } from "@/lib/bookings/bookings-store"
+import { fetchDefaultBreakMinutesForBusiness } from "@/lib/bookings/break-minutes"
 import { MANUAL_BOOKING_ANY_STAFF, resolveManualBookingStaffSelection } from "@/lib/bookings/manual-booking-staff"
 import { saveManualAppointment, type ManualAppointment } from "@/lib/appointments/manual-appointments"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
@@ -72,6 +73,7 @@ export async function submitManualAppointmentSheet(input: {
     if (!client || !bid) {
       return { ok: false, reason: { code: "create_failed", error: "other" } }
     }
+    const defaultBreakMinutes = await fetchDefaultBreakMinutesForBusiness(client, bid)
     const resolution = await resolveManualBookingStaffSelection({
       client,
       businessId: bid,
@@ -81,6 +83,7 @@ export async function submitManualAppointmentSheet(input: {
       staffChoice: form.manualStaffId.trim(),
       candidates: manualStaffForService,
       hasActiveTeam: hasActiveTeamMembers,
+      defaultBreakMinutes,
     })
     if (!resolution.ok) {
       return { ok: false, reason: { code: "staff_resolution", errorKey: resolution.errorKey } }

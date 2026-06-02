@@ -10,6 +10,10 @@ import {
   unwrapSupabaseBookingAppointmentId,
 } from "@/lib/bookings/bookings-store"
 import {
+  fetchDefaultBreakMinutesForBusiness,
+  resolveBreakMinutes,
+} from "@/lib/bookings/break-minutes"
+import {
   MANUAL_BOOKING_ANY_STAFF,
   resolveManualBookingStaffSelection,
 } from "@/lib/bookings/manual-booking-staff"
@@ -213,6 +217,10 @@ export function useAppointmentInlineActions(args: {
               return false
             }
             if (resolverClient && bidResolved) {
+              const defaultBreakMinutes = await fetchDefaultBreakMinutesForBusiness(
+                resolverClient,
+                bidResolved,
+              )
               const resolution = await resolveManualBookingStaffSelection({
                 client: resolverClient,
                 businessId: bidResolved,
@@ -224,6 +232,7 @@ export function useAppointmentInlineActions(args: {
                 hasActiveTeam: hasActiveTeamMembers && candidates.length > 0,
                 excludeBookingId: uuidSb ?? null,
                 availabilityFeedback: "proposal",
+                defaultBreakMinutes,
               })
               if (!resolution.ok) {
                 slotMsg()
@@ -277,7 +286,12 @@ export function useAppointmentInlineActions(args: {
                 ? resolvedStaffId.trim()
                 : null
             if (shouldResolveStaff && staffScope) {
+              const defaultBreakMinutes = await fetchDefaultBreakMinutesForBusiness(client, bid)
               const dur = Math.max(1, Math.floor(Number(serviceForProposal?.durationMinutes ?? 0) || 60))
+              const breakMin = resolveBreakMinutes(
+                serviceForProposal?.breakMinutes,
+                defaultBreakMinutes,
+              )
               const overlaps = await hasStaffSchedulingIntervalOverlap(
                 client,
                 bid,
@@ -285,7 +299,7 @@ export function useAppointmentInlineActions(args: {
                 time,
                 dur,
                 staffScope,
-                { excludeBookingId: uuidSb },
+                { excludeBookingId: uuidSb, breakMinutes: breakMin },
               )
               if (overlaps) {
                 slotMsg()

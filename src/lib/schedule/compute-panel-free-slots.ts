@@ -31,6 +31,7 @@ export type ComputePanelFreeSlotsInput = {
   year: number
   month: number
   durationMinutes: number
+  breakMinutes?: number
   businessAvailability: AvailabilityDay[]
   businessExceptionsByDate: Map<string, AvailabilityExceptionRecord | null>
   bookedSlots: BookedAppointmentSlot[]
@@ -55,6 +56,7 @@ function computeFreeSlotTimesForDay(
 ): string[] {
   const {
     durationMinutes,
+    breakMinutes = 0,
     businessAvailability,
     businessExceptionsByDate,
     bookedSlots,
@@ -64,6 +66,7 @@ function computeFreeSlotTimesForDay(
   } = input
 
   const duration = Math.max(15, Math.floor(durationMinutes || 30))
+  const breakMin = Math.max(0, Math.floor(breakMinutes || 0))
   const asOf = getAppToday()
   const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate())
   const activeStaff = staffMembers.filter((s) => s.isActive)
@@ -88,7 +91,7 @@ function computeFreeSlotTimesForDay(
   const staffList = staffScope.length > 0 ? staffScope : activeStaff
 
   if (staffList.length === 0) {
-    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, null, duration)
+    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, null, duration, breakMin)
     return getSlotsForSelectedDate(cellDate, today, asOf, duration, businessDays, blocked)
   }
 
@@ -97,7 +100,7 @@ function computeFreeSlotTimesForDay(
     const days = ctx
       ? applyStaffOverlayToWeek(businessDays, cellDate, ctx.rules, ctx.exceptions)
       : businessDays
-    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, member.id, duration)
+    const blocked = toBlockedSlotKeySetForStaff(bookedSlots, member.id, duration, breakMin)
     const slots = getSlotsForSelectedDate(cellDate, today, asOf, duration, days, blocked)
     for (const t of slots) union.add(t)
   }
@@ -133,6 +136,8 @@ export function calendarEntriesToBookedSlots(rows: readonly {
   appointment_time: string
   status: string
   staff_id: string | null
+  service_duration_minutes?: number | null
+  service_break_minutes?: number | null
 }[]): BookedAppointmentSlot[] {
   return rows
     .filter((r) => isBookingBlockingSlot(r.status))
@@ -142,5 +147,13 @@ export function calendarEntriesToBookedSlots(rows: readonly {
       appointment_time: r.appointment_time,
       status: r.status,
       staff_id: r.staff_id,
+      service_duration_minutes:
+        r.service_duration_minutes != null
+          ? Math.max(1, Math.floor(Number(r.service_duration_minutes) || 0))
+          : undefined,
+      service_break_minutes:
+        r.service_break_minutes != null
+          ? Math.max(0, Math.floor(Number(r.service_break_minutes) || 0))
+          : undefined,
     }))
 }

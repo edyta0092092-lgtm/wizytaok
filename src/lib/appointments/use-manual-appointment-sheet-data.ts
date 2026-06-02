@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
+import { fetchDefaultBreakMinutesForBusiness } from "@/lib/bookings/break-minutes"
 import { isStaffAvailableForSlot, MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
 import {
   getCurrentBusinessProfileIdForClient,
@@ -156,6 +157,7 @@ export function useManualAppointmentSheetData(
         if (!cancelled) setManualAvailableStaffIds(null)
         return
       }
+      const defaultBreakMinutes = await fetchDefaultBreakMinutesForBusiness(client, bid)
       const available = new Set<string>()
       for (const member of manualStaffForService) {
         const ok = await isStaffAvailableForSlot({
@@ -165,10 +167,12 @@ export function useManualAppointmentSheetData(
           service: {
             id: selectedService.id,
             durationMinutes: selectedService.durationMinutes,
+            breakMinutes: selectedService.breakMinutes,
             usesDefaultAvailability: selectedService.usesDefaultAvailability,
           },
           date: formDate,
           startTime: formTime,
+          defaultBreakMinutes,
         })
         if (ok) available.add(member.id)
       }
