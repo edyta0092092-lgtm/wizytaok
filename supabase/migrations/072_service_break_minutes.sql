@@ -24,6 +24,7 @@ set service_break_minutes = coalesce(
   (
     select coalesce(s.break_minutes, bp.default_break_minutes, 0)
     from public.services s
+    inner join public.business_profiles bp on bp.id = b.business_id
     where s.id = b.service_id
   ),
   (
