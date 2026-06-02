@@ -723,22 +723,30 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 pt-4">
-                  <div className="space-y-2">
+                  <div className="space-y-2 sm:max-w-xs">
                     <Label htmlFor="default-break-minutes">
                       {t("settings.defaultBreakMinutesLabel")}
                     </Label>
-                    <Input
-                      id="default-break-minutes"
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder="0"
-                      value={form.defaultBreakMinutes}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, defaultBreakMinutes: e.target.value }))
-                      }
-                      className="h-11 max-w-xs rounded-xl"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="default-break-minutes"
+                        type="number"
+                        min={0}
+                        step={1}
+                        placeholder="0"
+                        value={form.defaultBreakMinutes}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, defaultBreakMinutes: e.target.value }))
+                        }
+                        className="h-11 pr-10"
+                      />
+                      <span
+                        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
+                        aria-hidden
+                      >
+                        min
+                      </span>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {t("settings.defaultBreakMinutesHint")}
                     </p>

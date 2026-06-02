@@ -364,42 +364,73 @@ export default function ServicesPage() {
                     onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
                   />
                 </div>
-                <div className="space-y-1.5 sm:max-w-xs">
-                  <Label htmlFor="service-duration">{t("services.durationMinutesLabel")}</Label>
-                  <Input
-                    id="service-duration"
-                    type="number"
-                    min={1}
-                    step={1}
-                    placeholder={t("services.placeholderDuration")}
-                    value={form.durationMinutes}
-                    onChange={(event) => setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))}
-                  />
+                <div className="grid gap-3 sm:grid-cols-2 sm:max-w-lg">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="service-duration">{t("services.durationMinutesLabel")}</Label>
+                    <div className="relative">
+                      <Input
+                        id="service-duration"
+                        type="number"
+                        min={1}
+                        step={1}
+                        placeholder={t("services.placeholderDuration")}
+                        value={form.durationMinutes}
+                        onChange={(event) =>
+                          setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))
+                        }
+                        className="pr-10"
+                      />
+                      <span
+                        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
+                        aria-hidden
+                      >
+                        {t("services.min")}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="service-price">{t("services.priceLabel")}</Label>
+                    <div className="relative">
+                      <Input
+                        id="service-price"
+                        type="number"
+                        min={0}
+                        step={1}
+                        placeholder={t("services.placeholderPrice")}
+                        value={form.price}
+                        onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
+                        className="pr-10"
+                      />
+                      <span
+                        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
+                        aria-hidden
+                      >
+                        {t("services.zł")}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-1.5 sm:max-w-xs">
                   <Label htmlFor="service-break">{t("services.breakMinutesLabel")}</Label>
-                  <Input
-                    id="service-break"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder={t("services.placeholderBreakMinutes")}
-                    value={form.breakMinutes}
-                    onChange={(event) => setForm((prev) => ({ ...prev, breakMinutes: event.target.value }))}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="service-break"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder={t("services.placeholderBreakMinutes")}
+                      value={form.breakMinutes}
+                      onChange={(event) => setForm((prev) => ({ ...prev, breakMinutes: event.target.value }))}
+                      className="pr-10"
+                    />
+                    <span
+                      className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
+                      aria-hidden
+                    >
+                      {t("services.min")}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted-foreground">{t("services.breakMinutesHint")}</p>
-                </div>
-                <div className="space-y-1.5 sm:max-w-xs">
-                  <Label htmlFor="service-price">{t("services.priceLabel")}</Label>
-                  <Input
-                    id="service-price"
-                    type="number"
-                    min={0}
-                    step={1}
-                    placeholder={t("services.placeholderPrice")}
-                    value={form.price}
-                    onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-                  />
                 </div>
                 <div className="grid gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">
                   <div className="flex items-center justify-between gap-2">
