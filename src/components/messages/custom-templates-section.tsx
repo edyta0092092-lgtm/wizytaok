@@ -160,6 +160,9 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
     }
     setLoadError(null)
     setRows((data ?? []) as Tables<"custom_templates">[])
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("pw-custom-templates"))
+    }
   }, [])
 
   React.useEffect(() => {

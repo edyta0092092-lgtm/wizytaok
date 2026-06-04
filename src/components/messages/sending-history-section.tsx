@@ -26,6 +26,12 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { formatDeliveryError } from "@/lib/messages/delivery-error-label"
 import {
+  customTemplateFilterKey,
+  customTemplateIdFromFilterKey,
+  isCustomTemplateFilterKey,
+  STANDARD_MESSAGE_TEMPLATE_TYPES,
+} from "@/lib/messages/history-template-filters"
+import {
   loadNotificationPreviewDetails,
   type NotificationPreviewDetails,
   type NotificationPreviewTarget,
@@ -35,6 +41,8 @@ import type { Tables } from "@/types/database"
 import type { NotificationMessage } from "@/types/domain"
 
 type NotificationLogRow = Tables<"notification_logs">
+type CustomTemplateSendRow = Tables<"custom_template_sends">
+type CustomTemplateRow = Pick<Tables<"custom_templates">, "id" | "name">
 
 type HistoryFilter = "all" | "sent" | "scheduled" | "skipped"
 type ChannelFilter = "all" | "sms" | "email"
@@ -53,6 +61,7 @@ type MergedEntry =
       outcomeStatus: string
     }
   | { kind: "local"; sortAt: string; msg: NotificationMessage }
+  | { kind: "customSend"; sortAt: string; row: CustomTemplateSendRow; channel: "sms" | "email" }
 
 type PreviewTarget =
   | { kind: "db"; row: NotificationLogRow }
@@ -65,6 +74,7 @@ type PreviewTarget =
       outcomeStatus: string
     }
   | { kind: "local"; msg: NotificationMessage }
+  | { kind: "customSend"; row: CustomTemplateSendRow; channel: "sms" | "email" }
 
 type PlannedReminderRow = {
   id: string
@@ -416,7 +426,23 @@ function canonicalNotificationType(raw: string): string {
   return type
 }
 
-function typeLabel(canonicalType: string, t: (key: string) => string): string {
+function customSendChannel(row: CustomTemplateSendRow): "sms" | "email" {
+  return String(row.channel ?? "").trim().toLowerCase() === "email" ? "email" : "sms"
+}
+
+function customSendSortAt(row: CustomTemplateSendRow): string {
+  return row.sent_at ?? row.failed_at ?? row.skipped_at ?? row.created_at
+}
+
+function typeLabel(
+  canonicalType: string,
+  t: (key: string) => string,
+  customTemplateNames: Record<string, string>,
+): string {
+  if (isCustomTemplateFilterKey(canonicalType)) {
+    const name = customTemplateNames[customTemplateIdFromFilterKey(canonicalType)]?.trim()
+    return name || "Własny szablon"
+  }
   if (canonicalType === "reminder_24h") return t("notifications.reminder24hType")
   if (canonicalType === "reminder_before_visit") return t("notifications.secondReminderType")
   if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmationType")
@@ -458,11 +484,33 @@ function mergeBookingReminderRows(
   return Array.from(byId.values())
 }
 
+function entryChannel(entry: MergedEntry): "sms" | "email" {
+  if (entry.kind === "db") return dbChannel(entry.row)
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "customSend") {
+    return entry.channel
+  }
+  return entry.msg.channel
+}
+
+function resolvedHistoryTypeFilter(entry: MergedEntry): string {
+  if (entry.kind === "customSend") {
+    return customTemplateFilterKey(entry.row.custom_template_id)
+  }
+  if (entry.kind === "db") {
+    return canonicalNotificationType(String(entry.row.type ?? "").trim())
+  }
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome") {
+    return entry.reminderType
+  }
+  return canonicalNotificationType(String(entry.msg.type ?? "").trim())
+}
+
 function mergeEntries(
   rows: NotificationLogRow[],
   local: NotificationMessage[],
   planned: PlannedReminderRow[],
   queueByKey: Map<string, AppointmentReminderQueueRow>,
+  customSends: CustomTemplateSendRow[],
 ): MergedEntry[] {
   const out: MergedEntry[] = []
   const logKeys = buildLogDedupKeys(rows)
@@ -610,6 +658,15 @@ function mergeEntries(
   for (const msg of local) {
     out.push({ kind: "local", sortAt: msg.createdAt, msg })
   }
+  for (const row of customSends) {
+    const channel = customSendChannel(row)
+    out.push({
+      kind: "customSend",
+      sortAt: customSendSortAt(row),
+      row,
+      channel,
+    })
+  }
   out.sort(
     (a, b) =>
       new Date(b.sortAt).getTime() - new Date(a.sortAt).getTime()
@@ -620,6 +677,14 @@ function mergeEntries(
 function canonicalStatus(entry: MergedEntry): string {
   if (entry.kind === "planned") return "scheduled"
   if (entry.kind === "reminderOutcome") return entry.outcomeStatus
+  if (entry.kind === "customSend") {
+    const st = String(entry.row.status ?? "").trim().toLowerCase()
+    if (st === "sent") return "sent"
+    if (st === "failed") return "failed"
+    if (st === "skipped") return "skipped"
+    if (st === "processing") return "pending"
+    return st || "pending"
+  }
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
     if (st === "sent") return "sent"
@@ -665,17 +730,32 @@ function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean 
 
 function listTypeLine(
   entry: MergedEntry,
-  t: (key: string) => string
+  t: (key: string) => string,
+  customTemplateNames: Record<string, string>,
 ): string {
+  const channel =
+    entry.kind === "db"
+      ? dbChannel(entry.row)
+      : entry.kind === "planned" || entry.kind === "reminderOutcome"
+        ? entry.channel
+        : entry.kind === "customSend"
+          ? entry.channel
+          : entry.msg.channel
+
+  if (entry.kind === "customSend") {
+    const name =
+      customTemplateNames[entry.row.custom_template_id]?.trim() || "Własny szablon"
+    const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
+    return `${name} - ${chLabel}`
+  }
+
   const rawType =
     entry.kind === "db"
       ? String(entry.row.type ?? "").trim()
       : entry.kind === "planned" || entry.kind === "reminderOutcome"
         ? entry.reminderType
-      : entry.msg.type
+        : entry.msg.type
   const type = canonicalNotificationType(rawType)
-  const channel =
-    entry.kind === "db" ? dbChannel(entry.row) : entry.kind === "planned" || entry.kind === "reminderOutcome" ? entry.channel : entry.msg.channel
 
   if (rawType === "manual_reminder") {
     return channel === "email"
@@ -684,7 +764,7 @@ function listTypeLine(
   }
 
   const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
-  if (type) return `${typeLabel(type, t)} - ${chLabel}`
+  if (type) return `${typeLabel(type, t, customTemplateNames)} - ${chLabel}`
   return chLabel
 }
 
@@ -707,6 +787,14 @@ function previewAsMerged(p: PreviewTarget): MergedEntry {
       channel: p.channel,
       reminderType: p.reminderType,
       outcomeStatus: p.outcomeStatus,
+    }
+  }
+  if (p.kind === "customSend") {
+    return {
+      kind: "customSend",
+      sortAt: customSendSortAt(p.row),
+      row: p.row,
+      channel: p.channel,
     }
   }
   return { kind: "local", sortAt: p.msg.createdAt, msg: p.msg }
@@ -772,11 +860,17 @@ function recipientDisplay(entry: PreviewTarget): string {
     const v = entry.channel === "email" ? entry.row.client_email : entry.row.client_phone
     return v?.trim() || "-"
   }
+  if (entry.kind === "customSend") {
+    return entry.row.recipient?.trim() || "-"
+  }
   return entry.row.recipient?.trim() || "-"
 }
 
 function bodyForPreview(entry: PreviewTarget): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "customSend") {
+    return entry.row.body?.trim() || null
+  }
   if (entry.kind === "db") {
     const b = entry.row.body?.trim()
     return b || null
@@ -787,6 +881,9 @@ function bodyForPreview(entry: PreviewTarget): string | null {
 
 function subjectForPreview(entry: PreviewTarget): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "customSend") {
+    return entry.row.subject?.trim() || null
+  }
   if (entry.kind === "db") {
     const s = entry.row.subject?.trim()
     return s || null
@@ -824,6 +921,14 @@ function entryErrorDetail(
   language: "pl" | "en",
 ): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "customSend") {
+    const st = String(entry.row.status ?? "").trim().toLowerCase()
+    if (st === "failed" || st === "skipped") {
+      const raw = entry.row.last_error?.trim()
+      return raw ? formatDeliveryError(raw, t, language) : null
+    }
+    return null
+  }
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
     if (st === "failed" || st === "skipped" || st === "not_configured") {
@@ -844,6 +949,14 @@ function errorForPreview(
   language: "pl" | "en",
 ): string | null {
   if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "customSend") {
+    const st = String(entry.row.status ?? "").trim().toLowerCase()
+    if (st === "failed" || st === "skipped") {
+      const raw = entry.row.last_error?.trim()
+      return raw ? formatDeliveryError(raw, t, language) : null
+    }
+    return null
+  }
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
     if (
@@ -876,6 +989,8 @@ export function SendingHistorySection() {
     AppointmentReminderQueueRow[]
   >([])
   const [templateTypes, setTemplateTypes] = React.useState<string[]>([])
+  const [customTemplates, setCustomTemplates] = React.useState<CustomTemplateRow[]>([])
+  const [customSendRows, setCustomSendRows] = React.useState<CustomTemplateSendRow[]>([])
   const [localMessages, setLocalMessages] = React.useState<NotificationMessage[]>([])
   const [businessSlugNorm, setBusinessSlugNorm] = React.useState<string | null>(null)
   const [filter, setFilter] = React.useState<HistoryFilter>("all")
@@ -941,9 +1056,11 @@ export function SendingHistorySection() {
     refresh()
     window.addEventListener("pw-notification-messages", refresh)
     window.addEventListener("pw-bookings", refreshDb)
+    window.addEventListener("pw-custom-templates", refreshDb)
     return () => {
       window.removeEventListener("pw-notification-messages", refresh)
       window.removeEventListener("pw-bookings", refreshDb)
+      window.removeEventListener("pw-custom-templates", refreshDb)
     }
   }, [])
 
@@ -983,10 +1100,17 @@ export function SendingHistorySection() {
       const slugRaw = bp?.slug?.trim() ?? ""
       const slugNorm = slugRaw ? normalizePublicSlug(slugRaw) : null
 
-      const [logsLoad, { data: templateRows }, queueLogRows, appointmentQueueRows] =
+      const [logsLoad, { data: templateRows }, { data: customTemplateRows }, customSendsLoad, queueLogRows, appointmentQueueRows] =
         await Promise.all([
         loadNotificationLogRows(client, bid),
         client.from("message_templates").select("type").eq("business_id", bid),
+        client.from("custom_templates").select("id,name").eq("business_id", bid),
+        client
+          .from("custom_template_sends")
+          .select("*")
+          .eq("business_id", bid)
+          .order("created_at", { ascending: false })
+          .limit(500),
         loadSentAppointmentReminderLogRows(client, bid),
         loadAppointmentReminderQueueRows(client, bid),
       ])
@@ -1080,6 +1204,12 @@ export function SendingHistorySection() {
           ),
         )
         setTemplateTypes(nextTemplateTypes)
+        setCustomTemplates((customTemplateRows ?? []) as CustomTemplateRow[])
+        if (!customSendsLoad.error) {
+          setCustomSendRows((customSendsLoad.data ?? []) as CustomTemplateSendRow[])
+        } else {
+          setCustomSendRows([])
+        }
         if (process.env.NODE_ENV === "development") {
           console.info("[notifications.logs.load]", {
             businessId: bid,
@@ -1132,24 +1262,44 @@ export function SendingHistorySection() {
     [appointmentReminderQueue],
   )
 
+  const customTemplateNames = React.useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const row of customTemplates) {
+      if (row.id) map[row.id] = row.name?.trim() || "Własny szablon"
+    }
+    return map
+  }, [customTemplates])
+
   const merged = React.useMemo(
-    () => mergeEntries(rows, scopedLocal, plannedRows, queueByKey),
-    [rows, scopedLocal, plannedRows, queueByKey],
+    () => mergeEntries(rows, scopedLocal, plannedRows, queueByKey, customSendRows),
+    [rows, scopedLocal, plannedRows, queueByKey, customSendRows],
   )
 
   const availableTypeFilters = React.useMemo(() => {
-    const fromEntries = merged.map((entry) => {
-      const raw =
-        entry.kind === "db"
-          ? String(entry.row.type ?? "").trim()
-          : entry.kind === "planned" || entry.kind === "reminderOutcome"
-            ? entry.reminderType
-            : String(entry.msg.type ?? "").trim()
-      return canonicalNotificationType(raw)
-    })
-    const values = Array.from(new Set([...templateTypes, ...fromEntries].filter(Boolean)))
-    return values
-  }, [merged, templateTypes])
+    const fromEntries = merged.map((entry) => resolvedHistoryTypeFilter(entry)).filter(Boolean)
+    const customKeys = customTemplates.map((row) => customTemplateFilterKey(row.id))
+    const combined = new Set<string>([
+      ...STANDARD_MESSAGE_TEMPLATE_TYPES,
+      ...customKeys,
+      ...templateTypes,
+      ...fromEntries,
+    ])
+    const customSorted = [...customKeys]
+      .filter((key) => combined.has(key))
+      .sort((a, b) =>
+        (customTemplateNames[customTemplateIdFromFilterKey(a)] ?? "").localeCompare(
+          customTemplateNames[customTemplateIdFromFilterKey(b)] ?? "",
+          language === "en" ? "en" : "pl",
+        ),
+      )
+    const standard = STANDARD_MESSAGE_TEMPLATE_TYPES.filter((type) => combined.has(type))
+    const orphan = [...combined].filter(
+      (type) =>
+        !STANDARD_MESSAGE_TEMPLATE_TYPES.includes(type as (typeof STANDARD_MESSAGE_TEMPLATE_TYPES)[number]) &&
+        !customKeys.includes(type),
+    )
+    return [...standard, ...customSorted, ...orphan]
+  }, [merged, templateTypes, customTemplates, customTemplateNames, language])
 
   const [nowMs] = React.useState<number>(() => new Date().getTime())
 
@@ -1168,8 +1318,7 @@ export function SendingHistorySection() {
       .filter((e) => entryMatchesFilter(e, filter))
       .filter((e) => {
         if (channelFilter === "all") return true
-        const c = e.kind === "db" ? dbChannel(e.row) : e.kind === "planned" || e.kind === "reminderOutcome" ? e.channel : e.msg.channel
-        return c === channelFilter
+        return entryChannel(e) === channelFilter
       })
       .filter((e) => {
         if (sinceMs == null) return true
@@ -1177,13 +1326,7 @@ export function SendingHistorySection() {
       })
       .filter((e) => {
         if (typeFilter === "all") return true
-        const resolvedType =
-          e.kind === "db"
-            ? String(e.row.type ?? "").trim()
-            : e.kind === "planned" || e.kind === "reminderOutcome"
-              ? e.reminderType
-              : String(e.msg.type)
-        return canonicalNotificationType(resolvedType) === typeFilter
+        return resolvedHistoryTypeFilter(e) === typeFilter
       })
   }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs])
 
@@ -1215,7 +1358,9 @@ export function SendingHistorySection() {
   )
 
   const bookingIdForPreview =
-    preview?.kind === "db"
+    preview?.kind === "customSend"
+      ? preview.row.appointment_id
+      : preview?.kind === "db"
       ? preview.row.booking_id
       : preview?.kind === "planned" || preview?.kind === "reminderOutcome"
         ? preview.row.id
@@ -1435,7 +1580,7 @@ export function SendingHistorySection() {
               <option value="all">Wszystkie typy</option>
               {availableTypeFilters.map((type) => (
                 <option key={type} value={type}>
-                  {typeLabel(type, t)}
+                  {typeLabel(type, t, customTemplateNames)}
                 </option>
               ))}
             </FilterSelect>
@@ -1463,7 +1608,9 @@ export function SendingHistorySection() {
                       ? `planned:${entry.row.id}:${entry.reminderType}:${entry.channel}`
                       : entry.kind === "reminderOutcome"
                         ? `outcome:${entry.row.id}:${entry.reminderType}:${entry.channel}`
-                      : `local:${entry.msg.id}`
+                        : entry.kind === "customSend"
+                          ? `custom:${entry.row.id}:${entry.channel}`
+                          : `local:${entry.msg.id}`
                 const canon = canonicalStatus(entry)
                 const errorDetail = entryErrorDetail(entry, t, language)
                 return (
@@ -1471,7 +1618,7 @@ export function SendingHistorySection() {
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground">
-                          {listTypeLine(entry, t)}
+                          {listTypeLine(entry, t, customTemplateNames)}
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <span
@@ -1512,7 +1659,13 @@ export function SendingHistorySection() {
                                       reminderType: entry.reminderType,
                                       outcomeStatus: entry.outcomeStatus,
                                     }
-                              : { kind: "local", msg: entry.msg }
+                                  : entry.kind === "customSend"
+                                    ? {
+                                        kind: "customSend",
+                                        row: entry.row,
+                                        channel: entry.channel,
+                                      }
+                                    : { kind: "local", msg: entry.msg }
                           )
                         }}
                       >
@@ -1550,7 +1703,7 @@ export function SendingHistorySection() {
                   {t("messages.messagePreview")}
                 </SheetTitle>
                 <SheetDescription className="text-sm text-muted-foreground">
-                  {listTypeLine(previewAsMerged(preview), t)}
+                  {listTypeLine(previewAsMerged(preview), t, customTemplateNames)}
                 </SheetDescription>
               </SheetHeader>
               <div className="premium-scrollbar flex max-h-[calc(100vh-6rem)] flex-col gap-4 overflow-y-auto px-6 py-6">
@@ -1560,7 +1713,7 @@ export function SendingHistorySection() {
                       {t("messagesLog.fieldMessageType")}
                     </dt>
                     <dd className="mt-0.5 text-foreground">
-                      {listTypeLine(previewAsMerged(preview), t)}
+                      {listTypeLine(previewAsMerged(preview), t, customTemplateNames)}
                     </dd>
                   </div>
                   <div>
@@ -1570,6 +1723,8 @@ export function SendingHistorySection() {
                     <dd className="mt-0.5 text-foreground">
                       {(preview.kind === "db"
                         ? dbChannel(preview.row)
+                        : preview.kind === "customSend"
+                          ? preview.channel
                         : preview.kind === "planned" || preview.kind === "reminderOutcome"
                           ? preview.channel
                         : preview.msg.channel) === "email"
