@@ -153,3 +153,75 @@ export async function upsertSentNotificationLog(
 
   return insertNotificationLog(admin, row, logTag)
 }
+
+async function verifySentNotificationLogRow(
+  admin: SupabaseClient<Database>,
+  bookingId: string,
+  type: string,
+  channel: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from("notification_logs")
+    .select("id, status, body, recipient")
+    .eq("booking_id", bookingId)
+    .eq("type", type)
+    .eq("channel", channel)
+    .maybeSingle()
+  if (!data?.id) return false
+  const st = String(data.status ?? "").trim().toLowerCase()
+  const hasContent = Boolean(data.body?.trim()) || Boolean(data.recipient?.trim())
+  return hasContent && (st === "sent" || st === "skipped" || st === "queued")
+}
+
+/**
+ * Zapisuje wpis „sent” z upsertem po (booking_id, type, channel) — niezawodnie dla historii wysyłek.
+ */
+export async function forcePersistSentNotificationLog(
+  admin: SupabaseClient<Database>,
+  row: NotificationLogInsertInput,
+  logTag = "[notification.log]",
+): Promise<boolean> {
+  const sentAt = row.sent_at ?? new Date().toISOString()
+  const payload = toNotificationLogInsertRow({
+    ...row,
+    status: "sent",
+    sent_at: sentAt,
+  })
+  if (!payload.booking_id || !payload.type) {
+    return false
+  }
+
+  const { error: upsertErr } = await admin
+    .from("notification_logs")
+    .upsert(payload, { onConflict: "booking_id,type,channel" })
+
+  if (!upsertErr) {
+    const verified = await verifySentNotificationLogRow(
+      admin,
+      payload.booking_id,
+      payload.type,
+      payload.channel,
+    )
+    if (verified) return true
+  } else {
+    console.error(logTag, {
+      phase: "upsert_failed",
+      message: upsertErr.message,
+      booking_id: payload.booking_id,
+      type: payload.type,
+      channel: payload.channel,
+    })
+  }
+
+  const upgraded = await upsertSentNotificationLog(admin, row, logTag)
+  if (!upgraded.ok) {
+    return false
+  }
+
+  return verifySentNotificationLogRow(
+    admin,
+    payload.booking_id,
+    payload.type,
+    payload.channel,
+  )
+}

@@ -23,6 +23,10 @@ import {
   setCachedMergedAppointments,
 } from "@/lib/appointments/merged-appointments-cache"
 import { fetchCompleteBookingByCompany } from "@/lib/bookings/complete-booking-by-company-client"
+import {
+  createThankYouAfterVisitMessages,
+  enqueueThankYouAfterVisitNotifications,
+} from "@/lib/notifications/notifications"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
   getBookingsForCurrentBusiness,
@@ -448,6 +452,22 @@ export async function updateAppointmentStatus(
     if (status === "completed") {
       const apiResult = await fetchCompleteBookingByCompany(appointmentId, lang, true)
       if (!apiResult.ok) return false
+      const mirror = apiResult.thankYouHistoryMirror
+      if (mirror) {
+        const localMessages = createThankYouAfterVisitMessages({
+          bookingUiId: mirror.bookingUiId,
+          businessSlug: mirror.businessSlug,
+          clientName: mirror.clientName,
+          clientPhone: mirror.clientPhone,
+          clientEmail: mirror.clientEmail,
+          confirmationToken: mirror.confirmationToken,
+          smsBody: mirror.smsBody,
+          emailSubject: mirror.emailSubject,
+          emailBody: mirror.emailBody,
+          language: lang,
+        })
+        enqueueThankYouAfterVisitNotifications(localMessages)
+      }
       notifyBookingsAndHistoryChanged()
       return true
     }

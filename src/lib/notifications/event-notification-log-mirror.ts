@@ -1,5 +1,5 @@
 import { historyTypeForCustomEventTemplate } from "@/lib/messages/history-template-filters"
-import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import { forcePersistSentNotificationLog } from "@/lib/notifications/notification-log-insert"
 import type { CustomTemplateRow } from "@/lib/notifications/custom-template-send"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
@@ -28,7 +28,7 @@ export async function mirrorEventCustomTemplateToNotificationLog(
   const logType = historyTypeForCustomEventTemplate(args.template)
   if (!logType) return
 
-  const result = await insertNotificationLog(
+  const ok = await forcePersistSentNotificationLog(
     admin,
     {
       business_id: args.businessId,
@@ -45,12 +45,11 @@ export async function mirrorEventCustomTemplateToNotificationLog(
     },
     "[event-custom-template.mirror-log]",
   )
-  if (!result.ok) {
-    console.error("[event-custom-template.mirror-log] insert_failed", {
+  if (!ok) {
+    console.error("[event-custom-template.mirror-log] persist_failed", {
       booking_id: args.bookingId,
       type: logType,
       channel: args.channel,
-      message: result.message,
     })
   }
 }

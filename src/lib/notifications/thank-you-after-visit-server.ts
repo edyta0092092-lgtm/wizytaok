@@ -2,6 +2,7 @@ import { sendReminderEmail } from "@/lib/notifications/email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import type { NotificationLogUpdatePatch } from "@/lib/notifications/notification-log-update"
+import { forcePersistSentNotificationLog } from "@/lib/notifications/notification-log-insert"
 import { persistTransactionalChannelLog } from "@/lib/notifications/transactional-channel-log"
 import {
   applyTemplateVariables,
@@ -46,6 +47,15 @@ Best regards,
   },
 } as const
 
+export type ThankYouMessageContent = {
+  sendSms: boolean
+  sendEmail: boolean
+  smsText: string
+  emailSubject: string
+  emailText: string
+  emailHtml: string
+}
+
 function getPublicAppOrigin(): string {
   const explicit = process.env.APP_ORIGIN?.trim() || process.env.NEXT_PUBLIC_APP_URL?.trim()
   if (explicit) return explicit.replace(/\/$/, "")
@@ -74,6 +84,63 @@ function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notificatio
 
 type LogAdmin = NonNullable<ReturnType<typeof getServiceRoleClient>>
 
+async function loadStaffName(admin: LogAdmin, booking: Tables<"bookings">): Promise<string | null> {
+  const staffId =
+    typeof (booking as { staff_id?: string | null }).staff_id === "string"
+      ? ((booking as { staff_id?: string | null }).staff_id ?? "").trim()
+      : ""
+  if (!staffId) return null
+  const { data: staff } = await admin
+    .from("staff_members")
+    .select("name")
+    .eq("id", staffId)
+    .maybeSingle()
+  return staff?.name?.trim() || null
+}
+
+export async function buildThankYouAfterVisitContent(
+  admin: LogAdmin,
+  booking: Tables<"bookings">,
+  business: BusinessRow,
+  language: ThankYouAfterVisitLanguage,
+): Promise<ThankYouMessageContent> {
+  const runtime = await getTemplateRuntime(admin, business.id, THANK_YOU_AFTER_VISIT_LOG_TYPE)
+  const sendSms = runtime.smsExists ? runtime.smsEnabled : true
+  const sendEmail = runtime.emailExists ? runtime.emailEnabled : true
+  const staffNameRel = await loadStaffName(admin, booking)
+
+  const appUrl = getPublicAppOrigin()
+  const slug = business.slug?.trim() ?? ""
+  const linkRezerwacji = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
+  const confirmPath = `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`
+  const vars: Record<string, string> = {
+    imie: firstToken(booking.client_name),
+    data: String(booking.appointment_date).slice(0, 10),
+    godzina: formatTimeHmFromDb(String(booking.appointment_time)),
+    usluga: booking.service_name,
+    osoba: getStaffDisplayName({ name: staffNameRel ?? booking.staff_name ?? "" }),
+    ...buildBusinessTemplateVars(business, {
+      link_rezerwacji: linkRezerwacji,
+      link_potwierdzenia: confirmPath,
+      link_anulowania: confirmPath,
+    }),
+  }
+
+  const defaults = DEFAULTS[language] ?? DEFAULTS.pl
+  const smsText = applyTemplateVariables(runtime.smsBody?.trim() || defaults.sms, vars)
+  const emailSubject = applyTemplateVariables(runtime.emailSubject?.trim() || defaults.emailSubject, vars)
+  const emailText = applyTemplateVariables(runtime.emailBody?.trim() || defaults.emailBody, vars)
+
+  return {
+    sendSms,
+    sendEmail,
+    smsText,
+    emailSubject,
+    emailText,
+    emailHtml: plainTextEmailToHtml(emailText),
+  }
+}
+
 async function persistThankYouChannelLog(
   admin: LogAdmin,
   booking: Tables<"bookings">,
@@ -81,6 +148,27 @@ async function persistThankYouChannelLog(
   recipient: string,
   patch: NotificationLogUpdatePatch,
 ): Promise<boolean> {
+  const status = String(patch.status ?? "").trim().toLowerCase()
+  if (status === "sent") {
+    return forcePersistSentNotificationLog(
+      admin,
+      {
+        business_id: booking.business_id,
+        booking_id: booking.id,
+        channel,
+        type: THANK_YOU_AFTER_VISIT_LOG_TYPE,
+        recipient,
+        status: "sent",
+        subject: patch.subject ?? null,
+        body: patch.body ?? null,
+        provider: patch.provider ?? null,
+        provider_message_id: patch.provider_message_id ?? null,
+        error_message: patch.error_message ?? patch.error ?? null,
+        sent_at: patch.sent_at ?? new Date().toISOString(),
+      },
+      "[thank-you-after-visit.log]",
+    )
+  }
   return persistTransactionalChannelLog(
     admin,
     booking,
@@ -110,6 +198,55 @@ export async function hasThankYouAfterVisitHistoryLog(
   })
 }
 
+/**
+ * Uzupełnia wpisy w notification_logs bez ponownej wysyłki SMS/e-mail.
+ */
+export async function ensureThankYouLogsInHistory(args: {
+  booking: Tables<"bookings">
+  business: BusinessRow
+  language: ThankYouAfterVisitLanguage
+}): Promise<boolean> {
+  const admin = getServiceRoleClient()
+  if (!admin) return false
+
+  const { booking, business, language } = args
+  if (await hasThankYouAfterVisitHistoryLog(admin, booking.id)) return true
+
+  const content = await buildThankYouAfterVisitContent(admin, booking, business, language)
+  const nowIso = new Date().toISOString()
+  let anyOk = false
+
+  const phone = booking.client_phone?.trim() ?? ""
+  if (content.sendSms && phone) {
+    const ok = await persistThankYouChannelLog(admin, booking, "sms", phone, {
+      status: "sent",
+      subject: null,
+      body: content.smsText,
+      provider: null,
+      provider_message_id: null,
+      error_message: null,
+      sent_at: nowIso,
+    })
+    if (ok) anyOk = true
+  }
+
+  const email = booking.client_email?.trim() ?? ""
+  if (content.sendEmail && email) {
+    const ok = await persistThankYouChannelLog(admin, booking, "email", email, {
+      status: "sent",
+      subject: content.emailSubject,
+      body: content.emailText,
+      provider: null,
+      provider_message_id: null,
+      error_message: null,
+      sent_at: nowIso,
+    })
+    if (ok) anyOk = true
+  }
+
+  return anyOk
+}
+
 async function alreadyThanked(admin: LogAdmin, bookingId: string): Promise<boolean> {
   return hasThankYouAfterVisitHistoryLog(admin, bookingId)
 }
@@ -130,63 +267,24 @@ export async function notifyThankYouAfterVisit(args: {
   }
 
   const { booking, business, language } = args
-  const runtime = await getTemplateRuntime(admin, business.id, THANK_YOU_AFTER_VISIT_LOG_TYPE)
-  const sendSms = runtime.smsExists ? runtime.smsEnabled : true
-  const sendEmail = runtime.emailExists ? runtime.emailEnabled : true
-  if (!sendSms && !sendEmail) return { notice: "skipped" }
+  const content = await buildThankYouAfterVisitContent(admin, booking, business, language)
+  if (!content.sendSms && !content.sendEmail) return { notice: "skipped" }
 
   if (await alreadyThanked(admin, booking.id)) return { notice: "skipped" }
-
-  const staffId =
-    typeof (booking as { staff_id?: string | null }).staff_id === "string"
-      ? ((booking as { staff_id?: string | null }).staff_id ?? "").trim()
-      : ""
-  let staffNameRel: string | null = null
-  if (staffId) {
-    const { data: staff } = await admin
-      .from("staff_members")
-      .select("name")
-      .eq("id", staffId)
-      .maybeSingle()
-    staffNameRel = staff?.name?.trim() || null
-  }
-
-  const appUrl = getPublicAppOrigin()
-  const slug = business.slug?.trim() ?? ""
-  const linkRezerwacji = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
-  const confirmPath = `${appUrl}/confirm/${encodeURIComponent(booking.confirmation_token)}`
-  const vars: Record<string, string> = {
-    imie: firstToken(booking.client_name),
-    data: String(booking.appointment_date).slice(0, 10),
-    godzina: formatTimeHmFromDb(String(booking.appointment_time)),
-    usluga: booking.service_name,
-    osoba: getStaffDisplayName({ name: staffNameRel ?? booking.staff_name ?? "" }),
-    ...buildBusinessTemplateVars(business, {
-      link_rezerwacji: linkRezerwacji,
-      link_potwierdzenia: confirmPath,
-      link_anulowania: confirmPath,
-    }),
-  }
-
-  const defaults = DEFAULTS[language] ?? DEFAULTS.pl
-  const smsText = applyTemplateVariables(runtime.smsBody?.trim() || defaults.sms, vars)
-  const emailSubject = applyTemplateVariables(runtime.emailSubject?.trim() || defaults.emailSubject, vars)
-  const emailText = applyTemplateVariables(runtime.emailBody?.trim() || defaults.emailBody, vars)
-  const emailHtml = plainTextEmailToHtml(emailText)
 
   const nowIso = new Date().toISOString()
   let anySent = false
   let logsOk = true
 
   const phone = booking.client_phone?.trim() ?? ""
-  if (sendSms && phone) {
-    const smsRes = await sendPlainTransactionalSms({ to: phone, body: smsText })
+  if (content.sendSms && phone) {
+    const smsRes = await sendPlainTransactionalSms({ to: phone, body: content.smsText })
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
     const logged = await persistThankYouChannelLog(admin, booking, "sms", phone, {
       status,
       subject: null,
-      body: smsText,
+      body: content.smsText,
       provider: smsRes.ok ? smsRes.provider : null,
       provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
       error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
@@ -196,19 +294,19 @@ export async function notifyThankYouAfterVisit(args: {
   }
 
   const email = booking.client_email?.trim() ?? ""
-  if (sendEmail && email) {
+  if (content.sendEmail && email) {
     const emailRes = await sendReminderEmail({
       to: email,
-      subject: emailSubject,
-      textBody: emailText,
-      htmlBody: emailHtml,
+      subject: content.emailSubject,
+      textBody: content.emailText,
+      htmlBody: content.emailHtml,
     })
     const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
     if (emailRes.ok) anySent = true
     const logged = await persistThankYouChannelLog(admin, booking, "email", email, {
       status,
-      subject: emailSubject,
-      body: emailText,
+      subject: content.emailSubject,
+      body: content.emailText,
       provider: emailRes.ok ? emailRes.provider : null,
       provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
       error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
@@ -221,6 +319,7 @@ export async function notifyThankYouAfterVisit(args: {
     console.error("[thank-you-after-visit] sent_but_log_persist_failed", {
       bookingId: booking.id,
     })
+    await ensureThankYouLogsInHistory(args)
   }
 
   return { notice: anySent ? "sent" : "queued" }

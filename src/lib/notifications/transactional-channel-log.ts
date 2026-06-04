@@ -3,9 +3,9 @@ import {
   type NotificationLogUpdatePatch,
 } from "@/lib/notifications/notification-log-update"
 import {
+  forcePersistSentNotificationLog,
   insertNotificationLog,
   toNotificationLogInsertRow,
-  upsertSentNotificationLog,
 } from "@/lib/notifications/notification-log-insert"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Tables } from "@/types/database"
@@ -42,18 +42,16 @@ export async function persistTransactionalChannelLog(
       error_message: patch.error_message ?? patch.error ?? null,
       sent_at: patch.sent_at ?? new Date().toISOString(),
     })
-    const result = await upsertSentNotificationLog(admin, row, logTag)
-    if (!result.ok) {
+    const ok = await forcePersistSentNotificationLog(admin, row, logTag)
+    if (!ok) {
       console.error(logTag, {
         phase: "persist_sent_failed",
         booking_id: booking.id,
         type: logType,
         channel,
-        message: result.message,
       })
-      return false
     }
-    return true
+    return ok
   }
 
   const updated = await updateNotificationLogRow(

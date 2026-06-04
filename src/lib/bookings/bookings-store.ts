@@ -20,8 +20,7 @@ export const SB_BOOKING_PREFIX = "sb-"
 export type BookingsStoreClient = SupabaseClient<Database>
 
 export function unwrapSupabaseBookingAppointmentId(uiId: string): string | null {
-  const t = typeof uiId === "string" ? uiId.trim() : ""
-  return t.startsWith(SB_BOOKING_PREFIX) ? t.slice(SB_BOOKING_PREFIX.length) : null
+  return resolveSupabaseBookingRowUuidFromUiId(uiId)
 }
 
 const BOOKINGS_ROW_UUID_RE =

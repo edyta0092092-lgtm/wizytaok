@@ -13,6 +13,7 @@ function isNotificationMessageType(raw: unknown): raw is NotificationMessageType
   return (
     raw === "booking_created" ||
     raw === "booking_confirmed" ||
+    raw === "thank_you_after_visit" ||
     raw === "reminder_24h" ||
     raw === "first_reminder_24h" ||
     raw === "appointment_reminder_24h" ||
@@ -235,6 +236,66 @@ export function createBookingConfirmedMessages(
   }
 
   return [sms, email]
+}
+
+export function createThankYouAfterVisitMessages(args: {
+  bookingUiId: string
+  businessSlug: string
+  clientName: string
+  clientPhone?: string | null
+  clientEmail?: string | null
+  confirmationToken: string
+  smsBody?: string | null
+  emailSubject?: string | null
+  emailBody?: string | null
+  language: "pl" | "en"
+}): NotificationMessage[] {
+  const createdAt = new Date().toISOString()
+  const confirmationLink = `/confirm/${args.confirmationToken}`
+  const out: NotificationMessage[] = []
+  const phone = args.clientPhone?.trim() ?? ""
+  const email = args.clientEmail?.trim() ?? ""
+  if (phone && args.smsBody?.trim()) {
+    out.push({
+      id: crypto.randomUUID(),
+      bookingId: args.bookingUiId,
+      businessSlug: args.businessSlug,
+      channel: "sms",
+      type: "thank_you_after_visit",
+      recipientName: args.clientName,
+      recipientPhone: phone,
+      body: args.smsBody.trim(),
+      confirmationLink,
+      status: "sent",
+      sentAt: createdAt,
+      createdAt,
+    })
+  }
+  if (email && args.emailBody?.trim()) {
+    out.push({
+      id: crypto.randomUUID(),
+      bookingId: args.bookingUiId,
+      businessSlug: args.businessSlug,
+      channel: "email",
+      type: "thank_you_after_visit",
+      recipientName: args.clientName,
+      recipientEmail: email,
+      subject: args.emailSubject?.trim() || undefined,
+      body: args.emailBody.trim(),
+      confirmationLink,
+      status: "sent",
+      sentAt: createdAt,
+      createdAt,
+    })
+  }
+  return out
+}
+
+export function enqueueThankYouAfterVisitNotifications(
+  messages: NotificationMessage[],
+): void {
+  if (messages.length === 0) return
+  saveNotificationMessagesBatch(messages)
 }
 
 export function enqueueBookingConfirmedNotifications(

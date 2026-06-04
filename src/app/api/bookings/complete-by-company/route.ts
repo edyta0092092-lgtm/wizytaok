@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server"
 
-import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
 import {
+  resolveSupabaseBookingRowUuidFromUiId,
+  SB_BOOKING_PREFIX,
+} from "@/lib/bookings/bookings-store"
+import {
+  buildThankYouAfterVisitContent,
+  ensureThankYouLogsInHistory,
   hasThankYouAfterVisitHistoryLog,
   notifyThankYouAfterVisit,
+  type ThankYouAfterVisitLanguage,
 } from "@/lib/notifications/thank-you-after-visit-server"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
@@ -62,11 +68,24 @@ export async function POST(req: Request) {
     .eq("id", booking.business_id)
     .maybeSingle()
 
-  const language = body.language === "en" ? "en" : "pl"
+  const language: ThankYouAfterVisitLanguage = body.language === "en" ? "en" : "pl"
   const shouldNotifyClient = body.notifyClient !== false
 
   let notice: "saved" | "queued" | "sent" | "skipped" = "saved"
   let notificationSkipped = false
+  let thankYouHistoryMirror:
+    | {
+        bookingUiId: string
+        businessSlug: string
+        clientName: string
+        clientPhone: string | null
+        clientEmail: string | null
+        confirmationToken: string
+        smsBody: string | null
+        emailSubject: string | null
+        emailBody: string | null
+      }
+    | undefined
 
   const admin = getServiceRoleClient()
 
@@ -80,12 +99,38 @@ export async function POST(req: Request) {
       notice = "queued"
     } else {
       try {
-        const notifyResult = await notifyThankYouAfterVisit({
-          booking: { ...booking, status: "completed" },
+        const notifyArgs = {
+          booking: { ...booking, status: "completed" as const },
           business: profile,
           language,
-        })
+        }
+        const notifyResult = await notifyThankYouAfterVisit(notifyArgs)
         notice = notifyResult.notice
+        if (
+          admin &&
+          (notifyResult.notice === "sent" || notifyResult.notice === "queued") &&
+          !(await hasThankYouAfterVisitHistoryLog(admin, bookingUuid))
+        ) {
+          await ensureThankYouLogsInHistory(notifyArgs)
+        }
+        if (
+          admin &&
+          (notifyResult.notice === "sent" || notifyResult.notice === "queued") &&
+          profile.slug?.trim()
+        ) {
+          const content = await buildThankYouAfterVisitContent(admin, notifyArgs.booking, profile, language)
+          thankYouHistoryMirror = {
+            bookingUiId: `${SB_BOOKING_PREFIX}${bookingUuid}`,
+            businessSlug: profile.slug.trim(),
+            clientName: booking.client_name?.trim() || "",
+            clientPhone: booking.client_phone,
+            clientEmail: booking.client_email,
+            confirmationToken: booking.confirmation_token,
+            smsBody: content.sendSms ? content.smsText : null,
+            emailSubject: content.sendEmail ? content.emailSubject : null,
+            emailBody: content.sendEmail ? content.emailText : null,
+          }
+        }
         try {
           await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "completed" })
         } catch {
@@ -120,6 +165,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     notice,
+    ...(thankYouHistoryMirror ? { thankYouHistoryMirror } : {}),
     ...(notificationSkipped ? { notificationSkipped: true as const } : {}),
     ...(alreadyCompleted ? { alreadyCompleted: true as const } : {}),
   })
