@@ -1102,6 +1102,7 @@ export default function TeamPage() {
         invitationToken: string | null
         alreadyHasPanelAccess?: boolean
         emailOutcome?: "sent" | "not_configured" | "failed"
+        detail?: string
       }) => {
         const notices: string[] = []
         if (panelRes.alreadyHasPanelAccess) {
@@ -1120,12 +1121,17 @@ export default function TeamPage() {
           else notices.push(t("invitations.invitationCreated"))
           return notices
         }
-        notices.push(t("invitations.invitationCreateError"))
+        const line = t("invitations.invitationCreateError")
+        if (panelRes.detail?.trim()) {
+          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.detail.trim()}`)
+          return [`${line} (${panelRes.detail.trim()})`]
+        }
+        notices.push(line)
         return notices
       }
       const setSaveErrorWithDetail = (message: string, detail?: string) => {
         setNotice(message)
-        if (process.env.NODE_ENV === "development" && detail?.trim()) {
+        if (detail?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
         } else {
           setNoticeDetail(null)
@@ -1613,6 +1619,13 @@ export default function TeamPage() {
         typeof json.invitationToken === "string" && json.invitationToken.length > 0
           ? json.invitationToken
           : null
+      if (!json.alreadyHasPanelAccess && !token) {
+        return {
+          ok: false,
+          messageKey: "invitations.invitationCreateError",
+          detail: json?.detail ?? "invitation_token_missing",
+        }
+      }
       let emailOutcome: InvitationEmailSendOutcome | undefined
       if (token) {
         if (json.email?.sent) emailOutcome = "sent"
