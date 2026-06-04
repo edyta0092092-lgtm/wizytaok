@@ -1769,20 +1769,26 @@ export default function TeamPage() {
   }
 
   const cancelInvitation = async (invitationId: string) => {
-    const client = getBrowserClient()
-    const bid = businessProfileId
-    if (!client || !bid) return
-    const { error } = await client
-      .from("business_invitations")
-      .update({ status: "cancelled" })
-      .eq("id", invitationId)
-      .eq("business_id", bid)
-    if (error) {
+    setPanelInvites((prev) => prev.filter((inv) => inv.id !== invitationId))
+    if (inviteHighlightId === invitationId) setInviteHighlightId(null)
+    try {
+      const res = await fetch("/api/team/invitations/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invitationId }),
+      })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
+      if (!res.ok || !json?.ok) {
+        await load()
+        setNotice(t("invitations.invitationCreateError"))
+        return
+      }
+      setNotice(t("invitations.cancelled"))
+      setNoticeDetail(null)
+    } catch {
+      await load()
       setNotice(t("invitations.invitationCreateError"))
-      return
     }
-    await load()
-    setNotice(t("invitations.cancelled"))
   }
 
   const activeServices = React.useMemo(() => services.filter((s) => s.isActive), [services])
