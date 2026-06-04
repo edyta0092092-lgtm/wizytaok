@@ -27,6 +27,7 @@ const TYPE_ALIASES: Record<string, string[]> = {
   ],
   booking_cancelled_by_client: ["booking_cancelled_by_client", "client_cancelled_booking"],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
+  thank_you_after_visit: ["thank_you_after_visit", "thank_you", "visit_thank_you"],
 }
 
 function normalize(raw: string | null | undefined): string {

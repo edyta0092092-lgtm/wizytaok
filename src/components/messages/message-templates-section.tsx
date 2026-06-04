@@ -36,6 +36,7 @@ type TemplateType =
   | "booking_confirmation"
   | "booking_cancelled_by_company"
   | "no_show_follow_up"
+  | "thank_you_after_visit"
 
 type GroupedTemplate = {
   type: TemplateType
@@ -66,6 +67,7 @@ const TEMPLATE_ORDER: TemplateType[] = [
   "booking_confirmation",
   "booking_cancelled_by_company",
   "no_show_follow_up",
+  "thank_you_after_visit",
 ]
 
 const TEMPLATE_LABELS: Record<TemplateType, string> = {
@@ -74,6 +76,7 @@ const TEMPLATE_LABELS: Record<TemplateType, string> = {
   booking_confirmation: "Potwierdzenie wizyty",
   booking_cancelled_by_company: "Anulowanie wizyty",
   no_show_follow_up: "Follow-up po nieobecności klienta",
+  thank_you_after_visit: "Podziękowanie po wizycie",
 }
 
 const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
@@ -87,6 +90,7 @@ const TEMPLATE_TYPE_ALIASES: Record<TemplateType, string[]> = {
     "client_cancelled_booking",
   ],
   no_show_follow_up: ["no_show_follow_up", "followup_noshow", "follow_up_no_show"],
+  thank_you_after_visit: ["thank_you_after_visit", "thank_you", "visit_thank_you"],
 }
 
 function fallbackEnabledWhenNoTemplate(type: TemplateType): { sms: boolean; email: boolean } {
@@ -189,6 +193,18 @@ nie odnotowaliśmy Twojej wizyty:
 - Usługa: {{usluga}}
 
 Jeśli chcesz, możesz od razu umówić nowy termin:
+{{link_rezerwacji}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`,
+  },
+  thank_you_after_visit: {
+    smsBody:
+      "Cześć {{imie}}, dziękujemy za skorzystanie z naszych usług. Jeśli potrzebujesz, zapraszamy ponownie: {{link_rezerwacji}}. Pozdrawiamy, {{nazwa_firmy}}",
+    emailSubject: "{{nazwa_firmy}}: Dziękujemy za wizytę",
+    emailBody: `Cześć {{imie}},
+
+dziękujemy za skorzystanie z naszych usług. Jeśli potrzebujesz, zapraszamy ponownie:
 {{link_rezerwacji}}
 
 Pozdrawiamy,

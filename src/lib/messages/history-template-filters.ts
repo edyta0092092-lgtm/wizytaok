@@ -5,6 +5,7 @@ export const STANDARD_MESSAGE_TEMPLATE_TYPES = [
   "booking_confirmation",
   "booking_cancelled_by_company",
   "no_show_follow_up",
+  "thank_you_after_visit",
 ] as const
 
 export type StandardMessageTemplateType = (typeof STANDARD_MESSAGE_TEMPLATE_TYPES)[number]

@@ -31,6 +31,7 @@ export type MessageTemplateTypeDb =
   | "reschedule"
   | "followup_noshow"
   | "booking_cancelled_by_company"
+  | "thank_you_after_visit"
 
 export type MessageTemplateChannelDb = "sms" | "email"
 

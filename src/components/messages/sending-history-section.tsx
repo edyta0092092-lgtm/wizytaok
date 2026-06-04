@@ -61,6 +61,7 @@ const TRANSACTIONAL_HISTORY_TYPES = new Set([
   "booking_cancelled_by_company",
   "booking_cancelled_by_client",
   "no_show_follow_up",
+  "thank_you_after_visit",
 ])
 
 type HistoryFilter = "all" | "sent" | "scheduled" | "skipped"
@@ -455,6 +456,9 @@ function canonicalNotificationType(raw: string): string {
   if (["no_show_follow_up", "followup_noshow", "follow_up_no_show"].includes(type)) {
     return "no_show_follow_up"
   }
+  if (["thank_you_after_visit", "thank_you", "visit_thank_you"].includes(type)) {
+    return "thank_you_after_visit"
+  }
   return type
 }
 
@@ -548,6 +552,7 @@ function typeLabel(
   if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmationType")
   if (canonicalType === "booking_cancelled_by_company") return "Anulowanie wizyty"
   if (canonicalType === "no_show_follow_up") return "Follow-up po nieobecności"
+  if (canonicalType === "thank_you_after_visit") return "Podziękowanie po wizycie"
   if (canonicalType === "integration_test") return t("messagesLog.integrationTestLine")
   return canonicalType
 }

@@ -5,6 +5,7 @@ import { getBookingCreatedNotifyStatus } from "@/lib/notifications/booking-creat
 import { notifyBookingConfirmedForBooking } from "@/lib/notifications/booking-confirmed-server"
 import { notifyBookingCancelledByCompany } from "@/lib/notifications/booking-cancelled-by-company-server"
 import { notifyNoShowFollowUp } from "@/lib/notifications/no-show-follow-up-server"
+import { notifyThankYouAfterVisit } from "@/lib/notifications/thank-you-after-visit-server"
 import {
   dispatchCustomTemplatesForEvent,
   type CustomTemplateEventKey,
@@ -119,6 +120,14 @@ export async function POST(req: Request) {
     if (eventKey === "no_show") {
       const { notice } = await notifyNoShowFollowUp({
         booking: { ...booking, status: "no_show" },
+        business: profile,
+        language,
+      })
+      standardNotice = notice
+    }
+    if (eventKey === "completed") {
+      const { notice } = await notifyThankYouAfterVisit({
+        booking: { ...booking, status: "completed" },
         business: profile,
         language,
       })

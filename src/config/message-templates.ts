@@ -10,6 +10,7 @@ export const templateTypeOrder: MessageTemplateType[] = [
   "booking_confirmation",
   "booking_cancelled_by_company",
   "no_show_follow_up",
+  "thank_you_after_visit",
   "reminder",
   "second_reminder",
   "confirmation",
