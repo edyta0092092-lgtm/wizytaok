@@ -22,6 +22,8 @@ import {
   mergedAppointmentsCacheKey,
   setCachedMergedAppointments,
 } from "@/lib/appointments/merged-appointments-cache"
+import { fetchCompleteBookingByCompany } from "@/lib/bookings/complete-booking-by-company-client"
+import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
   getBookingsForCurrentBusiness,
   SB_BOOKING_PREFIX,
@@ -355,7 +357,14 @@ function mapAppointmentStatusToManualStatus(
 }
 
 const NOTIFY_AFTER_STATUS_UPDATE: AppointmentStatus[] = ["confirmed"]
-const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["cancelled", "no_show", "completed"]
+const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["no_show"]
+
+function notifyBookingsAndHistoryChanged(): void {
+  if (typeof window === "undefined") return
+  invalidateMergedAppointmentsCache()
+  window.dispatchEvent(new Event("pw-bookings"))
+  window.dispatchEvent(new Event("pw-notification-messages"))
+}
 
 function readNotifyLanguage(): "pl" | "en" {
   if (typeof window === "undefined") return "pl"
@@ -434,6 +443,21 @@ export async function updateAppointmentStatus(
     if (!client) return false
     const bid = await getCurrentBusinessProfileIdForClient(client)
     if (!bid) return false
+
+    const lang = readNotifyLanguage()
+    if (status === "completed") {
+      const apiResult = await fetchCompleteBookingByCompany(appointmentId, lang, true)
+      if (!apiResult.ok) return false
+      notifyBookingsAndHistoryChanged()
+      return true
+    }
+    if (status === "cancelled") {
+      const apiResult = await fetchCancelBookingByCompany(appointmentId, lang, true)
+      if (!apiResult.ok) return false
+      notifyBookingsAndHistoryChanged()
+      return true
+    }
+
     if (NOTIFY_BEFORE_STATUS_UPDATE.includes(status)) {
       await postBookingStatusNotify(appointmentId, status)
     }
@@ -446,10 +470,7 @@ export async function updateAppointmentStatus(
       reminderDueAtIso: options.reminderDueAtIso,
     })
     if (r.ok) {
-      // Bez tego lista i statystyki czytałyby stary status z cache aż do
-      // następnego pollingu. Wymuszamy natychmiastowe odświeżenie obu widoków.
-      invalidateMergedAppointmentsCache()
-      window.dispatchEvent(new Event("pw-bookings"))
+      notifyBookingsAndHistoryChanged()
       if (NOTIFY_AFTER_STATUS_UPDATE.includes(status)) {
         await postBookingStatusNotify(appointmentId, status)
       }

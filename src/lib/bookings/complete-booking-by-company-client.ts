@@ -1,35 +1,35 @@
-export type CancelBookingByCompanyResult =
+export type CompleteBookingByCompanyResult =
   | {
       ok: true
       notice?: string
-      alreadyCancelled?: boolean
+      alreadyCompleted?: boolean
       notificationSkipped?: boolean
     }
   | { ok: false; errorMessage: string }
 
-export async function fetchCancelBookingByCompany(
+export async function fetchCompleteBookingByCompany(
   bookingId: string,
   language: "pl" | "en",
-  notifyClient: boolean
-): Promise<CancelBookingByCompanyResult> {
-  const res = await fetch("/api/bookings/cancel-by-company", {
+  notifyClient = true,
+): Promise<CompleteBookingByCompanyResult> {
+  const res = await fetch("/api/bookings/complete-by-company", {
     method: "POST",
-    credentials: "include",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({ bookingId, language, notifyClient }),
   })
   const json = (await res.json().catch(() => ({}))) as {
     ok?: boolean
     error?: string
     notice?: string
-    alreadyCancelled?: boolean
+    alreadyCompleted?: boolean
     notificationSkipped?: boolean
   }
   if (json.ok) {
     return {
       ok: true,
       notice: typeof json.notice === "string" ? json.notice : undefined,
-      alreadyCancelled: json.alreadyCancelled === true,
+      alreadyCompleted: json.alreadyCompleted === true,
       notificationSkipped: json.notificationSkipped === true,
     }
   }

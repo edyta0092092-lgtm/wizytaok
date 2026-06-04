@@ -117,5 +117,12 @@ export async function upsertNotificationLog(
     if (inserted.ok) return
   }
 
-  console.error(logTag, { phase: "upsert_insert_failed", message: inserted.message })
+  console.error(logTag, {
+    phase: "upsert_insert_failed",
+    message: inserted.message,
+    booking_id: filters.booking_id,
+    type: filters.type,
+    channel: filters.channel,
+    status: row.status,
+  })
 }
