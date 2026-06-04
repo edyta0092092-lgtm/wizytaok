@@ -8,7 +8,7 @@ function SkeletonBlock({ className }: { className?: string }) {
 export function StatisticsSkeleton() {
   return (
     <div className="space-y-6">
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {Array.from({ length: 8 }).map((_, index) => (
           <Card key={index} className="rounded-3xl border-border/80">
             <CardContent className="px-4 py-4">

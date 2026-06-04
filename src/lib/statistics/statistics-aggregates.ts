@@ -1,4 +1,5 @@
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
+import { countBookingsNeedingAction } from "@/lib/bookings/booking-needs-action"
 import type { Appointment, AppointmentStatus, Service, StaffMember } from "@/types/domain"
 import type {
   StatisticsChartPoint,
@@ -451,12 +452,18 @@ export function buildStatisticsDataset({
   )
   const heatmap = buildHeatmap(heatmapAppointments, locale)
 
+  const needsAction = countBookingsNeedingAction(appointments, todayStart)
+  const completed = statusCounts.completed
+  const cancelled = statusCounts.cancelled
+  const noShow = statusCounts.no_show
+
   return {
     kpis: {
-      totalVisits: appointments.length,
-      completed: statusCounts.completed,
-      cancelled: statusCounts.cancelled,
-      noShow: statusCounts.no_show,
+      totalVisits: completed + cancelled + noShow + needsAction,
+      needsAction,
+      completed,
+      cancelled,
+      noShow,
       visitsToday,
       visitsThisMonth: appointmentsInMonth.length,
       newClients,

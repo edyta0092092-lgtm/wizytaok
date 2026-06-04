@@ -19,6 +19,7 @@ export type StatisticsChartPoint = {
 export type StatisticsKpis = {
   // All-time totals (cumulative, regardless of the selected range / month).
   totalVisits: number
+  needsAction: number
   completed: number
   cancelled: number
   noShow: number

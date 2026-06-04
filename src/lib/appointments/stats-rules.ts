@@ -31,3 +31,16 @@ export function appointmentRequiresBusinessContact(a: Appointment): boolean {
 export function appointmentRequiresPostVisitAction(a: Appointment, at: Date = new Date()): boolean {
   return bookingRequiresPostVisitStatus(a, at)
 }
+
+/**
+ * Wizyty wliczane do KPI „Wszystkie wizyty” (łącznie): zrealizowane, anulowane,
+ * nieobecność klienta oraz wizyty wymagające działania (dopóki status się nie zmieni).
+ */
+export function countsTowardStatisticsTotalVisits(
+  a: Appointment,
+  at: Date = new Date(),
+): boolean {
+  const s = a.status
+  if (s === "cancelled" || s === "no_show" || s === "completed") return true
+  return bookingNeedsAction(a, at)
+}

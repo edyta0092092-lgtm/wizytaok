@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react"
 import {
+  AlertCircle,
   CalendarCheck2,
   CalendarClock,
   CheckCircle2,
@@ -15,6 +16,7 @@ type KpiCopy = {
   visitsToday: string
   visitsThisMonth: string
   totalVisits: string
+  needsAction: string
   completed: string
   cancelled: string
   noShow: string
@@ -67,6 +69,11 @@ export function StatisticsKpiGrid({
       icon: CalendarCheck2,
     },
     {
+      label: copy.needsAction,
+      value: String(kpis.needsAction),
+      icon: AlertCircle,
+    },
+    {
       label: copy.completed,
       value: String(kpis.completed),
       icon: CheckCircle2,
@@ -107,7 +114,7 @@ export function StatisticsKpiGrid({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {copy.groupAllTime}
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {allTimeCards.map((card) => (
             <KpiCard key={card.label} {...card} />
           ))}
