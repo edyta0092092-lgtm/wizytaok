@@ -9,7 +9,10 @@ import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-s
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
-import type { Tables, TablesUpdate } from "@/types/database"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database, Tables, TablesUpdate } from "@/types/database"
+
+type DbClient = SupabaseClient<Database>
 
 async function hasCancellationNotificationLog(bookingId: string): Promise<boolean> {
   const admin = getServiceRoleClient()
@@ -21,6 +24,50 @@ async function hasCancellationNotificationLog(bookingId: string): Promise<boolea
     .in("type", ["booking_cancelled_by_company", "booking_cancelled_by_client"])
     .in("status", ["sent", "queued"])
   return (count ?? 0) > 0
+}
+
+async function applyBookingPatchSafely(
+  client: DbClient,
+  bookingUuid: string,
+  base: TablesUpdate<"bookings">,
+): Promise<string | null> {
+  let current: TablesUpdate<"bookings"> = { ...base }
+  for (let i = 0; i < 6; i += 1) {
+    const { error } = await client.from("bookings").update(current).eq("id", bookingUuid)
+    if (!error) return null
+    const msg = String(error.message ?? "")
+    const m = msg.match(/column\s+([a-zA-Z0-9_\."]+)\s+does not exist/i)
+    if (!m) return msg
+    const raw = m[1] ?? ""
+    const missing = raw.replace(/"/g, "").split(".").pop()?.trim() ?? ""
+    if (!missing) return msg
+    const next = { ...current } as Record<string, unknown>
+    if (!(missing in next)) return msg
+    delete next[missing]
+    current = next as TablesUpdate<"bookings">
+  }
+  return "update_failed"
+}
+
+async function persistCancelledBookingStatus(
+  memberClient: DbClient,
+  bookingUuid: string,
+  patch: TablesUpdate<"bookings">,
+): Promise<string | null> {
+  const admin = getServiceRoleClient()
+  const clients: DbClient[] = admin ? [memberClient, admin] : [memberClient]
+
+  for (const client of clients) {
+    const err = await applyBookingPatchSafely(client, bookingUuid, patch)
+    if (!err) return null
+  }
+
+  for (const client of clients) {
+    const err = await applyBookingPatchSafely(client, bookingUuid, { status: "cancelled" })
+    if (!err) return null
+  }
+
+  return "update_failed"
 }
 
 type Body = {
@@ -87,28 +134,16 @@ export async function POST(req: Request) {
     updated_at: now,
   }
 
-  const applyPatchSafely = async (base: TablesUpdate<"bookings">): Promise<string | null> => {
-    let current: TablesUpdate<"bookings"> = { ...base }
-    for (let i = 0; i < 4; i += 1) {
-      const { error } = await supabase.from("bookings").update(current).eq("id", bookingUuid)
-      if (!error) return null
-      const msg = String(error.message ?? "")
-      const m = msg.match(/column\s+([a-zA-Z0-9_\."]+)\s+does not exist/i)
-      if (!m) return msg
-      const raw = m[1] ?? ""
-      const missing = raw.replace(/"/g, "").split(".").pop()?.trim() ?? ""
-      if (!missing) return msg
-      const next = { ...current } as Record<string, unknown>
-      if (!(missing in next)) return msg
-      delete next[missing]
-      current = next as TablesUpdate<"bookings">
+  if (!alreadyCancelled) {
+    const upErrMsg = await persistCancelledBookingStatus(supabase, bookingUuid, patch)
+    if (upErrMsg) {
+      return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
     }
-    return "update_failed"
   }
 
   const shouldNotifyClient = body.notifyClient !== false
 
-  const { data: profile, error: profErr } = await supabase
+  const { data: profile } = await supabase
     .from("business_profiles")
     .select("id, slug, phone, contact_phone, business_name, business_address")
     .eq("id", booking.business_id)
@@ -155,13 +190,6 @@ export async function POST(req: Request) {
     }
   } else if (shouldNotifyClient) {
     notificationSkipped = true
-  }
-
-  if (!alreadyCancelled) {
-    const upErrMsg = await applyPatchSafely(patch)
-    if (upErrMsg) {
-      return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
-    }
   }
 
   if (!shouldNotifyClient) {

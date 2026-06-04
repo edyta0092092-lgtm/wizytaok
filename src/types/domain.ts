@@ -193,6 +193,11 @@ export type NotificationMessage = {
   scheduledFor?: string
   sentAt?: string
   createdAt: string
+  /** Powiązana wizyta (lokalna kopia historii, np. podziękowanie po wizycie). */
+  relatedServiceName?: string
+  relatedAppointmentDate?: string
+  relatedAppointmentTime?: string
+  relatedAppointmentStatus?: string
 }
 
 export type Service = {

@@ -81,6 +81,10 @@ export async function POST(req: Request) {
         clientPhone: string | null
         clientEmail: string | null
         confirmationToken: string
+        serviceName: string | null
+        appointmentDate: string | null
+        appointmentTime: string | null
+        appointmentStatus: string | null
         smsBody: string | null
         emailSubject: string | null
         emailBody: string | null
@@ -126,6 +130,10 @@ export async function POST(req: Request) {
             clientPhone: booking.client_phone,
             clientEmail: booking.client_email,
             confirmationToken: booking.confirmation_token,
+            serviceName: booking.service_name?.trim() || null,
+            appointmentDate: String(booking.appointment_date ?? "").slice(0, 10) || null,
+            appointmentTime: String(booking.appointment_time ?? "").slice(0, 5) || null,
+            appointmentStatus: booking.status?.trim() || "completed",
             smsBody: content.sendSms ? content.smsText : null,
             emailSubject: content.sendEmail ? content.emailSubject : null,
             emailBody: content.sendEmail ? content.emailText : null,

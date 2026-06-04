@@ -76,6 +76,14 @@ function normalizeMessage(raw: unknown): NotificationMessage | null {
     scheduledFor: typeof o.scheduledFor === "string" ? o.scheduledFor : undefined,
     sentAt: typeof o.sentAt === "string" ? o.sentAt : undefined,
     createdAt: o.createdAt,
+    relatedServiceName:
+      typeof o.relatedServiceName === "string" ? o.relatedServiceName : undefined,
+    relatedAppointmentDate:
+      typeof o.relatedAppointmentDate === "string" ? o.relatedAppointmentDate : undefined,
+    relatedAppointmentTime:
+      typeof o.relatedAppointmentTime === "string" ? o.relatedAppointmentTime : undefined,
+    relatedAppointmentStatus:
+      typeof o.relatedAppointmentStatus === "string" ? o.relatedAppointmentStatus : undefined,
   }
 }
 
@@ -245,6 +253,10 @@ export function createThankYouAfterVisitMessages(args: {
   clientPhone?: string | null
   clientEmail?: string | null
   confirmationToken: string
+  serviceName?: string | null
+  appointmentDate?: string | null
+  appointmentTime?: string | null
+  appointmentStatus?: string | null
   smsBody?: string | null
   emailSubject?: string | null
   emailBody?: string | null
@@ -252,6 +264,12 @@ export function createThankYouAfterVisitMessages(args: {
 }): NotificationMessage[] {
   const createdAt = new Date().toISOString()
   const confirmationLink = `/confirm/${args.confirmationToken}`
+  const visitMeta = {
+    relatedServiceName: args.serviceName?.trim() || undefined,
+    relatedAppointmentDate: args.appointmentDate?.trim()?.slice(0, 10) || undefined,
+    relatedAppointmentTime: args.appointmentTime?.trim()?.slice(0, 5) || undefined,
+    relatedAppointmentStatus: args.appointmentStatus?.trim() || undefined,
+  }
   const out: NotificationMessage[] = []
   const phone = args.clientPhone?.trim() ?? ""
   const email = args.clientEmail?.trim() ?? ""
@@ -269,6 +287,7 @@ export function createThankYouAfterVisitMessages(args: {
       status: "sent",
       sentAt: createdAt,
       createdAt,
+      ...visitMeta,
     })
   }
   if (email && args.emailBody?.trim()) {
@@ -286,6 +305,7 @@ export function createThankYouAfterVisitMessages(args: {
       status: "sent",
       sentAt: createdAt,
       createdAt,
+      ...visitMeta,
     })
   }
   return out

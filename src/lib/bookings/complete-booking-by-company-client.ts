@@ -5,6 +5,10 @@ export type ThankYouHistoryMirror = {
   clientPhone: string | null
   clientEmail: string | null
   confirmationToken: string
+  serviceName: string | null
+  appointmentDate: string | null
+  appointmentTime: string | null
+  appointmentStatus: string | null
   smsBody: string | null
   emailSubject: string | null
   emailBody: string | null

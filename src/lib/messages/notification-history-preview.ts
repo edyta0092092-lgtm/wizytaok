@@ -92,6 +92,9 @@ function canonicalNotificationType(raw: string): string {
   if (["booking_confirmation", "booking_confirmed", "booking_created", "confirmation"].includes(type)) {
     return "booking_confirmation"
   }
+  if (["thank_you_after_visit", "thank_you", "visit_thank_you"].includes(type)) {
+    return "thank_you_after_visit"
+  }
   return type
 }
 

@@ -19,6 +19,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { reminderLogTypeFromKind } from "@/lib/notifications/reminder-notification-log"
@@ -392,10 +393,17 @@ function mapPreviewBookingRow(
   }
 }
 
+function resolvePreviewBookingUuid(bookingId: string): string | null {
+  return resolveSupabaseBookingRowUuidFromUiId(bookingId.trim())
+}
+
 async function loadPreviewBookingInfo(
   client: NonNullable<ReturnType<typeof getBrowserClient>>,
   bookingId: string,
 ): Promise<PreviewBookingInfo | null> {
+  const bookingUuid = resolvePreviewBookingUuid(bookingId)
+  if (!bookingUuid) return null
+
   const selects = [
     "id,client_name,service_name,appointment_date,appointment_time,status,created_at,updated_at,last_status_change_source,confirmation_token,staff_name",
     "id,client_name,service_name,appointment_date,appointment_time,status,created_at,confirmation_token,staff_name",
@@ -406,11 +414,11 @@ async function loadPreviewBookingInfo(
     const { data, error } = await client
       .from("bookings")
       .select(select)
-      .eq("id", bookingId)
+      .eq("id", bookingUuid)
       .maybeSingle()
 
     if (!error && data) {
-      return mapPreviewBookingRow(data as unknown as Record<string, unknown>, bookingId)
+      return mapPreviewBookingRow(data as unknown as Record<string, unknown>, bookingUuid)
     }
     if (!isMissingColumnInBookingsQuery(error?.message)) {
       break
@@ -1689,6 +1697,29 @@ export function SendingHistorySection() {
 
   const relatedAppointmentInfo = React.useMemo((): PreviewBookingInfo | null => {
     if (previewBookingInfo) return previewBookingInfo
+    if (preview?.kind === "local") {
+      const m = preview.msg
+      const hasVisitMeta =
+        Boolean(m.relatedAppointmentDate?.trim()) ||
+        Boolean(m.relatedServiceName?.trim()) ||
+        Boolean(m.relatedAppointmentStatus?.trim())
+      if (hasVisitMeta) {
+        return {
+          id: m.bookingId,
+          clientName: m.recipientName?.trim() || "",
+          serviceName: m.relatedServiceName?.trim() || "",
+          appointmentDate: m.relatedAppointmentDate?.trim() || "",
+          appointmentTime: m.relatedAppointmentTime?.trim() || "",
+          status: m.relatedAppointmentStatus?.trim() || "",
+          createdAt: m.createdAt ?? null,
+          confirmedAt: null,
+          updatedAt: null,
+          lastStatusChangeSource: null,
+          confirmationToken: null,
+          staffName: null,
+        }
+      }
+    }
     if (preview?.kind === "planned" || preview?.kind === "reminderOutcome") {
       return {
         id: preview.row.id,
