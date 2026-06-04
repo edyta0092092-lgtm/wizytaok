@@ -37,23 +37,7 @@ export async function insertNotificationLog(
       payload.type &&
       payload.channel
     ) {
-      const sentAt = payload.sent_at ?? new Date().toISOString()
-      await admin
-        .from("notification_logs")
-        .update({
-          status: "sent",
-          sent_at: sentAt,
-          recipient: payload.recipient ?? null,
-          subject: payload.subject ?? null,
-          body: payload.body ?? null,
-          provider: payload.provider ?? null,
-          provider_message_id: payload.provider_message_id ?? null,
-          error_message: null,
-        })
-        .eq("booking_id", payload.booking_id)
-        .eq("type", payload.type)
-        .eq("channel", payload.channel)
-        .neq("status", "sent")
+      await upgradeNotificationLogToSent(admin, payload)
     }
     return { ok: true, duplicate: true }
   }
@@ -76,23 +60,7 @@ export async function insertNotificationLog(
         payload.type &&
         payload.channel
       ) {
-        const sentAt = payload.sent_at ?? new Date().toISOString()
-        await admin
-          .from("notification_logs")
-          .update({
-            status: "sent",
-            sent_at: sentAt,
-            recipient: payload.recipient ?? null,
-            subject: payload.subject ?? null,
-            body: payload.body ?? null,
-            provider: payload.provider ?? null,
-            provider_message_id: payload.provider_message_id ?? null,
-            error_message: null,
-          })
-          .eq("booking_id", payload.booking_id)
-          .eq("type", payload.type)
-          .eq("channel", payload.channel)
-          .neq("status", "sent")
+        await upgradeNotificationLogToSent(admin, payload)
       }
       return { ok: true, duplicate: true }
     }
@@ -122,4 +90,56 @@ export async function insertNotificationLog(
 function isMissingErrorMessageColumn(message: string): boolean {
   const m = message.toLowerCase()
   return m.includes("error_message") && (m.includes("does not exist") || m.includes("schema cache"))
+}
+
+async function upgradeNotificationLogToSent(
+  admin: SupabaseClient<Database>,
+  payload: NotificationLogInsert,
+): Promise<void> {
+  const sentAt = payload.sent_at ?? new Date().toISOString()
+  await admin
+    .from("notification_logs")
+    .update({
+      status: "sent",
+      sent_at: sentAt,
+      recipient: payload.recipient ?? null,
+      subject: payload.subject ?? null,
+      body: payload.body ?? null,
+      provider: payload.provider ?? null,
+      provider_message_id: payload.provider_message_id ?? null,
+      error_message: null,
+    })
+    .eq("booking_id", payload.booking_id!)
+    .eq("type", payload.type!)
+    .eq("channel", payload.channel)
+    .neq("status", "sent")
+}
+
+/** Zapisuje lub uaktualnia wpis „sent” (np. po duplikacie lub wcześniejszym skipped). */
+export async function upsertSentNotificationLog(
+  admin: SupabaseClient<Database>,
+  row: NotificationLogInsertInput,
+  logTag = "[notification.log]",
+): Promise<{ ok: true; duplicate?: boolean } | { ok: false; message: string; code?: string }> {
+  const payload = toNotificationLogInsertRow(row)
+  if (payload.status !== "sent" || !payload.booking_id || !payload.type) {
+    return insertNotificationLog(admin, row, logTag)
+  }
+
+  const { data: existing } = await admin
+    .from("notification_logs")
+    .select("id, status")
+    .eq("booking_id", payload.booking_id)
+    .eq("type", payload.type)
+    .eq("channel", payload.channel)
+    .maybeSingle()
+
+  if (existing?.id) {
+    if (String(existing.status ?? "").trim().toLowerCase() !== "sent") {
+      await upgradeNotificationLogToSent(admin, payload)
+    }
+    return { ok: true, duplicate: true }
+  }
+
+  return insertNotificationLog(admin, row, logTag)
 }

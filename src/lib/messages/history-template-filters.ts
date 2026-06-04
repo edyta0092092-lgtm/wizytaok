@@ -33,6 +33,7 @@ export function historyTypeForCustomEventTemplate(args: {
   const key = String(args.event_key ?? "").trim()
   if (key === "cancelled") return "booking_cancelled_by_company"
   if (key === "no_show") return "no_show_follow_up"
+  if (key === "completed") return "thank_you_after_visit"
   if (key === "confirmed" || key === "created") return "booking_confirmation"
   return null
 }

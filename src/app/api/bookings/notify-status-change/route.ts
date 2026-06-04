@@ -133,7 +133,12 @@ export async function POST(req: Request) {
       })
       standardNotice = notice
     }
-  } catch {
+  } catch (err) {
+    console.error("[notify-status-change] standard_notify_failed", {
+      eventKey,
+      bookingId: bookingUuid,
+      error: err instanceof Error ? err.message : String(err),
+    })
     standardNotice = "skipped"
   }
 

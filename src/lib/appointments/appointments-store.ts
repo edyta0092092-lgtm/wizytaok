@@ -357,9 +357,20 @@ function mapAppointmentStatusToManualStatus(
 const NOTIFY_AFTER_STATUS_UPDATE: AppointmentStatus[] = ["confirmed", "completed"]
 const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["cancelled", "no_show"]
 
+function readNotifyLanguage(): "pl" | "en" {
+  if (typeof window === "undefined") return "pl"
+  try {
+    const stored = window.localStorage.getItem("pw_language")
+    return stored === "en" ? "en" : "pl"
+  } catch {
+    return "pl"
+  }
+}
+
 async function postBookingStatusNotify(
   appointmentId: string,
   status: AppointmentStatus,
+  language?: "pl" | "en",
 ): Promise<void> {
   if (
     !NOTIFY_AFTER_STATUS_UPDATE.includes(status) &&
@@ -368,12 +379,19 @@ async function postBookingStatusNotify(
     return
   }
   try {
-    await fetch("/api/bookings/notify-status-change", {
+    const res = await fetch("/api/bookings/notify-status-change", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ bookingId: appointmentId, status }),
+      body: JSON.stringify({
+        bookingId: appointmentId,
+        status,
+        language: language ?? readNotifyLanguage(),
+      }),
     })
+    if (res.ok && typeof window !== "undefined") {
+      window.dispatchEvent(new Event("pw-bookings"))
+    }
   } catch {
     // fire-and-forget — błąd nie blokuje zapisu statusu
   }

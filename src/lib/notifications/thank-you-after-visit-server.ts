@@ -1,7 +1,10 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
-import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import {
+  insertNotificationLog,
+  upsertSentNotificationLog,
+} from "@/lib/notifications/notification-log-insert"
 import {
   applyTemplateVariables,
   getTemplateRuntime,
@@ -88,24 +91,24 @@ async function persistThankYouChannelLog(
     sent_at?: string | null
   },
 ): Promise<void> {
-  const result = await insertNotificationLog(
-    admin,
-    {
-      business_id: booking.business_id,
-      booking_id: booking.id,
-      channel,
-      type: THANK_YOU_AFTER_VISIT_LOG_TYPE,
-      recipient,
-      status: patch.status,
-      subject: patch.subject ?? null,
-      body: patch.body ?? null,
-      provider: patch.provider ?? null,
-      provider_message_id: patch.provider_message_id ?? null,
-      error_message: patch.error_message ?? null,
-      sent_at: patch.sent_at ?? null,
-    },
-    "[thank-you-after-visit.log]",
-  )
+  const logRow = {
+    business_id: booking.business_id,
+    booking_id: booking.id,
+    channel,
+    type: THANK_YOU_AFTER_VISIT_LOG_TYPE,
+    recipient,
+    status: patch.status,
+    subject: patch.subject ?? null,
+    body: patch.body ?? null,
+    provider: patch.provider ?? null,
+    provider_message_id: patch.provider_message_id ?? null,
+    error_message: patch.error_message ?? null,
+    sent_at: patch.sent_at ?? null,
+  }
+  const result =
+    patch.status === "sent"
+      ? await upsertSentNotificationLog(admin, logRow, "[thank-you-after-visit.log]")
+      : await insertNotificationLog(admin, logRow, "[thank-you-after-visit.log]")
   if (!result.ok) {
     console.error("[thank-you-after-visit.log] insert_failed", {
       booking_id: booking.id,
@@ -125,8 +128,18 @@ async function alreadyThanked(
     .select("id", { count: "exact", head: true })
     .eq("booking_id", bookingId)
     .eq("type", THANK_YOU_AFTER_VISIT_LOG_TYPE)
-    .in("status", ["sent", "queued"])
+    .eq("status", "sent")
   return (count ?? 0) > 0
+}
+
+/** Usuwa niedokończone wpisy (np. skipped przez trigger statusu końcowego) przed ponowną wysyłką. */
+async function clearStaleThankYouLogs(admin: LogAdmin, bookingId: string): Promise<void> {
+  await admin
+    .from("notification_logs")
+    .delete()
+    .eq("booking_id", bookingId)
+    .eq("type", THANK_YOU_AFTER_VISIT_LOG_TYPE)
+    .in("status", ["queued", "skipped", "pending"])
 }
 
 /**
@@ -151,6 +164,7 @@ export async function notifyThankYouAfterVisit(args: {
   if (!sendSms && !sendEmail) return { notice: "skipped" }
 
   if (await alreadyThanked(admin, booking.id)) return { notice: "skipped" }
+  await clearStaleThankYouLogs(admin, booking.id)
 
   const staffId =
     typeof (booking as { staff_id?: string | null }).staff_id === "string"
