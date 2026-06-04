@@ -1090,12 +1090,9 @@ export default function TeamPage() {
         const line = t(key as "team.panelEmailRequired")
         if (detail?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
-          if (key === "invitations.invitationCreateError") {
-            return `${line} (${detail.trim()})`
-          }
-        } else {
-          setNoticeDetail(null)
+          return `${line} (${detail.trim()})`
         }
+        setNoticeDetail(null)
         return line
       }
       const panelAccessNoticeForSuccess = (panelRes: {
@@ -1593,6 +1590,27 @@ export default function TeamPage() {
           sendEmail: true,
         }),
       })
+      if (!res.ok) {
+        const jsonErr = (await res.json().catch(() => null)) as {
+          messageKey?: string
+          detail?: string | null
+          error?: string
+        } | null
+        const serverError = typeof jsonErr?.error === "string" ? jsonErr.error : undefined
+        return {
+          ok: false,
+          messageKey:
+            jsonErr?.messageKey ??
+            (serverError === "supabase_unconfigured"
+              ? "team.invitationServerNotConfigured"
+              : "invitations.invitationCreateError"),
+          detail:
+            jsonErr?.detail ??
+            serverError ??
+            `http_${res.status}`,
+          serverError,
+        }
+      }
       const json = (await res.json().catch(() => null)) as {
         ok?: boolean
         invitationToken?: string | null
@@ -1644,8 +1662,71 @@ export default function TeamPage() {
         alreadyHasPanelAccess: json.alreadyHasPanelAccess === true,
         emailOutcome,
       }
-    } catch {
-      return { ok: false, messageKey: "invitations.invitationCreateError" }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "network_error"
+      return { ok: false, messageKey: "invitations.invitationCreateError", detail: msg }
+    }
+  }
+
+  const sendPanelInvitationOnly = async () => {
+    if (!editing?.id) return
+    const emailTrim = form.email.trim()
+    if (!emailTrim) {
+      setNotice(t("team.panelEmailRequired"))
+      setNoticeDetail(null)
+      return
+    }
+    if (!EMAIL_RE.test(emailTrim)) {
+      setNotice(t("team.validationEmailInvalid"))
+      setNoticeDetail(null)
+      return
+    }
+    setSaving(true)
+    setNoticeDetail(null)
+    try {
+      const panelRes = await requestPanelAccessForStaff(
+        editing.id,
+        emailTrim,
+        form.panelMemberRole,
+      )
+      if (!panelRes.ok) {
+        let key = "invitations.invitationCreateError"
+        if (panelRes.messageKey === "team.panelEmailRequired") key = "team.panelEmailRequired"
+        else if (panelRes.messageKey === "team.panelInviteEmailConflict") {
+          key = "team.panelInviteEmailConflict"
+        } else if (panelRes.messageKey === "team.panelInviteOwnerEmail") {
+          key = "team.panelInviteOwnerEmail"
+        } else if (panelRes.messageKey === "team.invitationServerNotConfigured") {
+          key = "team.invitationServerNotConfigured"
+        } else if (panelRes.messageKey) key = panelRes.messageKey
+        const line = t(key as "team.panelEmailRequired")
+        if (panelRes.detail?.trim()) {
+          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.detail.trim()}`)
+          setNotice(`${line} (${panelRes.detail.trim()})`)
+        } else {
+          setNotice(line)
+        }
+        return
+      }
+      if (panelRes.alreadyHasPanelAccess) {
+        setNotice(t("team.panelAlreadyHasAccess"))
+      } else if (panelRes.invitationToken) {
+        const emailLine =
+          panelRes.emailOutcome === "sent"
+            ? t("invitations.invitationEmailSent")
+            : panelRes.emailOutcome === "not_configured"
+              ? t("invitations.invitationEmailNotConfigured")
+              : panelRes.emailOutcome === "failed"
+                ? t("invitations.invitationEmailFailed")
+                : t("invitations.invitationCreated")
+        setNotice(emailLine)
+        setSidebarTab("invites")
+      } else {
+        setNotice(t("invitations.invitationCreateError"))
+      }
+      await load()
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -2123,6 +2204,17 @@ export default function TeamPage() {
                           {t("team.panelAccessIntro")}
                         </p>
                       </div>
+                      {editing ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="h-11 w-full rounded-xl"
+                          disabled={saving || !form.email.trim()}
+                          onClick={() => void sendPanelInvitationOnly()}
+                        >
+                          {t("invitations.sendInvitation")}
+                        </Button>
+                      ) : null}
                     </TabsContent>
                   ) : null}
 

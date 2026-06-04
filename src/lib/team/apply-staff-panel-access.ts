@@ -14,28 +14,27 @@ export type ApplyStaffPanelAccessResult =
   | { ok: true; alreadyHasPanelAccess: true; invitationToken?: string | null }
   | { ok: false; messageKey: string; detail?: string }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
 async function resolveOwnerAuthEmail(client: Client, ownerId: string): Promise<string | null> {
   const { data, error } = await client.auth.admin.getUserById(ownerId)
   if (error || !data?.user?.email?.trim()) return null
-  return data.user.email.trim().toLowerCase()
+  return normalizeEmail(data.user.email)
 }
 
 async function findInvitationByEmail(client: Client, businessId: string, email: string) {
-  const em = email.trim().toLowerCase()
+  const em = normalizeEmail(email)
   const { data, error } = await client
     .from("business_invitations")
     .select("id, status, staff_member_id, email")
     .eq("business_id", businessId)
-    .eq("email", em)
-    .maybeSingle()
+    .ilike("email", em)
 
-  if (error && !error.message.toLowerCase().includes("0 rows")) {
-    return { row: null as null, error: error.message }
-  }
-  const row = data ?? null
-  if (row && (row.email ?? "").trim().toLowerCase() !== em) {
-    return { row: null, error: null as null }
-  }
+  if (error) return { row: null as null, error: error.message }
+  const row =
+    (data ?? []).find((r) => normalizeEmail(r.email ?? "") === em) ?? null
   return { row, error: null as null }
 }
 
@@ -45,29 +44,20 @@ async function readPendingToken(
   staffMemberId: string,
   email: string,
 ): Promise<string | null> {
-  const em = email.trim().toLowerCase()
+  const em = normalizeEmail(email)
 
-  const { data: byEmail } = await client
+  const { data: pendingRows } = await client
     .from("business_invitations")
-    .select("token")
+    .select("token, email, staff_member_id")
     .eq("business_id", businessId)
-    .eq("email", em)
     .eq("status", "pending")
-    .limit(1)
 
-  const emailTok = byEmail?.[0]?.token
-  if (emailTok) return String(emailTok)
+  const rows = pendingRows ?? []
+  const byEmail = rows.find((r) => normalizeEmail(r.email ?? "") === em)
+  if (byEmail?.token) return String(byEmail.token)
 
-  const { data: byStaff } = await client
-    .from("business_invitations")
-    .select("token")
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .eq("status", "pending")
-    .limit(1)
-
-  const staffTok = byStaff?.[0]?.token
-  return staffTok ? String(staffTok) : null
+  const byStaff = rows.find((r) => r.staff_member_id === staffMemberId)
+  return byStaff?.token ? String(byStaff.token) : null
 }
 
 /** Uaktualnia rolę panelu przy istniejącym powiązaniu biznes‑członkostwo ↔ staff (bez wymuszania zaproszenia). */
@@ -95,6 +85,37 @@ export async function syncBusinessMemberRoleForStaff(
   return { ok: true }
 }
 
+async function writeInvitationRow(
+  client: Client,
+  businessId: string,
+  emailRowId: string | null,
+  invitationPatch: Record<string, unknown>,
+): Promise<{ token: string | null; error: string | null }> {
+  if (emailRowId) {
+    const { data, error } = await client
+      .from("business_invitations")
+      .update(invitationPatch)
+      .eq("id", emailRowId)
+      .select("token")
+
+    if (error) return { token: null, error: error.message }
+    const tok = data?.[0]?.token ? String(data[0].token) : null
+    if (tok) return { token: tok, error: null }
+  }
+
+  const { data, error } = await client
+    .from("business_invitations")
+    .insert({
+      business_id: businessId,
+      ...invitationPatch,
+    })
+    .select("token")
+
+  if (error) return { token: null, error: error.message }
+  const tok = data?.[0]?.token ? String(data[0].token) : null
+  return { token: tok, error: null }
+}
+
 async function applyStaffPanelAccessDirect(
   client: Client,
   businessId: string,
@@ -102,7 +123,7 @@ async function applyStaffPanelAccessDirect(
   form: StaffPanelFormSlice,
   invitedBy: string | null,
 ): Promise<ApplyStaffPanelAccessResult> {
-  const em = form.invitationEmail.trim().toLowerCase()
+  const em = normalizeEmail(form.invitationEmail)
   if (!em) {
     return { ok: false, messageKey: "team.panelEmailRequired" }
   }
@@ -134,6 +155,14 @@ async function applyStaffPanelAccessDirect(
       .not("user_id", "is", null)
   }
 
+  if (membersQuery.error) {
+    return {
+      ok: false,
+      messageKey: "invitations.invitationCreateError",
+      detail: membersQuery.error.message,
+    }
+  }
+
   const members = membersQuery.data ?? []
   const activeMemberForStaff = members.find((m) => m.staff_member_id === staffMemberId && m.user_id)
   if (activeMemberForStaff?.id) {
@@ -146,7 +175,7 @@ async function applyStaffPanelAccessDirect(
   const otherActiveMemberWithEmail = members.find((m) => {
     if (!m.user_id || !m.staff_member_id) return false
     if (m.staff_member_id === staffMemberId) return false
-    return (m.email ?? "").trim().toLowerCase() === em
+    return normalizeEmail(m.email ?? "") === em
   })
   if (otherActiveMemberWithEmail) {
     return { ok: false, messageKey: "team.panelInviteEmailConflict", detail: "email_conflict" }
@@ -163,7 +192,7 @@ async function applyStaffPanelAccessDirect(
     .from("business_invitations")
     .update({ status: "cancelled" })
     .eq("business_id", businessId)
-    .eq("email", em)
+    .ilike("email", em)
     .eq("status", "pending")
     .or(`staff_member_id.is.null,staff_member_id.neq.${staffMemberId}`)
 
@@ -196,62 +225,36 @@ async function applyStaffPanelAccessDirect(
     accepted_at: null,
   }
 
-  const persistWithInvitedBy = async (invitedByValue: string | null) => {
-    const patch = { ...invitationPatch, invited_by: invitedByValue }
-    if (emailRow?.id) {
-      return client
-        .from("business_invitations")
-        .update(patch)
-        .eq("id", emailRow.id)
-        .select("token")
-        .single()
-    }
-    return client
-      .from("business_invitations")
-      .insert({
-        business_id: businessId,
-        ...patch,
-      })
-      .select("token")
-      .single()
-  }
-
-  let write = await persistWithInvitedBy(invitedBy)
-  if (write.error?.message?.toLowerCase().includes("foreign key") && invitedBy) {
-    write = await persistWithInvitedBy(null)
+  let write = await writeInvitationRow(client, businessId, emailRow?.id ?? null, invitationPatch)
+  if (write.error?.toLowerCase().includes("foreign key") && invitedBy) {
+    write = await writeInvitationRow(client, businessId, emailRow?.id ?? null, {
+      ...invitationPatch,
+      invited_by: null,
+    })
   }
 
   if (write.error) {
-    if (write.error.code === "23505" || write.error.message.toLowerCase().includes("duplicate")) {
+    const isDuplicate =
+      write.error.toLowerCase().includes("duplicate") ||
+      write.error.includes("23505") ||
+      write.error.toLowerCase().includes("business_invitations_business_id_email")
+    if (isDuplicate) {
       const { row: again } = await findInvitationByEmail(client, businessId, em)
       if (again?.id) {
-        const retry = await client
-          .from("business_invitations")
-          .update(invitationPatch)
-          .eq("id", again.id)
-          .select("token")
-          .single()
-        if (retry.error) {
-          return {
-            ok: false,
-            messageKey: "invitations.invitationCreateError",
-            detail: retry.error.message,
-          }
-        }
-        const retryTok = retry.data?.token ? String(retry.data.token) : null
-        if (retryTok) return { ok: true, invitationToken: retryTok }
+        write = await writeInvitationRow(client, businessId, again.id, invitationPatch)
       }
     }
-    return {
-      ok: false,
-      messageKey: "invitations.invitationCreateError",
-      detail: write.error.message,
+    if (write.error) {
+      return {
+        ok: false,
+        messageKey: "invitations.invitationCreateError",
+        detail: write.error,
+      }
     }
   }
 
-  const writtenToken = write.data?.token ? String(write.data.token) : null
-  if (writtenToken) {
-    return { ok: true, invitationToken: writtenToken }
+  if (write.token) {
+    return { ok: true, invitationToken: write.token }
   }
 
   const verified = await readPendingToken(client, businessId, staffMemberId, em)
@@ -297,7 +300,7 @@ async function applyStaffPanelAccessViaRpc(
   const { data, error } = await client.rpc("upsert_staff_panel_invitation", {
     p_business_id: businessId,
     p_staff_member_id: staffMemberId,
-    p_email: form.invitationEmail.trim().toLowerCase(),
+    p_email: normalizeEmail(form.invitationEmail),
     p_role: form.panelMemberRole,
     p_invited_by: invitedBy,
   })
@@ -355,22 +358,6 @@ export async function applyStaffPanelAccess(
   form: StaffPanelFormSlice,
   invitedBy: string | null,
 ): Promise<ApplyStaffPanelAccessResult> {
-  const viaRpc = await applyStaffPanelAccessViaRpc(
-    client,
-    businessId,
-    staffMemberId,
-    form,
-    invitedBy,
-  )
-  if (viaRpc?.ok) return viaRpc
-  if (
-    viaRpc &&
-    !viaRpc.ok &&
-    viaRpc.messageKey !== "invitations.invitationCreateError"
-  ) {
-    return viaRpc
-  }
-
   const direct = await applyStaffPanelAccessDirect(
     client,
     businessId,
@@ -379,13 +366,20 @@ export async function applyStaffPanelAccess(
     invitedBy,
   )
   if (direct.ok) return direct
+  if (direct.messageKey !== "invitations.invitationCreateError") return direct
 
-  if (viaRpc && !viaRpc.ok) {
-    if (direct.messageKey === "invitations.invitationCreateError" && direct.detail) {
-      return direct
-    }
+  const viaRpc = await applyStaffPanelAccessViaRpc(
+    client,
+    businessId,
+    staffMemberId,
+    form,
+    invitedBy,
+  )
+  if (viaRpc?.ok) return viaRpc
+  if (viaRpc && !viaRpc.ok && viaRpc.messageKey !== "invitations.invitationCreateError") {
     return viaRpc
   }
 
-  return direct
+  if (direct.detail) return direct
+  return viaRpc ?? direct
 }
