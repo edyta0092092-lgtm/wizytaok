@@ -1077,6 +1077,9 @@ export default function TeamPage() {
         let key = "invitations.invitationCreateError"
         if (messageKey === "team.panelEmailRequired") key = "team.panelEmailRequired"
         else if (messageKey === "team.panelInviteEmailConflict") key = "team.panelInviteEmailConflict"
+        else if (messageKey === "team.panelInviteOwnerEmail") key = "team.panelInviteOwnerEmail"
+        else if (detail === "email_conflict") key = "team.panelInviteEmailConflict"
+        else if (detail === "owner_email") key = "team.panelInviteOwnerEmail"
         else if (
           messageKey === "team.invitationServerNotConfigured" ||
           serverError === "supabase_unconfigured"
@@ -1085,11 +1088,8 @@ export default function TeamPage() {
         } else if (messageKey === "team.migration082Required") key = "team.migration082Required"
         else if (messageKey) key = messageKey
         const line = t(key as "team.panelEmailRequired")
-        if (detail?.trim()) {
+        if (detail?.trim() && detail.trim() !== key) {
           const detailLine = `${t("team.errorDetailsPrefix")} ${detail.trim()}`
-          if (key === "invitations.invitationCreateError") {
-            return `${line} ${detailLine}`
-          }
           setNoticeDetail(detailLine)
         } else {
           setNoticeDetail(null)
@@ -1991,13 +1991,18 @@ export default function TeamPage() {
                   }}
                   className="w-full"
                 >
-                  <TabsList className="w-full flex-wrap justify-start gap-1">
-                    <TabsTrigger value="profile">{t("team.personDetailsSection")}</TabsTrigger>
+                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
+                    <TabsTrigger value="profile" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
+                      {t("team.personDetailsSection")}
+                    </TabsTrigger>
                     {access.canManageInvitations ? (
-                      <TabsTrigger value="panel">{t("team.panelAccessSection")}</TabsTrigger>
+                      <TabsTrigger value="panel" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
+                        {t("team.panelAccessSection")}
+                      </TabsTrigger>
                     ) : null}
                     <TabsTrigger
                       value="services"
+                      className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm"
                       data-tour={
                         staffServiceTourNeedsServicesTab
                           ? "team-staff-service-target"
@@ -2006,8 +2011,12 @@ export default function TeamPage() {
                     >
                       {t("team.servicesForStaff")}
                     </TabsTrigger>
-                    <TabsTrigger value="schedule">{t("team.schedule")}</TabsTrigger>
-                    <TabsTrigger value="exceptions">{t("team.scheduleExceptionsTitle")}</TabsTrigger>
+                    <TabsTrigger value="schedule" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
+                      {t("team.schedule")}
+                    </TabsTrigger>
+                    <TabsTrigger value="exceptions" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
+                      {t("team.scheduleExceptionsTitle")}
+                    </TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="profile" className="mt-5 space-y-4">

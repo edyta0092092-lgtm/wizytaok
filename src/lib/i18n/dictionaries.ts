@@ -1912,6 +1912,8 @@ Pozdrawiamy,
       panelAccessPending: "Zaproszenie oczekujące",
       panelEmailRequired: "Podaj adres e-mail, aby utworzyć zaproszenie do panelu.",
       panelInviteEmailConflict: "Ten adres jest już użyty w innym zaproszeniu lub koncie.",
+      panelInviteOwnerEmail:
+        "Ten adres e-mail należy do konta właściciela firmy. Użyj innego adresu dla osoby z zespołu.",
       panelAlreadyHasAccess:
         "Ta osoba ma już dostęp do panelu — nowe zaproszenie nie jest potrzebne.",
       invitationServerNotConfigured:
@@ -4476,6 +4478,8 @@ Regards,
       panelAccessPending: "Pending invitation",
       panelEmailRequired: "Enter an email address to create a panel invitation.",
       panelInviteEmailConflict: "This address is already used for another invitation or account.",
+      panelInviteOwnerEmail:
+        "This email belongs to the business owner account. Use a different address for this team member.",
       panelAlreadyHasAccess:
         "This person already has panel access — a new invitation is not required.",
       invitationServerNotConfigured:

@@ -19,6 +19,7 @@ type RpcUpsertResult = {
   token?: string | null
   already_has_access?: boolean
   code?: string
+  detail?: string
 }
 
 function mapRpcCodeToMessageKey(code: string | undefined): string {
@@ -27,8 +28,11 @@ function mapRpcCodeToMessageKey(code: string | undefined): string {
       return "team.panelEmailRequired"
     case "email_conflict":
       return "team.panelInviteEmailConflict"
+    case "owner_email":
+      return "team.panelInviteOwnerEmail"
     case "invalid_role":
     case "not_persisted":
+    case "db_error":
     default:
       return "invitations.invitationCreateError"
   }
@@ -97,10 +101,14 @@ export async function applyStaffPanelAccess(
   const payload = (data ?? null) as RpcUpsertResult | null
   if (!payload || payload.ok !== true) {
     const code = typeof payload?.code === "string" ? payload.code : "unknown"
+    const detail =
+      typeof payload?.detail === "string" && payload.detail.trim()
+        ? payload.detail.trim()
+        : code
     return {
       ok: false,
       messageKey: mapRpcCodeToMessageKey(code),
-      detail: code,
+      detail,
     }
   }
 
