@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
+import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -25,11 +26,13 @@ export async function GET() {
   }
 
   const admin = getServiceRoleClient()
-  if (!admin) {
-    return NextResponse.json({ ok: false, error: "service_role_missing" }, { status: 500 })
+  const memberClient = admin ? null : await getServerClient()
+  const reader = admin ?? memberClient
+  if (!reader) {
+    return NextResponse.json({ ok: false, error: "supabase_unconfigured" }, { status: 500 })
   }
 
-  const { data, error } = await admin
+  const { data, error } = await reader
     .from("notification_logs")
     .select("*")
     .eq("business_id", resolution.businessId)
@@ -44,5 +47,6 @@ export async function GET() {
     ok: true,
     businessId: resolution.businessId,
     rows: (data ?? []).map((row) => normalizeLogRow(row as Record<string, unknown>)),
+    ...(admin ? {} : { readVia: "member_rls" as const }),
   })
 }

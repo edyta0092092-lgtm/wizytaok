@@ -61,10 +61,11 @@ export async function cancelAppointmentFromRemove(
   if (bookingUuid) {
     if (notifyClient) {
       const apiResult = await fetchCancelBookingByCompany(tid, language, true)
+      notifyBookingsChanged()
       if (apiResult.ok) {
-        notifyBookingsChanged()
         return { ok: true, notice: apiResult.notice }
       }
+      return { ok: false, error: apiResult.errorMessage ?? "cancel_notify_failed" }
     }
 
     const client = getBrowserClient()
@@ -131,7 +132,6 @@ export async function cancelAppointmentFromRemove(
         }
         data = minimal.data
       }
-      if (notifyClient) void fetchCancelBookingByCompany(tid, language, true)
       notifyBookingsChanged()
       return { ok: true, data }
     }

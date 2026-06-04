@@ -5,6 +5,7 @@ import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import { mirrorEventCustomTemplateToNotificationLog } from "@/lib/notifications/event-notification-log-mirror"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database, Tables } from "@/types/database"
@@ -196,7 +197,14 @@ function channelContent(
 
 async function finalizeSend(
   admin: Admin,
-  key: { appointmentId: string; templateId: string; channel: CustomTemplateChannel },
+  key: {
+    businessId: string
+    appointmentId: string
+    templateId: string
+    channel: CustomTemplateChannel
+    recipient: string
+    template: CustomTemplateRow
+  },
   result: {
     status: "sent" | "failed" | "skipped" | "pending"
     provider?: string | null
@@ -224,6 +232,21 @@ async function finalizeSend(
     .eq("appointment_id", key.appointmentId)
     .eq("custom_template_id", key.templateId)
     .eq("channel", key.channel)
+
+  if (result.status === "sent") {
+    await mirrorEventCustomTemplateToNotificationLog(admin, {
+      template: key.template,
+      businessId: key.businessId,
+      bookingId: key.appointmentId,
+      channel: key.channel,
+      recipient: key.recipient,
+      subject: result.subject ?? null,
+      body: result.body ?? "",
+      provider: result.provider ?? null,
+      providerMessageId: result.messageId ?? null,
+      sentAt: nowIso,
+    })
+  }
 }
 
 /**
@@ -245,6 +268,14 @@ export async function sendCustomTemplateForBookingDedup(
   const rendered = renderCustomTemplate(template, vars)
   const outcomes: CustomChannelOutcome[] = []
   for (const { channel, recipient } of channels) {
+    const finalizeKey = {
+      businessId: booking.business_id,
+      appointmentId: booking.id,
+      templateId: template.id,
+      channel,
+      recipient,
+      template,
+    }
     const claim = await claimSend(admin, {
       businessId: booking.business_id,
       appointmentId: booking.id,
@@ -261,7 +292,7 @@ export async function sendCustomTemplateForBookingDedup(
       const quota = await getSmsQuotaStatus(admin, booking.business_id)
       if (quota.countFailed) {
         // Nie potrafimy policzyć — zwalniamy rekord do ponownej próby w kolejnym przebiegu.
-        await finalizeSend(admin, { appointmentId: booking.id, templateId: template.id, channel }, {
+        await finalizeSend(admin, finalizeKey, {
           status: "pending",
           error: "sms_quota_count_failed",
         })
@@ -269,7 +300,7 @@ export async function sendCustomTemplateForBookingDedup(
         continue
       }
       if (!quota.allowed) {
-        await finalizeSend(admin, { appointmentId: booking.id, templateId: template.id, channel }, {
+        await finalizeSend(admin, finalizeKey, {
           status: "skipped",
           error: "sms_monthly_limit_reached",
           ...channelContent(channel, rendered),
@@ -281,7 +312,7 @@ export async function sendCustomTemplateForBookingDedup(
     const content = channelContent(channel, rendered)
     const delivered = await deliverChannel(channel, recipient, rendered)
     if (delivered.ok) {
-      await finalizeSend(admin, { appointmentId: booking.id, templateId: template.id, channel }, {
+      await finalizeSend(admin, finalizeKey, {
         status: "sent",
         provider: delivered.provider,
         messageId: delivered.messageId,
@@ -289,7 +320,7 @@ export async function sendCustomTemplateForBookingDedup(
       })
       outcomes.push({ channel, status: "sent" })
     } else {
-      await finalizeSend(admin, { appointmentId: booking.id, templateId: template.id, channel }, {
+      await finalizeSend(admin, finalizeKey, {
         status: "failed",
         error: delivered.error,
         ...content,

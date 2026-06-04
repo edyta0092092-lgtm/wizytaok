@@ -28,6 +28,7 @@ import { formatDeliveryError } from "@/lib/messages/delivery-error-label"
 import {
   customTemplateFilterKey,
   customTemplateIdFromFilterKey,
+  historyTypeForCustomEventTemplate,
   isCustomTemplateFilterKey,
   STANDARD_MESSAGE_TEMPLATE_TYPES,
 } from "@/lib/messages/history-template-filters"
@@ -45,7 +46,13 @@ type NotificationLogRow = Tables<"notification_logs">
 type CustomTemplateSendRow = Tables<"custom_template_sends">
 type CustomTemplateRow = Pick<
   Tables<"custom_templates">,
-  "id" | "name" | "trigger_type" | "offset_minutes" | "sms_enabled" | "email_enabled"
+  | "id"
+  | "name"
+  | "trigger_type"
+  | "event_key"
+  | "offset_minutes"
+  | "sms_enabled"
+  | "email_enabled"
 >
 
 const TRANSACTIONAL_HISTORY_TYPES = new Set([
@@ -590,10 +597,16 @@ function entryChannel(entry: MergedEntry): "sms" | "email" {
   return entry.msg.channel
 }
 
-function resolvedHistoryTypeFilter(entry: MergedEntry): string {
+function resolvedHistoryTypeFilter(
+  entry: MergedEntry,
+  customTemplateByIdMap?: Map<string, CustomTemplateRow>,
+): string {
   if (entry.kind === "customSend" || entry.kind === "plannedCustom") {
     const templateId =
       entry.kind === "customSend" ? entry.row.custom_template_id : entry.templateId
+    const template = customTemplateByIdMap?.get(templateId)
+    const eventType = template ? historyTypeForCustomEventTemplate(template) : null
+    if (eventType) return eventType
     return customTemplateFilterKey(templateId)
   }
   if (entry.kind === "db") {
@@ -799,6 +812,15 @@ function mergeEntries(
   for (const row of customSends) {
     if (!shouldIncludeCustomSendRow(row, templateById)) continue
     const channel = customSendChannel(row)
+    const template = templateById.get(row.custom_template_id)
+    const eventType = template ? historyTypeForCustomEventTemplate(template) : null
+    if (
+      eventType &&
+      row.appointment_id &&
+      logKeys.has(`${row.appointment_id}:${eventType}:${channel}`)
+    ) {
+      continue
+    }
     out.push({
       kind: "customSend",
       sortAt: customSendSortAt(row),
@@ -1287,7 +1309,7 @@ export function SendingHistorySection() {
         client.from("message_templates").select("type").eq("business_id", bid),
         client
           .from("custom_templates")
-          .select("id,name,trigger_type,offset_minutes,sms_enabled,email_enabled")
+          .select("id,name,trigger_type,event_key,offset_minutes,sms_enabled,email_enabled")
           .eq("business_id", bid),
         client
           .from("custom_template_sends")
@@ -1476,7 +1498,9 @@ export function SendingHistorySection() {
   )
 
   const availableTypeFilters = React.useMemo(() => {
-    const fromEntries = merged.map((entry) => resolvedHistoryTypeFilter(entry)).filter(Boolean)
+    const fromEntries = merged
+      .map((entry) => resolvedHistoryTypeFilter(entry, customTemplateByIdMap))
+      .filter(Boolean)
     const customKeys = customTemplates.map((row) => customTemplateFilterKey(row.id))
     const combined = new Set<string>([
       ...STANDARD_MESSAGE_TEMPLATE_TYPES,
@@ -1524,7 +1548,7 @@ export function SendingHistorySection() {
       })
       .filter((e) => {
         if (typeFilter === "all") return true
-        return resolvedHistoryTypeFilter(e) === typeFilter
+        return resolvedHistoryTypeFilter(e, customTemplateByIdMap) === typeFilter
       })
   }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs, customTemplateByIdMap])
 

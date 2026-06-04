@@ -106,36 +106,13 @@ export async function POST(req: Request) {
     return "update_failed"
   }
 
-  if (!alreadyCancelled) {
-    const upErrMsg = await applyPatchSafely(patch)
-    if (upErrMsg) {
-      return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
-    }
-  }
-
   const shouldNotifyClient = body.notifyClient !== false
-  if (!shouldNotifyClient) {
-    return NextResponse.json({
-      ok: true,
-      notice: "saved" as const,
-      notificationSkipped: true,
-      ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
-    })
-  }
 
   const { data: profile, error: profErr } = await supabase
     .from("business_profiles")
     .select("id, slug, phone, contact_phone, business_name, business_address")
     .eq("id", booking.business_id)
     .maybeSingle()
-
-  if (profErr || !profile) {
-    return NextResponse.json({
-      ok: true,
-      notice: "saved" as const,
-      notificationSkipped: true,
-    })
-  }
 
   const language: CancelNotifyLanguage = body.language === "en" ? "en" : "pl"
   const updatedBooking: Tables<"bookings"> = {
@@ -146,34 +123,48 @@ export async function POST(req: Request) {
     status: "cancelled",
   }
 
-  if (alreadyCancelled && (await hasCancellationNotificationLog(bookingUuid))) {
-    try {
-      await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
-    } catch {
-      // własne szablony nie blokują odpowiedzi
+  let notice: "saved" | "queued" | "sent" = "saved"
+  let notificationSkipped = false
+
+  if (shouldNotifyClient && profile) {
+    if (alreadyCancelled && (await hasCancellationNotificationLog(bookingUuid))) {
+      try {
+        await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
+      } catch {
+        // własne szablony nie blokują odpowiedzi
+      }
+      notice = "queued"
+    } else {
+      try {
+        const messagesOn = inferMessagesEffectivelySent()
+        const notifyResult = await notifyBookingCancelledByCompany({
+          booking: updatedBooking,
+          business: profile,
+          language,
+          messagesEffectivelySent: messagesOn,
+        })
+        notice = notifyResult.notice
+        try {
+          await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
+        } catch {
+          // własne szablony nie blokują głównej odpowiedzi
+        }
+      } catch {
+        notificationSkipped = true
+      }
     }
-    return NextResponse.json({ ok: true, notice: "queued" as const, alreadyCancelled: true })
+  } else if (shouldNotifyClient) {
+    notificationSkipped = true
   }
 
-  try {
-    const messagesOn = inferMessagesEffectivelySent()
-    const { notice } = await notifyBookingCancelledByCompany({
-      booking: updatedBooking,
-      business: profile,
-      language,
-      messagesEffectivelySent: messagesOn,
-    })
-    try {
-      await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
-    } catch {
-      // własne szablony nie blokują głównej odpowiedzi
+  if (!alreadyCancelled) {
+    const upErrMsg = await applyPatchSafely(patch)
+    if (upErrMsg) {
+      return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
     }
-    return NextResponse.json({
-      ok: true,
-      notice,
-      ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
-    })
-  } catch {
+  }
+
+  if (!shouldNotifyClient) {
     return NextResponse.json({
       ok: true,
       notice: "saved" as const,
@@ -181,4 +172,11 @@ export async function POST(req: Request) {
       ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
     })
   }
+
+  return NextResponse.json({
+    ok: true,
+    notice,
+    ...(notificationSkipped ? { notificationSkipped: true as const } : {}),
+    ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
+  })
 }

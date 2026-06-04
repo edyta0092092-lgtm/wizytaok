@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { cn } from "@/lib/utils"
+import { THANK_YOU_AFTER_VISIT_TEMPLATE_NAME } from "@/lib/messages/default-custom-templates"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
 
@@ -60,20 +61,44 @@ const UNIT_MINUTES: Record<OffsetUnit, number> = {
   days: 60 * 24,
 }
 
+const DEFAULT_THANK_YOU_SMS =
+  "Cześć {{imie}}, dziękujemy za skorzystanie z naszych usług. Jeśli potrzebujesz, zapraszamy ponownie: {{link_rezerwacji}}. Pozdrawiamy, {{nazwa_firmy}}"
+
+const DEFAULT_THANK_YOU_EMAIL_SUBJECT = "{{nazwa_firmy}}: Dziękujemy za wizytę"
+
+const DEFAULT_THANK_YOU_EMAIL_BODY = `Cześć {{imie}},
+
+dziękujemy za skorzystanie z naszych usług. Jeśli potrzebujesz, zapraszamy ponownie:
+{{link_rezerwacji}}
+
+Pozdrawiamy,
+{{nazwa_firmy}}`
+
 function emptyForm(): CustomForm {
   return {
     id: null,
-    name: "",
-    smsEnabled: false,
-    smsContent: "",
+    name: THANK_YOU_AFTER_VISIT_TEMPLATE_NAME,
+    smsEnabled: true,
+    smsContent: DEFAULT_THANK_YOU_SMS,
     emailEnabled: true,
-    emailSubject: "",
-    emailContent: "",
-    triggerType: "schedule_before",
-    offsetValue: 1,
-    offsetUnit: "days",
+    emailSubject: DEFAULT_THANK_YOU_EMAIL_SUBJECT,
+    emailContent: DEFAULT_THANK_YOU_EMAIL_BODY,
+    triggerType: "event",
+    offsetValue: 0,
+    offsetUnit: "minutes",
     eventKey: "completed",
     status: "active",
+  }
+}
+
+async function ensureBuiltinCustomTemplates(): Promise<void> {
+  try {
+    await fetch("/api/messages/ensure-default-custom-templates", {
+      method: "POST",
+      credentials: "include",
+    })
+  } catch {
+    // brak szablonu domyślnego nie blokuje panelu
   }
 }
 
@@ -179,6 +204,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
         }
         return
       }
+      await ensureBuiltinCustomTemplates()
       await reload(bid)
       if (cancelled) return
       setBusinessId(bid)
