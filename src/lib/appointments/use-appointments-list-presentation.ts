@@ -9,7 +9,7 @@ import {
   type AppointmentGroupKey,
   type AppointmentsDayGroupFilter,
 } from "@/lib/appointments/appointments-grouping"
-import { appointmentRequiresPostVisitAction } from "@/lib/appointments/stats-rules"
+import { appointmentShowsNeedsActionStatus } from "@/lib/appointments/stats-rules"
 import { getAppToday, isSameAppDay } from "@/lib/date/current-date"
 import { bookingMatchesStaffFilter } from "@/lib/staff/staff-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
@@ -73,18 +73,18 @@ export function useAppointmentsListPresentation(args: {
     }
     let stage: Appointment[]
     if (filter === "needs_action") {
-      stage = base.filter((a) => appointmentRequiresPostVisitAction(a))
+      stage = base.filter((a) => appointmentShowsNeedsActionStatus(a))
     } else if (filter === "all") {
       stage = base
     } else if (filter === "unconfirmed") {
       stage = base.filter(
         (a) =>
           (a.status === "booked" || a.status === "pending") &&
-          !appointmentRequiresPostVisitAction(a),
+          !appointmentShowsNeedsActionStatus(a),
       )
     } else {
       stage = base.filter(
-        (a) => a.status === filter && !appointmentRequiresPostVisitAction(a),
+        (a) => a.status === filter && !appointmentShowsNeedsActionStatus(a),
       )
     }
     return stage

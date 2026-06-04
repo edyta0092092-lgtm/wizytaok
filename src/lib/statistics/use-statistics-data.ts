@@ -2,7 +2,10 @@
 
 import * as React from "react"
 
-import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
+import {
+  invalidateMergedAppointmentsCache,
+  useAppointmentsStore,
+} from "@/lib/appointments/appointments-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { getServices } from "@/lib/services/services-store"
@@ -115,6 +118,13 @@ export function useStatisticsData({
     ready: appointmentsReady,
     loadError: appointmentsLoadError,
   } = useAppointmentsStore(access.ready ? access.businessId : undefined)
+
+  React.useEffect(() => {
+    if (!access.ready || !access.businessId?.trim()) return
+    invalidateMergedAppointmentsCache()
+    window.dispatchEvent(new Event("pw-bookings"))
+  }, [access.businessId, access.ready])
+
   const [services, setServices] = React.useState<Service[]>([])
   const [staff, setStaff] = React.useState<StaffMember[]>([])
   const [notificationSources, setNotificationSources] = React.useState<

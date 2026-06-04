@@ -28,9 +28,23 @@ export function appointmentRequiresBusinessContact(a: Appointment): boolean {
   return bookingNeedsAction(a)
 }
 
-/** Minione wizyty bez statusu końcowego — spójne z filtrem „Wymaga działania” na /appointments. */
-export function appointmentRequiresPostVisitAction(a: Appointment, at: Date = new Date()): boolean {
+/**
+ * Wizyta w stanie „Wymaga działania” (filtr /appointments, KPI statystyk, badge).
+ * Tylko minione terminy bez statusu końcowego (booked / pending / confirmed).
+ * Po zmianie na zrealizowane, anulowane lub nieobecność — nie jest już liczona.
+ */
+export function appointmentShowsNeedsActionStatus(
+  a: Appointment,
+  at: Date = new Date(),
+): boolean {
+  const s = a.status
+  if (s === "completed" || s === "cancelled" || s === "no_show") return false
   return bookingRequiresPostVisitStatus(a, at)
+}
+
+/** @deprecated Użyj appointmentShowsNeedsActionStatus */
+export function appointmentRequiresPostVisitAction(a: Appointment, at: Date = new Date()): boolean {
+  return appointmentShowsNeedsActionStatus(a, at)
 }
 
 export function countStatisticsNeedsActionVisits(
@@ -39,7 +53,7 @@ export function countStatisticsNeedsActionVisits(
 ): number {
   let n = 0
   for (const a of appointments) {
-    if (appointmentRequiresPostVisitAction(a, at)) n += 1
+    if (appointmentShowsNeedsActionStatus(a, at)) n += 1
   }
   return n
 }
@@ -54,5 +68,5 @@ export function countsTowardStatisticsTotalVisits(
 ): boolean {
   const s = a.status
   if (s === "cancelled" || s === "no_show" || s === "completed") return true
-  return appointmentRequiresPostVisitAction(a, at)
+  return appointmentShowsNeedsActionStatus(a, at)
 }

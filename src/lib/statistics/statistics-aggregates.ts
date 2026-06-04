@@ -454,7 +454,7 @@ export function buildStatisticsDataset({
   )
   const heatmap = buildHeatmap(heatmapAppointments, locale)
 
-  const needsAction = countStatisticsNeedsActionVisits(appointments, todayStart)
+  const needsAction = countStatisticsNeedsActionVisits(appointments, today)
   const completed = statusCounts.completed
   const cancelled = statusCounts.cancelled
   const noShow = statusCounts.no_show
