@@ -73,32 +73,64 @@ export default function AcceptInvitePage() {
         }
         return
       }
-      const { data, error } = await client.rpc("get_business_invitation_public", {
-        p_token: token,
-      })
-      if (cancelled) return
-      if (error) {
-        setLoadError("rpc")
+      const applyPreview = (businessName: string, email: string) => {
+        setPreview({ businessName, email })
         setLoadBusy(false)
-        return
       }
-      const row = readRpcJson(data)
-      if (!row || row.ok !== true) {
-        const err = typeof row?.error === "string" ? row.error : "not_found"
+
+      const applyLoadFailure = (err: string, status?: string) => {
         if (err === "not_pending") {
-          const st = typeof row?.status === "string" ? row.status : ""
-          setLoadError(st === "accepted" ? "used" : "invalid")
+          setLoadError(status === "accepted" ? "used" : "invalid")
+        } else if (err === "cancelled") {
+          setLoadError("invalid")
         } else {
           setLoadError("invalid")
         }
         setLoadBusy(false)
-        return
       }
-      setPreview({
-        businessName: typeof row.business_name === "string" ? row.business_name : "",
-        email: typeof row.email === "string" ? row.email : "",
+
+      const { data, error } = await client.rpc("get_business_invitation_public", {
+        p_token: token,
       })
-      setLoadBusy(false)
+      if (cancelled) return
+      if (!error) {
+        const row = readRpcJson(data)
+        if (row?.ok === true) {
+          applyPreview(
+            typeof row.business_name === "string" ? row.business_name : "",
+            typeof row.email === "string" ? row.email : "",
+          )
+          return
+        }
+        const err = typeof row?.error === "string" ? row.error : "not_found"
+        const st = typeof row?.status === "string" ? row.status : undefined
+        if (err !== "not_found" && err !== "not_pending") {
+          applyLoadFailure(err, st)
+          return
+        }
+      }
+
+      try {
+        const apiRes = await fetch(
+          `/api/public/business-invitation?token=${encodeURIComponent(token)}`,
+          { cache: "no-store" },
+        )
+        const apiJson = (await apiRes.json().catch(() => null)) as {
+          ok?: boolean
+          business_name?: string
+          email?: string
+          error?: string
+          status?: string
+        } | null
+        if (cancelled) return
+        if (apiJson?.ok) {
+          applyPreview(apiJson.business_name ?? "", apiJson.email ?? "")
+          return
+        }
+        applyLoadFailure(apiJson?.error ?? "not_found", apiJson?.status)
+      } catch {
+        if (!cancelled) setLoadError("rpc")
+      }
     })()
     return () => {
       cancelled = true
@@ -125,23 +157,47 @@ export default function AcceptInvitePage() {
         setActionMsg(t("invitations.emailMismatch"))
         return
       }
-      const { data, error } = await client.rpc("accept_business_invitation", { p_token: token })
-      if (error) {
-        setActionMsg(t("invitations.invitationCreateError"))
-        return
+      const finishAccept = () => {
+        router.replace("/dashboard")
+        router.refresh()
       }
-      const row = readRpcJson(data)
-      if (!row || row.ok !== true) {
-        const err = typeof row?.error === "string" ? row.error : "unknown"
+
+      const mapAcceptError = (err: string) => {
         if (err === "email_mismatch") setActionMsg(t("invitations.emailMismatch"))
         else if (err === "already_used") setActionMsg(t("invitations.alreadyUsed"))
         else if (err === "cancelled") setActionMsg(t("invitations.cancelled"))
         else if (err === "not_authenticated") setActionMsg(t("invitations.joinPrompt"))
         else setActionMsg(t("invitations.invalidOrExpired"))
+      }
+
+      const { data, error } = await client.rpc("accept_business_invitation", { p_token: token })
+      if (!error) {
+        const row = readRpcJson(data)
+        if (row?.ok === true) {
+          finishAccept()
+          return
+        }
+        const err = typeof row?.error === "string" ? row.error : "unknown"
+        if (err !== "not_found") {
+          mapAcceptError(err)
+          return
+        }
+      }
+
+      const apiRes = await fetch("/api/public/accept-business-invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+      const apiJson = (await apiRes.json().catch(() => null)) as {
+        ok?: boolean
+        error?: string
+      } | null
+      if (apiJson?.ok) {
+        finishAccept()
         return
       }
-      router.replace("/dashboard")
-      router.refresh()
+      mapAcceptError(apiJson?.error ?? "unknown")
     } finally {
       setBusy(false)
     }
