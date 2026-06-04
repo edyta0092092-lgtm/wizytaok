@@ -1,9 +1,12 @@
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
+
 export type CancelBookingByCompanyResult =
   | {
       ok: true
       notice?: string
       alreadyCancelled?: boolean
       notificationSkipped?: boolean
+      cancellationHistoryMirror?: TransactionalHistoryMirror
     }
   | { ok: false; errorMessage: string }
 
@@ -24,6 +27,7 @@ export async function fetchCancelBookingByCompany(
     notice?: string
     alreadyCancelled?: boolean
     notificationSkipped?: boolean
+    cancellationHistoryMirror?: TransactionalHistoryMirror
   }
   if (json.ok) {
     return {
@@ -31,6 +35,7 @@ export async function fetchCancelBookingByCompany(
       notice: typeof json.notice === "string" ? json.notice : undefined,
       alreadyCancelled: json.alreadyCancelled === true,
       notificationSkipped: json.notificationSkipped === true,
+      cancellationHistoryMirror: json.cancellationHistoryMirror,
     }
   }
   const msg =

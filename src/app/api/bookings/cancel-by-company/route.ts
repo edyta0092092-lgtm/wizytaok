@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server"
 
 import {
+  buildBookingCancelledNotifyContent,
+  hasCancellationHistoryLog,
+  ensureCancellationLogsInHistory,
   inferMessagesEffectivelySent,
   notifyBookingCancelledByCompany,
   type CancelNotifyLanguage,
 } from "@/lib/notifications/booking-cancelled-by-company-server"
-import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import {
+  resolveSupabaseBookingRowUuidFromUiId,
+  SB_BOOKING_PREFIX,
+} from "@/lib/bookings/bookings-store"
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -160,6 +167,9 @@ export async function POST(req: Request) {
 
   let notice: "saved" | "queued" | "sent" = "saved"
   let notificationSkipped = false
+  let cancellationHistoryMirror: TransactionalHistoryMirror | undefined
+
+  const admin = getServiceRoleClient()
 
   if (shouldNotifyClient && profile) {
     if (alreadyCancelled && (await hasCancellationNotificationLog(bookingUuid))) {
@@ -172,13 +182,48 @@ export async function POST(req: Request) {
     } else {
       try {
         const messagesOn = inferMessagesEffectivelySent()
-        const notifyResult = await notifyBookingCancelledByCompany({
+        const notifyArgs = {
           booking: updatedBooking,
           business: profile,
           language,
           messagesEffectivelySent: messagesOn,
-        })
+        }
+        const notifyResult = await notifyBookingCancelledByCompany(notifyArgs)
         notice = notifyResult.notice
+        if (
+          admin &&
+          (notifyResult.notice === "sent" || notifyResult.notice === "queued") &&
+          !(await hasCancellationHistoryLog(admin, bookingUuid))
+        ) {
+          await ensureCancellationLogsInHistory(notifyArgs)
+        }
+        if (
+          admin &&
+          (notifyResult.notice === "sent" || notifyResult.notice === "queued") &&
+          profile.slug?.trim()
+        ) {
+          const content = await buildBookingCancelledNotifyContent(
+            admin,
+            updatedBooking,
+            profile,
+            language,
+          )
+          cancellationHistoryMirror = {
+            bookingUiId: `${SB_BOOKING_PREFIX}${bookingUuid}`,
+            businessSlug: profile.slug.trim(),
+            clientName: booking.client_name?.trim() || "",
+            clientPhone: booking.client_phone,
+            clientEmail: booking.client_email,
+            confirmationToken: booking.confirmation_token,
+            serviceName: booking.service_name?.trim() || null,
+            appointmentDate: String(booking.appointment_date ?? "").slice(0, 10) || null,
+            appointmentTime: String(booking.appointment_time ?? "").slice(0, 5) || null,
+            appointmentStatus: "cancelled",
+            smsBody: content.sendSms ? content.sms : null,
+            emailSubject: content.sendEmail ? content.emailSubject : null,
+            emailBody: content.sendEmail ? content.emailText : null,
+          }
+        }
         try {
           await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
         } catch {
@@ -204,6 +249,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     notice,
+    ...(cancellationHistoryMirror ? { cancellationHistoryMirror } : {}),
     ...(notificationSkipped ? { notificationSkipped: true as const } : {}),
     ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
   })

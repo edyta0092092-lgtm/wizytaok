@@ -1,18 +1,6 @@
-export type ThankYouHistoryMirror = {
-  bookingUiId: string
-  businessSlug: string
-  clientName: string
-  clientPhone: string | null
-  clientEmail: string | null
-  confirmationToken: string
-  serviceName: string | null
-  appointmentDate: string | null
-  appointmentTime: string | null
-  appointmentStatus: string | null
-  smsBody: string | null
-  emailSubject: string | null
-  emailBody: string | null
-}
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
+
+export type ThankYouHistoryMirror = TransactionalHistoryMirror
 
 export type CompleteBookingByCompanyResult =
   | {

@@ -1,4 +1,5 @@
 import type { PublicBooking } from "@/lib/bookings/public-bookings"
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
 import type {
   NotificationFailureReason,
   NotificationMessage,
@@ -14,6 +15,8 @@ function isNotificationMessageType(raw: unknown): raw is NotificationMessageType
     raw === "booking_created" ||
     raw === "booking_confirmed" ||
     raw === "thank_you_after_visit" ||
+    raw === "booking_cancelled_by_company" ||
+    raw === "no_show_follow_up" ||
     raw === "reminder_24h" ||
     raw === "first_reminder_24h" ||
     raw === "appointment_reminder_24h" ||
@@ -246,43 +249,34 @@ export function createBookingConfirmedMessages(
   return [sms, email]
 }
 
-export function createThankYouAfterVisitMessages(args: {
-  bookingUiId: string
-  businessSlug: string
-  clientName: string
-  clientPhone?: string | null
-  clientEmail?: string | null
-  confirmationToken: string
-  serviceName?: string | null
-  appointmentDate?: string | null
-  appointmentTime?: string | null
-  appointmentStatus?: string | null
-  smsBody?: string | null
-  emailSubject?: string | null
-  emailBody?: string | null
-  language: "pl" | "en"
+export function createTransactionalHistoryMessages(args: {
+  messageType: Extract<
+    NotificationMessageType,
+    "thank_you_after_visit" | "booking_cancelled_by_company" | "no_show_follow_up"
+  >
+  mirror: TransactionalHistoryMirror
 }): NotificationMessage[] {
   const createdAt = new Date().toISOString()
-  const confirmationLink = `/confirm/${args.confirmationToken}`
+  const confirmationLink = `/confirm/${args.mirror.confirmationToken}`
   const visitMeta = {
-    relatedServiceName: args.serviceName?.trim() || undefined,
-    relatedAppointmentDate: args.appointmentDate?.trim()?.slice(0, 10) || undefined,
-    relatedAppointmentTime: args.appointmentTime?.trim()?.slice(0, 5) || undefined,
-    relatedAppointmentStatus: args.appointmentStatus?.trim() || undefined,
+    relatedServiceName: args.mirror.serviceName?.trim() || undefined,
+    relatedAppointmentDate: args.mirror.appointmentDate?.trim()?.slice(0, 10) || undefined,
+    relatedAppointmentTime: args.mirror.appointmentTime?.trim()?.slice(0, 5) || undefined,
+    relatedAppointmentStatus: args.mirror.appointmentStatus?.trim() || undefined,
   }
   const out: NotificationMessage[] = []
-  const phone = args.clientPhone?.trim() ?? ""
-  const email = args.clientEmail?.trim() ?? ""
-  if (phone && args.smsBody?.trim()) {
+  const phone = args.mirror.clientPhone?.trim() ?? ""
+  const email = args.mirror.clientEmail?.trim() ?? ""
+  if (phone && args.mirror.smsBody?.trim()) {
     out.push({
       id: crypto.randomUUID(),
-      bookingId: args.bookingUiId,
-      businessSlug: args.businessSlug,
+      bookingId: args.mirror.bookingUiId,
+      businessSlug: args.mirror.businessSlug,
       channel: "sms",
-      type: "thank_you_after_visit",
-      recipientName: args.clientName,
+      type: args.messageType,
+      recipientName: args.mirror.clientName,
       recipientPhone: phone,
-      body: args.smsBody.trim(),
+      body: args.mirror.smsBody.trim(),
       confirmationLink,
       status: "sent",
       sentAt: createdAt,
@@ -290,17 +284,17 @@ export function createThankYouAfterVisitMessages(args: {
       ...visitMeta,
     })
   }
-  if (email && args.emailBody?.trim()) {
+  if (email && args.mirror.emailBody?.trim()) {
     out.push({
       id: crypto.randomUUID(),
-      bookingId: args.bookingUiId,
-      businessSlug: args.businessSlug,
+      bookingId: args.mirror.bookingUiId,
+      businessSlug: args.mirror.businessSlug,
       channel: "email",
-      type: "thank_you_after_visit",
-      recipientName: args.clientName,
+      type: args.messageType,
+      recipientName: args.mirror.clientName,
       recipientEmail: email,
-      subject: args.emailSubject?.trim() || undefined,
-      body: args.emailBody.trim(),
+      subject: args.mirror.emailSubject?.trim() || undefined,
+      body: args.mirror.emailBody.trim(),
       confirmationLink,
       status: "sent",
       sentAt: createdAt,
@@ -311,11 +305,22 @@ export function createThankYouAfterVisitMessages(args: {
   return out
 }
 
-export function enqueueThankYouAfterVisitNotifications(
-  messages: NotificationMessage[],
-): void {
+export function createThankYouAfterVisitMessages(
+  mirror: TransactionalHistoryMirror,
+): NotificationMessage[] {
+  return createTransactionalHistoryMessages({
+    messageType: "thank_you_after_visit",
+    mirror,
+  })
+}
+
+export function enqueueTransactionalHistoryNotifications(messages: NotificationMessage[]): void {
   if (messages.length === 0) return
   saveNotificationMessagesBatch(messages)
+}
+
+export function enqueueThankYouAfterVisitNotifications(messages: NotificationMessage[]): void {
+  enqueueTransactionalHistoryNotifications(messages)
 }
 
 export function enqueueBookingConfirmedNotifications(

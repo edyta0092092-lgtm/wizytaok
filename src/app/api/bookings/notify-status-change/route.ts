@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server"
 
-import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import {
+  resolveSupabaseBookingRowUuidFromUiId,
+  SB_BOOKING_PREFIX,
+} from "@/lib/bookings/bookings-store"
 import { getBookingCreatedNotifyStatus } from "@/lib/notifications/booking-created-server"
 import { notifyBookingConfirmedForBooking } from "@/lib/notifications/booking-confirmed-server"
-import { notifyBookingCancelledByCompany } from "@/lib/notifications/booking-cancelled-by-company-server"
-import { notifyNoShowFollowUp } from "@/lib/notifications/no-show-follow-up-server"
+import {
+  buildBookingCancelledNotifyContent,
+  ensureCancellationLogsInHistory,
+  hasCancellationHistoryLog,
+  notifyBookingCancelledByCompany,
+} from "@/lib/notifications/booking-cancelled-by-company-server"
+import {
+  buildNoShowFollowUpContent,
+  ensureNoShowFollowUpLogsInHistory,
+  hasNoShowFollowUpHistoryLog,
+  notifyNoShowFollowUp,
+} from "@/lib/notifications/no-show-follow-up-server"
 import { notifyThankYouAfterVisit } from "@/lib/notifications/thank-you-after-visit-server"
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
 import {
   dispatchCustomTemplatesForEvent,
   type CustomTemplateEventKey,
 } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables } from "@/types/database"
 
 export const dynamic = "force-dynamic"
@@ -27,6 +42,32 @@ const STATUS_TO_EVENT: Record<string, CustomTemplateEventKey> = {
   cancelled: "cancelled",
   no_show: "no_show",
   completed: "completed",
+}
+
+function buildTransactionalHistoryMirror(args: {
+  bookingUuid: string
+  booking: Tables<"bookings">
+  businessSlug: string
+  appointmentStatus: string
+  smsBody: string | null
+  emailSubject: string | null
+  emailBody: string | null
+}): TransactionalHistoryMirror {
+  return {
+    bookingUiId: `${SB_BOOKING_PREFIX}${args.bookingUuid}`,
+    businessSlug: args.businessSlug,
+    clientName: args.booking.client_name?.trim() || "",
+    clientPhone: args.booking.client_phone,
+    clientEmail: args.booking.client_email,
+    confirmationToken: args.booking.confirmation_token,
+    serviceName: args.booking.service_name?.trim() || null,
+    appointmentDate: String(args.booking.appointment_date ?? "").slice(0, 10) || null,
+    appointmentTime: String(args.booking.appointment_time ?? "").slice(0, 5) || null,
+    appointmentStatus: args.appointmentStatus,
+    smsBody: args.smsBody,
+    emailSubject: args.emailSubject,
+    emailBody: args.emailBody,
+  }
 }
 
 /**
@@ -83,8 +124,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, notice: "skipped" as const, reason: "no_business" })
   }
 
-  const language = body.language === "en" ? "en" : "pl"
+  const language: "pl" | "en" = body.language === "en" ? "en" : "pl"
+  const admin = getServiceRoleClient()
   let standardNotice: string | null = null
+  let transactionalHistoryMirror: TransactionalHistoryMirror | undefined
 
   try {
     if (eventKey === "confirmed" && booking.status === "confirmed") {
@@ -110,20 +153,70 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, standardNotice })
     }
     if (eventKey === "cancelled") {
-      const { notice } = await notifyBookingCancelledByCompany({
+      const notifyArgs = {
         booking: { ...booking, status: "cancelled" },
         business: profile,
         language,
-      })
+      }
+      const { notice } = await notifyBookingCancelledByCompany(notifyArgs)
       standardNotice = notice
+      if (
+        admin &&
+        (notice === "sent" || notice === "queued") &&
+        !(await hasCancellationHistoryLog(admin, bookingUuid))
+      ) {
+        await ensureCancellationLogsInHistory(notifyArgs)
+      }
+      if (admin && (notice === "sent" || notice === "queued") && profile.slug?.trim()) {
+        const content = await buildBookingCancelledNotifyContent(
+          admin,
+          notifyArgs.booking,
+          profile,
+          language,
+        )
+        transactionalHistoryMirror = buildTransactionalHistoryMirror({
+          bookingUuid,
+          booking: notifyArgs.booking,
+          businessSlug: profile.slug.trim(),
+          appointmentStatus: "cancelled",
+          smsBody: content.sendSms ? content.sms : null,
+          emailSubject: content.sendEmail ? content.emailSubject : null,
+          emailBody: content.sendEmail ? content.emailText : null,
+        })
+      }
     }
     if (eventKey === "no_show") {
-      const { notice } = await notifyNoShowFollowUp({
+      const notifyArgs = {
         booking: { ...booking, status: "no_show" },
         business: profile,
         language,
-      })
+      }
+      const { notice } = await notifyNoShowFollowUp(notifyArgs)
       standardNotice = notice
+      if (
+        admin &&
+        (notice === "sent" || notice === "queued") &&
+        !(await hasNoShowFollowUpHistoryLog(admin, bookingUuid))
+      ) {
+        await ensureNoShowFollowUpLogsInHistory(notifyArgs)
+      }
+      if (admin && (notice === "sent" || notice === "queued") && profile.slug?.trim()) {
+        const content = await buildNoShowFollowUpContent(
+          admin,
+          notifyArgs.booking,
+          profile,
+          language,
+        )
+        transactionalHistoryMirror = buildTransactionalHistoryMirror({
+          bookingUuid,
+          booking: notifyArgs.booking,
+          businessSlug: profile.slug.trim(),
+          appointmentStatus: "no_show",
+          smsBody: content.sendSms ? content.smsText : null,
+          emailSubject: content.sendEmail ? content.emailSubject : null,
+          emailBody: content.sendEmail ? content.emailText : null,
+        })
+      }
     }
     if (eventKey === "completed") {
       const { notice } = await notifyThankYouAfterVisit({
@@ -147,12 +240,14 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       standardNotice,
+      ...(transactionalHistoryMirror ? { transactionalHistoryMirror } : {}),
       customTemplates: custom,
     })
   } catch {
     return NextResponse.json({
       ok: true,
       standardNotice: standardNotice ?? "skipped",
+      ...(transactionalHistoryMirror ? { transactionalHistoryMirror } : {}),
       notice: "skipped" as const,
       reason: "dispatch_error",
     })

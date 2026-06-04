@@ -92,6 +92,19 @@ function canonicalNotificationType(raw: string): string {
   if (["booking_confirmation", "booking_confirmed", "booking_created", "confirmation"].includes(type)) {
     return "booking_confirmation"
   }
+  if (
+    [
+      "booking_cancelled_by_company",
+      "company_cancelled_booking",
+      "booking_cancelled_by_client",
+      "client_cancelled_booking",
+    ].includes(type)
+  ) {
+    return "booking_cancelled_by_company"
+  }
+  if (["no_show_follow_up", "followup_noshow", "follow_up_no_show"].includes(type)) {
+    return "no_show_follow_up"
+  }
   if (["thank_you_after_visit", "thank_you", "visit_thank_you"].includes(type)) {
     return "thank_you_after_visit"
   }

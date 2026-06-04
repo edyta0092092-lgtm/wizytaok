@@ -162,8 +162,8 @@ async function persistCancelledChannelLog(
   channel: "sms" | "email",
   recipient: string,
   patch: NotificationLogUpdatePatch,
-): Promise<void> {
-  await persistTransactionalChannelLog(
+): Promise<boolean> {
+  return persistTransactionalChannelLog(
     admin,
     booking,
     logType,
@@ -227,6 +227,7 @@ export async function sendBookingCancelledConfirmation(args: {
   const messages = buildBookingCancelledMessages(language, vars, args.messageOverrides)
   const nowIso = new Date().toISOString()
   let anySent = false
+  let logsOk = true
 
   const shouldSendSms = args.sendSms ?? true
   const shouldSendEmail = args.sendEmail ?? true
@@ -237,7 +238,7 @@ export async function sendBookingCancelledConfirmation(args: {
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
     if (admin) {
-      await persistCancelledChannelLog(admin, booking, logType, "sms", phone, {
+      const logged = await persistCancelledChannelLog(admin, booking, logType, "sms", phone, {
         status,
         subject: null,
         body: messages.sms,
@@ -246,6 +247,9 @@ export async function sendBookingCancelledConfirmation(args: {
         error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
         sent_at: smsRes.ok ? nowIso : null,
       })
+      if (smsRes.ok && !logged) logsOk = false
+    } else if (smsRes.ok) {
+      logsOk = false
     }
   }
 
@@ -260,7 +264,7 @@ export async function sendBookingCancelledConfirmation(args: {
     const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
     if (emailRes.ok) anySent = true
     if (admin) {
-      await persistCancelledChannelLog(admin, booking, logType, "email", email, {
+      const logged = await persistCancelledChannelLog(admin, booking, logType, "email", email, {
         status,
         subject: messages.emailSubject,
         body: messages.emailText,
@@ -269,7 +273,17 @@ export async function sendBookingCancelledConfirmation(args: {
         error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
         sent_at: emailRes.ok ? nowIso : null,
       })
+      if (emailRes.ok && !logged) logsOk = false
+    } else if (emailRes.ok) {
+      logsOk = false
     }
+  }
+
+  if (anySent && !logsOk) {
+    console.error("[booking-cancelled.notify.log] sent_but_log_persist_failed", {
+      bookingId: booking.id,
+      logType,
+    })
   }
 
   return { notice: anySent ? "sent" : "queued" }

@@ -24,9 +24,10 @@ import {
 } from "@/lib/appointments/merged-appointments-cache"
 import { fetchCompleteBookingByCompany } from "@/lib/bookings/complete-booking-by-company-client"
 import {
-  createThankYouAfterVisitMessages,
-  enqueueThankYouAfterVisitNotifications,
+  createTransactionalHistoryMessages,
+  enqueueTransactionalHistoryNotifications,
 } from "@/lib/notifications/notifications"
+import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
   getBookingsForCurrentBusiness,
@@ -380,16 +381,24 @@ function readNotifyLanguage(): "pl" | "en" {
   }
 }
 
+function enqueueTransactionalHistoryMirror(
+  messageType: "thank_you_after_visit" | "booking_cancelled_by_company" | "no_show_follow_up",
+  mirror: TransactionalHistoryMirror,
+): void {
+  const messages = createTransactionalHistoryMessages({ messageType, mirror })
+  enqueueTransactionalHistoryNotifications(messages)
+}
+
 async function postBookingStatusNotify(
   appointmentId: string,
   status: AppointmentStatus,
   language?: "pl" | "en",
-): Promise<void> {
+): Promise<TransactionalHistoryMirror | undefined> {
   if (
     !NOTIFY_AFTER_STATUS_UPDATE.includes(status) &&
     !NOTIFY_BEFORE_STATUS_UPDATE.includes(status)
   ) {
-    return
+    return undefined
   }
   try {
     const res = await fetch("/api/bookings/notify-status-change", {
@@ -402,12 +411,17 @@ async function postBookingStatusNotify(
         language: language ?? readNotifyLanguage(),
       }),
     })
+    const json = (await res.json().catch(() => ({}))) as {
+      transactionalHistoryMirror?: TransactionalHistoryMirror
+    }
     if (res.ok && typeof window !== "undefined") {
       window.dispatchEvent(new Event("pw-bookings"))
       window.dispatchEvent(new Event("pw-notification-messages"))
     }
+    return json.transactionalHistoryMirror
   } catch {
     // fire-and-forget — błąd nie blokuje zapisu statusu
+    return undefined
   }
 }
 
@@ -454,23 +468,7 @@ export async function updateAppointmentStatus(
       if (!apiResult.ok) return false
       const mirror = apiResult.thankYouHistoryMirror
       if (mirror) {
-        const localMessages = createThankYouAfterVisitMessages({
-          bookingUiId: mirror.bookingUiId,
-          businessSlug: mirror.businessSlug,
-          clientName: mirror.clientName,
-          clientPhone: mirror.clientPhone,
-          clientEmail: mirror.clientEmail,
-          confirmationToken: mirror.confirmationToken,
-          serviceName: mirror.serviceName,
-          appointmentDate: mirror.appointmentDate,
-          appointmentTime: mirror.appointmentTime,
-          appointmentStatus: mirror.appointmentStatus,
-          smsBody: mirror.smsBody,
-          emailSubject: mirror.emailSubject,
-          emailBody: mirror.emailBody,
-          language: lang,
-        })
-        enqueueThankYouAfterVisitNotifications(localMessages)
+        enqueueTransactionalHistoryMirror("thank_you_after_visit", mirror)
       }
       notifyBookingsAndHistoryChanged()
       return true
@@ -478,12 +476,19 @@ export async function updateAppointmentStatus(
     if (status === "cancelled") {
       const apiResult = await fetchCancelBookingByCompany(appointmentId, lang, true)
       if (!apiResult.ok) return false
+      const mirror = apiResult.cancellationHistoryMirror
+      if (mirror) {
+        enqueueTransactionalHistoryMirror("booking_cancelled_by_company", mirror)
+      }
       notifyBookingsAndHistoryChanged()
       return true
     }
 
     if (NOTIFY_BEFORE_STATUS_UPDATE.includes(status)) {
-      await postBookingStatusNotify(appointmentId, status)
+      const mirror = await postBookingStatusNotify(appointmentId, status, lang)
+      if (status === "no_show" && mirror) {
+        enqueueTransactionalHistoryMirror("no_show_follow_up", mirror)
+      }
     }
     const r = await updateBookingStatus(client, bid, rawSb, status, {
       lastUpdatedBy: options.lastUpdatedBy,

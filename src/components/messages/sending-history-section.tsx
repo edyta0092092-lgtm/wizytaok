@@ -19,7 +19,13 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import {
+  emptyPreviewBookingInfo,
+  mergePreviewBookingInfo,
+  resolvePreviewBookingInfo,
+  type PreviewBookingInfo,
+} from "@/lib/messages/preview-booking-info"
+import { getCachedMergedAppointments, mergedAppointmentsCacheKey } from "@/lib/appointments/merged-appointments-cache"
 import { normalizePublicSlug } from "@/lib/business/slug"
 import { getNotificationMessages } from "@/lib/notifications/notifications"
 import { reminderLogTypeFromKind } from "@/lib/notifications/reminder-notification-log"
@@ -117,6 +123,8 @@ type PlannedReminderRow = {
   client_email: string | null
   appointment_date: string
   appointment_time: string
+  service_name?: string | null
+  status?: string | null
   first_reminder_due_at: string | null
   first_reminder_sent_at: string | null
   first_reminder_status: string | null
@@ -171,21 +179,6 @@ async function loadAppointmentReminderQueueRows(
     .eq("business_id", businessId)
   if (error || !data) return []
   return data as AppointmentReminderQueueRow[]
-}
-
-type PreviewBookingInfo = {
-  id: string
-  clientName: string
-  serviceName: string
-  appointmentDate: string
-  appointmentTime: string
-  status: string
-  createdAt: string | null
-  confirmedAt: string | null
-  updatedAt: string | null
-  lastStatusChangeSource: string | null
-  confirmationToken: string | null
-  staffName: string | null
 }
 
 type PreviewBusinessInfo = {
@@ -264,7 +257,7 @@ async function loadSentReminderHistoryRows(
   const { data: historyData, error: historyErr } = await client
     .from("bookings")
     .select(
-      "id,client_name,client_phone,client_email,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
+      "id,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
     )
     .eq("business_id", businessId)
     .or("first_reminder_sent_at.not.is.null,second_reminder_sent_at.not.is.null")
@@ -280,7 +273,7 @@ async function loadSentReminderHistoryRows(
   const { data: legacyHistory, error: legacyHistoryErr } = await client
     .from("bookings")
     .select(
-      "id,client_name,client_phone,client_email,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
+      "id,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
     )
     .eq("business_id", businessId)
     .not("reminder_sent_at", "is", null)
@@ -358,73 +351,39 @@ function mergeLogRowsWithQueueHistory(
   return merged
 }
 
-function mapPreviewBookingRow(
-  bookingData: Record<string, unknown>,
-  bookingId: string,
-): PreviewBookingInfo {
-  return {
-    id: String(bookingData.id ?? bookingId),
-    clientName:
-      typeof bookingData.client_name === "string" ? bookingData.client_name.trim() : "",
-    serviceName:
-      typeof bookingData.service_name === "string" ? bookingData.service_name.trim() : "",
-    appointmentDate:
-      typeof bookingData.appointment_date === "string"
-        ? String(bookingData.appointment_date).slice(0, 10)
-        : "",
-    appointmentTime:
-      typeof bookingData.appointment_time === "string"
-        ? String(bookingData.appointment_time).slice(0, 5)
-        : "",
-    status: typeof bookingData.status === "string" ? bookingData.status.trim() : "",
-    createdAt: typeof bookingData.created_at === "string" ? bookingData.created_at : null,
-    confirmedAt: typeof bookingData.confirmed_at === "string" ? bookingData.confirmed_at : null,
-    updatedAt: typeof bookingData.updated_at === "string" ? bookingData.updated_at : null,
-    lastStatusChangeSource:
-      typeof bookingData.last_status_change_source === "string"
-        ? bookingData.last_status_change_source.trim()
-        : null,
-    confirmationToken:
-      typeof bookingData.confirmation_token === "string"
-        ? bookingData.confirmation_token.trim()
-        : null,
-    staffName:
-      typeof bookingData.staff_name === "string" ? bookingData.staff_name.trim() : null,
-  }
-}
-
-function resolvePreviewBookingUuid(bookingId: string): string | null {
-  return resolveSupabaseBookingRowUuidFromUiId(bookingId.trim())
-}
-
-async function loadPreviewBookingInfo(
-  client: NonNullable<ReturnType<typeof getBrowserClient>>,
-  bookingId: string,
-): Promise<PreviewBookingInfo | null> {
-  const bookingUuid = resolvePreviewBookingUuid(bookingId)
-  if (!bookingUuid) return null
-
-  const selects = [
-    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,updated_at,last_status_change_source,confirmation_token,staff_name",
-    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,confirmation_token,staff_name",
-    "id,client_name,service_name,appointment_date,appointment_time,status,created_at,staff_name",
-  ]
-
-  for (const select of selects) {
-    const { data, error } = await client
-      .from("bookings")
-      .select(select)
-      .eq("id", bookingUuid)
-      .maybeSingle()
-
-    if (!error && data) {
-      return mapPreviewBookingRow(data as unknown as Record<string, unknown>, bookingUuid)
-    }
-    if (!isMissingColumnInBookingsQuery(error?.message)) {
-      break
+function previewPartialFromTarget(target: PreviewTarget): Partial<PreviewBookingInfo> | null {
+  if (target.kind === "local") {
+    const m = target.msg
+    return {
+      id: m.bookingId,
+      clientName: m.recipientName?.trim() || "",
+      serviceName: m.relatedServiceName?.trim() || "",
+      appointmentDate: m.relatedAppointmentDate?.trim()?.slice(0, 10) || "",
+      appointmentTime: m.relatedAppointmentTime?.trim()?.slice(0, 5) || "",
+      status: m.relatedAppointmentStatus?.trim() || "",
     }
   }
-
+  if (
+    target.kind === "planned" ||
+    target.kind === "reminderOutcome" ||
+    target.kind === "plannedCustom"
+  ) {
+    const row = target.row
+    return {
+      id: row.id,
+      clientName: row.client_name?.trim() || "",
+      serviceName: row.service_name?.trim() || "",
+      appointmentDate: String(row.appointment_date ?? "").slice(0, 10),
+      appointmentTime: String(row.appointment_time ?? "").slice(0, 5),
+      status: String(row.status ?? "").trim(),
+    }
+  }
+  if (target.kind === "customSend") {
+    return { id: target.row.appointment_id }
+  }
+  if (target.kind === "db" && target.row.booking_id) {
+    return { id: target.row.booking_id }
+  }
   return null
 }
 
@@ -1349,7 +1308,7 @@ export function SendingHistorySection() {
       const { data: planData, error: planErr } = await client
         .from("bookings")
         .select(
-          "id,client_name,client_phone,client_email,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
+          "id,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,first_reminder_due_at,first_reminder_sent_at,first_reminder_status,second_reminder_due_at,second_reminder_sent_at,second_reminder_status,status"
         )
         .eq("business_id", bid)
         .in("status", ["booked", "pending", "confirmed"])
@@ -1362,7 +1321,7 @@ export function SendingHistorySection() {
         const { data: legacyPlanData, error: legacyPlanErr } = await client
           .from("bookings")
           .select(
-            "id,client_name,client_phone,client_email,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
+            "id,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,reminder_sent_at,reminder_status,status"
           )
           .eq("business_id", bid)
           .in("status", ["booked", "pending", "confirmed"])
@@ -1376,7 +1335,7 @@ export function SendingHistorySection() {
       if (plannedError && isMissingColumnInBookingsQuery(plannedError.message)) {
         const { data: minimalPlanData, error: minimalPlanErr } = await client
           .from("bookings")
-          .select("id,client_name,client_phone,client_email,appointment_date,appointment_time,status")
+          .select("id,client_name,client_phone,client_email,service_name,appointment_date,appointment_time,status")
           .eq("business_id", bid)
           .in("status", ["booked", "pending", "confirmed"])
         if (!minimalPlanErr) {
@@ -1659,7 +1618,15 @@ export function SendingHistorySection() {
       }
 
       if (bookingIdForPreview) {
-        bookingInfo = await loadPreviewBookingInfo(client, bookingIdForPreview)
+        const appointmentsCache =
+          getCachedMergedAppointments(mergedAppointmentsCacheKey(bid)) ?? undefined
+        bookingInfo = await resolvePreviewBookingInfo({
+          client,
+          businessId: bid,
+          bookingId: bookingIdForPreview,
+          partial: preview ? previewPartialFromTarget(preview) : null,
+          appointments: appointmentsCache,
+        })
       }
 
       if (cancelled) return
@@ -1696,45 +1663,13 @@ export function SendingHistorySection() {
   }, [preview, bookingIdForPreview, access.businessId, queueByKey, dateFmt, language, t])
 
   const relatedAppointmentInfo = React.useMemo((): PreviewBookingInfo | null => {
-    if (previewBookingInfo) return previewBookingInfo
-    if (preview?.kind === "local") {
-      const m = preview.msg
-      const hasVisitMeta =
-        Boolean(m.relatedAppointmentDate?.trim()) ||
-        Boolean(m.relatedServiceName?.trim()) ||
-        Boolean(m.relatedAppointmentStatus?.trim())
-      if (hasVisitMeta) {
-        return {
-          id: m.bookingId,
-          clientName: m.recipientName?.trim() || "",
-          serviceName: m.relatedServiceName?.trim() || "",
-          appointmentDate: m.relatedAppointmentDate?.trim() || "",
-          appointmentTime: m.relatedAppointmentTime?.trim() || "",
-          status: m.relatedAppointmentStatus?.trim() || "",
-          createdAt: m.createdAt ?? null,
-          confirmedAt: null,
-          updatedAt: null,
-          lastStatusChangeSource: null,
-          confirmationToken: null,
-          staffName: null,
-        }
-      }
+    if (!preview) return null
+    const partial = previewPartialFromTarget(preview)
+    if (previewBookingInfo) {
+      return mergePreviewBookingInfo(partial, previewBookingInfo)
     }
-    if (preview?.kind === "planned" || preview?.kind === "reminderOutcome") {
-      return {
-        id: preview.row.id,
-        clientName: preview.row.client_name?.trim() || "",
-        serviceName: "",
-        appointmentDate: String(preview.row.appointment_date ?? "").slice(0, 10),
-        appointmentTime: String(preview.row.appointment_time ?? "").slice(0, 5),
-        status: "",
-        createdAt: null,
-        confirmedAt: null,
-        updatedAt: null,
-        lastStatusChangeSource: null,
-        confirmationToken: null,
-        staffName: null,
-      }
+    if (partial?.id) {
+      return mergePreviewBookingInfo(emptyPreviewBookingInfo(partial.id), partial)
     }
     return null
   }, [previewBookingInfo, preview])

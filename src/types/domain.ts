@@ -166,6 +166,8 @@ export type NotificationMessageType =
   | "booking_created"
   | "booking_confirmed"
   | "thank_you_after_visit"
+  | "booking_cancelled_by_company"
+  | "no_show_follow_up"
   | "reminder_24h"
   | "first_reminder_24h"
   | "appointment_reminder_24h"
