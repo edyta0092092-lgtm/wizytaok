@@ -105,9 +105,12 @@ export async function POST(req: Request) {
 
   const sendEmail = body.sendEmail !== false
   const language = normalizeLanguage(body.language)
-  let emailResult: { sent: boolean; code?: string; membershipLinked?: boolean } = {
-    sent: false,
-  }
+  let emailResult: {
+    sent: boolean
+    code?: string
+    detail?: string | null
+    membershipLinked?: boolean
+  } = { sent: false }
 
   if (sendEmail && panelOut.invitationToken) {
     const { data: business } = await admin
@@ -116,18 +119,26 @@ export async function POST(req: Request) {
       .eq("id", resolution.businessId)
       .maybeSingle()
 
-    const sendOut = await deliverStaffInvitation({
-      token: panelOut.invitationToken,
-      invitationEmail: invitationEmail.trim().toLowerCase(),
-      businessName: business?.business_name?.trim() || "WizytaOK",
-      role: normalizePanelRole(body.panelMemberRole),
-      inviteeName: staffRow.name?.trim() || undefined,
-      language,
-    })
+    const sendOut = await deliverStaffInvitation(
+      {
+        token: panelOut.invitationToken,
+        invitationEmail: invitationEmail.trim().toLowerCase(),
+        businessName: business?.business_name?.trim() || "WizytaOK",
+        role: normalizePanelRole(body.panelMemberRole),
+        inviteeName: staffRow.name?.trim() || undefined,
+        language,
+        invitationStatus: "pending",
+      },
+      { linkMembership: true, resetPassword: true },
+    )
     if (sendOut.ok) {
       emailResult = { sent: true, membershipLinked: sendOut.membershipLinked }
     } else {
-      emailResult = { sent: false, code: sendOut.code }
+      emailResult = {
+        sent: false,
+        code: sendOut.code,
+        detail: sendOut.error ?? null,
+      }
     }
   }
 

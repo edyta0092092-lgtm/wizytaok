@@ -58,8 +58,8 @@ export async function POST(req: Request) {
   if (!invitation) {
     return NextResponse.json({ ok: false, error: "invitation_not_found" }, { status: 404 })
   }
-  if (invitation.status !== "pending") {
-    return NextResponse.json({ ok: false, error: "invitation_not_pending" }, { status: 409 })
+  if (invitation.status === "cancelled") {
+    return NextResponse.json({ ok: false, error: "invitation_cancelled" }, { status: 409 })
   }
 
   const to = String(invitation.email ?? "").trim().toLowerCase()
@@ -86,23 +86,31 @@ export async function POST(req: Request) {
   const businessName = business?.business_name?.trim() || "WizytaOK"
   const language = normalizeLanguage(body.language)
 
-  const sendResult = await deliverStaffInvitation({
-    token,
-    invitationEmail: to,
-    businessName,
-    role: normalizePanelRole(invitation.role),
-    inviteeName,
-    language,
-  })
+  const sendResult = await deliverStaffInvitation(
+    {
+      token,
+      invitationEmail: to,
+      businessName,
+      role: normalizePanelRole(invitation.role),
+      inviteeName,
+      language,
+      invitationStatus: invitation.status,
+    },
+    {
+      linkMembership: invitation.status === "pending",
+      resetPassword: true,
+    },
+  )
 
   if (!sendResult.ok) {
     return NextResponse.json(
       {
         ok: false,
-        error: sendResult.code,
+        error: sendResult.code ?? "send_failed",
         detail: sendResult.error ?? null,
       },
-      { status: sendResult.code === "not_configured" || sendResult.code === "simulated_dev" ? 503 : 502 },
+      { status:
+        sendResult.code === "not_configured" || sendResult.code === "simulated_dev" ? 503 : 502 },
     )
   }
 
@@ -110,5 +118,6 @@ export async function POST(req: Request) {
     ok: true,
     invitationId: invitation.id,
     messageId: sendResult.messageId ?? null,
+    membershipLinked: sendResult.membershipLinked,
   })
 }

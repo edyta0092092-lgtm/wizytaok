@@ -4,6 +4,11 @@ export type ProvisionInviteeAuthResult =
   | { ok: true; userId: string; email: string; tempPassword: string | null; isNew: boolean }
   | { ok: false; error: string }
 
+export type ProvisionInviteeAuthOptions = {
+  /** Ustaw nowe hasło tymczasowe także dla istniejącego konta (ponowne wysłanie zaproszenia). */
+  resetPasswordForExisting?: boolean
+}
+
 /** Hasło spełniające politykę rejestracji (min. 8 znaków, wielka litera, znak specjalny). */
 export function generateStaffInviteTempPassword(): string {
   const chunk = crypto.randomUUID().replace(/-/g, "").slice(0, 10)
@@ -30,6 +35,7 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
 
 export async function provisionInviteeAuthAccount(
   email: string,
+  options: ProvisionInviteeAuthOptions = {},
 ): Promise<ProvisionInviteeAuthResult> {
   const admin = getServiceRoleClient()
   if (!admin) {
@@ -76,6 +82,26 @@ export async function provisionInviteeAuthAccount(
   const existingId = await findAuthUserIdByEmail(normalized)
   if (!existingId) {
     return { ok: false, error: "user_exists_but_not_found" }
+  }
+
+  if (options.resetPasswordForExisting) {
+    const { error: updateErr } = await admin.auth.admin.updateUserById(existingId, {
+      password: tempPassword,
+      user_metadata: {
+        staff_invite: true,
+        must_change_password: true,
+      },
+    })
+    if (updateErr) {
+      return { ok: false, error: updateErr.message }
+    }
+    return {
+      ok: true,
+      userId: existingId,
+      email: normalized,
+      tempPassword,
+      isNew: false,
+    }
   }
 
   return {
