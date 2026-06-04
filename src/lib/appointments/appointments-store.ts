@@ -354,8 +354,8 @@ function mapAppointmentStatusToManualStatus(
   return null
 }
 
-const NOTIFY_AFTER_STATUS_UPDATE: AppointmentStatus[] = ["confirmed", "completed"]
-const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["cancelled", "no_show"]
+const NOTIFY_AFTER_STATUS_UPDATE: AppointmentStatus[] = ["confirmed"]
+const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["cancelled", "no_show", "completed"]
 
 function readNotifyLanguage(): "pl" | "en" {
   if (typeof window === "undefined") return "pl"
@@ -391,6 +391,7 @@ async function postBookingStatusNotify(
     })
     if (res.ok && typeof window !== "undefined") {
       window.dispatchEvent(new Event("pw-bookings"))
+      window.dispatchEvent(new Event("pw-notification-messages"))
     }
   } catch {
     // fire-and-forget — błąd nie blokuje zapisu statusu
@@ -450,7 +451,7 @@ export async function updateAppointmentStatus(
       invalidateMergedAppointmentsCache()
       window.dispatchEvent(new Event("pw-bookings"))
       if (NOTIFY_AFTER_STATUS_UPDATE.includes(status)) {
-        void postBookingStatusNotify(appointmentId, status)
+        await postBookingStatusNotify(appointmentId, status)
       }
     }
     return r.ok

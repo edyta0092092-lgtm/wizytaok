@@ -8,7 +8,8 @@ import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
-import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import type { NotificationLogUpdatePatch } from "@/lib/notifications/notification-log-update"
+import { persistTransactionalChannelLog } from "@/lib/notifications/transactional-channel-log"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesInsert } from "@/types/database"
 
@@ -160,43 +161,17 @@ async function persistCancelledChannelLog(
   logType: BookingCancelledLogType,
   channel: "sms" | "email",
   recipient: string,
-  patch: {
-    status: TablesInsert<"notification_logs">["status"]
-    subject?: string | null
-    body?: string | null
-    provider?: string | null
-    provider_message_id?: string | null
-    error_message?: string | null
-    sent_at?: string | null
-  },
+  patch: NotificationLogUpdatePatch,
 ): Promise<void> {
-  const result = await insertNotificationLog(
+  await persistTransactionalChannelLog(
     admin,
-    {
-      business_id: booking.business_id,
-      booking_id: booking.id,
-      channel,
-      type: logType,
-      recipient,
-      status: patch.status,
-      subject: patch.subject ?? null,
-      body: patch.body ?? null,
-      provider: patch.provider ?? null,
-      provider_message_id: patch.provider_message_id ?? null,
-      error_message: patch.error_message ?? null,
-      sent_at: patch.sent_at ?? null,
-    },
+    booking,
+    logType,
+    channel,
+    recipient,
+    patch,
     "[booking-cancelled.notify.log]",
   )
-  if (!result.ok) {
-    console.error("[booking-cancelled.notify.log] insert_failed", {
-      booking_id: booking.id,
-      type: logType,
-      channel,
-      message: result.message,
-      code: result.code,
-    })
-  }
 }
 
 function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notification_logs">["status"] {
