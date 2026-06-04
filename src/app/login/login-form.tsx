@@ -36,6 +36,7 @@ export function LoginForm() {
   const postLoginPath = safeInternalRedirect(
     searchParams.get("next") ?? searchParams.get("redirectTo")
   )
+  const inviteTokenFromUrl = searchParams.get("invite")?.trim() ?? ""
   const emailPrefill = searchParams.get("email")?.trim() ?? ""
   const resetStatus = searchParams.get("reset")
   const confirmedStatus = searchParams.get("confirmed")
@@ -135,6 +136,24 @@ export function LoginForm() {
         setError(t("auth.authError"))
         return
       }
+
+      if (inviteTokenFromUrl) {
+        try {
+          await fetch("/api/public/accept-business-invitation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: inviteTokenFromUrl }),
+          })
+        } catch {
+          // fallback: accept-pending-invitations poniżej
+        }
+      }
+      try {
+        await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+      } catch {
+        // brak zaproszenia — normalny flow właściciela
+      }
+
       const { data: profile } = await client
         .from("business_profiles")
         .select("id, subscription_status, stripe_subscription_status")

@@ -138,7 +138,32 @@ async function loadAccessState(): Promise<BusinessAccessState> {
       .eq("user_id", user.id)
       .limit(1)
   }
-  const member = memberQuery.data?.[0]
+  let member = memberQuery.data?.[0]
+  if (!member?.business_id && user.email?.trim()) {
+    try {
+      await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+      let retryQuery = await client
+        .from("business_members")
+        .select("business_id, role, display_name, email")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+      if (
+        retryQuery.error?.message &&
+        retryQuery.error.message.toLowerCase().includes("is_active") &&
+        retryQuery.error.message.toLowerCase().includes("does not exist")
+      ) {
+        retryQuery = await client
+          .from("business_members")
+          .select("business_id, role, display_name, email")
+          .eq("user_id", user.id)
+          .limit(1)
+      }
+      member = retryQuery.data?.[0]
+    } catch {
+      // ignore — pokażemy setup tylko gdy nadal brak członkostwa
+    }
+  }
   if (!member?.business_id) {
     return {
       ready: true,

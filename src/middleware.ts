@@ -126,7 +126,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isOperationalPanelPath(pathname)) {
-    const access = await resolveBusinessPanelAccess(supabase, user.id)
+    const access = await resolveBusinessPanelAccess(supabase, user.id, user.email)
     if (!access.hasActiveAccess) {
       return redirectToBillingRecovery(request, billingRecoveryRedirectPath(access))
     }
@@ -142,7 +142,7 @@ export async function middleware(request: NextRequest) {
       isSettingsStripeReturnPath(searchParams) ||
       isSettingsBillingRecoveryPath(searchParams)
     if (!settingsExempt) {
-      const access = await resolveBusinessPanelAccess(supabase, user.id)
+      const access = await resolveBusinessPanelAccess(supabase, user.id, user.email)
       if (!access.hasActiveAccess && !access.canManageBilling) {
         return redirectToBillingRecovery(request, "/subscription-required")
       }

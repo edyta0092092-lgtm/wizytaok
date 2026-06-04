@@ -38,8 +38,14 @@ export async function deliverStaffInvitation(
 ): Promise<DeliverStaffInvitationResult> {
   const email = input.invitationEmail.trim().toLowerCase()
   const origin = getPublicAppOrigin()
-  const acceptInviteUrl = `${origin}/accept-invite/${encodeURIComponent(input.token.trim())}`
-  const loginUrl = `${origin}/login?next=${encodeURIComponent("/dashboard")}&email=${encodeURIComponent(email)}`
+  const token = input.token.trim()
+  const acceptInviteUrl = `${origin}/accept-invite/${encodeURIComponent(token)}`
+  const loginParams = new URLSearchParams({
+    next: "/dashboard",
+    email,
+    invite: token,
+  })
+  const loginUrl = `${origin}/login?${loginParams.toString()}`
   const linkMembership =
     options.linkMembership ?? (input.invitationStatus === "pending" || !input.invitationStatus)
   const resetPassword = options.resetPassword ?? true

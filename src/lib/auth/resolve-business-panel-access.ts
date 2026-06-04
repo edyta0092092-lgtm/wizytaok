@@ -10,6 +10,7 @@ import {
   normalizeBusinessMemberPanelRole,
   type PanelRole,
 } from "@/lib/auth/permissions"
+import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
 import type { Database } from "@/types/database"
 
 export type BusinessPanelAccess = {
@@ -48,6 +49,7 @@ async function loadProfileSubscription(
 export async function resolveBusinessPanelAccess(
   supabase: SupabaseClient<Database>,
   userId: string,
+  userEmail?: string | null,
 ): Promise<BusinessPanelAccess> {
   const empty: BusinessPanelAccess = {
     businessId: null,
@@ -107,7 +109,28 @@ export async function resolveBusinessPanelAccess(
       .limit(1)
   }
 
-  const member = memberQuery.data?.[0]
+  let member = memberQuery.data?.[0]
+  if (!member?.business_id && userEmail?.trim()) {
+    await acceptPendingInvitationsForUser(userId, userEmail)
+    let retryQuery = await supabase
+      .from("business_members")
+      .select("business_id, role")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .limit(1)
+    if (
+      retryQuery.error?.message &&
+      retryQuery.error.message.toLowerCase().includes("is_active") &&
+      retryQuery.error.message.toLowerCase().includes("does not exist")
+    ) {
+      retryQuery = await supabase
+        .from("business_members")
+        .select("business_id, role")
+        .eq("user_id", userId)
+        .limit(1)
+    }
+    member = retryQuery.data?.[0]
+  }
   if (!member?.business_id) {
     return empty
   }

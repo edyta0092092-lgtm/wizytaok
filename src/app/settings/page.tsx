@@ -509,6 +509,11 @@ export default function SettingsPage() {
 
   const showOAuthSetupOnly = oauthBusinessSetup && ready && !businessId
 
+  React.useEffect(() => {
+    if (!oauthBusinessSetup || !ready || businessId) return
+    void refresh()
+  }, [oauthBusinessSetup, ready, businessId, refresh])
+
   if (showOAuthSetupOnly) {
     return (
       <AppShell

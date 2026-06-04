@@ -8,9 +8,36 @@ import {
 import { evaluateTrialStartEligibility } from "@/lib/billing/trial-eligibility-server"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
 import type { Database } from "@/types/database"
 
 const BUSINESS_SETUP_PATH = "/settings?setup=business"
+
+async function readMemberBusinessId(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+): Promise<string | null> {
+  let memberQuery = await supabase
+    .from("business_members")
+    .select("business_id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+
+  if (
+    memberQuery.error?.message &&
+    memberQuery.error.message.toLowerCase().includes("is_active") &&
+    memberQuery.error.message.toLowerCase().includes("does not exist")
+  ) {
+    memberQuery = await supabase
+      .from("business_members")
+      .select("business_id")
+      .eq("user_id", userId)
+      .limit(1)
+  }
+
+  return memberQuery.data?.[0]?.business_id ?? null
+}
 
 function userWantsTrial(user: User): boolean {
   const raw = user.user_metadata?.trial_intent
@@ -81,26 +108,11 @@ export async function resolvePostAuthRedirect(
     return "/dashboard"
   }
 
-  let memberQuery = await supabase
-    .from("business_members")
-    .select("business_id")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-
-  if (
-    memberQuery.error?.message &&
-    memberQuery.error.message.toLowerCase().includes("is_active") &&
-    memberQuery.error.message.toLowerCase().includes("does not exist")
-  ) {
-    memberQuery = await supabase
-      .from("business_members")
-      .select("business_id")
-      .eq("user_id", user.id)
-      .limit(1)
+  let memberBusinessId = await readMemberBusinessId(supabase, user.id)
+  if (!memberBusinessId) {
+    await acceptPendingInvitationsForUser(user.id, email)
+    memberBusinessId = await readMemberBusinessId(supabase, user.id)
   }
-
-  const memberBusinessId = memberQuery.data?.[0]?.business_id
   if (memberBusinessId) {
     return requestedNext ?? "/dashboard"
   }
