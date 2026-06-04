@@ -1,6 +1,13 @@
 -- Uruchom w SQL Editor projektu z NEXT_PUBLIC_SUPABASE_URL aplikacji.
 -- Błąd 086 „relation business_invitations does not exist” = brak tabeli w tej bazie.
+-- Błąd „business_members.staff_member_id does not exist” → uruchom też 088.
 -- Ten plik tworzy tabelę (jeśli brakuje), potem normalizuje e-maile jak 086.
+
+alter table public.business_members
+  add column if not exists staff_member_id uuid references public.staff_members (id) on delete set null;
+
+create index if not exists business_members_staff_member_id_idx
+  on public.business_members (staff_member_id);
 
 create table if not exists public.business_invitations (
   id uuid primary key default gen_random_uuid (),
