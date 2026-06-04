@@ -23,10 +23,7 @@ import {
   setCachedMergedAppointments,
 } from "@/lib/appointments/merged-appointments-cache"
 import { fetchCompleteBookingByCompany } from "@/lib/bookings/complete-booking-by-company-client"
-import {
-  createTransactionalHistoryMessages,
-  enqueueTransactionalHistoryNotifications,
-} from "@/lib/notifications/notifications"
+import { enqueueTransactionalHistoryMirror } from "@/lib/notifications/notifications"
 import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import {
@@ -379,14 +376,6 @@ function readNotifyLanguage(): "pl" | "en" {
   } catch {
     return "pl"
   }
-}
-
-function enqueueTransactionalHistoryMirror(
-  messageType: "thank_you_after_visit" | "booking_cancelled_by_company" | "no_show_follow_up",
-  mirror: TransactionalHistoryMirror,
-): void {
-  const messages = createTransactionalHistoryMessages({ messageType, mirror })
-  enqueueTransactionalHistoryNotifications(messages)
 }
 
 async function postBookingStatusNotify(

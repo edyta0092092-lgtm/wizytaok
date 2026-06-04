@@ -273,11 +273,7 @@ export async function notifyBookingCancelledByCompany(args: {
     sendEmail,
   })
 
-  if (
-    admin &&
-    (result.notice === "sent" || result.notice === "queued") &&
-    !(await hasCancellationHistoryLog(admin, booking.id))
-  ) {
+  if (admin && !(await hasCancellationHistoryLog(admin, booking.id))) {
     await ensureCancellationLogsInHistory({ booking, business, language })
   }
 

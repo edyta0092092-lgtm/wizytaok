@@ -3,6 +3,10 @@ import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appoin
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
 import { updatePublicBooking, unwrapPublicAppointmentId } from "@/lib/bookings/public-bookings"
+import {
+  enqueueTransactionalHistoryMirror,
+  notifyNotificationMessagesChanged,
+} from "@/lib/notifications/notifications"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { TablesUpdate } from "@/types/database"
 
@@ -14,12 +18,23 @@ import type { TablesUpdate } from "@/types/database"
 function notifyBookingsChanged(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("pw-bookings"))
+    notifyNotificationMessagesChanged()
   }
+}
+
+function applyCancellationHistoryMirror(
+  apiResult: Awaited<ReturnType<typeof fetchCancelBookingByCompany>>,
+): void {
+  if (!apiResult.ok || !apiResult.cancellationHistoryMirror) return
+  enqueueTransactionalHistoryMirror(
+    "booking_cancelled_by_company",
+    apiResult.cancellationHistoryMirror,
+  )
 }
 
 export async function cancelAppointmentFromRemove(
   appointmentId: string,
-  language: "en" | "pl",
+  language: "pl" | "en",
   notifyClient = false,
 ): Promise<{ ok: boolean; error?: string; data?: unknown; notice?: string }> {
   const tid = typeof appointmentId === "string" ? appointmentId.trim() : ""
@@ -61,6 +76,7 @@ export async function cancelAppointmentFromRemove(
   if (bookingUuid) {
     if (notifyClient) {
       const apiResult = await fetchCancelBookingByCompany(tid, language, true)
+      applyCancellationHistoryMirror(apiResult)
       notifyBookingsChanged()
       if (apiResult.ok) {
         return { ok: true, notice: apiResult.notice }
@@ -137,11 +153,12 @@ export async function cancelAppointmentFromRemove(
     }
 
     const apiResult = await fetchCancelBookingByCompany(tid, language, notifyClient)
+    applyCancellationHistoryMirror(apiResult)
     if (!apiResult.ok) {
       return { ok: false, error: apiResult.errorMessage }
     }
     notifyBookingsChanged()
-    return { ok: true }
+    return { ok: true, notice: apiResult.notice }
   }
 
   const mockOk = await updateAppointmentStatus(tid, "cancelled", {

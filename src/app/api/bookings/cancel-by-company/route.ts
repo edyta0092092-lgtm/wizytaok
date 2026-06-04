@@ -197,20 +197,17 @@ export async function POST(req: Request) {
         ) {
           await ensureCancellationLogsInHistory(notifyArgs)
         }
-        if (
-          admin &&
-          (notifyResult.notice === "sent" || notifyResult.notice === "queued") &&
-          profile.slug?.trim()
-        ) {
+        if (admin && (notifyResult.notice === "sent" || notifyResult.notice === "queued")) {
           const content = await buildBookingCancelledNotifyContent(
             admin,
             updatedBooking,
             profile,
             language,
           )
+          const slugForMirror = profile.slug?.trim() ?? ""
           cancellationHistoryMirror = {
             bookingUiId: `${SB_BOOKING_PREFIX}${bookingUuid}`,
-            businessSlug: profile.slug.trim(),
+            businessSlug: slugForMirror,
             clientName: booking.client_name?.trim() || "",
             clientPhone: booking.client_phone,
             clientEmail: booking.client_email,

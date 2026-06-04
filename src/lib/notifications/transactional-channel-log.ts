@@ -26,8 +26,12 @@ export async function persistTransactionalChannelLog(
   logTag: string,
 ): Promise<boolean> {
   const status = String(patch.status ?? "").trim().toLowerCase()
+  const hasContent = Boolean(patch.body?.trim()) || Boolean(recipient.trim())
+  const persistAsSent =
+    status === "sent" ||
+    (hasContent && status !== "failed" && status !== "not_configured")
 
-  if (status === "sent") {
+  if (persistAsSent) {
     const row = toNotificationLogInsertRow({
       business_id: booking.business_id,
       booking_id: booking.id,

@@ -319,6 +319,17 @@ export function enqueueTransactionalHistoryNotifications(messages: NotificationM
   saveNotificationMessagesBatch(messages)
 }
 
+export function enqueueTransactionalHistoryMirror(
+  messageType: Extract<
+    NotificationMessageType,
+    "thank_you_after_visit" | "booking_cancelled_by_company" | "no_show_follow_up"
+  >,
+  mirror: TransactionalHistoryMirror,
+): void {
+  const messages = createTransactionalHistoryMessages({ messageType, mirror })
+  enqueueTransactionalHistoryNotifications(messages)
+}
+
 export function enqueueThankYouAfterVisitNotifications(messages: NotificationMessage[]): void {
   enqueueTransactionalHistoryNotifications(messages)
 }

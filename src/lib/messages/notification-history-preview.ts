@@ -98,6 +98,7 @@ function canonicalNotificationType(raw: string): string {
       "company_cancelled_booking",
       "booking_cancelled_by_client",
       "client_cancelled_booking",
+      "booking_cancelled",
     ].includes(type)
   ) {
     return "booking_cancelled_by_company"
