@@ -145,6 +145,7 @@ async function insertNotificationLog(
     error?: string | null
     error_message?: string | null
     sent_at: string | null
+    timing_minutes_before?: number | null
   }
 ) {
   const result = await persistNotificationLog(admin, { ...row, type: row.type }, "[reminders-v2.notify.log]")
@@ -216,6 +217,7 @@ async function processSingleReminder(
   })
   const templateType = reminderTemplateType(kind)
   const runtime = await getTemplateRuntime(admin, row.business_id, templateType)
+  const timingMinutesBefore = runtime.timingMinutesBefore ?? defaultTimingMinutes(kind)
   const staffDisplayName = getStaffDisplayName({
     name: row.staff_members?.name ?? row.staff_name ?? "",
   })
@@ -277,6 +279,7 @@ async function processSingleReminder(
       provider_message_id: null,
       error: "Missing client contact details",
       sent_at: nowIso,
+      timing_minutes_before: timingMinutesBefore,
     })
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "Missing client contact details", false)
     return "skipped"
@@ -299,6 +302,7 @@ async function processSingleReminder(
       provider_message_id: null,
       error: "template_disabled",
       sent_at: nowIso,
+      timing_minutes_before: timingMinutesBefore,
     })
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "template_disabled", false)
     return "skipped"
@@ -325,6 +329,7 @@ async function processSingleReminder(
       provider_message_id: null,
       error: "booking_cancelled",
       sent_at: nowIso,
+      timing_minutes_before: timingMinutesBefore,
     })
     await updateBookingReminderStatus(admin, row, kind, "skipped", nowIso, "booking_cancelled", false)
     return "skipped"
@@ -367,6 +372,7 @@ async function processSingleReminder(
       provider_message_id: res.ok ? res.messageId ?? null : null,
       error: res.ok ? null : res.error ?? res.code,
       sent_at: nowIso,
+      timing_minutes_before: timingMinutesBefore,
     })
     }
   }
@@ -400,6 +406,7 @@ async function processSingleReminder(
       provider_message_id: res.ok ? res.messageId ?? null : null,
       error: res.ok ? null : res.error ?? res.code,
       sent_at: nowIso,
+      timing_minutes_before: timingMinutesBefore,
     })
     }
   }

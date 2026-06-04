@@ -601,37 +601,37 @@ export const dictionaries = {
       todoAllClear: "Wszystko pod kontrolą.",
       tipItems: {
         "0":
-          "W zakładce Wizyty użyj filtru „Wymaga reakcji”, żeby zobaczyć wizyty oczekujące na decyzję firmy.",
+          "W zakładce Wizyty użyj filtru „Wymaga reakcji”, aby zobaczyć wizyty po terminie, które czekają na oznaczenie jako zrealizowane lub nieobecność.",
         "1":
-          "Uzupełnij telefon i e-mail klienta, żeby automatyczne przypomnienia mogły działać poprawnie.",
+          "Uzupełnij telefon i e-mail klienta przy wizycie — bez kontaktu automatyczne SMS-y i maile z przypomnieniami nie zostaną wysłane.",
         "2":
-          "Dni wolne i wyjątki pomagają uniknąć rezerwacji w święta lub urlopy.",
+          "W Dostępności dodaj dni wolne, święta i wyjątki — wtedy klienci nie zarezerwują terminu, gdy firma nie pracuje.",
         "3":
-          "Przypisz usługi do osób z zespołu, żeby klient mógł wybrać właściwego specjalistę.",
+          "W Zespole przypisz usługi do konkretnych osób — klient na stronie rezerwacji zobaczy tylko terminy u właściwego specjalisty.",
         "4":
-          "Jeśli usługa ma inne godziny niż firma, ustaw Godziny usługi w zakładce Usługi.",
+          "Jeśli usługa ma inne godziny niż firma, wejdź w Usługi, wybierz usługę i ustaw Godziny usługi zamiast godzin całej firmy.",
         "5":
-          "Regularnie sprawdzaj Błędy przypomnień, jeśli SMS lub e-mail nie zostały wysłane.",
+          "W Wiadomościach sprawdzaj historię wysyłek i zakładkę z błędami — tam widać, czy SMS lub e-mail z przypomnieniem nie doszedł.",
         "6":
-          "Zajęte terminy powinny znikać z publicznej strony rezerwacji.",
+          "Potwierdzone i oczekujące wizyty blokują sloty — zajęty termin znika ze strony rezerwacji online dla innych klientów.",
         "7":
-          "Dodaj NIP tylko wtedy, gdy firma go używa - pole może pozostać puste.",
+          "NIP w ustawieniach firmy jest opcjonalny — uzupełnij go tylko wtedy, gdy firma faktycznie go podaje na dokumentach.",
         "8":
-          "Eksport CSV otworzysz w Excelu lub Google Sheets.",
+          "Listę wizyt lub klientów możesz wyeksportować do CSV i otworzyć w Excelu albo Google Sheets do dalszej analizy.",
         "9":
-          "Pracownik powinien mieć własne konto i ograniczony dostęp do ustawień firmy.",
+          "Każdy pracownik powinien mieć osobne konto — możesz ograniczyć dostęp do ustawień firmy i zostawić mu tylko wizyty oraz grafik.",
         "10":
-          "Jeśli często widzisz „Brak historii wysyłek”, sprawdź czy szablony i kanały przypomnień są aktywne.",
+          "Gdy w historii wysyłek widzisz puste wpisy lub błędy, sprawdź w Wiadomościach, czy szablony są włączone i czy wybrano kanał SMS lub e-mail.",
         "11":
-          "W Grafiku kliknij dzień, żeby szybko podejrzeć telefon klienta i notatki bez przechodzenia do innych widoków.",
+          "W Grafiku kliknij dzień, aby od razu zobaczyć listę wizyt z telefonem klienta i notatkami — bez przechodzenia do osobnej zakładki.",
         "12":
-          "Dla usług o dużej liczbie nieobecności ustaw krótsze drugie przypomnienie, np. 60 lub 30 minut przed wizytą.",
+          "Przy częstych nieobecnościach skróć drugie przypomnienie w szablonach Wiadomości, np. do 60 lub 30 minut przed wizytą.",
         "13":
-          "Po każdej zmianie statusu warto dodać notatkę — ułatwia to zespołowi podejmowanie decyzji przy kolejnych wizytach.",
+          "Po zmianie statusu wizyty dodaj krótką notatkę — kolejna osoba w zespole od razu wie, co ustalono z klientem.",
         "14":
-          "W Klientach regularnie uzupełniaj e-mail i telefon — poprawia to skuteczność potwierdzeń i zmniejsza liczbę no-show.",
+          "W Klientach trzymaj aktualny telefon i e-mail — ułatwia to wysyłkę przypomnień i zmniejsza ryzyko nieobecności.",
         "15":
-          "Jeśli pracujesz w zespole, ustaw przypisanie usług do konkretnych osób, żeby uniknąć konfliktów terminów.",
+          "Przy kilku osobach w zespole przypisz każdej usługi osobno — unikniesz podwójnych rezerwacji tego samego terminu.",
       },
       quickAddHint:
         "Wpisz termin i od razu widzisz status.",
@@ -1919,6 +1919,7 @@ Pozdrawiamy,
       cardTitle: "Konfiguracja firmy",
       cardLead: "Dokończ setup, aby przyjmować rezerwacje online.",
       continueCta: "Kontynuuj konfigurację",
+      startFromBeginningCta: "Rozpocznij od nowa",
       progressLabel: "Postęp konfiguracji",
       loading: "Sprawdzamy postęp…",
       allDone: "Konfiguracja ukończona",
@@ -2116,94 +2117,161 @@ Pozdrawiamy,
       helpCenterSubtitle: "To dokumentacja produktu — szybki setup znajdziesz na planie dnia.",
       helpCenterBadge: "Pomoc",
       helpCenterSetupNote:
-        "Pierwsza konfiguracja (godziny, zespół, usługa, link rezerwacji) to osobny kreator na planie dnia — przycisk „Kontynuuj konfigurację”. Katalog klientów nie jest wymagany na start.",
+        "Szybki start (kreator 6 kroków) jest na planie dnia — przycisk „Kontynuuj konfigurację”. Poniżej znajdziesz pełny opis każdej funkcji panelu.",
       catAll: "Wszystko",
       catSchedule: "Grafik i dostępność",
-      catScheduleDesc: "Godziny firmy, wyjątki, grafik miesięczny i grafik osób.",
+      catScheduleDesc:
+        "Kiedy firma i osoby pracują, wyjątki kalendarza oraz jak liczone są wolne terminy.",
       catAppointments: "Wizyty",
-      catAppointmentsDesc: "Lista wizyt, statusy, anulowanie i prośby klientów.",
+      catAppointmentsDesc:
+        "Plan dnia, lista wizyt, statusy, filtr Wymaga działania i obsługa próśb klientów.",
       catNotifications: "Powiadomienia",
-      catNotificationsDesc: "Przypomnienia SMS/e-mail, szablony i historia wysyłek.",
+      catNotificationsDesc:
+        "Szablony SMS/e-mail, własne wiadomości, ustawienia kanału i historia wysyłek.",
       catBooking: "Rezerwacje online",
-      catBookingDesc: "Publiczny link, strona rezerwacji i strona klienta /confirm.",
+      catBookingDesc:
+        "Link dla klientów, przebieg rezerwacji na stronie publicznej i strona /confirm.",
       catBilling: "Płatności",
-      catBillingDesc: "Trial, subskrypcja i Stripe.",
+      catBillingDesc: "Trial, subskrypcja miesięczna i dostęp do panelu (Stripe).",
       catTeam: "Zespół i usługi",
-      catTeamDesc: "Osoby, przypisane usługi i zaproszenia do panelu.",
+      catTeamDesc: "Oferta usług, przypisanie do osób, zaproszenia i role w panelu.",
       catOther: "Pozostałe",
-      catOtherDesc: "Ustawienia firmy, klienci, eksport i pomoc.",
+      catOtherDesc: "Pierwsza konfiguracja, statystyki, ustawienia firmy, klienci i pomoc.",
       hcAvailTitle: "Godziny pracy firmy",
-      hcAvailLead: "Tu ustawiasz standardowy tydzień — które dni firma przyjmuje klientów i w jakich godzinach.",
+      hcAvailLead:
+        "To podstawa kalendarza rezerwacji. Określasz, w które dni tygodnia firma przyjmuje klientów i w jakich godzinach. Bez zapisanych godzin klienci nie zobaczą wolnych terminów.",
       hcAvailSteps:
-        "1. Otwórz Dostępność.\n2. Włącz dni tygodnia.\n3. Ustaw godziny od–do.\n4. Kliknij Zapisz dostępność.",
-      hcAvailExTitle: "Dni wolne i wyjątki",
+        "1. Menu po lewej → Dostępność.\n2. Włącz dni tygodnia, w których pracujecie.\n3. Dla każdego dnia ustaw godziny od i do.\n4. Kliknij Zapisz dostępność.\n5. Sprawdź publiczny link rezerwacji — kalendarz powinien pokazywać tylko te dni.",
+      hcAvailTip:
+        "Godziny firmy możesz nadpisać dla pojedynczej usługi (Usługi → Godziny usługi) albo dla osoby (Zespół → grafik osoby).",
+      hcAvailExTitle: "Dni wolne i wyjątki firmy",
+      hcAvailExLead:
+        "Używaj wyjątków, gdy w konkretnym dniu firma nie pracuje standardowo — święto, urlop całej firmy albo krótszy dzień pracy.",
       hcAvailExSteps:
-        "1. W sekcji Dni wolne dodaj datę.\n2. Wybierz: cały dzień nieczynny albo specjalne godziny.\n3. Zapisz wyjątek — kalendarz rezerwacji i grafik to uwzględnią.",
+        "1. Dostępność → sekcja Dni wolne i wyjątki.\n2. Kliknij Dodaj dzień wolny.\n3. Wybierz datę.\n4. Ustaw Cały dzień nieczynny albo Specjalne godziny.\n5. Opcjonalnie wpisz powód (np. święto).\n6. Zapisz — termin zniknie ze strony rezerwacji i będzie widoczny w grafiku.",
       hcStaffScheduleTitle: "Grafik i wyjątki osoby",
       hcStaffScheduleLead:
-        "Każda osoba w zespole może mieć własny grafik oraz dni wolne lub specjalne godziny (urlopy, szkolenia).",
+        "Gdy kilka osób wykonuje usługi, każda może mieć inny tydzień pracy niż firma oraz własne urlopy. Klient widzi tylko terminy u wybranej osoby.",
       hcStaffScheduleSteps:
-        "1. Zespół → wybierz osobę.\n2. Zakładka Grafik — godziny lub „jak firma”.\n3. Zakładka Wyjątki — dodaj dzień wolny.\n4. Zapisz.",
+        "1. Zespół → wybierz osobę z listy.\n2. Zakładka Grafik: własne godziny albo „jak firma”.\n3. Zakładka Wyjątki: dodaj dzień wolny lub specjalne godziny.\n4. Zapisz.\n5. W Usługach zaznacz, które usługi wykonuje ta osoba — inaczej nie pojawi się przy rezerwacji.",
+      hcSlotsTitle: "Zajęte terminy i przerwy",
+      hcSlotsLead:
+        "System układa wizyty tak, żeby nie nakładały się na siebie. Wolny slot to taki, który spełnia godziny firmy, usługi, osoby oraz nie koliduje z inną wizytą.",
+      hcSlotsBlocking:
+        "Blokują termin (nie da się zarezerwować): Potwierdzona — w tym nowe rezerwacje online zapisane w bazie jako booked/pending i wyświetlane jako Potwierdzona.",
+      hcSlotsNonBlocking:
+        "Nie blokują terminu: Anulowana, Nieobecność klienta, Zrealizowana — slot wraca do puli.",
+      hcSlotsBreakBody:
+        "Przerwa między wizytami: w Ustawieniach (domyślna przerwa firmy) i przy każdej usłudze (czas trwania + przerwa). Po wizycie 60 min + przerwa 15 min następny wolny slot zacznie się o 75 min od startu poprzedniej.",
+      hcDayplanBullets:
+        "- lista wizyt na dziś ze szybką zmianą statusu\n- liczniki potwierdzonych i anulowanych na dziś\n- karta konfiguracji firmy (jeśli setup nie ukończony)\n- rotujące podpowiedzi z praktycznymi wskazówkami",
+      hcDayplanLead:
+        "Plan dnia to ekran startowy — widzisz, co dzieje się dziś, bez przechodzenia przez całą listę wizyt.",
+      hcDayplanSteps:
+        "1. Menu → Plan dnia.\n2. Przejrzyj wizyty na dziś i zmień status z menu na karcie.\n3. Użyj Dodaj wizytę, gdy wpisujesz termin telefonicznie.\n4. Pełne filtry, Wymaga działania i historia — w zakładce Wizyty.",
+      hcFirstSetupTitle: "Pierwsza konfiguracja (kreator)",
+      hcFirstSetupLead:
+        "Po aktywacji konta na planie dnia pojawia się kreator. Prowadzi przez 6 kroków: godziny, usługa, zespół, przypisanie usługi, link rezerwacji, pierwsza wizyta. Kroki odhaczają się same, gdy dane są już w systemie — nawet jeśli wcześniej pominąłeś krok.",
+      hcFirstSetupSteps:
+        "1. Na planie dnia kliknij Kontynuuj konfigurację (albo Rozpocznij od nowa, jeśli wracasz).\n2. System otworzy właściwą zakładkę i podświetli sekcję do uzupełnienia.\n3. Po każdym kroku wróć do planu dnia lub kontynuuj — postęp aktualizuje się automatycznie.\n4. Gdy wszystkie kroki są zielone, kreator znika; możesz go przywołać z Ustawień → Ponowna konfiguracja.",
+      hcFirstSetupTip:
+        "Katalog klientów nie jest wymagany na start — wystarczy link rezerwacji i jedna usługa z godzinami.",
       hcApptListTitle: "Lista wizyt",
       hcApptListLead:
-        "Wizyty to główne miejsce pracy z terminami. Filtruj po statusie, osobie, kliencie lub usłudze.",
+        "Tu obsługujesz wszystkie terminy: przeszłe i przyszłe. To główne narzędzie po planie dnia, gdy szukasz wizyty po kliencie, usłudze lub statusie.",
       hcApptStatuses:
-        "- Potwierdzona — aktywna wizyta (nowe rezerwacje online i ręczne trafiają tutaj).\n- Zrealizowana — wizyta wykonana.\n- Nieobecność klienta — klient nie przyszedł.\n- Anulowana — wizyta odwołana.",
+        "- Potwierdzona — wizyta jest w kalendarzu (rezerwacja online i ręczna).\n- Zrealizowana — usługa się odbyła.\n- Nieobecność klienta — klient nie przyszedł.\n- Anulowana — wizyta odwołana, termin wolny.\n- Wymaga działania — filtr: minął termin, a status nadal Potwierdzona (trzeba oznaczyć wynik wizyty).",
       hcApptListSteps:
-        "1. Otwórz Wizyty.\n2. Użyj filtrów: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność klienta, Anulowane.\n3. Dodaj wizytę ręcznie przyciskiem u góry.\n4. Odznaka źródła pokazuje rezerwację online lub wpis z panelu.",
-      hcApptStatusMenuTitle: "Zmiana statusu",
-      hcApptStatusMenuLead: "Na karcie wizyty lub w planie dnia użyj menu „Zmień status”.",
+        "1. Menu → Wizyty.\n2. Filtruj: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność, Anulowane lub Wymaga działania.\n3. Użyj wyszukiwania i filtrów osoby / usługi.\n4. Odznaka źródła: Rezerwacja online lub Dodane ręcznie.\n5. Przycisk Dodaj wizytę — nowy termin z panelu.",
+      hcNeedsActionTitle: "Filtr „Wymaga działania”",
+      hcNeedsActionLead:
+        "Po upływie godziny wizyty system oczekuje, że oznaczysz wynik: zrealizowana lub nieobecność. Dopóki tego nie zrobisz, wizyta trafia do filtra Wymaga działania i do statystyk jako „wymaga działania”.",
+      hcNeedsActionBullets:
+        "- dotyczy tylko minionych terminów ze statusem Potwierdzona\n- nie mylić z błędem SMS ani prośbą klienta o zmianę — to osobne sprawy na karcie wizyty\n- po ustawieniu Zrealizowana / Nieobecność / Anulowana wizyta znika z tego filtra",
+      hcNeedsActionSteps:
+        "1. Wizyty → filtr Wymaga działania.\n2. Otwórz wizytę z listy.\n3. Menu Zmień status → wybierz Zrealizowana lub Nieobecność klienta.\n4. Ten sam filtr jest spójny ze statystykami i KPI na stronie Statystyki.",
+      hcManualApptTitle: "Dodanie wizyty ręcznie",
+      hcManualApptLead:
+        "Gdy klient dzwoni lub pisze, dodajesz wizytę w panelu zamiast wysyłać go na stronę rezerwacji. Wizyta od razu blokuje termin jak rezerwacja online.",
+      hcManualApptSteps:
+        "1. Plan dnia lub Wizyty → Dodaj wizytę.\n2. Wybierz usługę, osobę (jeśli dotyczy), datę i godzinę.\n3. Wpisz imię i nazwisko oraz telefon lub e-mail (przynajmniej jeden kontakt — do przypomnień).\n4. Zapisz — status będzie Potwierdzona, źródło: Dodane ręcznie.",
+      hcApptStatusMenuTitle: "Zmiana statusu wizyty",
+      hcApptStatusMenuLead:
+        "Status mówi, czy wizyta się odbędzie, się odbyła, padła albo klient nie przyszedł. Zmieniasz go po fakcie lub gdy klient anuluje.",
       hcApptStatusMenuBullets:
-        "- Potwierdzona\n- Zrealizowana\n- Nieobecność klienta\n- Anulowana",
+        "- Potwierdzona — przed wizytą\n- Zrealizowana — po udanej wizycie\n- Nieobecność klienta — po terminie, gdy nikt nie przyszedł\n- Anulowana — rezygnacja",
+      hcApptStatusMenuSteps:
+        "1. Na karcie wizyty (Wizyty, Plan dnia lub Grafik → dzień) otwórz menu Zmień status.\n2. Wybierz nowy status.\n3. Opcjonalnie dodaj notatkę dla zespołu.",
       hcClientChangeTitle: "Prośba klienta o zmianę",
       hcClientChangeLead:
-        "Gdy klient użyje linku z wiadomości (/confirm/…), może poprosić o inny termin lub usługę. Na karcie wizyty zobaczysz sekcję prośby — nie jest to osobny filtr na liście.",
+        "Z linku w SMS/e-mail (/confirm/…) klient może poprosić o inny termin lub usługę. Prośba pojawia się na karcie wizyty — nie ma osobnego filtra na liście.",
       hcClientChangeSteps:
-        "1. Otwórz wizytę z widoczną prośbą klienta.\n2. Zaakceptuj propozycję albo wyślij własną.\n3. Możesz odrzucić prośbę — wizyta wraca do poprzedniego stanu.",
+        "1. Wizyty → znajdź wizytę z sekcją prośby klienta.\n2. Zaakceptuj propozycję klienta albo zaproponuj inny termin.\n3. Odrzuć, jeśli nie możesz przyjąć zmiany.\n4. Po decyzji status i termin aktualizują się w grafiku.",
       hcCancelTitle: "Anulowanie wizyty",
-      hcCancelLead: "Anulowanie możesz zrobić z listy Wizyty lub z grafiku dnia.",
+      hcCancelLead:
+        "Anulowanie zwalnia termin w kalendarzu rezerwacji. Możesz anulować z panelu lub klient może anulować sam przez link /confirm.",
       hcCancelSteps:
-        "1. Otwórz wizytę.\n2. Wybierz Anuluj wizytę i potwierdź.\n3. Status zmieni się na Anulowana — termin zwalnia się do nowych rezerwacji.",
-      hcDayplanLead:
-        "Plan dnia pokazuje dzisiejsze wizyty i szybkie liczniki (potwierdzone / anulowane). To podgląd dnia, nie pełna lista.",
-      hcDayplanSteps:
-        "1. Otwórz Plan dnia.\n2. Przejrzyj listę na dziś.\n3. Zmień status z menu na karcie, jeśli trzeba.\n4. Pełną listę i filtry znajdziesz w Wizytach.",
-      hcRemindersTitle: "Automatyczne przypomnienia",
+        "1. Otwórz wizytę (Wizyty lub Grafik).\n2. Wybierz Anuluj wizytę i potwierdź.\n3. Status: Anulowana — slot znów dostępny dla innych.\n4. Jeśli były zaplanowane SMS/e-mail, system nie wyśle ich po anulowaniu.",
+      hcRemindersTitle: "Ustawienia przypomnień (kanał i drugie przypomnienie)",
       hcRemindersLead:
-        "Pierwsze przypomnienie (domyślnie 24 h przed wizytą) wysyła link do potwierdzenia lub zmiany. Drugie przypomnienie to krótka informacja — ustawiasz je w Ustawieniach.",
+        "Przypomnienia działają automatycznie — nie wysyłasz ich ręcznie z listy wizyt. W Ustawieniach wybierasz kanał (SMS, e-mail lub oba) i czas drugiego, krótkiego przypomnienia.",
+      hcRemindersBullets:
+        "- pierwsze przypomnienie: treść i czas (np. 24 h lub 48 h) edytujesz w Wiadomościach → szablon pierwszego przypomnienia\n- drugie przypomnienie: krótka informacja przed wizytą (np. 2 h) — włącz/wyłącz w Ustawieniach\n- bez telefonu i e-mail u klienta wysyłka zostanie pominięta",
       hcRemindersBody:
-        "Nie wysyłasz przypomnień ręcznie z panelu — działają automatycznie według ustawień firmy.",
-      hcMsgsLead: "Szablony treści wiadomości automatycznych (SMS i e-mail).",
+        "Historia każdej próby wysyłki jest w Wiadomościach → Historia wysyłek (wysłano, błąd, pominięto).",
+      hcMsgsLead:
+        "Szablony to gotowe treści SMS i e-mail: pierwsze przypomnienie, drugie przypomnienie, potwierdzenie wizyty, anulowanie, follow-up po nieobecności.",
+      hcMsgsBullets:
+        "- włącz/wyłącz kanał SMS i e-mail na karcie szablonu\n- zmienne {{imie}}, {{data}}, {{godzina}}, {{usluga}} itd. wstawiają dane z wizyty\n- czas pierwszego przypomnienia ustawiasz na karcie (np. 48 h przed wizytą)",
       hcMsgsSteps:
-        "1. Wiadomości → szablony.\n2. Edytuj treść pod swój styl.\n3. Zapisz — system użyje ich przy przypomnieniach i powiadomieniach.",
+        "1. Wiadomości → sekcja Szablony wiadomości.\n2. Kliknij Edytuj przy szablonie.\n3. Dostosuj temat (e-mail) i treść, włącz kanały.\n4. Zapisz.\n5. Wykonaj testową rezerwację i sprawdź Historię wysyłek.",
+      hcCustomTemplatesTitle: "Własne szablony wiadomości",
+      hcCustomTemplatesLead:
+        "Poza automatycznymi szablonami możesz dodać własne wiadomości i wysłać je ręcznie z karty wizyty (np. podziękowanie lub akcja marketingowa).",
+      hcCustomTemplatesSteps:
+        "1. Wiadomości → Własne szablony → Nowy szablon.\n2. Nazwij szablon, wpisz treść SMS i/lub e-mail.\n3. Zapisz.\n4. Na wizycie użyj akcji wyślij własny szablon (gdy dostępna).\n5. Wpis pojawi się w Historii wysyłek pod nazwą szablonu.",
       hcMsgHistoryTitle: "Historia wysyłek",
-      hcMsgHistoryLead: "Podgląd wysłanych, zaplanowanych i pominiętych wiadomości.",
+      hcMsgHistoryLead:
+        "Pełny dziennik automatycznych i ręcznych wiadomości — wiesz, co wyszło do klienta, co się nie udało i dlaczego.",
       hcMsgHistoryBullets:
-        "- status wysyłki i ewentualny błąd\n- wpisy testowe w trybie developerskim",
+        "- zakładki: Wszystkie, Wysłane, Zaplanowane, Pominięte (w tym błędy dostawcy)\n- filtry: kanał, zakres dat, typ wiadomości (w tym własne szablony)\n- etykieta czasu przypomnienia z momentu wysyłki (np. 48 h), nie z aktualnego ustawienia szablonu",
+      hcMsgHistorySteps:
+        "1. Wiadomości → przewiń do Historia wysyłek.\n2. Użyj filtrów, aby znaleźć SMS/e-mail dla wizyty.\n3. Kliknij Podgląd wiadomości — treść, odbiorca, status, komunikat błędu.",
       hcBookingLinkTitle: "Link strony rezerwacji",
       hcBookingLinkLead:
-        "Adres ustawiasz w Ustawieniach (końcówka URL). Pełny link to /rezerwacje/[twoja-końcówka].",
+        "To adres, który wysyłasz klientom (strona www, Instagram, wizytówka). Bez niego rezerwacje online nie ruszą.",
       hcBookingLinkSteps:
-        "1. Ustawienia → dane firmy → adres strony rezerwacji.\n2. Zapisz zmiany.\n3. Skopiuj link i udostępnij klientom (strona, SMS, QR).",
-      hcBookingFlowLead: "Klient wybiera usługę, osobę (jeśli dotyczy), termin i podaje kontakt.",
+        "1. Ustawienia → Dane firmy.\n2. Uzupełnij Adres strony rezerwacji (końcówka URL, np. nazwa-firmy).\n3. Zapisz zmiany.\n4. Skopiuj pełny link (format: twoja-domena/rezerwacje/końcówka).\n5. Otwórz w nowej karcie i sprawdź, czy widać usługi i kalendarz.",
+      hcBookingFlowLead:
+        "Strona publiczna nie wymaga konta u klienta. Klient wybiera usługę, osobę (jeśli macie zespół), wolny termin i zostawia kontakt.",
       hcBillingTitle: "Trial i subskrypcja",
-      hcBillingLead: "Dostęp do panelu wymaga aktywnego triala lub opłaconej subskrypcji (Stripe).",
+      hcBillingLead:
+        "Panel działa po aktywacji triala lub opłaceniu planu. Bez aktywnego dostępu zobaczysz ekran z prośbą o subskrypcję.",
       hcBillingBullets:
-        "- 14-dniowy trial po aktywacji\n- po trialu subskrypcja miesięczna\n- zarządzanie płatnością w ustawieniach / portalu Stripe",
+        "- trial na start (ok. 14 dni — zależnie od oferty)\n- potem subskrypcja miesięczna przez Stripe\n- faktury i karta w portalu klienta Stripe z linku w Ustawieniach",
       hcBillingSteps:
-        "1. Po rejestracji uruchom trial lub opłać plan.\n2. W Ustawieniach sprawdź status dostępu.\n3. Przy problemie z płatnością użyj linku do portalu klienta Stripe.",
+        "1. Po rejestracji uruchom trial lub opłać plan z ekranu aktywacji.\n2. Ustawienia → sekcja Subskrypcja / dostęp — sprawdź status.\n3. Przy problemie z płatnością użyj Zarządzaj subskrypcją (portal Stripe).",
       hcClientsTitle: "Katalog klientów",
       hcClientsLead:
-        "Opcjonalna baza kontaktów z notatkami i historią. Przy rezerwacji online dane i tak zapisują się przy wizycie.",
+        "Opcjonalna lista kontaktów z notatkami i historią wizyt. Przy rezerwacji online dane i tak zapisują się przy każdej wizycie — nie musisz wcześniej tworzyć karty klienta.",
+      hcClientsSteps:
+        "1. Menu → Klienci.\n2. Wyszukaj po imieniu, telefonie lub e-mailu.\n3. Otwórz kartę — notatki, historia, ryzyko nieobecności.\n4. Uzupełnij brakujący kontakt, jeśli przypomnienia nie dochodzą.",
       hcClientsTip:
-        "Nie musisz najpierw dodawać klienta ręcznie — to ułatwienie, nie krok obowiązkowy setupu.",
-      hcSlotsLead: "Termin jest zajęty, gdy istnieje aktywna wizyta ze statusem blokującym slot.",
-      hcSlotsBlocking: "Blokują slot: Potwierdzona (w tym nowe rezerwacje w bazie jako booked/pending).",
-      hcSlotsNonBlocking: "Nie blokują: Anulowana, Nieobecność klienta, Zrealizowana.",
+        "Spójny telefon i e-mail u klienta zmniejszają liczbę pominiętych przypomnień.",
+      hcStatisticsTitle: "Statystyki",
+      hcStatisticsLead:
+        "Podsumowanie wizyt w wybranym okresie: ile zrealizowanych, anulowanych, nieobecności i ile czeka na oznaczenie po wizycie (Wymaga działania).",
+      hcStatisticsBullets:
+        "- KPI „Wszystkie wizyty” liczy zrealizowane + anulowane + nieobecność + wymaga działania\n- wykres statusów i trend — w tym seria Wymaga działania\n- zmiana statusu na liście od razu aktualizuje liczniki po odświeżeniu",
+      hcStatisticsSteps:
+        "1. Menu → Statystyki.\n2. Wybierz zakres dat.\n3. Porównaj wykresy z filtrem Wymaga działania w Wizytach.\n4. Użyj danych przy planowaniu obłożenia i follow-up po nieobecnościach.",
       hcExportTitle: "Eksport CSV",
-      hcExportLead: "Pobierz wizyty lub klientów do pliku CSV z Ustawień.",
+      hcExportLead: "Pobierz listę wizyt lub klientów do arkusza — np. do rozliczeń lub marketingu.",
       hcExportSteps:
-        "1. Ustawienia → Eksport danych.\n2. Wybierz wizyty lub klientów.\n3. Otwórz plik w Excelu lub Arkuszach.",
+        "1. Ustawienia → Eksport danych.\n2. Wybierz wizyty lub klientów.\n3. Pobierz plik CSV.\n4. Otwórz w Excelu lub Google Sheets.",
+      hcHelpSteps:
+        "1. Menu → Pomoc.\n2. Wybierz rozmowę lub rozpocznij nową.\n3. Opisz problem — odpowiedź zespołu WizytaOK pojawi się w wątku.\n4. Nie zamyka to dostępu do tego przewodnika (/guide).",
+      navStatistics: "Przejdź do statystyk",
       description:
         "Opis wszystkich modułów panelu: od konfiguracji firmy po grafik, wizyty, wiadomości i pomoc techniczną.",
       heroSub:
@@ -2304,7 +2372,7 @@ Pozdrawiamy,
       modServicesExplain:
         "Usługi to pozycje, które klient wybiera podczas rezerwacji. Każda ma nazwę, opis, czas trwania, cenę, status aktywna lub nieaktywna oraz opcję godzin usługi.",
       modServicesSteps:
-        "1. Wejdź w Usługi.\n2. Kliknij Dodaj usługę.\n3. Wpisz nazwę, opis, czas trwania i cenę.\n4. Ustaw, czy usługa ma być aktywna.\n5. Kliknij Zapisz usługę.",
+        "1. Menu → Usługi → Dodaj usługę.\n2. Nazwa, opis, czas trwania wizyty i przerwa po wizycie (min).\n3. Cena i status Aktywna.\n4. Zapisz usługę.\n5. W Zespole przypisz usługę do osób, które ją wykonują.",
       modServicesHoursTitle: "Godziny konkretnej usługi",
       modServicesHoursLead:
         "Usługa może korzystać z godzin pracy firmy albo mieć własne godziny. Brak własnych godzin oznacza użycie godzin firmy.",
@@ -2376,12 +2444,6 @@ Pozdrawiamy,
       modLegalInfoLead:
         "Te informacje są dostępne w Ustawieniach, w sekcji Informacje prawne i techniczne.",
       modDayplanTitle: "Plan dnia",
-      modDayplanLead:
-        "Plan dnia to podgląd dzisiejszych wizyt i liczników — potwierdzone i anulowane na dziś.",
-      modDayplanBullets:
-        "- lista wizyt na dziś\n- szybka zmiana statusu na karcie",
-      modDayplanSteps:
-        "1. Wejdź w Plan dnia.\n2. Przejrzyj wizyty na dziś.\n3. Użyj menu Zmień status, gdy trzeba.\n4. Pełne filtry i wyszukiwanie — w zakładce Wizyty.",
       modMsgsTitle: "Wiadomości i historia wysyłek",
       modMsgsLead:
         "Wiadomości zawierają szablony oraz historię wysyłek.",
@@ -2389,14 +2451,14 @@ Pozdrawiamy,
         "1. Szablony służą do treści automatycznych wiadomości.\n2. Historia wysyłek pokazuje wysłane, zaplanowane, błędne, pominięte i wpisy dev/symulacje.\n3. Podgląd pokazuje treść, odbiorcę, status i błąd, jeśli wystąpił.",
       modMsgsMvp:
         "Na etapie MVP wiadomości mogą być zapisywane jako symulacja. Prawdziwa wysyłka SMS lub e-mail wymaga podłączenia dostawcy.",
-      modManageTitle: "9. Strona zarządzania rezerwacją",
+      modManageTitle: "Strona klienta (/confirm)",
       modManageLead:
         "Klient z linku w wiadomości otwiera swoją wizytę (adres typu /confirm/[id]).",
       modManageFlow:
         "- potwierdzanie obecności\n- zmiana terminu (z dostępnym kalendarzem)\n- zmiana usługi (jeżeli dostępne)\n- anulowanie wizyty",
       modManageSteps:
         "1. Klient otwiera link z wiadomości.\n2. Widzi szczegóły rezerwacji.\n3. Może kliknąć potwierdzenie obecności.\n4. Może wybrać zmianę terminu i wybrać nowy slot.\n5. Może zmienić usługę, jeżeli funkcja jest włączona.\n6. Może anulować wizytę.\n7. Zmiana jest widoczna w Twoim panelu jako nowy status lub prośba o zmianę.",
-      modSlotsTitle: "10. Zajęte terminy",
+      modSlotsTitle: "Zajęte terminy",
       modSlotsLead:
         "Jeśli termin jest zajęty przez aktywną rezerwację ze statusem blokującym, nie powinien być dostępny dla kolejnej osoby przy rezerwacji online lub przy zmianie terminu przez innego klienta.",
       modSlotsBlocking:
@@ -2456,13 +2518,15 @@ Pozdrawiamy,
       faqQ1: "Czy klient musi mieć konto?",
       faqA1:
         "Nie. Wystarczy link do rezerwacji lub link z wiadomości do zarządzania wizytą (/confirm/…).",
-      faqQ2: "Jakie statusy wizyt widzę w panelu?",
+      faqQ2: "Co oznacza filtr „Wymaga działania”?",
       faqA2:
-        "Na liście: Potwierdzone, Zrealizowane, Nieobecność klienta i Anulowane. W menu „Zmień status” ustawisz Zrealizowaną, Nieobecność lub Anulowaną.",
-      faqQ3: "Czy mogę ręcznie wysłać przypomnienie?",
-      faqA3: "Nie — przypomnienia SMS/e-mail wysyłają się automatycznie według ustawień firmy.",
-      faqQ4: "Czy mogę dodać drugie przypomnienie?",
-      faqA4: "Tak, w Ustawieniach (np. 2 godziny przed wizytą).",
+        "To wizyty po terminie, które nadal mają status Potwierdzona. Oznacz je jako Zrealizowana lub Nieobecność klienta — wtedy znikną z filtra i zaktualizują statystyki.",
+      faqQ3: "Czy mogę ręcznie wysłać standardowe przypomnienie?",
+      faqA3:
+        "Nie — pierwsze i drugie przypomnienie wysyłają się automatycznie. Możesz wysłać własny szablon z Wiadomości ręcznie z karty wizyty.",
+      faqQ4: "Gdzie ustawię 48 h przed wizytą zamiast 24 h?",
+      faqA4:
+        "Wiadomości → szablon pierwszego przypomnienia → Edytuj → pole czasu przed wizytą. Historia wysyłek zapisuje czas z momentu wysłania.",
       faqQ5: "Czy anulowana wizyta blokuje termin?",
       faqA5: "Nie — termin wraca do puli wolnych slotów.",
       faqQ6: "Czy Nieobecność klienta blokuje termin?",
@@ -2478,6 +2542,12 @@ Pozdrawiamy,
       faqQ10: "Jak działa trial i płatność?",
       faqA10:
         "Po aktywacji uruchamiasz trial lub opłacasz subskrypcję (Stripe). Bez aktywnego dostępu panel jest zablokowany.",
+      faqQ11: "Po co przerwa między wizytami?",
+      faqA11:
+        "Przerwa (w usłudze i domyślnie w Ustawieniach) odkłada następny wolny slot — np. po 60 min wizyty i 15 min przerwy kolejna rezerwacja od :75. Chroni przed „klejeniem” terminów.",
+      faqQ12: "Gdzie jest pierwsza konfiguracja?",
+      faqA12:
+        "Na planie dnia — kreator z checklistą. Możesz kontynuować od pierwszego brakującego kroku albo zacząć od nowa; ukończone kroki zostają odhaczone, jeśli dane są już w systemie.",
       chk1: "Pilnuj Wizyty i statusów po wizycie",
       chk5: "Sprawdzaj Grafik przy planowaniu tygodnia",
       chk2: "Sprawdzaj Plan dnia na bieżąco",
@@ -2506,7 +2576,7 @@ Pozdrawiamy,
     footer: {
       terms: "Regulamin",
       privacy: "Polityka prywatności",
-      developer: "Kontakt do dewelopera",
+      developer: "Kontakt",
     },
     termsPage: plTermsPage,
     developerPage: plDeveloperPage,
@@ -3099,37 +3169,37 @@ Pozdrawiamy,
       todoAllClear: "Everything is under control.",
       tipItems: {
         "0":
-          "In Appointments, use the “Needs action” filter to see visits waiting for a business decision.",
+          "In Appointments, use the “Needs action” filter to see past visits waiting to be marked completed or no-show.",
         "1":
-          "Add the client's phone and email so automatic reminders can work correctly.",
+          "Add the client's phone and email on the visit — without contact details, automatic SMS and email reminders cannot be sent.",
         "2":
-          "Days off and exceptions help prevent bookings during holidays or leave.",
+          "In Availability, add days off, holidays and exceptions so clients cannot book when the business is closed.",
         "3":
-          "Assign services to team members so clients can choose the right specialist.",
+          "In Team, assign services to specific people — clients on the booking page only see slots with the right specialist.",
         "4":
-          "If a service has different hours than the business, set Service hours in Services.",
+          "If a service has different hours than the business, open Services, pick the service and set Service hours instead of company-wide hours.",
         "5":
-          "Regularly check Reminder errors if SMS or email was not sent.",
+          "In Messages, check sending history and failed items — you will see whether an SMS or email reminder did not go through.",
         "6":
-          "Booked time slots should disappear from the public booking page.",
+          "Confirmed and pending visits block slots — a taken time disappears from the public booking page for other clients.",
         "7":
-          "Add a tax ID only if the business uses one - the field can stay empty.",
+          "Tax ID in business settings is optional — fill it in only if your business actually uses it on documents.",
         "8":
-          "CSV exports can be opened in Excel or Google Sheets.",
+          "You can export visits or clients to CSV and open the file in Excel or Google Sheets for further analysis.",
         "9":
-          "Staff members should have their own account with limited access to business settings.",
+          "Each staff member should have their own account — you can limit access to business settings and leave visits and schedule only.",
         "10":
-          "If you often see “No sending history”, check whether reminder templates and channels are active.",
+          "If sending history is empty or shows errors, check in Messages that templates are enabled and SMS or email channel is selected.",
         "11":
-          "In Schedule, click a day to quickly view the client's phone and notes without switching views.",
+          "In Schedule, click a day to see visits with the client's phone and notes right away — without opening another tab.",
         "12":
-          "For services with frequent no-shows, set a shorter second reminder, e.g. 60 or 30 minutes before.",
+          "If no-shows are frequent, shorten the second reminder in Message templates, e.g. to 60 or 30 minutes before the visit.",
         "13":
-          "After each status change, add a note — it helps the team make faster decisions on future visits.",
+          "After changing a visit status, add a short note — the next person on the team knows what was agreed with the client.",
         "14":
-          "Keep client email and phone updated — it improves confirmation delivery and reduces no-shows.",
+          "In Clients, keep phone and email up to date — it improves reminders and reduces no-shows.",
         "15":
-          "If you work in a team, assign services to specific people to avoid scheduling conflicts.",
+          "With several people on the team, assign services per person — you avoid double-booking the same time slot.",
       },
       quickAddHint:
         "Add the time and see the status right away.",
@@ -4400,6 +4470,7 @@ Regards,
       cardTitle: "Business setup",
       cardLead: "Finish setup to start accepting online bookings.",
       continueCta: "Continue setup",
+      startFromBeginningCta: "Start from the beginning",
       progressLabel: "Setup progress",
       loading: "Checking progress…",
       allDone: "Setup complete",
@@ -4593,84 +4664,159 @@ Regards,
       helpCenterSubtitle: "Product documentation — quick setup lives on the day plan.",
       helpCenterBadge: "Help",
       helpCenterSetupNote:
-        "First-time setup (hours, team, service, booking link) is the separate wizard on the day plan — Continue setup. The client catalog is not required to go live.",
+        "Quick setup (6-step wizard) is on the day plan — Continue setup. Below is the full guide to every panel feature.",
       catAll: "All",
       catSchedule: "Schedule & availability",
-      catScheduleDesc: "Business hours, exceptions, month schedule and staff schedules.",
+      catScheduleDesc:
+        "When the business and staff work, calendar exceptions, and how free slots are calculated.",
       catAppointments: "Appointments",
-      catAppointmentsDesc: "List, statuses, cancel and client change requests.",
+      catAppointmentsDesc:
+        "Day plan, visit list, statuses, Needs action filter and client requests.",
       catNotifications: "Notifications",
-      catNotificationsDesc: "SMS/email reminders, templates and sending history.",
+      catNotificationsDesc:
+        "SMS/email templates, custom messages, channel settings and sending history.",
       catBooking: "Online booking",
-      catBookingDesc: "Public link, booking page and client /confirm page.",
+      catBookingDesc: "Client link, public booking flow and /confirm management page.",
       catBilling: "Billing",
-      catBillingDesc: "Trial, subscription and Stripe.",
+      catBillingDesc: "Trial, monthly subscription and panel access (Stripe).",
       catTeam: "Team & services",
-      catTeamDesc: "Staff, assigned services and panel invitations.",
+      catTeamDesc: "Services, staff assignment, invitations and panel roles.",
       catOther: "Other",
-      catOtherDesc: "Business settings, clients, export and support.",
+      catOtherDesc: "First-time setup, statistics, business settings, clients and support.",
       hcAvailTitle: "Business working hours",
-      hcAvailLead: "Set which weekdays you accept clients and your open hours.",
+      hcAvailLead:
+        "This is the foundation of the booking calendar. You define which weekdays the business is open and the hours. Without saved hours, clients will not see available times.",
       hcAvailSteps:
-        "1. Open Availability.\n2. Enable weekdays.\n3. Set from–to hours.\n4. Save availability.",
-      hcAvailExTitle: "Days off and exceptions",
+        "1. Left menu → Availability.\n2. Enable the weekdays you work.\n3. Set from and to hours for each day.\n4. Click Save availability.\n5. Check the public booking link — only those days should appear.",
+      hcAvailTip:
+        "You can override business hours per service (Services → Service hours) or per person (Team → staff schedule).",
+      hcAvailExTitle: "Business days off and exceptions",
+      hcAvailExLead:
+        "Use exceptions when the business does not follow the regular week — holiday, company-wide leave or shorter day.",
       hcAvailExSteps:
-        "1. Add a date under Days off.\n2. Choose closed all day or special hours.\n3. Save — booking and schedule will respect it.",
+        "1. Availability → Days off and exceptions.\n2. Add day off.\n3. Pick a date.\n4. Choose Closed all day or Special hours.\n5. Optional reason (e.g. holiday).\n6. Save — the date disappears from booking and shows in the schedule.",
       hcStaffScheduleTitle: "Staff schedule and exceptions",
-      hcStaffScheduleLead: "Each team member can have their own hours and days off.",
+      hcStaffScheduleLead:
+        "When several people deliver services, each can have different weekly hours and time off. Clients only see slots for the person they pick.",
       hcStaffScheduleSteps:
-        "1. Team → pick a person.\n2. Schedule tab — custom hours or match business.\n3. Exceptions tab — add time off.\n4. Save.",
+        "1. Team → select a person.\n2. Schedule tab: custom hours or match business.\n3. Exceptions tab: add time off or special hours.\n4. Save.\n5. In Services, assign which services they perform — otherwise they will not appear when booking.",
+      hcSlotsTitle: "Booked slots and breaks",
+      hcSlotsLead:
+        "The system prevents overlapping visits. A free slot must match business, service and staff hours and must not conflict with another visit.",
+      hcSlotsBlocking:
+        "Blocks the slot: Confirmed — including new online bookings stored as booked/pending and shown as Confirmed.",
+      hcSlotsNonBlocking:
+        "Does not block: Cancelled, Client did not attend, Completed — the slot returns to the pool.",
+      hcSlotsBreakBody:
+        "Break between visits: default in Settings and per service (duration + break). After a 60 min visit with 15 min break, the next free slot starts 75 min after the previous start.",
+      hcDayplanBullets:
+        "- today’s visit list with quick status change\n- confirmed and cancelled counts for today\n- setup card when onboarding is incomplete\n- rotating practical tips",
+      hcDayplanLead:
+        "Day plan is your home screen — see what is happening today without opening the full appointments list.",
+      hcDayplanSteps:
+        "1. Menu → Day plan.\n2. Review today’s visits and change status from the row menu.\n3. Use Add appointment for phone bookings.\n4. Full filters, Needs action and history — under Appointments.",
+      hcFirstSetupTitle: "First-time setup (wizard)",
+      hcFirstSetupLead:
+        "After activation, a wizard appears on the day plan. It walks through 6 steps: hours, service, team, service assignment, booking link, first visit. Steps check off automatically when data already exists — even if you skipped a step earlier.",
+      hcFirstSetupSteps:
+        "1. On day plan click Continue setup (or Start from the beginning if returning).\n2. The app opens the right tab and highlights the section to complete.\n3. After each step continue — progress updates automatically.\n4. When all steps are done the wizard hides; reopen from Settings → Reconfigure.",
+      hcFirstSetupTip:
+        "The client catalog is not required to go live — a booking link and one service with hours is enough.",
       hcApptListTitle: "Appointments list",
-      hcApptListLead: "Main workspace for visits — filter by status, staff, client or service.",
+      hcApptListLead:
+        "Handle all visits here: past and upcoming. Main tool after day plan when you search by client, service or status.",
       hcApptStatuses:
-        "- Confirmed — active visit (online and manual bookings land here).\n- Completed — visit done.\n- Client did not attend — no-show.\n- Cancelled — visit cancelled.",
+        "- Confirmed — on the calendar (online and manual).\n- Completed — visit happened.\n- Client did not attend — no-show.\n- Cancelled — visit cancelled, slot free.\n- Needs action — filter: visit time passed but still Confirmed (mark the outcome).",
       hcApptListSteps:
-        "1. Open Appointments.\n2. Filters: All, Confirmed, Completed, Client did not attend, Cancelled.\n3. Add manually with the top button.\n4. Source badge shows online vs panel entry.",
-      hcApptStatusMenuTitle: "Change status",
-      hcApptStatusMenuLead: "Use Change status on the row or on the day plan.",
+        "1. Menu → Appointments.\n2. Filter: All, Confirmed, Completed, Client did not attend, Cancelled or Needs action.\n3. Search and filter by staff / service.\n4. Source badge: Online booking or Added manually.\n5. Add appointment — new visit from the panel.",
+      hcNeedsActionTitle: "“Needs action” filter",
+      hcNeedsActionLead:
+        "After the visit time passes, you should mark Completed or Client did not attend. Until then the visit appears under Needs action and in statistics as needs action.",
+      hcNeedsActionBullets:
+        "- only past visits still Confirmed\n- not the same as SMS errors or client change requests — those show on the visit card\n- after Completed / No-show / Cancelled the visit leaves this filter",
+      hcNeedsActionSteps:
+        "1. Appointments → Needs action filter.\n2. Open a visit.\n3. Change status → Completed or Client did not attend.\n4. Same logic as the Needs action KPI on Statistics.",
+      hcManualApptTitle: "Add a visit manually",
+      hcManualApptLead:
+        "When a client calls or messages, add the visit in the panel instead of sending them to the booking page. It blocks the slot like an online booking.",
+      hcManualApptSteps:
+        "1. Day plan or Appointments → Add appointment.\n2. Pick service, staff (if any), date and time.\n3. Enter name and phone or email (at least one — for reminders).\n4. Save — status Confirmed, source Added manually.",
+      hcApptStatusMenuTitle: "Change visit status",
+      hcApptStatusMenuLead:
+        "Status tells whether the visit will happen, happened, was cancelled or the client did not show. Change it after the fact or when the client cancels.",
       hcApptStatusMenuBullets:
-        "- Confirmed\n- Completed\n- Client did not attend\n- Cancelled",
+        "- Confirmed — before the visit\n- Completed — after a successful visit\n- Client did not attend — after no-show\n- Cancelled — visit called off",
+      hcApptStatusMenuSteps:
+        "1. On the visit card (Appointments, Day plan or Schedule → day) open Change status.\n2. Pick the new status.\n3. Optionally add a team note.",
       hcClientChangeTitle: "Client change request",
       hcClientChangeLead:
-        "When a client uses the link from a message (/confirm/…), a request section appears on the visit row — not a separate list filter.",
+        "From the SMS/email link (/confirm/…) a client can request another time or service. The request appears on the visit card — not as a separate list filter.",
       hcClientChangeSteps:
-        "1. Open the visit with the client request.\n2. Accept or send your counter-proposal.\n3. Decline to revert the visit.",
+        "1. Appointments → visit with client request section.\n2. Accept the proposal or suggest another time.\n3. Decline if you cannot accept.\n4. Schedule updates after your decision.",
       hcCancelTitle: "Cancel a visit",
-      hcCancelLead: "Cancel from Appointments or from the schedule day board.",
+      hcCancelLead:
+        "Cancelling frees the slot on the booking calendar. You can cancel in the panel or the client can cancel via /confirm.",
       hcCancelSteps:
-        "1. Open the visit.\n2. Cancel visit and confirm.\n3. Status becomes Cancelled — the slot opens for new bookings.",
-      hcDayplanLead: "Day plan shows today’s visits and quick counts — confirmed and cancelled today.",
-      hcDayplanSteps:
-        "1. Open Day plan.\n2. Review today’s list.\n3. Change status from the row menu.\n4. Full filters live under Appointments.",
-      hcRemindersTitle: "Automatic reminders",
+        "1. Open the visit (Appointments or Schedule).\n2. Cancel visit and confirm.\n3. Status Cancelled — slot available again.\n4. Planned SMS/email will not be sent after cancellation.",
+      hcRemindersTitle: "Reminder settings (channel & second reminder)",
       hcRemindersLead:
-        "First reminder (default 24h before) includes a management link. Second reminder is a short heads-up — configured in Settings.",
-      hcRemindersBody: "You cannot send reminders manually from the panel — they run from settings.",
-      hcMsgsLead: "Templates for automated SMS and email.",
-      hcMsgsSteps: "1. Messages → templates.\n2. Edit copy.\n3. Save.",
+        "Reminders run automatically — you do not send them manually from the visit list. In Settings choose channel (SMS, email or both) and the second short reminder time.",
+      hcRemindersBullets:
+        "- first reminder: copy and timing (e.g. 24h or 48h) in Messages → first reminder template\n- second reminder: short heads-up (e.g. 2h) — enable in Settings\n- without client phone and email sending is skipped",
+      hcRemindersBody:
+        "Every attempt is logged under Messages → Sending history (sent, failed, skipped).",
+      hcMsgsLead:
+        "Templates are ready-made SMS and email: first reminder, second reminder, booking confirmation, cancellation, no-show follow-up.",
+      hcMsgsBullets:
+        "- enable/disable SMS and email on each template card\n- variables {{imie}}, {{data}}, {{godzina}}, {{usluga}} insert visit data\n- set first reminder timing on the card (e.g. 48h before)",
+      hcMsgsSteps:
+        "1. Messages → Message templates.\n2. Click Edit on a template.\n3. Adjust subject (email) and body, enable channels.\n4. Save.\n5. Make a test booking and check Sending history.",
+      hcCustomTemplatesTitle: "Custom message templates",
+      hcCustomTemplatesLead:
+        "Besides automatic templates you can add your own messages and send them manually from a visit (e.g. thank-you or promo).",
+      hcCustomTemplatesSteps:
+        "1. Messages → Custom templates → New template.\n2. Name it and write SMS and/or email body.\n3. Save.\n4. On a visit use send custom template when available.\n5. Entry appears in Sending history under the template name.",
       hcMsgHistoryTitle: "Sending history",
-      hcMsgHistoryLead: "See sent, scheduled and skipped messages.",
-      hcMsgHistoryBullets: "- delivery status and errors\n- dev/test entries in development mode",
+      hcMsgHistoryLead:
+        "Full log of automatic and manual messages — see what reached the client, what failed and why.",
+      hcMsgHistoryBullets:
+        "- tabs: All, Sent, Scheduled, Skipped (includes provider errors)\n- filters: channel, date range, message type (including custom templates)\n- reminder label shows timing at send time (e.g. 48h), not current template setting",
+      hcMsgHistorySteps:
+        "1. Messages → Sending history.\n2. Use filters to find SMS/email for a visit.\n3. Click Message preview — body, recipient, status, error.",
       hcBookingLinkTitle: "Booking page link",
-      hcBookingLinkLead: "Set the URL slug in Settings. Full path: /rezerwacje/[your-slug].",
+      hcBookingLinkLead:
+        "The address you share with clients (website, social, card). Online booking will not work without it.",
       hcBookingLinkSteps:
-        "1. Settings → business details → booking page address.\n2. Save changes.\n3. Share the link (site, SMS, QR).",
-      hcBookingFlowLead: "Client picks service, staff (if any), time and contact details.",
+        "1. Settings → Business details.\n2. Set Booking page address (URL slug).\n3. Save changes.\n4. Copy the full link (your-domain/rezerwacje/slug).\n5. Open in a new tab and verify services and calendar.",
+      hcBookingFlowLead:
+        "The public page needs no client account. They pick service, staff (if you have a team), a free slot and leave contact details.",
       hcBillingTitle: "Trial and subscription",
-      hcBillingLead: "Panel access requires an active trial or paid subscription (Stripe).",
+      hcBillingLead:
+        "The panel works after trial activation or paid plan. Without active access you see the subscription screen.",
       hcBillingBullets:
-        "- 14-day trial after activation\n- monthly subscription after trial\n- manage payment in Settings / Stripe portal",
+        "- trial on start (about 14 days — depends on offer)\n- then monthly subscription via Stripe\n- invoices and card in Stripe customer portal from Settings",
       hcBillingSteps:
-        "1. Start trial or pay after signup.\n2. Check access status in Settings.\n3. Use Stripe customer portal if payment fails.",
+        "1. After signup start trial or pay from the activation screen.\n2. Settings → Subscription / access — check status.\n3. If payment fails use Manage subscription (Stripe portal).",
       hcClientsTitle: "Client catalog",
-      hcClientsLead: "Optional contacts with notes and history. Online bookings still save client data on the visit.",
-      hcClientsTip: "You do not need to add clients first — optional, not part of required setup.",
-      hcSlotsLead: "A slot is taken when an active visit has a blocking status.",
-      hcSlotsBlocking: "Blocks: Confirmed (stored as booked/pending before display).",
-      hcSlotsNonBlocking: "Does not block: Cancelled, Client did not attend, Completed.",
+      hcClientsLead:
+        "Optional contact list with notes and visit history. Online bookings still save data on each visit — you do not need to create a client card first.",
+      hcClientsSteps:
+        "1. Menu → Clients.\n2. Search by name, phone or email.\n3. Open a card — notes, history, no-show risk.\n4. Fill missing contact if reminders are skipped.",
+      hcClientsTip: "Consistent phone and email reduce skipped reminders.",
+      hcStatisticsTitle: "Statistics",
+      hcStatisticsLead:
+        "Visit summary for a date range: completed, cancelled, no-shows and visits waiting for post-visit status (Needs action).",
+      hcStatisticsBullets:
+        "- “All visits” KPI = completed + cancelled + no-show + needs action\n- status and trend charts include Needs action\n- changing status on the list updates KPIs after refresh",
+      hcStatisticsSteps:
+        "1. Menu → Statistics.\n2. Pick a date range.\n3. Compare charts with Needs action filter in Appointments.\n4. Use data for capacity planning and no-show follow-up.",
       hcExportTitle: "CSV export",
-      hcExportLead: "Download visits or clients from Settings.",
-      hcExportSteps: "1. Settings → Data export.\n2. Pick visits or clients.\n3. Open in Excel or Sheets.",
+      hcExportLead: "Download visits or clients to a spreadsheet — e.g. billing or marketing.",
+      hcExportSteps:
+        "1. Settings → Data export.\n2. Choose visits or clients.\n3. Download CSV.\n4. Open in Excel or Google Sheets.",
+      hcHelpSteps:
+        "1. Menu → Help.\n2. Pick a thread or start a new one.\n3. Describe the issue — WizytaOK support replies in the thread.\n4. This does not replace the guide at /guide.",
+      navStatistics: "Go to statistics",
       description:
         "Overview of every panel module: from business setup to schedule, appointments, messages and support.",
       heroSub:
@@ -4766,7 +4912,7 @@ Regards,
       modServicesExplain:
         "Each service has a name, description, duration, price, active or inactive state, and service hours.",
       modServicesSteps:
-        "1. Open Services.\n2. Tap Add service.\n3. Enter name, description, duration and price.\n4. Decide if it should be active.\n5. Save the service.",
+        "1. Menu → Services → Add service.\n2. Name, description, visit duration and break after visit (min).\n3. Price and Active status.\n4. Save.\n5. In Team assign the service to staff who deliver it.",
       modServicesHoursTitle: "Hours for one service only",
       modServicesHoursLead:
         "A service can use business hours or its own hours. No custom hours means business hours are used.",
@@ -4907,13 +5053,15 @@ Regards,
       faqQ1: "Does the client need an account?",
       faqA1:
         "No. The client uses the booking link or the appointment management link.",
-      faqQ2: "Which appointment statuses do I see in the panel?",
+      faqQ2: "What does the “Needs action” filter mean?",
       faqA2:
-        "On the list: Confirmed, Completed, Client did not attend and Cancelled. Use Change status to set Completed, Client did not attend or Cancelled.",
-      faqQ3: "Can I send a reminder manually?",
-      faqA3: "No. SMS/email reminders are sent automatically according to your business settings.",
-      faqQ4: "Can I add a second reminder?",
-      faqA4: "Yes, in Settings (for example 2 hours before the visit).",
+        "Visits whose time has passed but status is still Confirmed. Mark Completed or Client did not attend — they leave the filter and update statistics.",
+      faqQ3: "Can I send a standard reminder manually?",
+      faqA3:
+        "No — first and second reminders are automatic. You can send a custom template manually from a visit when available.",
+      faqQ4: "Where do I set 48h before instead of 24h?",
+      faqA4:
+        "Messages → first reminder template → Edit → timing before visit. Sending history stores the timing used at send time.",
       faqQ5: "Does a cancelled appointment block a time slot?",
       faqA5: "No — the slot becomes available again.",
       faqQ6: "Does Client did not attend block a time slot?",
@@ -4929,11 +5077,12 @@ Regards,
       faqQ10: "How do trial and billing work?",
       faqA10:
         "After activation you start a trial or pay for a subscription (Stripe). Without active access the panel is blocked.",
-      faqQ11: "Can I write to support?",
-      faqA11: "Yes. Help includes a support chat.",
-      faqQ12: "Where is the monthly schedule?",
+      faqQ11: "What is the break between visits for?",
+      faqA11:
+        "Break (per service and default in Settings) pushes the next free slot — e.g. after 60 min visit and 15 min break the next booking starts 75 min after the previous start.",
+      faqQ12: "Where is first-time setup?",
       faqA12:
-        "Choose Schedule in the sidebar (next to Appointments). That is the month view; the full filtered list lives under Appointments.",
+        "On the day plan — the wizard with a checklist. Continue from the first missing step or start from the beginning; completed steps stay checked when data already exists.",
       chk1: "Track appointments and post-visit statuses",
       chk2: "Check Day plan daily",
       chk3: "Tune message templates under Messages",
@@ -4962,7 +5111,7 @@ Regards,
     footer: {
       terms: "Terms",
       privacy: "Privacy Policy",
-      developer: "Developer contact",
+      developer: "Contact",
     },
     termsPage: enTermsPage,
     developerPage: enDeveloperPage,

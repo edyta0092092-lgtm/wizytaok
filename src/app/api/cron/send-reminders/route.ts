@@ -19,6 +19,10 @@ import {
   type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
 import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
+import {
+  DEFAULT_FIRST_REMINDER_MINUTES,
+  DEFAULT_SECOND_REMINDER_MINUTES,
+} from "@/lib/messages/reminder-settings-from-templates"
 import { upsertReminderNotificationLog } from "@/lib/notifications/reminder-notification-log"
 import { getStaffDisplayName, getStaffFirstName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -371,6 +375,20 @@ function resolveBusinessName(business: BusinessRow | null): string {
   return name && name.length > 0 ? name : "WizytaOK"
 }
 
+function defaultTimingMinutesForReminderKind(reminderKind: string): number {
+  const k = reminderKind.trim().toLowerCase()
+  if (k === "second" || k === "appointment_reminder_short") return DEFAULT_SECOND_REMINDER_MINUTES
+  return DEFAULT_FIRST_REMINDER_MINUTES
+}
+
+function resolveReminderTimingMinutes(
+  runtime: NotificationTemplateRuntime,
+  reminderKind: string,
+): number {
+  if (runtime.timingMinutesBefore != null) return runtime.timingMinutesBefore
+  return defaultTimingMinutesForReminderKind(reminderKind)
+}
+
 /** Mapuje rodzaj przypomnienia z kolejki na typ edytowalnego szablonu. */
 function reminderTemplateTypeFromKind(kind: string): string {
   const k = kind.trim().toLowerCase()
@@ -597,7 +615,14 @@ async function processEmailReminder(
     // zapisała szablon i wyłączyła w nim ten kanał (status draft) — tak jak
     // pokazuje przełącznik „off" w kafelku szablonu.
     if (runtime.emailExists && !runtime.emailEnabled) {
-      await markSkipped(admin, item, "template_email_disabled", booking, recipient)
+      await markSkipped(
+        admin,
+        item,
+        "template_email_disabled",
+        booking,
+        recipient,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -606,7 +631,14 @@ async function processEmailReminder(
     const manageUrl = resolveManageUrl(booking)
 
     if (await isBookingTerminalNow(admin, booking.id)) {
-      await markSkipped(admin, item, "booking_cancelled_race", booking, recipient)
+      await markSkipped(
+        admin,
+        item,
+        "booking_cancelled_race",
+        booking,
+        recipient,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -618,7 +650,14 @@ async function processEmailReminder(
         booking.appointment_time,
       )
     ) {
-      await markSkipped(admin, item, "first_reminder_window_passed", booking, recipient)
+      await markSkipped(
+        admin,
+        item,
+        "first_reminder_window_passed",
+        booking,
+        recipient,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -672,6 +711,7 @@ async function processEmailReminder(
           provider: emailResult.provider,
           providerMessageId: emailResult.messageId,
           sentAt,
+          timingMinutesBefore: resolveReminderTimingMinutes(runtime, item.reminder_kind),
         },
         "[cron/send-reminders.log]",
       )
@@ -743,7 +783,14 @@ async function processSmsReminder(
     )
     // Pomijamy tylko, gdy firma zapisała szablon SMS i wyłączyła go (status draft).
     if (runtime.smsExists && !runtime.smsEnabled) {
-      await markSkipped(admin, item, "template_sms_disabled", booking, phone)
+      await markSkipped(
+        admin,
+        item,
+        "template_sms_disabled",
+        booking,
+        phone,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -761,7 +808,14 @@ async function processSmsReminder(
     const monthlyLimit = quota.limit
     const used = quota.used
     if (!quota.allowed) {
-      await markSkipped(admin, item, "sms_monthly_limit_reached", booking, phone)
+      await markSkipped(
+        admin,
+        item,
+        "sms_monthly_limit_reached",
+        booking,
+        phone,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       console.info("[cron/send-reminders] sms_limit_reached", {
         id: item.id,
         business_id: item.business_id,
@@ -772,7 +826,14 @@ async function processSmsReminder(
     }
 
     if (await isBookingTerminalNow(admin, booking.id)) {
-      await markSkipped(admin, item, "booking_cancelled_race", booking, phone)
+      await markSkipped(
+        admin,
+        item,
+        "booking_cancelled_race",
+        booking,
+        phone,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -784,7 +845,14 @@ async function processSmsReminder(
         booking.appointment_time,
       )
     ) {
-      await markSkipped(admin, item, "first_reminder_window_passed", booking, phone)
+      await markSkipped(
+        admin,
+        item,
+        "first_reminder_window_passed",
+        booking,
+        phone,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -829,6 +897,7 @@ async function processSmsReminder(
           provider: smsResult.provider,
           providerMessageId: smsResult.messageId,
           sentAt,
+          timingMinutesBefore: resolveReminderTimingMinutes(runtime, item.reminder_kind),
         },
         "[cron/send-reminders.log]",
       )
@@ -853,7 +922,14 @@ async function processSmsReminder(
       // Telefon istniał w bazie, ale nie potrafimy go znormalizować do MSISDN.
       // To trwała wada danych — `skipped` (a nie retry), żeby nie napierać na
       // SMSAPI z każdym uruchomieniem crona.
-      await markSkipped(admin, item, smsResult.error || "invalid_phone", booking, phone)
+      await markSkipped(
+        admin,
+        item,
+        smsResult.error || "invalid_phone",
+        booking,
+        phone,
+        resolveReminderTimingMinutes(runtime, item.reminder_kind),
+      )
       return "skipped"
     }
 
@@ -873,6 +949,7 @@ async function markSkipped(
   reason: string,
   booking: BookingRow | null,
   recipient?: string | null,
+  timingMinutesBefore?: number | null,
 ): Promise<void> {
   const { error } = await admin
     .from("appointment_reminders")
@@ -901,6 +978,8 @@ async function markSkipped(
         recipient: recipient ?? null,
         errorMessage: reason,
         sentAt: new Date().toISOString(),
+        timingMinutesBefore:
+          timingMinutesBefore ?? defaultTimingMinutesForReminderKind(item.reminder_kind),
       },
       "[cron/send-reminders.log]",
     )

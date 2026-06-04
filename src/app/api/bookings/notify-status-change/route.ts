@@ -4,6 +4,7 @@ import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-s
 import { getBookingCreatedNotifyStatus } from "@/lib/notifications/booking-created-server"
 import { notifyBookingConfirmedForBooking } from "@/lib/notifications/booking-confirmed-server"
 import { notifyBookingCancelledByCompany } from "@/lib/notifications/booking-cancelled-by-company-server"
+import { notifyNoShowFollowUp } from "@/lib/notifications/no-show-follow-up-server"
 import {
   dispatchCustomTemplatesForEvent,
   type CustomTemplateEventKey,
@@ -107,9 +108,17 @@ export async function POST(req: Request) {
       standardNotice = result.email === "sent" || result.sms === "sent" ? "sent" : "queued"
       return NextResponse.json({ ok: true, standardNotice })
     }
-    if (eventKey === "cancelled" && booking.status === "cancelled") {
+    if (eventKey === "cancelled") {
       const { notice } = await notifyBookingCancelledByCompany({
-        booking,
+        booking: { ...booking, status: "cancelled" },
+        business: profile,
+        language,
+      })
+      standardNotice = notice
+    }
+    if (eventKey === "no_show") {
+      const { notice } = await notifyNoShowFollowUp({
+        booking: { ...booking, status: "no_show" },
         business: profile,
         language,
       })

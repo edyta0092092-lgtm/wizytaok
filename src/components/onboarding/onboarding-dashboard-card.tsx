@@ -9,7 +9,7 @@ import {
 } from "@/components/onboarding/onboarding-step-list"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { emptyOnboardingProgress } from "@/lib/onboarding/onboarding-steps"
+import { emptyOnboardingProgress, isOnboardingFullyComplete } from "@/lib/onboarding/onboarding-steps"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -22,6 +22,7 @@ export function OnboardingDashboardCard() {
     flowActive,
     activeStepId,
     continueSetup,
+    startSetupFromBeginning,
     skipForNow,
   } = useOnboarding()
 
@@ -29,7 +30,8 @@ export function OnboardingDashboardCard() {
 
   const progress = snapshot?.progress ?? emptyOnboardingProgress()
   const { done, total } = onboardingStepCount(progress)
-  const allDone = done >= total
+  const allDone = isOnboardingFullyComplete(progress)
+  const showStartFromBeginning = done > 0 && !allDone
 
   return (
     <Card className="overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-[color:var(--nav-active-bg)] via-card to-card shadow-sm shadow-slate-900/5">
@@ -69,6 +71,17 @@ export function OnboardingDashboardCard() {
             {allDone ? t("onboarding.allDone") : t("onboarding.continueCta")}
             {!allDone ? <ArrowRight className="ml-2 size-4" aria-hidden /> : null}
           </Button>
+          {showStartFromBeginning ? (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 rounded-xl sm:min-w-[12rem]"
+              onClick={() => startSetupFromBeginning()}
+              disabled={loading}
+            >
+              {t("onboarding.startFromBeginningCta")}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"

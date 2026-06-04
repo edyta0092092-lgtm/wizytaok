@@ -111,7 +111,7 @@ function TipCard() {
         <CardTitle className="text-sm font-semibold">{t("dashboard.tip")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2 pt-0">
-        <p className="line-clamp-4 text-sm leading-relaxed text-muted-foreground sm:line-clamp-2">
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {t(tipKey)}
         </p>
         <Button

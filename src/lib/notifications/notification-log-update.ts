@@ -18,6 +18,7 @@ export type NotificationLogUpdatePatch = {
   error?: string | null
   sent_at?: string | null
   recipient?: string | null
+  timing_minutes_before?: number | null
 }
 
 function isMissingErrorMessageColumn(message: string): boolean {
@@ -47,6 +48,9 @@ async function updateNotificationLogRow(
     provider: patch.provider ?? null,
     provider_message_id: patch.provider_message_id ?? null,
     sent_at: patch.sent_at ?? null,
+    ...(patch.timing_minutes_before !== undefined
+      ? { timing_minutes_before: patch.timing_minutes_before }
+      : {}),
   }
   const errVal = errorFieldValue(patch)
 

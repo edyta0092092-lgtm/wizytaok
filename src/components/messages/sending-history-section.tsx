@@ -36,13 +36,25 @@ import {
   type NotificationPreviewDetails,
   type NotificationPreviewTarget,
 } from "@/lib/messages/notification-history-preview"
+import { reminderHistoryTypeLabel } from "@/lib/messages/reminder-settings-from-templates"
 import { cn } from "@/lib/utils"
 import type { Tables } from "@/types/database"
 import type { NotificationMessage } from "@/types/domain"
 
 type NotificationLogRow = Tables<"notification_logs">
 type CustomTemplateSendRow = Tables<"custom_template_sends">
-type CustomTemplateRow = Pick<Tables<"custom_templates">, "id" | "name">
+type CustomTemplateRow = Pick<
+  Tables<"custom_templates">,
+  "id" | "name" | "trigger_type" | "offset_minutes" | "sms_enabled" | "email_enabled"
+>
+
+const TRANSACTIONAL_HISTORY_TYPES = new Set([
+  "booking_confirmation",
+  "booking_created",
+  "booking_cancelled_by_company",
+  "booking_cancelled_by_client",
+  "no_show_follow_up",
+])
 
 type HistoryFilter = "all" | "sent" | "scheduled" | "skipped"
 type ChannelFilter = "all" | "sms" | "email"
@@ -62,6 +74,13 @@ type MergedEntry =
     }
   | { kind: "local"; sortAt: string; msg: NotificationMessage }
   | { kind: "customSend"; sortAt: string; row: CustomTemplateSendRow; channel: "sms" | "email" }
+  | {
+      kind: "plannedCustom"
+      sortAt: string
+      row: PlannedReminderRow
+      channel: "sms" | "email"
+      templateId: string
+    }
 
 type PreviewTarget =
   | { kind: "db"; row: NotificationLogRow }
@@ -75,6 +94,12 @@ type PreviewTarget =
     }
   | { kind: "local"; msg: NotificationMessage }
   | { kind: "customSend"; row: CustomTemplateSendRow; channel: "sms" | "email" }
+  | {
+      kind: "plannedCustom"
+      row: PlannedReminderRow
+      channel: "sms" | "email"
+      templateId: string
+    }
 
 type PlannedReminderRow = {
   id: string
@@ -434,17 +459,85 @@ function customSendSortAt(row: CustomTemplateSendRow): string {
   return row.sent_at ?? row.failed_at ?? row.skipped_at ?? row.created_at
 }
 
+function isScheduledCustomTrigger(triggerType: string): boolean {
+  const t = triggerType.trim()
+  return t === "schedule_before" || t === "schedule_after"
+}
+
+function customTemplateById(
+  templates: CustomTemplateRow[],
+): Map<string, CustomTemplateRow> {
+  return new Map(templates.map((row) => [row.id, row]))
+}
+
+function customSendDedupKey(
+  appointmentId: string,
+  templateId: string,
+  channel: "sms" | "email",
+): string {
+  return `${appointmentId}:${templateId}:${channel}`
+}
+
+function buildSettledCustomSendKeys(rows: CustomTemplateSendRow[]): Set<string> {
+  const keys = new Set<string>()
+  for (const row of rows) {
+    const st = String(row.status ?? "").trim().toLowerCase()
+    if (st === "sent" || st === "failed" || st === "skipped" || st === "processing") {
+      keys.add(customSendDedupKey(row.appointment_id, row.custom_template_id, customSendChannel(row)))
+    }
+  }
+  return keys
+}
+
+function shouldIncludeCustomSendRow(
+  row: CustomTemplateSendRow,
+  templateById: Map<string, CustomTemplateRow>,
+): boolean {
+  const st = String(row.status ?? "").trim().toLowerCase()
+  if (st === "sent" || st === "failed" || st === "skipped") return true
+  const trigger = templateById.get(row.custom_template_id)?.trigger_type ?? ""
+  return isScheduledCustomTrigger(trigger) && (st === "pending" || st === "processing")
+}
+
+function computeCustomTemplateTriggerIso(
+  row: PlannedReminderRow,
+  template: CustomTemplateRow,
+): string | null {
+  if (template.offset_minutes == null) return null
+  const startIso = `${row.appointment_date}T${String(row.appointment_time).slice(0, 5)}:00`
+  const startMs = new Date(startIso).getTime()
+  if (Number.isNaN(startMs)) return null
+  const offsetMs = template.offset_minutes * 60 * 1000
+  if (template.trigger_type === "schedule_before") {
+    return new Date(startMs - offsetMs).toISOString()
+  }
+  if (template.trigger_type === "schedule_after") {
+    return new Date(startMs + offsetMs).toISOString()
+  }
+  return null
+}
+
+function isTransactionalDbLog(row: NotificationLogRow): boolean {
+  const type = canonicalNotificationType(String(row.type ?? "").trim())
+  return TRANSACTIONAL_HISTORY_TYPES.has(type)
+}
+
 function typeLabel(
   canonicalType: string,
   t: (key: string) => string,
   customTemplateNames: Record<string, string>,
+  timingMinutesBefore?: number | null,
 ): string {
   if (isCustomTemplateFilterKey(canonicalType)) {
     const name = customTemplateNames[customTemplateIdFromFilterKey(canonicalType)]?.trim()
     return name || "Własny szablon"
   }
-  if (canonicalType === "reminder_24h") return t("notifications.reminder24hType")
-  if (canonicalType === "reminder_before_visit") return t("notifications.secondReminderType")
+  if (canonicalType === "reminder_24h") {
+    return reminderHistoryTypeLabel("first", timingMinutesBefore, t("notifications.reminder24hType"))
+  }
+  if (canonicalType === "reminder_before_visit") {
+    return reminderHistoryTypeLabel("second", timingMinutesBefore, t("notifications.secondReminderType"))
+  }
   if (canonicalType === "booking_confirmation") return t("notifications.bookingConfirmationType")
   if (canonicalType === "booking_cancelled_by_company") return "Anulowanie wizyty"
   if (canonicalType === "no_show_follow_up") return "Follow-up po nieobecności"
@@ -486,15 +579,22 @@ function mergeBookingReminderRows(
 
 function entryChannel(entry: MergedEntry): "sms" | "email" {
   if (entry.kind === "db") return dbChannel(entry.row)
-  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "customSend") {
+  if (
+    entry.kind === "planned" ||
+    entry.kind === "reminderOutcome" ||
+    entry.kind === "customSend" ||
+    entry.kind === "plannedCustom"
+  ) {
     return entry.channel
   }
   return entry.msg.channel
 }
 
 function resolvedHistoryTypeFilter(entry: MergedEntry): string {
-  if (entry.kind === "customSend") {
-    return customTemplateFilterKey(entry.row.custom_template_id)
+  if (entry.kind === "customSend" || entry.kind === "plannedCustom") {
+    const templateId =
+      entry.kind === "customSend" ? entry.row.custom_template_id : entry.templateId
+    return customTemplateFilterKey(templateId)
   }
   if (entry.kind === "db") {
     return canonicalNotificationType(String(entry.row.type ?? "").trim())
@@ -511,6 +611,8 @@ function mergeEntries(
   planned: PlannedReminderRow[],
   queueByKey: Map<string, AppointmentReminderQueueRow>,
   customSends: CustomTemplateSendRow[],
+  customTemplates: CustomTemplateRow[],
+  nowMs: number,
 ): MergedEntry[] {
   const out: MergedEntry[] = []
   const logKeys = buildLogDedupKeys(rows)
@@ -658,7 +760,44 @@ function mergeEntries(
   for (const msg of local) {
     out.push({ kind: "local", sortAt: msg.createdAt, msg })
   }
+
+  const templateById = customTemplateById(customTemplates)
+  const settledCustomKeys = buildSettledCustomSendKeys(customSends)
+  for (const template of customTemplates) {
+    if (!isScheduledCustomTrigger(template.trigger_type)) continue
+    for (const row of planned) {
+      const triggerIso = computeCustomTemplateTriggerIso(row, template)
+      if (!triggerIso) continue
+      if (new Date(triggerIso).getTime() <= nowMs) continue
+      if (template.sms_enabled && row.client_phone?.trim()) {
+        const key = customSendDedupKey(row.id, template.id, "sms")
+        if (!settledCustomKeys.has(key)) {
+          out.push({
+            kind: "plannedCustom",
+            sortAt: triggerIso,
+            row,
+            channel: "sms",
+            templateId: template.id,
+          })
+        }
+      }
+      if (template.email_enabled && row.client_email?.trim()) {
+        const key = customSendDedupKey(row.id, template.id, "email")
+        if (!settledCustomKeys.has(key)) {
+          out.push({
+            kind: "plannedCustom",
+            sortAt: triggerIso,
+            row,
+            channel: "email",
+            templateId: template.id,
+          })
+        }
+      }
+    }
+  }
+
   for (const row of customSends) {
+    if (!shouldIncludeCustomSendRow(row, templateById)) continue
     const channel = customSendChannel(row)
     out.push({
       kind: "customSend",
@@ -674,14 +813,22 @@ function mergeEntries(
   return out
 }
 
-function canonicalStatus(entry: MergedEntry): string {
-  if (entry.kind === "planned") return "scheduled"
+function canonicalStatus(
+  entry: MergedEntry,
+  customTemplateByIdMap?: Map<string, CustomTemplateRow>,
+): string {
+  if (entry.kind === "planned" || entry.kind === "plannedCustom") return "scheduled"
   if (entry.kind === "reminderOutcome") return entry.outcomeStatus
   if (entry.kind === "customSend") {
     const st = String(entry.row.status ?? "").trim().toLowerCase()
     if (st === "sent") return "sent"
     if (st === "failed") return "failed"
     if (st === "skipped") return "skipped"
+    const trigger =
+      customTemplateByIdMap?.get(entry.row.custom_template_id)?.trigger_type ?? ""
+    if (isScheduledCustomTrigger(trigger) && (st === "pending" || st === "processing")) {
+      return "scheduled"
+    }
     if (st === "processing") return "pending"
     return st || "pending"
   }
@@ -717,11 +864,19 @@ function statusTone(
   return "neutral"
 }
 
-function entryMatchesFilter(entry: MergedEntry, filter: HistoryFilter): boolean {
+function entryMatchesFilter(
+  entry: MergedEntry,
+  filter: HistoryFilter,
+  customTemplateByIdMap: Map<string, CustomTemplateRow>,
+): boolean {
   if (filter === "all") return true
-  const c = canonicalStatus(entry)
+  const c = canonicalStatus(entry, customTemplateByIdMap)
   if (filter === "sent") return c === "sent"
-  if (filter === "scheduled") return entry.kind === "planned" && c === "scheduled"
+  if (filter === "scheduled") {
+    return (
+      (entry.kind === "planned" || entry.kind === "plannedCustom") && c === "scheduled"
+    ) || (entry.kind === "customSend" && c === "scheduled")
+  }
   if (filter === "skipped") {
     return c === "skipped" || c === "not_configured" || c === "failed"
   }
@@ -736,15 +891,17 @@ function listTypeLine(
   const channel =
     entry.kind === "db"
       ? dbChannel(entry.row)
-      : entry.kind === "planned" || entry.kind === "reminderOutcome"
+      : entry.kind === "planned" ||
+          entry.kind === "reminderOutcome" ||
+          entry.kind === "customSend" ||
+          entry.kind === "plannedCustom"
         ? entry.channel
-        : entry.kind === "customSend"
-          ? entry.channel
-          : entry.msg.channel
+        : entry.msg.channel
 
-  if (entry.kind === "customSend") {
-    const name =
-      customTemplateNames[entry.row.custom_template_id]?.trim() || "Własny szablon"
+  if (entry.kind === "customSend" || entry.kind === "plannedCustom") {
+    const templateId =
+      entry.kind === "customSend" ? entry.row.custom_template_id : entry.templateId
+    const name = customTemplateNames[templateId]?.trim() || "Własny szablon"
     const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
     return `${name} - ${chLabel}`
   }
@@ -764,7 +921,8 @@ function listTypeLine(
   }
 
   const chLabel = channel === "email" ? t("messages.email") : t("messages.sms")
-  if (type) return `${typeLabel(type, t, customTemplateNames)} - ${chLabel}`
+  const timingMinutesBefore = entry.kind === "db" ? entry.row.timing_minutes_before : null
+  if (type) return `${typeLabel(type, t, customTemplateNames, timingMinutesBefore)} - ${chLabel}`
   return chLabel
 }
 
@@ -797,6 +955,15 @@ function previewAsMerged(p: PreviewTarget): MergedEntry {
       channel: p.channel,
     }
   }
+  if (p.kind === "plannedCustom") {
+    return {
+      kind: "plannedCustom",
+      sortAt: p.row.appointment_date,
+      row: p.row,
+      channel: p.channel,
+      templateId: p.templateId,
+    }
+  }
   return { kind: "local", sortAt: p.msg.createdAt, msg: p.msg }
 }
 
@@ -812,13 +979,18 @@ function safeFormatDate(
 
 function statusDisplay(
   canon: string,
-  t: (key: string) => string
+  t: (key: string) => string,
+  entry?: MergedEntry,
 ): string {
   switch (canon) {
     case "sent":
       return t("messagesLog.statusSent")
     case "scheduled":
+      return t("messagesLog.statusScheduled")
     case "queued":
+      if (entry?.kind === "db" && isTransactionalDbLog(entry.row)) {
+        return t("messagesLog.statusPending")
+      }
       return t("messagesLog.statusScheduled")
     case "failed":
       return t("messagesLog.statusFailed")
@@ -856,7 +1028,7 @@ function recipientDisplay(entry: PreviewTarget): string {
     if (bits.length) return bits.join(" · ")
     return "-"
   }
-  if (entry.kind === "planned" || entry.kind === "reminderOutcome") {
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "plannedCustom") {
     const v = entry.channel === "email" ? entry.row.client_email : entry.row.client_phone
     return v?.trim() || "-"
   }
@@ -867,7 +1039,9 @@ function recipientDisplay(entry: PreviewTarget): string {
 }
 
 function bodyForPreview(entry: PreviewTarget): string | null {
-  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "plannedCustom") {
+    return null
+  }
   if (entry.kind === "customSend") {
     return entry.row.body?.trim() || null
   }
@@ -880,7 +1054,9 @@ function bodyForPreview(entry: PreviewTarget): string | null {
 }
 
 function subjectForPreview(entry: PreviewTarget): string | null {
-  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "plannedCustom") {
+    return null
+  }
   if (entry.kind === "customSend") {
     return entry.row.subject?.trim() || null
   }
@@ -920,7 +1096,9 @@ function entryErrorDetail(
   t: (key: string) => string,
   language: "pl" | "en",
 ): string | null {
-  if (entry.kind === "planned" || entry.kind === "reminderOutcome") return null
+  if (entry.kind === "planned" || entry.kind === "reminderOutcome" || entry.kind === "plannedCustom") {
+    return null
+  }
   if (entry.kind === "customSend") {
     const st = String(entry.row.status ?? "").trim().toLowerCase()
     if (st === "failed" || st === "skipped") {
@@ -969,7 +1147,7 @@ function errorForPreview(
     }
     return null
   }
-  if (entry.msg.status === "failed") {
+  if (entry.kind === "local" && entry.msg.status === "failed") {
     return localFailureDetail(entry.msg, t)
   }
   return null
@@ -1104,7 +1282,10 @@ export function SendingHistorySection() {
         await Promise.all([
         loadNotificationLogRows(client, bid),
         client.from("message_templates").select("type").eq("business_id", bid),
-        client.from("custom_templates").select("id,name").eq("business_id", bid),
+        client
+          .from("custom_templates")
+          .select("id,name,trigger_type,offset_minutes,sms_enabled,email_enabled")
+          .eq("business_id", bid),
         client
           .from("custom_template_sends")
           .select("*")
@@ -1270,9 +1451,25 @@ export function SendingHistorySection() {
     return map
   }, [customTemplates])
 
+  const customTemplateByIdMap = React.useMemo(
+    () => customTemplateById(customTemplates),
+    [customTemplates],
+  )
+
+  const [nowMs] = React.useState<number>(() => new Date().getTime())
+
   const merged = React.useMemo(
-    () => mergeEntries(rows, scopedLocal, plannedRows, queueByKey, customSendRows),
-    [rows, scopedLocal, plannedRows, queueByKey, customSendRows],
+    () =>
+      mergeEntries(
+        rows,
+        scopedLocal,
+        plannedRows,
+        queueByKey,
+        customSendRows,
+        customTemplates,
+        nowMs,
+      ),
+    [rows, scopedLocal, plannedRows, queueByKey, customSendRows, customTemplates, nowMs],
   )
 
   const availableTypeFilters = React.useMemo(() => {
@@ -1301,8 +1498,6 @@ export function SendingHistorySection() {
     return [...standard, ...customSorted, ...orphan]
   }, [merged, templateTypes, customTemplates, customTemplateNames, language])
 
-  const [nowMs] = React.useState<number>(() => new Date().getTime())
-
   const tabFiltered = React.useMemo(() => {
     const sinceMs =
       filter === "scheduled"
@@ -1315,7 +1510,7 @@ export function SendingHistorySection() {
             ? nowMs - 30 * 24 * 60 * 60 * 1000
             : null
     return merged
-      .filter((e) => entryMatchesFilter(e, filter))
+      .filter((e) => entryMatchesFilter(e, filter, customTemplateByIdMap))
       .filter((e) => {
         if (channelFilter === "all") return true
         return entryChannel(e) === channelFilter
@@ -1328,7 +1523,7 @@ export function SendingHistorySection() {
         if (typeFilter === "all") return true
         return resolvedHistoryTypeFilter(e) === typeFilter
       })
-  }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs])
+  }, [merged, filter, channelFilter, dateRange, typeFilter, nowMs, customTemplateByIdMap])
 
   React.useEffect(() => {
     if (typeFilter === "all") return
@@ -1339,14 +1534,14 @@ export function SendingHistorySection() {
 
   const listEntries = React.useMemo(() => {
     if (logFilter === "failed") {
-      return tabFiltered.filter((e) => canonicalStatus(e) === "failed")
+      return tabFiltered.filter((e) => canonicalStatus(e, customTemplateByIdMap) === "failed")
     }
     if (logFilter !== "needs_attention") return tabFiltered
     return tabFiltered.filter((e) => {
-      const c = canonicalStatus(e)
+      const c = canonicalStatus(e, customTemplateByIdMap)
       return c === "failed" || c === "scheduled" || c === "queued" || c === "pending"
     })
-  }, [tabFiltered, logFilter])
+  }, [tabFiltered, logFilter, customTemplateByIdMap])
 
   const dateFmt = React.useMemo(
     () =>
@@ -1362,7 +1557,9 @@ export function SendingHistorySection() {
       ? preview.row.appointment_id
       : preview?.kind === "db"
       ? preview.row.booking_id
-      : preview?.kind === "planned" || preview?.kind === "reminderOutcome"
+      : preview?.kind === "planned" ||
+          preview?.kind === "reminderOutcome" ||
+          preview?.kind === "plannedCustom"
         ? preview.row.id
       : preview?.kind === "local"
         ? preview.msg.bookingId
@@ -1610,8 +1807,10 @@ export function SendingHistorySection() {
                         ? `outcome:${entry.row.id}:${entry.reminderType}:${entry.channel}`
                         : entry.kind === "customSend"
                           ? `custom:${entry.row.id}:${entry.channel}`
-                          : `local:${entry.msg.id}`
-                const canon = canonicalStatus(entry)
+                          : entry.kind === "plannedCustom"
+                            ? `plannedCustom:${entry.row.id}:${entry.templateId}:${entry.channel}`
+                            : `local:${entry.msg.id}`
+                const canon = canonicalStatus(entry, customTemplateByIdMap)
                 const errorDetail = entryErrorDetail(entry, t, language)
                 return (
                   <li key={key} className="min-h-[4.5rem] px-3 py-3 sm:px-4">
@@ -1627,7 +1826,7 @@ export function SendingHistorySection() {
                               semanticStatusBadgeClass(statusTone(canon))
                             )}
                           >
-                            {statusDisplay(canon, t)}
+                            {statusDisplay(canon, t, entry)}
                           </span>
                           <span className="tabular-nums">
                             {safeFormatDate(entry.sortAt, dateFmt)}
@@ -1665,7 +1864,14 @@ export function SendingHistorySection() {
                                         row: entry.row,
                                         channel: entry.channel,
                                       }
-                                    : { kind: "local", msg: entry.msg }
+                                    : entry.kind === "plannedCustom"
+                                      ? {
+                                          kind: "plannedCustom",
+                                          row: entry.row,
+                                          channel: entry.channel,
+                                          templateId: entry.templateId,
+                                        }
+                                      : { kind: "local", msg: entry.msg }
                           )
                         }}
                       >
@@ -1723,11 +1929,12 @@ export function SendingHistorySection() {
                     <dd className="mt-0.5 text-foreground">
                       {(preview.kind === "db"
                         ? dbChannel(preview.row)
-                        : preview.kind === "customSend"
+                        : preview.kind === "customSend" ||
+                            preview.kind === "planned" ||
+                            preview.kind === "reminderOutcome" ||
+                            preview.kind === "plannedCustom"
                           ? preview.channel
-                        : preview.kind === "planned" || preview.kind === "reminderOutcome"
-                          ? preview.channel
-                        : preview.msg.channel) === "email"
+                          : preview.msg.channel) === "email"
                         ? t("messages.email")
                         : t("messages.sms")}
                     </dd>
@@ -1739,7 +1946,9 @@ export function SendingHistorySection() {
                     <dd className="mt-0.5 text-foreground">
                       {preview.kind === "local"
                         ? preview.msg.recipientName || "-"
-                        : preview.kind === "planned" || preview.kind === "reminderOutcome"
+                        : preview.kind === "planned" ||
+                            preview.kind === "reminderOutcome" ||
+                            preview.kind === "plannedCustom"
                           ? preview.row.client_name || "-"
                           : preview.kind === "db" &&
                               (!preview.row.booking_id ||
@@ -1761,7 +1970,11 @@ export function SendingHistorySection() {
                       {t("messagesLog.fieldStatus")}
                     </dt>
                     <dd className="mt-0.5 text-foreground">
-                      {statusDisplay(canonicalStatus(previewAsMerged(preview)), t)}
+                      {statusDisplay(
+                        canonicalStatus(previewAsMerged(preview), customTemplateByIdMap),
+                        t,
+                        previewAsMerged(preview),
+                      )}
                     </dd>
                   </div>
                   <div>

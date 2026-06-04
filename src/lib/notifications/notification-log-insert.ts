@@ -31,6 +31,30 @@ export async function insertNotificationLog(
     return { ok: true }
   }
   if (error.code === "23505") {
+    if (
+      payload.status === "sent" &&
+      payload.booking_id &&
+      payload.type &&
+      payload.channel
+    ) {
+      const sentAt = payload.sent_at ?? new Date().toISOString()
+      await admin
+        .from("notification_logs")
+        .update({
+          status: "sent",
+          sent_at: sentAt,
+          recipient: payload.recipient ?? null,
+          subject: payload.subject ?? null,
+          body: payload.body ?? null,
+          provider: payload.provider ?? null,
+          provider_message_id: payload.provider_message_id ?? null,
+          error_message: null,
+        })
+        .eq("booking_id", payload.booking_id)
+        .eq("type", payload.type)
+        .eq("channel", payload.channel)
+        .neq("status", "sent")
+    }
     return { ok: true, duplicate: true }
   }
   if (isMissingErrorMessageColumn(error.message)) {
@@ -46,6 +70,30 @@ export async function insertNotificationLog(
       return { ok: true }
     }
     if (legacy.error.code === "23505") {
+      if (
+        payload.status === "sent" &&
+        payload.booking_id &&
+        payload.type &&
+        payload.channel
+      ) {
+        const sentAt = payload.sent_at ?? new Date().toISOString()
+        await admin
+          .from("notification_logs")
+          .update({
+            status: "sent",
+            sent_at: sentAt,
+            recipient: payload.recipient ?? null,
+            subject: payload.subject ?? null,
+            body: payload.body ?? null,
+            provider: payload.provider ?? null,
+            provider_message_id: payload.provider_message_id ?? null,
+            error_message: null,
+          })
+          .eq("booking_id", payload.booking_id)
+          .eq("type", payload.type)
+          .eq("channel", payload.channel)
+          .neq("status", "sent")
+      }
       return { ok: true, duplicate: true }
     }
     console.error(logTag, {

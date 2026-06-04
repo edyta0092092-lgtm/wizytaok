@@ -783,6 +783,7 @@ export interface Database {
           provider: string | null
           provider_message_id: string | null
           error_message: string | null
+          timing_minutes_before: number | null
           sent_at: string | null
           created_at: string
         }
@@ -799,6 +800,7 @@ export interface Database {
           provider?: string | null
           provider_message_id?: string | null
           error_message?: string | null
+          timing_minutes_before?: number | null
           sent_at?: string | null
           created_at?: string
         }
@@ -815,6 +817,7 @@ export interface Database {
           provider?: string | null
           provider_message_id?: string | null
           error_message?: string | null
+          timing_minutes_before?: number | null
           sent_at?: string | null
           created_at?: string
         }

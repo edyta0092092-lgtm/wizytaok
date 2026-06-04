@@ -8,7 +8,20 @@ import {
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
+import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesUpdate } from "@/types/database"
+
+async function hasCancellationNotificationLog(bookingId: string): Promise<boolean> {
+  const admin = getServiceRoleClient()
+  if (!admin) return false
+  const { count } = await admin
+    .from("notification_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("booking_id", bookingId)
+    .in("type", ["booking_cancelled_by_company", "booking_cancelled_by_client"])
+    .in("status", ["sent", "queued"])
+  return (count ?? 0) > 0
+}
 
 type Body = {
   bookingId?: string
@@ -56,10 +69,7 @@ export async function POST(req: Request) {
   }
 
   const booking = bookingRow as Tables<"bookings">
-
-  if (booking.status === "cancelled") {
-    return NextResponse.json({ ok: true, notice: "queued" as const, alreadyCancelled: true })
-  }
+  const alreadyCancelled = booking.status === "cancelled"
 
   const now = new Date().toISOString()
   const note =
@@ -96,14 +106,21 @@ export async function POST(req: Request) {
     return "update_failed"
   }
 
-  const upErrMsg = await applyPatchSafely(patch)
-  if (upErrMsg) {
-    return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
+  if (!alreadyCancelled) {
+    const upErrMsg = await applyPatchSafely(patch)
+    if (upErrMsg) {
+      return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
+    }
   }
 
   const shouldNotifyClient = body.notifyClient !== false
   if (!shouldNotifyClient) {
-    return NextResponse.json({ ok: true, notice: "saved" as const, notificationSkipped: true })
+    return NextResponse.json({
+      ok: true,
+      notice: "saved" as const,
+      notificationSkipped: true,
+      ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
+    })
   }
 
   const { data: profile, error: profErr } = await supabase
@@ -124,9 +141,18 @@ export async function POST(req: Request) {
   const updatedBooking: Tables<"bookings"> = {
     ...booking,
     ...patch,
-    cancelled_at: now,
-    cancellation_note: note,
+    cancelled_at: booking.cancelled_at ?? now,
+    cancellation_note: note ?? booking.cancellation_note,
     status: "cancelled",
+  }
+
+  if (alreadyCancelled && (await hasCancellationNotificationLog(bookingUuid))) {
+    try {
+      await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "cancelled" })
+    } catch {
+      // własne szablony nie blokują odpowiedzi
+    }
+    return NextResponse.json({ ok: true, notice: "queued" as const, alreadyCancelled: true })
   }
 
   try {
@@ -142,12 +168,17 @@ export async function POST(req: Request) {
     } catch {
       // własne szablony nie blokują głównej odpowiedzi
     }
-    return NextResponse.json({ ok: true, notice })
+    return NextResponse.json({
+      ok: true,
+      notice,
+      ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
+    })
   } catch {
     return NextResponse.json({
       ok: true,
       notice: "saved" as const,
       notificationSkipped: true,
+      ...(alreadyCancelled ? { alreadyCancelled: true as const } : {}),
     })
   }
 }

@@ -139,3 +139,19 @@ export function reminder24hTitleFromMinutes(minutes: number | null): string {
   }
   return `Przypomnienie ${formatTimingLabel(safe)} przed wizytą`
 }
+
+/** Krótka etykieta typu w historii wysyłek (np. „Przypomnienie 48h”). */
+export function reminderHistoryTypeLabel(
+  kind: "first" | "second",
+  timingMinutesBefore: number | null | undefined,
+  fallbackLabel: string,
+): string {
+  if (typeof timingMinutesBefore !== "number" || !Number.isFinite(timingMinutesBefore)) {
+    return fallbackLabel
+  }
+  const safe = Math.max(0, Math.floor(timingMinutesBefore))
+  if (safe > 0 && safe % 60 === 0) {
+    return `Przypomnienie ${Math.floor(safe / 60)}h`
+  }
+  return `Przypomnienie ${formatTimingLabel(safe)}`
+}

@@ -58,10 +58,6 @@ export async function POST(req: Request) {
   }
   const booking = bookingRow as Tables<"bookings">
 
-  if (booking.status !== "no_show") {
-    return NextResponse.json({ ok: true, notice: "skipped" as const, reason: "not_no_show" })
-  }
-
   const { data: profile, error: profErr } = await supabase
     .from("business_profiles")
     .select("id, slug, phone, contact_phone, business_name, business_address")
@@ -73,7 +69,11 @@ export async function POST(req: Request) {
 
   const language: NoShowFollowUpLanguage = body.language === "en" ? "en" : "pl"
   try {
-    const { notice } = await notifyNoShowFollowUp({ booking, business: profile, language })
+    const { notice } = await notifyNoShowFollowUp({
+      booking: { ...booking, status: "no_show" },
+      business: profile,
+      language,
+    })
     try {
       await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "no_show" })
     } catch {

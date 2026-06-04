@@ -45,6 +45,7 @@ type OnboardingContextValue = {
   setupComplete: boolean
   dismissWelcome: () => void
   continueSetup: () => void
+  startSetupFromBeginning: () => void
   restartOnboarding: () => void
   refreshProgress: () => Promise<void>
   skipForNow: () => void
@@ -80,7 +81,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [welcomeOpen, setWelcomeOpen] = React.useState(false)
   const [flowActive, setFlowActive] = React.useState(false)
   const [activeStepId, setActiveStepId] = React.useState<OnboardingStepId | null>(null)
-  const [freshChecklistOpen, setFreshChecklistOpen] = React.useState(false)
 
   const { ready: eligibilityReady, eligible: panelEligible } = usePanelOnboardingEligibility(flowActive)
   const isAdmin = isBusinessAdmin(access)
@@ -105,7 +105,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       const next = applyLocalOnboardingProgress(fetched, businessId)
       setSnapshot(next)
       setLoading(false)
-      if (flowActive && !freshChecklistOpen && isOnboardingFullyComplete(next.progress) && businessId) {
+      if (flowActive && isOnboardingFullyComplete(next.progress) && businessId) {
         markOnboardingComplete(businessId)
         markWelcomeHandledForBusiness(businessId)
         setFlowActive(false)
@@ -120,7 +120,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       })
       setLoading(false)
     }
-  }, [businessId, flowActive, freshChecklistOpen])
+  }, [businessId, flowActive])
 
   React.useEffect(() => {
     queueMicrotask(() => setReady(true))
@@ -211,7 +211,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
       queueMicrotask(() => {
         clearPanelAccessJustActivated()
-        setFreshChecklistOpen(true)
         setWelcomeOpen(true)
       })
       return
@@ -220,10 +219,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     if (dataComplete || markedComplete) return
 
     if (!dismissed) {
-      queueMicrotask(() => {
-        setFreshChecklistOpen(true)
-        setWelcomeOpen(true)
-      })
+      queueMicrotask(() => setWelcomeOpen(true))
     }
   }, [
     ready,
@@ -251,7 +247,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     dismissWelcome()
     setFlowActive(false)
     setActiveStepId(null)
-    setFreshChecklistOpen(false)
   }, [dismissWelcome])
 
   const navigateToStep = React.useCallback(
@@ -262,7 +257,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setActiveStepId(stepId)
       setFlowActive(true)
       setWelcomeOpen(false)
-      setFreshChecklistOpen(false)
       if (businessId) markOnboardingWelcomeDismissed(businessId)
 
       if (stepId === "booking_page" && snapshot?.bookingPath) {
@@ -299,15 +293,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   )
 
   const continueSetup = React.useCallback(() => {
-    if (freshChecklistOpen) {
-      navigateToStep("working_hours")
-      return
-    }
     if (!snapshot) {
       void refreshProgress()
       setFlowActive(true)
       setWelcomeOpen(false)
-      setFreshChecklistOpen(false)
       if (businessId) markOnboardingWelcomeDismissed(businessId)
       router.push("/availability")
       return
@@ -320,13 +309,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return
     }
     navigateToStep(next)
-  }, [freshChecklistOpen, snapshot, refreshProgress, businessId, navigateToStep, router])
+  }, [snapshot, refreshProgress, businessId, navigateToStep, router])
+
+  const startSetupFromBeginning = React.useCallback(() => {
+    navigateToStep("working_hours")
+  }, [navigateToStep])
 
   const restartOnboarding = React.useCallback(() => {
     if (!businessId) return
     requestOnboardingRestart(businessId)
     setWelcomeOpen(true)
-    setFreshChecklistOpen(true)
     setFlowActive(false)
     setActiveStepId(null)
     void refreshProgress()
@@ -339,20 +331,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       Boolean(snapshot && isOnboardingFullyComplete(snapshot.progress)))
   const welcomeDismissed = Boolean(businessId) && isOnboardingWelcomeDismissed(businessId)
 
-  const displaySnapshot = React.useMemo<OnboardingProgressSnapshot | null>(() => {
-    if (!freshChecklistOpen) return snapshot
-    return {
-      progress: emptyOnboardingProgress(),
-      slug: snapshot?.slug ?? null,
-      bookingPath: snapshot?.bookingPath ?? null,
-    }
-  }, [freshChecklistOpen, snapshot])
-
   const showDashboardCard =
-    eligible &&
-    Boolean(businessId) &&
-    !welcomeDismissed &&
-    (freshChecklistOpen || !setupComplete)
+    eligible && Boolean(businessId) && !welcomeDismissed && !setupComplete
 
   const value = React.useMemo<OnboardingContextValue>(
     () => ({
@@ -360,7 +340,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       eligible,
       isAdmin,
       loading,
-      snapshot: displaySnapshot,
+      snapshot,
       welcomeOpen,
       flowActive,
       activeStepId,
@@ -368,6 +348,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setupComplete,
       dismissWelcome,
       continueSetup,
+      startSetupFromBeginning,
       restartOnboarding,
       refreshProgress,
       skipForNow,
@@ -377,7 +358,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       eligible,
       isAdmin,
       loading,
-      displaySnapshot,
+      snapshot,
       welcomeOpen,
       flowActive,
       activeStepId,
@@ -385,6 +366,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setupComplete,
       dismissWelcome,
       continueSetup,
+      startSetupFromBeginning,
       restartOnboarding,
       refreshProgress,
       skipForNow,

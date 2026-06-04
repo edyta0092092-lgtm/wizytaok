@@ -7,6 +7,7 @@ import {
   onboardingStepCount,
   OnboardingStepList,
 } from "@/components/onboarding/onboarding-step-list"
+import { isOnboardingFullyComplete } from "@/lib/onboarding/onboarding-steps"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { emptyOnboardingProgress } from "@/lib/onboarding/onboarding-steps"
@@ -22,6 +23,7 @@ export function OnboardingWelcomeModal() {
     snapshot,
     dismissWelcome,
     continueSetup,
+    startSetupFromBeginning,
     skipForNow,
   } = useOnboarding()
 
@@ -29,6 +31,8 @@ export function OnboardingWelcomeModal() {
 
   const progress = snapshot?.progress ?? emptyOnboardingProgress()
   const { done, total } = onboardingStepCount(progress)
+  const allDone = isOnboardingFullyComplete(progress)
+  const showStartFromBeginning = done > 0 && !allDone
 
   return (
     <div
@@ -82,6 +86,17 @@ export function OnboardingWelcomeModal() {
               {t("onboarding.continueCta")}
               <ArrowRight className="ml-2 size-4" />
             </Button>
+            {showStartFromBeginning ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-xl"
+                onClick={() => startSetupFromBeginning()}
+                disabled={loading}
+              >
+                {t("onboarding.startFromBeginningCta")}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"

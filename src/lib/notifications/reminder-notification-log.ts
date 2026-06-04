@@ -28,11 +28,18 @@ export async function upsertReminderNotificationLog(
     providerMessageId?: string | null
     errorMessage?: string | null
     sentAt?: string | null
+    timingMinutesBefore?: number | null
   },
   logTag = "[reminder.notify.log]",
 ): Promise<void> {
   const type = reminderLogTypeFromKind(args.reminderKind)
   const recipient = (args.recipient ?? "").trim()
+  const timing_minutes_before =
+    typeof args.timingMinutesBefore === "number" && Number.isFinite(args.timingMinutesBefore)
+      ? Math.max(0, Math.floor(args.timingMinutesBefore))
+      : args.timingMinutesBefore === null
+        ? null
+        : undefined
   await upsertNotificationLog(
     admin,
     { booking_id: args.bookingId, type, channel: args.channel },
@@ -49,6 +56,7 @@ export async function upsertReminderNotificationLog(
       provider_message_id: args.providerMessageId ?? null,
       error_message: args.errorMessage ?? null,
       sent_at: args.sentAt ?? null,
+      ...(timing_minutes_before !== undefined ? { timing_minutes_before } : {}),
     },
     {
       status: args.status,
@@ -59,6 +67,7 @@ export async function upsertReminderNotificationLog(
       provider_message_id: args.providerMessageId ?? null,
       error_message: args.errorMessage ?? null,
       sent_at: args.sentAt ?? null,
+      ...(timing_minutes_before !== undefined ? { timing_minutes_before } : {}),
     },
     logTag,
   )
