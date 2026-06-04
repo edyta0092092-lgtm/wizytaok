@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
-import { applyStaffPanelAccess, syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
+import { syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -1045,10 +1045,19 @@ export default function TeamPage() {
         language === "en"
           ? "Staff member was saved. Some additional settings need to be saved again."
           : "Osoba została zapisana. Niektóre dodatkowe ustawienia wymagają ponownego zapisania."
-      const msgInviteWarn =
-        language === "en"
-          ? "Invitation link could not be created. Try again later."
-          : "Nie udało się utworzyć linku zaproszenia. Spróbuj ponownie później."
+      const panelAccessNoticeForFailure = (messageKey?: string, detail?: string) => {
+        const key =
+          messageKey === "team.panelEmailRequired"
+            ? "team.panelEmailRequired"
+            : messageKey === "team.panelInviteEmailConflict"
+              ? "team.panelInviteEmailConflict"
+              : "invitations.invitationCreateError"
+        const line = t(key as "team.panelEmailRequired")
+        if (process.env.NODE_ENV === "development" && detail?.trim()) {
+          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
+        }
+        return line
+      }
       const setSaveErrorWithDetail = (message: string, detail?: string) => {
         setNotice(message)
         if (process.env.NODE_ENV === "development" && detail?.trim()) {
@@ -1129,26 +1138,19 @@ export default function TeamPage() {
           }
         }
         let inviteToken: string | null = null
-        if (client && bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
-          const {
-            data: { user },
-          } = await client.auth.getUser()
-          const panelOut = await applyStaffPanelAccess(
-            client,
-            bid,
-            newStaffId,
-            { panelMemberRole: form.panelMemberRole, invitationEmail: form.email },
-            user?.id ?? null,
-          )
-          if (!panelOut.ok) {
-            partialNotices = [...partialNotices, msgInviteWarn]
+        if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
+          const panelRes = await requestPanelAccessForStaff(newStaffId, form.email, form.panelMemberRole)
+          if (!panelRes.ok) {
+            partialNotices = [
+              ...partialNotices,
+              panelAccessNoticeForFailure(panelRes.messageKey, panelRes.detail),
+            ]
           } else {
-            inviteToken = panelOut.invitationToken
+            inviteToken = panelRes.invitationToken
+            if (panelRes.emailOutcome) {
+              partialNotices = appendInvitationEmailNotice(partialNotices, panelRes.emailOutcome)
+            }
           }
-        }
-        if (inviteToken) {
-          const emailOutcome = await sendInvitationEmailByToken(inviteToken)
-          partialNotices = appendInvitationEmailNotice(partialNotices, emailOutcome)
         }
         if (client && bid && isSupabaseConfigured()) {
           const syncOutCreate = await syncBusinessMemberRoleForStaff(
@@ -1313,26 +1315,19 @@ export default function TeamPage() {
         }
       }
       let editInviteToken: string | null = null
-      if (client && bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
-        const {
-          data: { user },
-        } = await client.auth.getUser()
-        const panelOut = await applyStaffPanelAccess(
-          client,
-          bid,
-          editing.id,
-          { panelMemberRole: form.panelMemberRole, invitationEmail: form.email },
-          user?.id ?? null,
-        )
-        if (!panelOut.ok) {
-          partialNotices = [...partialNotices, msgInviteWarn]
+      if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
+        const panelRes = await requestPanelAccessForStaff(editing.id, form.email, form.panelMemberRole)
+        if (!panelRes.ok) {
+          partialNotices = [
+            ...partialNotices,
+            panelAccessNoticeForFailure(panelRes.messageKey, panelRes.detail),
+          ]
         } else {
-          editInviteToken = panelOut.invitationToken
+          editInviteToken = panelRes.invitationToken
+          if (panelRes.emailOutcome) {
+            partialNotices = appendInvitationEmailNotice(partialNotices, panelRes.emailOutcome)
+          }
         }
-      }
-      if (editInviteToken) {
-        const emailOutcome = await sendInvitationEmailByToken(editInviteToken)
-        partialNotices = appendInvitationEmailNotice(partialNotices, emailOutcome)
       }
       await load()
       let editHighlightId: string | null = null
@@ -1495,6 +1490,66 @@ export default function TeamPage() {
   }
 
   type InvitationEmailSendOutcome = "sent" | "not_configured" | "failed"
+
+  const requestPanelAccessForStaff = async (
+    staffMemberId: string,
+    invitationEmail: string,
+    panelMemberRole: PanelRole,
+  ): Promise<
+    | {
+        ok: true
+        invitationToken: string | null
+        emailOutcome?: InvitationEmailSendOutcome
+      }
+    | { ok: false; messageKey?: string; detail?: string }
+  > => {
+    try {
+      const res = await fetch("/api/team/apply-panel-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          staffMemberId,
+          invitationEmail,
+          panelMemberRole,
+          language,
+          sendEmail: true,
+        }),
+      })
+      const json = (await res.json().catch(() => null)) as {
+        ok?: boolean
+        invitationToken?: string | null
+        messageKey?: string
+        detail?: string | null
+        email?: { sent?: boolean; code?: string }
+      } | null
+      if (!json?.ok) {
+        return {
+          ok: false,
+          messageKey: json?.messageKey,
+          detail: json?.detail ?? undefined,
+        }
+      }
+      const token =
+        typeof json.invitationToken === "string" && json.invitationToken.length > 0
+          ? json.invitationToken
+          : null
+      let emailOutcome: InvitationEmailSendOutcome | undefined
+      if (token) {
+        if (json.email?.sent) emailOutcome = "sent"
+        else if (
+          json.email?.code === "not_configured" ||
+          json.email?.code === "simulated_dev"
+        ) {
+          emailOutcome = "not_configured"
+        } else if (json.email?.code) {
+          emailOutcome = "failed"
+        }
+      }
+      return { ok: true, invitationToken: token, emailOutcome }
+    } catch {
+      return { ok: false, messageKey: "invitations.invitationCreateError" }
+    }
+  }
 
   const sendInvitationEmailByToken = async (token: string): Promise<InvitationEmailSendOutcome> => {
     try {
