@@ -22,14 +22,26 @@ export function isPlannedVisitForDashboardStats(a: Appointment, at: Date = new D
 }
 
 /**
- * Wizyty wymagające reakcji firmy (kafelek, filtr /appointments, helper booking-needs-action).
+ * Wizyty wymagające reakcji firmy (dashboard, badge wiersza — szersze niż filtr listy).
  */
 export function appointmentRequiresBusinessContact(a: Appointment): boolean {
   return bookingNeedsAction(a)
 }
 
+/** Minione wizyty bez statusu końcowego — spójne z filtrem „Wymaga działania” na /appointments. */
 export function appointmentRequiresPostVisitAction(a: Appointment, at: Date = new Date()): boolean {
   return bookingRequiresPostVisitStatus(a, at)
+}
+
+export function countStatisticsNeedsActionVisits(
+  appointments: readonly Appointment[],
+  at: Date = new Date(),
+): number {
+  let n = 0
+  for (const a of appointments) {
+    if (appointmentRequiresPostVisitAction(a, at)) n += 1
+  }
+  return n
 }
 
 /**
@@ -42,5 +54,5 @@ export function countsTowardStatisticsTotalVisits(
 ): boolean {
   const s = a.status
   if (s === "cancelled" || s === "no_show" || s === "completed") return true
-  return bookingNeedsAction(a, at)
+  return appointmentRequiresPostVisitAction(a, at)
 }

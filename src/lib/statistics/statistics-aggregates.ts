@@ -1,5 +1,7 @@
-import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
-import { countBookingsNeedingAction } from "@/lib/bookings/booking-needs-action"
+import {
+  countStatisticsNeedsActionVisits,
+  isPlannedVisitForDashboardStats,
+} from "@/lib/appointments/stats-rules"
 import type { Appointment, AppointmentStatus, Service, StaffMember } from "@/types/domain"
 import type {
   StatisticsChartPoint,
@@ -452,7 +454,7 @@ export function buildStatisticsDataset({
   )
   const heatmap = buildHeatmap(heatmapAppointments, locale)
 
-  const needsAction = countBookingsNeedingAction(appointments, todayStart)
+  const needsAction = countStatisticsNeedsActionVisits(appointments, todayStart)
   const completed = statusCounts.completed
   const cancelled = statusCounts.cancelled
   const noShow = statusCounts.no_show
