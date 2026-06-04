@@ -1916,6 +1916,8 @@ Pozdrawiamy,
         "Ta osoba ma już dostęp do panelu — nowe zaproszenie nie jest potrzebne.",
       invitationServerNotConfigured:
         "Serwer nie ma skonfigurowanego SUPABASE_SERVICE_ROLE_KEY — zaproszenie nie mogło zostać zapisane.",
+      migration082Required:
+        "Brak funkcji zaproszeń w bazie. Uruchom migrację 082 w Supabase (SQL Editor).",
       errorDetailsPrefix: "Szczegóły:",
       servicesShort: "Usługi",
       noServicesAssigned: "Brak przypisanych usług",
@@ -4478,6 +4480,8 @@ Regards,
         "This person already has panel access — a new invitation is not required.",
       invitationServerNotConfigured:
         "SUPABASE_SERVICE_ROLE_KEY is not configured on the server — the invitation could not be saved.",
+      migration082Required:
+        "Invitation function is missing in the database. Run migration 082 in Supabase (SQL Editor).",
       errorDetailsPrefix: "Details:",
       servicesShort: "Services",
       noServicesAssigned: "No services assigned",

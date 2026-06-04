@@ -1,9 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import type { Database } from "@/types/database"
 import type { PanelRole } from "@/lib/auth/permissions"
 
-type Client = SupabaseClient<Database>
+type Client = SupabaseClient
 
 export type StaffPanelFormSlice = {
   panelMemberRole: PanelRole
@@ -15,39 +14,24 @@ export type ApplyStaffPanelAccessResult =
   | { ok: true; alreadyHasPanelAccess: true; invitationToken?: string | null }
   | { ok: false; messageKey: string; detail?: string }
 
-async function findInvitationByEmail(
-  client: Client,
-  businessId: string,
-  email: string,
-) {
-  const em = email.trim().toLowerCase()
-  const { data, error } = await client
-    .from("business_invitations")
-    .select("id, status, staff_member_id, email")
-    .eq("business_id", businessId)
-    .ilike("email", em)
-
-  if (error) return { row: null as null, error: error.message }
-  const row =
-    data?.find((r) => (r.email ?? "").trim().toLowerCase() === em) ?? data?.[0] ?? null
-  return { row, error: null as null }
+type RpcUpsertResult = {
+  ok?: boolean
+  token?: string | null
+  already_has_access?: boolean
+  code?: string
 }
 
-async function readPendingTokenForStaff(
-  client: Client,
-  businessId: string,
-  staffMemberId: string,
-): Promise<string | null> {
-  const { data, error } = await client
-    .from("business_invitations")
-    .select("token")
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .eq("status", "pending")
-    .maybeSingle()
-
-  if (error || !data?.token) return null
-  return String(data.token)
+function mapRpcCodeToMessageKey(code: string | undefined): string {
+  switch (code) {
+    case "email_required":
+      return "team.panelEmailRequired"
+    case "email_conflict":
+      return "team.panelInviteEmailConflict"
+    case "invalid_role":
+    case "not_persisted":
+    default:
+      return "invitations.invitationCreateError"
+  }
 }
 
 /** Uaktualnia rolę panelu przy istniejącym powiązaniu biznes‑członkostwo ↔ staff (bez wymuszania zaproszenia). */
@@ -87,158 +71,53 @@ export async function applyStaffPanelAccess(
     return { ok: false, messageKey: "team.panelEmailRequired" }
   }
 
-  let memberQuery = await client
-    .from("business_members")
-    .select("id, user_id")
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .eq("is_active", true)
-    .maybeSingle()
+  const { data, error } = await client.rpc("upsert_staff_panel_invitation", {
+    p_business_id: businessId,
+    p_staff_member_id: staffMemberId,
+    p_email: em,
+    p_role: form.panelMemberRole,
+    p_invited_by: invitedBy,
+  })
 
-  if (
-    memberQuery.error?.message &&
-    memberQuery.error.message.toLowerCase().includes("is_active") &&
-    memberQuery.error.message.toLowerCase().includes("does not exist")
-  ) {
-    memberQuery = await client
-      .from("business_members")
-      .select("id, user_id")
-      .eq("business_id", businessId)
-      .eq("staff_member_id", staffMemberId)
-      .maybeSingle()
-  }
-
-  const activeMember = memberQuery.data
-
-  if (activeMember?.user_id) {
-    const { error: memberUpdateErr } = await client
-      .from("business_members")
-      .update({
-        role: form.panelMemberRole,
-        email: em,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", activeMember.id)
-
-    if (memberUpdateErr) {
+  if (error) {
+    const msg = error.message ?? ""
+    if (
+      msg.includes("upsert_staff_panel_invitation") &&
+      (msg.includes("does not exist") || msg.includes("Could not find"))
+    ) {
       return {
         ok: false,
-        messageKey: "invitations.invitationCreateError",
-        detail: memberUpdateErr.message,
+        messageKey: "team.migration082Required",
+        detail: "migration_082_required",
       }
     }
-
-    const pendingTok = await readPendingTokenForStaff(client, businessId, staffMemberId)
-    return { ok: true, alreadyHasPanelAccess: true, invitationToken: pendingTok }
+    return { ok: false, messageKey: "invitations.invitationCreateError", detail: msg }
   }
 
-  await client
-    .from("business_invitations")
-    .update({ status: "cancelled" })
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .eq("status", "pending")
-
-  const { row: emailRow, error: emailLookupErr } = await findInvitationByEmail(client, businessId, em)
-  if (emailLookupErr) {
-    return { ok: false, messageKey: "invitations.invitationCreateError", detail: emailLookupErr }
-  }
-
-  if (
-    emailRow?.status === "pending" &&
-    emailRow.staff_member_id &&
-    emailRow.staff_member_id !== staffMemberId
-  ) {
-    return { ok: false, messageKey: "team.panelInviteEmailConflict" }
-  }
-
-  if (
-    emailRow?.status === "accepted" &&
-    emailRow.staff_member_id &&
-    emailRow.staff_member_id !== staffMemberId
-  ) {
-    return { ok: false, messageKey: "team.panelInviteEmailConflict" }
-  }
-
-  const token = crypto.randomUUID()
-  const invitationPatch = {
-    status: "pending" as const,
-    email: em,
-    role: form.panelMemberRole,
-    staff_member_id: staffMemberId,
-    invited_by: invitedBy,
-    token,
-    accepted_at: null,
-  }
-
-  if (emailRow?.id) {
-    const { error: updateErr } = await client
-      .from("business_invitations")
-      .update(invitationPatch)
-      .eq("id", emailRow.id)
-
-    if (updateErr) {
-      return { ok: false, messageKey: "invitations.invitationCreateError", detail: updateErr.message }
-    }
-  } else {
-    const { error: insertErr } = await client.from("business_invitations").insert({
-      business_id: businessId,
-      ...invitationPatch,
-    })
-
-    if (insertErr) {
-      if (insertErr.code === "23505" || insertErr.message.toLowerCase().includes("duplicate")) {
-        const { row: again } = await findInvitationByEmail(client, businessId, em)
-        if (again?.id) {
-          const { error: retryErr } = await client
-            .from("business_invitations")
-            .update(invitationPatch)
-            .eq("id", again.id)
-          if (retryErr) {
-            return {
-              ok: false,
-              messageKey: "invitations.invitationCreateError",
-              detail: retryErr.message,
-            }
-          }
-        } else {
-          return {
-            ok: false,
-            messageKey: "invitations.invitationCreateError",
-            detail: insertErr.message,
-          }
-        }
-      } else {
-        return {
-          ok: false,
-          messageKey: "invitations.invitationCreateError",
-          detail: insertErr.message,
-        }
-      }
+  const payload = (data ?? null) as RpcUpsertResult | null
+  if (!payload || payload.ok !== true) {
+    const code = typeof payload?.code === "string" ? payload.code : "unknown"
+    return {
+      ok: false,
+      messageKey: mapRpcCodeToMessageKey(code),
+      detail: code,
     }
   }
 
-  const verified =
-    (await readPendingTokenForStaff(client, businessId, staffMemberId)) ??
-    (await (async () => {
-      const { data } = await client
-        .from("business_invitations")
-        .select("token")
-        .eq("business_id", businessId)
-        .ilike("email", em)
-        .eq("status", "pending")
-        .maybeSingle()
-      return data?.token ? String(data.token) : null
-    })())
+  if (payload.already_has_access === true) {
+    const tok =
+      typeof payload.token === "string" && payload.token.length > 0 ? payload.token : null
+    return { ok: true, alreadyHasPanelAccess: true, invitationToken: tok }
+  }
 
-  if (!verified) {
+  const token = typeof payload.token === "string" ? payload.token.trim() : ""
+  if (!token) {
     return {
       ok: false,
       messageKey: "invitations.invitationCreateError",
-      detail: "invitation_not_persisted",
+      detail: "invitation_token_missing",
     }
   }
 
-  return { ok: true, invitationToken: verified }
+  return { ok: true, invitationToken: token }
 }

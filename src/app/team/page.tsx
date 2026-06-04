@@ -1082,12 +1082,15 @@ export default function TeamPage() {
           serverError === "supabase_unconfigured"
         ) {
           key = "team.invitationServerNotConfigured"
-        } else if (messageKey) key = messageKey
+        } else if (messageKey === "team.migration082Required") key = "team.migration082Required"
+        else if (messageKey) key = messageKey
         const line = t(key as "team.panelEmailRequired")
-        if (process.env.NODE_ENV === "development" && detail?.trim()) {
-          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
-        } else if (detail?.trim()) {
-          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
+        if (detail?.trim()) {
+          const detailLine = `${t("team.errorDetailsPrefix")} ${detail.trim()}`
+          if (key === "invitations.invitationCreateError") {
+            return `${line} ${detailLine}`
+          }
+          setNoticeDetail(detailLine)
         } else {
           setNoticeDetail(null)
         }
