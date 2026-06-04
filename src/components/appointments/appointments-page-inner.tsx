@@ -7,7 +7,9 @@ import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
-import { ManualAppointmentSheet } from "@/components/appointments/manual-appointment-sheet"
+import { EMPTY_MANUAL_APPOINTMENT_FORM } from "@/lib/appointments/manual-appointment-form-defaults"
+import { useManualAppointmentSheetData } from "@/lib/appointments/use-manual-appointment-sheet-data"
+import { useBusinessBookingPagePath } from "@/lib/business/use-business-booking-page-path"
 import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
 import {
   APPOINTMENTS_PANEL_DISMISSED_EVENT,
@@ -22,7 +24,6 @@ import { useStaffByServiceCacheForAppointments } from "@/lib/appointments/use-st
 import { useAppointmentsTransientBanners } from "@/lib/appointments/use-appointments-transient-banners"
 import { useAppointmentsDeleteFlow } from "@/lib/appointments/use-appointments-delete-flow"
 import { useAppointmentsPageListController } from "@/lib/appointments/use-appointments-page-list-controller"
-import { useManualAppointmentCreateSheet } from "@/lib/appointments/use-manual-appointment-create-sheet"
 import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
 import type { AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
@@ -82,27 +83,15 @@ export function AppointmentsPageInner() {
   )
 
   const uiLang = appointmentsUiLanguage(language)
-  const [, setShowAddedBanner] = React.useState(false)
-  const {
-    sheetOpen,
-    setSheetOpen,
-    form: manualForm,
-    setForm: setManualForm,
-    isSaving: isSavingManualAppointment,
-    manualServiceOptions,
-    manualStaffForService,
-    manualAvailableStaffIds,
-    canSubmitManual,
-    openCreate: openManualAppointmentCreate,
-    saveManual,
-  } = useManualAppointmentCreateSheet({
+  const bookingPagePath = useBusinessBookingPagePath()
+  const [manualFormStub, setManualFormStub] = React.useState(EMPTY_MANUAL_APPOINTMENT_FORM)
+  const { manualServiceOptions } = useManualAppointmentSheetData(
     businessId,
-    hasActiveTeamMembers,
-    language: uiLang,
-    t,
-    setActionNotice,
-    setShowAdded: setShowAddedBanner,
-  })
+    manualFormStub.serviceId,
+    manualFormStub.date,
+    manualFormStub.time,
+    setManualFormStub,
+  )
 
   const {
     setConfirmDeleteAppointmentId,
@@ -224,7 +213,7 @@ export function AppointmentsPageInner() {
       title={t("navigation.appointments")}
       pageDescription={t("appointments.description")}
       primaryAction={
-        <AddAppointmentHeaderButton onClick={openManualAppointmentCreate} />
+        <AddAppointmentHeaderButton href={bookingPagePath} />
       }
     >
       <PageShell>
@@ -234,20 +223,6 @@ export function AppointmentsPageInner() {
           list={appointmentsListBundles}
         />
       </PageShell>
-      <ManualAppointmentSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        form={manualForm}
-        setForm={setManualForm}
-        manualServiceOptions={manualServiceOptions}
-        manualStaffForService={manualStaffForService}
-        manualAvailableStaffIds={manualAvailableStaffIds}
-        hasActiveTeamMembers={hasActiveTeamMembers}
-        canSubmitManualAppointment={canSubmitManual}
-        isSaving={isSavingManualAppointment}
-        language={uiLang}
-        onSubmit={saveManual}
-      />
     </AppShell>
   )
 }

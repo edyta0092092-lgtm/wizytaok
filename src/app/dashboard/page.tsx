@@ -13,7 +13,6 @@ import {
 } from "lucide-react"
 
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
-import { ManualAppointmentSheet } from "@/components/appointments/manual-appointment-sheet"
 import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
@@ -33,8 +32,7 @@ import {
   updateAppointmentStatus,
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
-import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
-import { useManualAppointmentCreateSheet } from "@/lib/appointments/use-manual-appointment-create-sheet"
+import { useBusinessBookingPagePath } from "@/lib/business/use-business-booking-page-path"
 import {
   isPlannedVisitForDashboardStats,
 } from "@/lib/appointments/stats-rules"
@@ -43,7 +41,6 @@ import { formatTodayAppointmentsLabel } from "@/lib/dashboard/today-appointments
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { getStaffForBusiness } from "@/lib/staff/staff-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { AppointmentStatus } from "@/types/domain"
 
@@ -139,8 +136,6 @@ export default function DashboardPage() {
   } = useAppointmentsStore(accessReady ? businessId : undefined)
   const appToday = React.useMemo(() => getAppToday(), [])
   const [statusNotice, setStatusNotice] = React.useState("")
-  const [hasActiveTeamMembers, setHasActiveTeamMembers] = React.useState(false)
-  const uiLang = appointmentsUiLanguage(language)
   const [statsLoading, setStatsLoading] = React.useState(true)
   const [statsError, setStatsError] = React.useState<string | null>(null)
   const [statsContextState, setStatsContextState] = React.useState<"login_required" | "no_data" | null>(null)
@@ -161,46 +156,7 @@ export default function DashboardPage() {
 
   const statsReady = appointmentsReady && !appointmentsLoadError && !statsLoading && !statsError
 
-  React.useEffect(() => {
-    if (!accessReady || !businessId?.trim()) {
-      setHasActiveTeamMembers(false)
-      return
-    }
-    const client = getBrowserClient()
-    if (!client || !isSupabaseConfigured()) {
-      setHasActiveTeamMembers(false)
-      return
-    }
-    let cancelled = false
-    void getStaffForBusiness(client, businessId).then((staff) => {
-      if (cancelled) return
-      setHasActiveTeamMembers(staff.some((member) => member.isActive))
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [accessReady, businessId])
-
-  const {
-    sheetOpen: manualSheetOpen,
-    setSheetOpen: setManualSheetOpen,
-    form: manualForm,
-    setForm: setManualForm,
-    isSaving: isSavingManualAppointment,
-    manualServiceOptions,
-    manualStaffForService,
-    manualAvailableStaffIds,
-    canSubmitManual,
-    openCreate: openManualAppointmentCreate,
-    saveManual,
-  } = useManualAppointmentCreateSheet({
-    businessId: businessId ?? null,
-    hasActiveTeamMembers,
-    language: uiLang,
-    t,
-    setActionNotice: setStatusNotice,
-    setShowAdded: () => {},
-  })
+  const bookingPagePath = useBusinessBookingPagePath()
 
   const isAuthOrContextError = (message: string): boolean => {
     const text = message.toLowerCase()
@@ -376,7 +332,7 @@ export default function DashboardPage() {
       title={t("dashboard.title")}
       pageDescription={t("dashboard.pageDescription")}
       primaryAction={
-        <AddAppointmentHeaderButton onClick={openManualAppointmentCreate} />
+        <AddAppointmentHeaderButton href={bookingPagePath} />
       }
     >
       <PageShell>
@@ -548,20 +504,6 @@ export default function DashboardPage() {
           </aside>
         </div>
       </PageShell>
-      <ManualAppointmentSheet
-        open={manualSheetOpen}
-        onOpenChange={setManualSheetOpen}
-        form={manualForm}
-        setForm={setManualForm}
-        manualServiceOptions={manualServiceOptions}
-        manualStaffForService={manualStaffForService}
-        manualAvailableStaffIds={manualAvailableStaffIds}
-        hasActiveTeamMembers={hasActiveTeamMembers}
-        canSubmitManualAppointment={canSubmitManual}
-        isSaving={isSavingManualAppointment}
-        language={uiLang}
-        onSubmit={saveManual}
-      />
     </AppShell>
   )
 }
