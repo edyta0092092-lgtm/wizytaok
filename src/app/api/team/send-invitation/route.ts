@@ -119,5 +119,6 @@ export async function POST(req: Request) {
     invitationId: invitation.id,
     messageId: sendResult.messageId ?? null,
     membershipLinked: sendResult.membershipLinked,
+    membershipWarning: sendResult.membershipWarning ?? null,
   })
 }

@@ -1100,6 +1100,7 @@ export default function TeamPage() {
         alreadyHasPanelAccess?: boolean
         emailOutcome?: "sent" | "not_configured" | "failed"
         emailDetail?: string
+        membershipWarning?: string | null
         detail?: string
       }) => {
         const notices: string[] = []
@@ -1119,6 +1120,9 @@ export default function TeamPage() {
           else notices.push(t("invitations.invitationCreated"))
           if (panelRes.emailOutcome === "failed" && panelRes.emailDetail?.trim()) {
             setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.emailDetail.trim()}`)
+          } else if (panelRes.membershipWarning?.trim()) {
+            setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.membershipWarning.trim()}`)
+            notices.push(t("invitations.invitationEmailSentAcceptLink"))
           } else if (panelRes.emailOutcome !== "failed") {
             setNoticeDetail(null)
           }
@@ -1582,6 +1586,7 @@ export default function TeamPage() {
         alreadyHasPanelAccess?: boolean
         emailOutcome?: InvitationEmailSendOutcome
         emailDetail?: string
+        membershipWarning?: string | null
       }
     | { ok: false; messageKey?: string; detail?: string; serverError?: string }
   > => {
@@ -1625,7 +1630,12 @@ export default function TeamPage() {
         detail?: string | null
         error?: string
         alreadyHasPanelAccess?: boolean
-        email?: { sent?: boolean; code?: string; detail?: string | null }
+        email?: {
+          sent?: boolean
+          code?: string
+          detail?: string | null
+          membershipWarning?: string | null
+        }
       } | null
       if (!json?.ok) {
         const serverError = typeof json?.error === "string" ? json.error : undefined
@@ -1654,12 +1664,14 @@ export default function TeamPage() {
       let emailOutcome: InvitationEmailSendOutcome | undefined
       let emailDetail: string | undefined
       if (token) {
-        if (json.email?.sent) emailOutcome = "sent"
-        else if (
+        if (json.email?.sent) {
+          emailOutcome = "sent"
+        } else if (
           json.email?.code === "not_configured" ||
           json.email?.code === "simulated_dev"
         ) {
           emailOutcome = "not_configured"
+          emailDetail = json.email?.detail?.trim() || json.email?.code
         } else if (json.email?.code) {
           emailOutcome = "failed"
           emailDetail = json.email?.detail?.trim() || json.email?.code
@@ -1671,6 +1683,7 @@ export default function TeamPage() {
         alreadyHasPanelAccess: json.alreadyHasPanelAccess === true,
         emailOutcome,
         emailDetail,
+        membershipWarning: json.email?.membershipWarning ?? null,
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "network_error"
@@ -1732,6 +1745,8 @@ export default function TeamPage() {
         setNotice(emailLine)
         if (panelRes.emailOutcome === "failed" && panelRes.emailDetail?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.emailDetail.trim()}`)
+        } else if (panelRes.membershipWarning?.trim()) {
+          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${panelRes.membershipWarning.trim()}`)
         } else {
           setNoticeDetail(null)
         }
@@ -1747,7 +1762,11 @@ export default function TeamPage() {
 
   const sendInvitationEmailByToken = async (
     token: string,
-  ): Promise<{ outcome: InvitationEmailSendOutcome; detail?: string }> => {
+  ): Promise<{
+    outcome: InvitationEmailSendOutcome
+    detail?: string
+    membershipWarning?: string | null
+  }> => {
     try {
       const res = await fetch("/api/team/send-invitation", {
         method: "POST",
@@ -1758,12 +1777,24 @@ export default function TeamPage() {
         ok?: boolean
         error?: string
         detail?: string | null
+        membershipWarning?: string | null
       } | null
-      if (json?.ok) return { outcome: "sent" }
+      if (json?.ok) {
+        return {
+          outcome: "sent",
+          membershipWarning: json.membershipWarning ?? null,
+        }
+      }
       const err = json?.error
       const detail = json?.detail ?? undefined
       if (err === "not_configured" || err === "simulated_dev") {
         return { outcome: "not_configured", detail }
+      }
+      if (err === "provision_failed") {
+        return {
+          outcome: "failed",
+          detail: detail ?? t("invitations.invitationEmailProvisionFailed"),
+        }
       }
       return { outcome: "failed", detail: detail ?? err }
     } catch (e) {
@@ -1788,15 +1819,18 @@ export default function TeamPage() {
   }
 
   const resendInvitationEmail = async (token: string) => {
-    const { outcome, detail } = await sendInvitationEmailByToken(token)
+    const { outcome, detail, membershipWarning } = await sendInvitationEmailByToken(token)
     await load()
     const line = invitationEmailNoticeForOutcome(outcome)
     if (line) {
       if (detail?.trim() && outcome === "failed") {
         setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
         setNotice(line)
+      } else if (outcome === "sent" && membershipWarning?.trim()) {
+        setNoticeDetail(`${t("team.errorDetailsPrefix")} ${membershipWarning.trim()}`)
+        setNotice(t("invitations.invitationEmailSentAcceptLink"))
       } else if (outcome === "not_configured") {
-        setNoticeDetail(null)
+        setNoticeDetail(detail?.trim() ? `${t("team.errorDetailsPrefix")} ${detail.trim()}` : null)
         setNotice(line)
       } else {
         setNoticeDetail(null)

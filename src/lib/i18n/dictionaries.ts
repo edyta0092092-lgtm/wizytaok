@@ -331,6 +331,10 @@ export const dictionaries = {
       invitationEmailFailed: "Nie udało się wysłać e-maila. Skopiuj link zaproszenia i prześlij go ręcznie.",
       invitationEmailNotConfigured:
         "E-mail nie jest skonfigurowany na serwerze (RESEND_API_KEY). Skopiuj link i prześlij go ręcznie.",
+      invitationEmailSentAcceptLink:
+        "Wysłano e-mail. Jeśli po zalogowaniu nie widzisz firmy, użyj linku zaproszenia z wiadomości.",
+      invitationEmailProvisionFailed:
+        "Nie udało się przygotować konta do logowania. Skopiuj link zaproszenia i prześlij go ręcznie.",
       resendInvitationEmail: "Wyślij e-mail ponownie",
       pendingInvitationsEmailHint:
         "Zaproszenia są wysyłane automatycznie na adres e-mail. W razie potrzeby możesz skopiować link lub wysłać e-mail ponownie.",
@@ -2917,6 +2921,10 @@ Pozdrawiamy,
       invitationEmailFailed: "Could not send the email. Copy the invitation link and send it manually.",
       invitationEmailNotConfigured:
         "Email is not configured on the server (RESEND_API_KEY). Copy the link and send it manually.",
+      invitationEmailSentAcceptLink:
+        "Email sent. If you do not see the business after signing in, use the invitation link from the message.",
+      invitationEmailProvisionFailed:
+        "Could not prepare a login account. Copy the invitation link and send it manually.",
       resendInvitationEmail: "Resend invitation email",
       pendingInvitationsEmailHint:
         "Invitations are sent automatically by email. You can also copy the link or resend the email.",

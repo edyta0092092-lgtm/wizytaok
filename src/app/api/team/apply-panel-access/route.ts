@@ -110,6 +110,7 @@ export async function POST(req: Request) {
     code?: string
     detail?: string | null
     membershipLinked?: boolean
+    membershipWarning?: string | null
   } = { sent: false }
 
   if (sendEmail && panelOut.invitationToken) {
@@ -132,7 +133,11 @@ export async function POST(req: Request) {
       { linkMembership: true, resetPassword: true },
     )
     if (sendOut.ok) {
-      emailResult = { sent: true, membershipLinked: sendOut.membershipLinked }
+      emailResult = {
+        sent: true,
+        membershipLinked: sendOut.membershipLinked,
+        membershipWarning: sendOut.membershipWarning ?? null,
+      }
     } else {
       emailResult = {
         sent: false,

@@ -1456,6 +1456,10 @@ export interface Database {
         Args: { p_business_id: string }
         Returns: boolean
       }
+      lookup_auth_user_id_by_email: {
+        Args: { p_email: string }
+        Returns: string | null
+      }
     }
     Enums: {
       appointment_status: AppointmentStatusDb

@@ -1,3 +1,5 @@
+import { Resend } from "resend"
+
 export type SendReminderEmailInput = {
   to: string
   subject: string
@@ -11,7 +13,7 @@ export type SendReminderEmailResult =
 
 const DEFAULT_RESEND_FROM = "WizytaOK <no-reply@nordigital.pl>"
 
-function resolveResendFromAddress(): string {
+export function resolveResendFromAddress(): string {
   return (
     process.env.REMINDERS_FROM_EMAIL?.trim() ||
     process.env.RESEND_FROM?.trim() ||
@@ -20,8 +22,8 @@ function resolveResendFromAddress(): string {
 }
 
 /**
- * Wysyłka e-mail przypomnienia (Resend REST API przez fetch, bez dodatkowej paczki).
- * Wymaga RESEND_API_KEY. Nadawca: REMINDERS_FROM_EMAIL, RESEND_FROM lub domyślny adres.
+ * Wysyłka e-mail (Resend SDK). Wymaga RESEND_API_KEY.
+ * Nadawca: REMINDERS_FROM_EMAIL, RESEND_FROM lub domyślny adres.
  */
 export async function sendReminderEmail(input: SendReminderEmailInput): Promise<SendReminderEmailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim()
@@ -33,30 +35,33 @@ export async function sendReminderEmail(input: SendReminderEmailInput): Promise<
     return { ok: false, code: "not_configured", error: "RESEND_API_KEY not set" }
   }
 
+  const to = input.to.trim()
+  if (!to) {
+    return { ok: false, code: "failed", error: "recipient_required" }
+  }
+
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [input.to],
-        subject: input.subject,
-        text: input.textBody,
-        html: input.htmlBody ?? undefined,
-      }),
+    const resend = new Resend(apiKey)
+    const result = await resend.emails.send({
+      from,
+      to: [to],
+      subject: input.subject,
+      text: input.textBody,
+      html: input.htmlBody ?? undefined,
     })
-    const json = (await res.json().catch(() => null)) as { id?: string; message?: string } | null
-    if (!res.ok) {
-      return {
-        ok: false,
-        code: "failed",
-        error: json && typeof json.message === "string" ? json.message : `HTTP ${res.status}`,
-      }
+    if (result.error) {
+      const message =
+        result.error.message ||
+        (typeof result.error === "object" && "name" in result.error
+          ? String((result.error as { name?: string }).name)
+          : "resend_error")
+      return { ok: false, code: "failed", error: message }
     }
-    return { ok: true, provider: "resend", messageId: typeof json?.id === "string" ? json.id : undefined }
+    return {
+      ok: true,
+      provider: "resend",
+      messageId: result.data?.id ?? undefined,
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown_error"
     return { ok: false, code: "failed", error: msg }

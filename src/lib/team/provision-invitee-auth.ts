@@ -15,14 +15,25 @@ export function generateStaffInviteTempPassword(): string {
   return `A${chunk}#1`
 }
 
-async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+async function findAuthUserIdByEmailRpc(email: string): Promise<string | null> {
+  const admin = getServiceRoleClient()
+  if (!admin) return null
+  const { data, error } = await admin.rpc("lookup_auth_user_id_by_email", {
+    p_email: email,
+  })
+  if (error) return null
+  if (typeof data === "string" && data.length > 0) return data
+  return null
+}
+
+async function findAuthUserIdByEmailList(email: string): Promise<string | null> {
   const admin = getServiceRoleClient()
   if (!admin) return null
   const normalized = email.trim().toLowerCase()
 
   let page = 1
   const perPage = 200
-  for (let i = 0; i < 10; i += 1) {
+  for (let i = 0; i < 25; i += 1) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage })
     if (error || !data?.users?.length) break
     const hit = data.users.find((u) => (u.email ?? "").trim().toLowerCase() === normalized)
@@ -31,6 +42,12 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
     page += 1
   }
   return null
+}
+
+async function findAuthUserIdByEmail(email: string): Promise<string | null> {
+  const fromRpc = await findAuthUserIdByEmailRpc(email)
+  if (fromRpc) return fromRpc
+  return findAuthUserIdByEmailList(email)
 }
 
 export async function provisionInviteeAuthAccount(
@@ -68,20 +85,9 @@ export async function provisionInviteeAuthAccount(
     }
   }
 
-  const msg = createErr?.message?.toLowerCase() ?? ""
-  const alreadyExists =
-    msg.includes("already") ||
-    msg.includes("registered") ||
-    msg.includes("exists") ||
-    msg.includes("duplicate")
-
-  if (!alreadyExists) {
-    return { ok: false, error: createErr?.message ?? "create_user_failed" }
-  }
-
   const existingId = await findAuthUserIdByEmail(normalized)
   if (!existingId) {
-    return { ok: false, error: "user_exists_but_not_found" }
+    return { ok: false, error: createErr?.message ?? "create_user_failed" }
   }
 
   if (options.resetPasswordForExisting) {

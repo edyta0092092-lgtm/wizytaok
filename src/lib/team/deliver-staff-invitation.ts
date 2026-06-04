@@ -23,7 +23,13 @@ export type DeliverStaffInvitationOptions = {
 }
 
 export type DeliverStaffInvitationResult =
-  | { ok: true; messageId?: string; membershipLinked: boolean; accountCreated: boolean }
+  | {
+      ok: true
+      messageId?: string
+      membershipLinked: boolean
+      accountCreated: boolean
+      membershipWarning?: string
+    }
   | { ok: false; code?: string; error?: string }
 
 export async function deliverStaffInvitation(
@@ -32,6 +38,7 @@ export async function deliverStaffInvitation(
 ): Promise<DeliverStaffInvitationResult> {
   const email = input.invitationEmail.trim().toLowerCase()
   const origin = getPublicAppOrigin()
+  const acceptInviteUrl = `${origin}/accept-invite/${encodeURIComponent(input.token.trim())}`
   const loginUrl = `${origin}/login?next=${encodeURIComponent("/dashboard")}&email=${encodeURIComponent(email)}`
   const linkMembership =
     options.linkMembership ?? (input.invitationStatus === "pending" || !input.invitationStatus)
@@ -41,13 +48,14 @@ export async function deliverStaffInvitation(
     resetPasswordForExisting: resetPassword,
   })
   if (!provision.ok) {
+    console.error("[deliver-staff-invitation] provision_failed", email, provision.error)
     return { ok: false, code: "provision_failed", error: provision.error }
   }
 
   const sendOut = await sendBusinessInvitationEmail({
     to: email,
     businessName: input.businessName,
-    inviteUrl: loginUrl,
+    inviteUrl: acceptInviteUrl,
     loginUrl,
     loginEmail: email,
     tempPassword: provision.tempPassword,
@@ -58,6 +66,7 @@ export async function deliverStaffInvitation(
   })
 
   if (!sendOut.ok) {
+    console.error("[deliver-staff-invitation] email_failed", email, sendOut.code, sendOut.error)
     return {
       ok: false,
       code: sendOut.code,
@@ -66,6 +75,7 @@ export async function deliverStaffInvitation(
   }
 
   let membershipLinked = false
+  let membershipWarning: string | undefined
   if (linkMembership) {
     const acceptOut = await acceptBusinessInvitationForUser(
       input.token,
@@ -77,7 +87,12 @@ export async function deliverStaffInvitation(
     } else if (acceptOut.error === "already_used") {
       membershipLinked = true
     } else {
-      return { ok: false, code: acceptOut.error, error: acceptOut.error }
+      console.error(
+        "[deliver-staff-invitation] accept_after_email",
+        email,
+        acceptOut.error,
+      )
+      membershipWarning = acceptOut.error
     }
   }
 
@@ -86,5 +101,6 @@ export async function deliverStaffInvitation(
     messageId: sendOut.messageId,
     membershipLinked,
     accountCreated: provision.isNew,
+    membershipWarning,
   }
 }

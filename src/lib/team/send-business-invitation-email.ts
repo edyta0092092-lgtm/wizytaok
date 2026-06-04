@@ -62,6 +62,14 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
   const business = businessName.trim() || "WizytaOK"
   const emailLogin = (loginEmail ?? input.to).trim()
   const ctaHref = (loginUrl ?? inviteUrl).trim()
+  const inviteLink = inviteUrl.trim()
+  const loginLink = (loginUrl ?? inviteUrl).trim()
+  const linkFooter =
+    inviteLink && inviteLink !== loginLink
+      ? lang === "en"
+        ? `Sign in: ${loginLink}\nAccept invitation: ${inviteLink}`
+        : `Logowanie: ${loginLink}\nLink zaproszenia: ${inviteLink}`
+      : ctaHref
   const hasTempPassword = Boolean(tempPassword?.trim())
 
   const detailRows =
@@ -127,7 +135,7 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
         detailsHeading: "Login details",
         detailRows,
         cta,
-        extraParagraph: ctaHref,
+        extraParagraph: linkFooter,
         footerNote: passwordNote ?? "This message was sent automatically by WizytaOK.",
       }),
     }
@@ -163,7 +171,7 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
       detailsHeading: "Dane logowania",
       detailRows,
       cta,
-      extraParagraph: ctaHref,
+      extraParagraph: linkFooter,
       footerNote: passwordNote ?? "Ta wiadomość została wysłana automatycznie przez WizytaOK.",
     }),
   }
