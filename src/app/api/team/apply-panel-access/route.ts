@@ -3,9 +3,8 @@ import { NextResponse } from "next/server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import type { PanelRole } from "@/lib/auth/permissions"
 import type { Language } from "@/lib/i18n/dictionaries"
-import { getPublicAppOrigin } from "@/lib/notifications/public-app-origin"
 import { applyStaffPanelAccess } from "@/lib/team/apply-staff-panel-access"
-import { sendBusinessInvitationEmail } from "@/lib/team/send-business-invitation-email"
+import { deliverStaffInvitation } from "@/lib/team/deliver-staff-invitation"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -106,7 +105,9 @@ export async function POST(req: Request) {
 
   const sendEmail = body.sendEmail !== false
   const language = normalizeLanguage(body.language)
-  let emailResult: { sent: boolean; code?: string } = { sent: false }
+  let emailResult: { sent: boolean; code?: string; membershipLinked?: boolean } = {
+    sent: false,
+  }
 
   if (sendEmail && panelOut.invitationToken) {
     const { data: business } = await admin
@@ -115,17 +116,16 @@ export async function POST(req: Request) {
       .eq("id", resolution.businessId)
       .maybeSingle()
 
-    const inviteUrl = `${getPublicAppOrigin()}/accept-invite/${panelOut.invitationToken}`
-    const sendOut = await sendBusinessInvitationEmail({
-      to: invitationEmail.trim().toLowerCase(),
+    const sendOut = await deliverStaffInvitation({
+      token: panelOut.invitationToken,
+      invitationEmail: invitationEmail.trim().toLowerCase(),
       businessName: business?.business_name?.trim() || "WizytaOK",
-      inviteUrl,
       role: normalizePanelRole(body.panelMemberRole),
       inviteeName: staffRow.name?.trim() || undefined,
       language,
     })
     if (sendOut.ok) {
-      emailResult = { sent: true }
+      emailResult = { sent: true, membershipLinked: sendOut.membershipLinked }
     } else {
       emailResult = { sent: false, code: sendOut.code }
     }

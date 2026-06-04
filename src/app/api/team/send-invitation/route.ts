@@ -2,8 +2,7 @@ import { NextResponse } from "next/server"
 
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import type { Language } from "@/lib/i18n/dictionaries"
-import { getPublicAppOrigin } from "@/lib/notifications/public-app-origin"
-import { sendBusinessInvitationEmail } from "@/lib/team/send-business-invitation-email"
+import { deliverStaffInvitation } from "@/lib/team/deliver-staff-invitation"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { PanelRole } from "@/lib/auth/permissions"
 
@@ -85,13 +84,12 @@ export async function POST(req: Request) {
   }
 
   const businessName = business?.business_name?.trim() || "WizytaOK"
-  const inviteUrl = `${getPublicAppOrigin()}/accept-invite/${token}`
   const language = normalizeLanguage(body.language)
 
-  const sendResult = await sendBusinessInvitationEmail({
-    to,
+  const sendResult = await deliverStaffInvitation({
+    token,
+    invitationEmail: to,
     businessName,
-    inviteUrl,
     role: normalizePanelRole(invitation.role),
     inviteeName,
     language,

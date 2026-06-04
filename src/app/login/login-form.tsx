@@ -36,12 +36,13 @@ export function LoginForm() {
   const postLoginPath = safeInternalRedirect(
     searchParams.get("next") ?? searchParams.get("redirectTo")
   )
+  const emailPrefill = searchParams.get("email")?.trim() ?? ""
   const resetStatus = searchParams.get("reset")
   const confirmedStatus = searchParams.get("confirmed")
   const oauthErrorCode = searchParams.get("oauth_error")
   const hasRecoverableConfirmationLinkError = oauthErrorCode === "auth_link_invalid_or_expired"
 
-  const [email, setEmail] = React.useState("")
+  const [email, setEmail] = React.useState(emailPrefill)
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(
@@ -71,6 +72,12 @@ export function LoginForm() {
     const eligibility = await fetchTrialStartEligibility()
     return eligibility.blocked ? "/activate-access?trial_blocked=1" : "/activate-access"
   }, [])
+
+  React.useEffect(() => {
+    if (emailPrefill) {
+      setEmail(emailPrefill)
+    }
+  }, [emailPrefill])
 
   React.useEffect(() => {
     queueMicrotask(() => {
@@ -164,7 +171,30 @@ export function LoginForm() {
         }
       }
 
-      let dest = postLoginPath ?? (profile ? "/dashboard" : "/settings?setup=business")
+      let memberBusinessId: string | null = null
+      if (!profile?.id) {
+        let memberQuery = await client
+          .from("business_members")
+          .select("business_id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .limit(1)
+        if (
+          memberQuery.error?.message?.toLowerCase().includes("is_active") &&
+          memberQuery.error.message.toLowerCase().includes("does not exist")
+        ) {
+          memberQuery = await client
+            .from("business_members")
+            .select("business_id")
+            .eq("user_id", user.id)
+            .limit(1)
+        }
+        memberBusinessId = memberQuery.data?.[0]?.business_id ?? null
+      }
+
+      let dest =
+        postLoginPath ??
+        (profile?.id || memberBusinessId ? "/dashboard" : "/settings?setup=business")
 
       if (!postLoginPath && shouldStartTrialAfterLogin) {
         if (!profile?.id) {

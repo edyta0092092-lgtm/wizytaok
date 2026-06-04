@@ -10,6 +10,10 @@ export type SendBusinessInvitationEmailInput = {
   to: string
   businessName: string
   inviteUrl: string
+  loginUrl?: string
+  loginEmail?: string
+  tempPassword?: string | null
+  accountAlreadyExists?: boolean
   role: PanelRole
   inviteeName?: string
   language: Language
@@ -22,7 +26,6 @@ function roleLabel(role: PanelRole, language: Language): string {
   return language === "en" ? "Staff" : "Obsługa"
 }
 
-/** „mysiaPYSIA PYSIA” → „Mysia Pysia” */
 function formatInviteeDisplayName(raw: string | undefined): string | null {
   const trimmed = raw?.trim()
   if (!trimmed) return null
@@ -42,30 +45,69 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
   textBody: string
   htmlBody: string
 } {
-  const { businessName, inviteUrl, role, inviteeName, language } = input
+  const {
+    businessName,
+    inviteUrl,
+    loginUrl,
+    loginEmail,
+    tempPassword,
+    accountAlreadyExists,
+    role,
+    inviteeName,
+    language,
+  } = input
   const lang = language === "en" ? "en" : "pl"
   const displayName = formatInviteeDisplayName(inviteeName)
   const roleText = roleLabel(role, lang)
   const business = businessName.trim() || "WizytaOK"
+  const emailLogin = (loginEmail ?? input.to).trim()
+  const ctaHref = (loginUrl ?? inviteUrl).trim()
+  const hasTempPassword = Boolean(tempPassword?.trim())
+
+  const detailRows =
+    lang === "en"
+      ? [
+          { label: "Company", value: business },
+          { label: "Panel role", value: roleText },
+          { label: "Login email", value: emailLogin },
+          ...(hasTempPassword
+            ? [{ label: "Temporary password", value: tempPassword!.trim() }]
+            : []),
+        ]
+      : [
+          { label: "Firma", value: business },
+          { label: "Rola w panelu", value: roleText },
+          { label: "E-mail logowania", value: emailLogin },
+          ...(hasTempPassword
+            ? [{ label: "Hasło tymczasowe", value: tempPassword!.trim() }]
+            : []),
+        ]
+
+  const passwordNote =
+    lang === "en"
+      ? hasTempPassword
+        ? "After signing in, change your password in account settings."
+        : accountAlreadyExists
+          ? "Use your existing WizytaOK password. If you forgot it, reset it on the login page."
+          : null
+      : hasTempPassword
+        ? "Po zalogowaniu zmień hasło w ustawieniach konta."
+        : accountAlreadyExists
+          ? "Użyj dotychczasowego hasła do WizytaOK. Jeśli je zapomniałeś(-aś), zresetuj je na stronie logowania."
+          : null
 
   if (lang === "en") {
-    const subject = `Invitation to ${business} panel — WizytaOK`
-    const title = "Panel invitation"
-    const preheader = `Join the ${business} team in WizytaOK.`
+    const subject = `Access to ${business} panel — WizytaOK`
+    const title = "Your panel access"
+    const preheader = `Login details for ${business} in WizytaOK.`
     const intro = displayName
-      ? `Hello ${displayName}, you have been invited to join the ${business} team in WizytaOK. Use the button below to sign in or create an account and set your password.`
-      : `You have been invited to join the ${business} team in WizytaOK. Use the button below to sign in or create an account and set your password.`
-    const detailRows = [
-      { label: "Company", value: business },
-      { label: "Panel role", value: roleText },
-    ]
+      ? `Hello ${displayName}, you have been added to the ${business} team in WizytaOK. Sign in with the credentials below.`
+      : `You have been added to the ${business} team in WizytaOK. Sign in with the credentials below.`
     const cta = {
-      href: inviteUrl,
-      label: "Accept invitation",
+      href: ctaHref,
+      label: "Sign in to the panel",
       hint: "If the button does not work, copy the link below into your browser.",
     }
-    const extraParagraph = inviteUrl
-    const footerNote = "If you did not expect this message, you can ignore it."
 
     return {
       subject,
@@ -74,7 +116,7 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
         intro,
         detailRows,
         cta,
-        footerNote,
+        footerNote: passwordNote ?? undefined,
       }),
       htmlBody: buildTransactionalEmailHtml({
         lang,
@@ -82,32 +124,26 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
         preheader,
         title,
         intro,
-        detailsHeading: "Invitation details",
+        detailsHeading: "Login details",
         detailRows,
         cta,
-        extraParagraph,
-        footerNote,
+        extraParagraph: ctaHref,
+        footerNote: passwordNote ?? "This message was sent automatically by WizytaOK.",
       }),
     }
   }
 
-  const subject = `Zaproszenie do panelu ${business} — WizytaOK`
-  const title = "Zaproszenie do panelu"
-  const preheader = `Dołącz do zespołu ${business} w WizytaOK.`
+  const subject = `Dostęp do panelu ${business} — WizytaOK`
+  const title = "Dostęp do panelu"
+  const preheader = `Dane logowania do ${business} w WizytaOK.`
   const intro = displayName
-    ? `Cześć ${displayName}, zapraszamy Cię do panelu zespołu firmy ${business} w WizytaOK. Kliknij przycisk poniżej, aby się zalogować lub utworzyć konto i ustawić hasło.`
-    : `Zapraszamy Cię do panelu zespołu firmy ${business} w WizytaOK. Kliknij przycisk poniżej, aby się zalogować lub utworzyć konto i ustawić hasło.`
-  const detailRows = [
-    { label: "Firma", value: business },
-    { label: "Rola w panelu", value: roleText },
-  ]
+    ? `Cześć ${displayName}, zostałaś dodana do zespołu firmy ${business} w WizytaOK. Zaloguj się poniższymi danymi.`
+    : `Zostałaś dodana do zespołu firmy ${business} w WizytaOK. Zaloguj się poniższymi danymi.`
   const cta = {
-    href: inviteUrl,
-    label: "Przyjmij zaproszenie",
+    href: ctaHref,
+    label: "Zaloguj się do panelu",
     hint: "Gdy przycisk nie działa, skopiuj link poniżej i wklej go w przeglądarce.",
   }
-  const extraParagraph = inviteUrl
-  const footerNote = "Jeśli nie spodziewałeś(-aś) się tej wiadomości, zignoruj ją."
 
   return {
     subject,
@@ -116,7 +152,7 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
       intro,
       detailRows,
       cta,
-      footerNote,
+      footerNote: passwordNote ?? undefined,
     }),
     htmlBody: buildTransactionalEmailHtml({
       lang,
@@ -124,11 +160,11 @@ function buildInvitationEmailContent(input: SendBusinessInvitationEmailInput): {
       preheader,
       title,
       intro,
-      detailsHeading: "Szczegóły zaproszenia",
+      detailsHeading: "Dane logowania",
       detailRows,
       cta,
-      extraParagraph,
-      footerNote,
+      extraParagraph: ctaHref,
+      footerNote: passwordNote ?? "Ta wiadomość została wysłana automatycznie przez WizytaOK.",
     }),
   }
 }

@@ -41,9 +41,13 @@ export default function AcceptInvitePage() {
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [actionMsg, setActionMsg] = React.useState<string | null>(null)
 
-  const nextPath = token && UUID_RE.test(token) ? `/accept-invite/${token}` : "/accept-invite/invalid"
-  const loginHref = `/login?next=${encodeURIComponent(nextPath)}`
-  const signupHref = `/signup-staff?next=${encodeURIComponent(nextPath)}`
+  const dashboardNext = encodeURIComponent("/dashboard")
+  const loginHref = preview?.email
+    ? `/login?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}`
+    : `/login?next=${dashboardNext}`
+  const signupHref = preview?.email
+    ? `/signup-staff?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}`
+    : `/signup-staff?next=${dashboardNext}`
 
   React.useEffect(() => {
     let cancelled = false

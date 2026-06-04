@@ -34,8 +34,9 @@ export function SignupStaffForm() {
   const { t } = useTranslations()
   const searchParams = useSearchParams()
   const next = safeNext(searchParams.get("next"))
+  const emailPrefill = searchParams.get("email")?.trim() ?? ""
 
-  const [email, setEmail] = React.useState("")
+  const [email, setEmail] = React.useState(emailPrefill)
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [info, setInfo] = React.useState<string | null>(null)
@@ -47,6 +48,10 @@ export function SignupStaffForm() {
   }, [password, t])
 
   const passwordBlocksSubmit = Boolean(passwordLiveHint)
+
+  React.useEffect(() => {
+    if (emailPrefill) setEmail(emailPrefill)
+  }, [emailPrefill])
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
