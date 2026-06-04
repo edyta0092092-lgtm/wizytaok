@@ -354,6 +354,31 @@ function mapAppointmentStatusToManualStatus(
   return null
 }
 
+const NOTIFY_AFTER_STATUS_UPDATE: AppointmentStatus[] = ["confirmed", "completed"]
+const NOTIFY_BEFORE_STATUS_UPDATE: AppointmentStatus[] = ["cancelled", "no_show"]
+
+async function postBookingStatusNotify(
+  appointmentId: string,
+  status: AppointmentStatus,
+): Promise<void> {
+  if (
+    !NOTIFY_AFTER_STATUS_UPDATE.includes(status) &&
+    !NOTIFY_BEFORE_STATUS_UPDATE.includes(status)
+  ) {
+    return
+  }
+  try {
+    await fetch("/api/bookings/notify-status-change", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: appointmentId, status }),
+    })
+  } catch {
+    // fire-and-forget — błąd nie blokuje zapisu statusu
+  }
+}
+
 function saveMockStatusOverride(
   appointmentId: string,
   status: AppointmentStatus,
@@ -390,6 +415,9 @@ export async function updateAppointmentStatus(
     if (!client) return false
     const bid = await getCurrentBusinessProfileIdForClient(client)
     if (!bid) return false
+    if (NOTIFY_BEFORE_STATUS_UPDATE.includes(status)) {
+      await postBookingStatusNotify(appointmentId, status)
+    }
     const r = await updateBookingStatus(client, bid, rawSb, status, {
       lastUpdatedBy: options.lastUpdatedBy,
       lastStatusChangeSource: options.lastStatusChangeSource,
@@ -403,30 +431,8 @@ export async function updateAppointmentStatus(
       // następnego pollingu. Wymuszamy natychmiastowe odświeżenie obu widoków.
       invalidateMergedAppointmentsCache()
       window.dispatchEvent(new Event("pw-bookings"))
-      // Po oznaczeniu „nieobecność klienta” wysyłamy follow-up (tylko gdy firma
-      // ma włączony szablon `no_show_follow_up`). Fire-and-forget — nie blokuje UI.
-      if (status === "no_show") {
-        void fetch("/api/bookings/notify-no-show", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId: appointmentId }),
-          keepalive: true,
-        }).catch(() => {})
-      }
-      // Własne szablony typu „zdarzenie" dla zmian statusu z panelu (created jest
-      // wysyłane na ścieżce rezerwacji). Fire-and-forget; dedup chroni przed dublami.
-      if (
-        status === "confirmed" ||
-        status === "cancelled" ||
-        status === "no_show" ||
-        status === "completed"
-      ) {
-        void fetch("/api/bookings/notify-status-change", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bookingId: appointmentId, status }),
-          keepalive: true,
-        }).catch(() => {})
+      if (NOTIFY_AFTER_STATUS_UPDATE.includes(status)) {
+        void postBookingStatusNotify(appointmentId, status)
       }
     }
     return r.ok

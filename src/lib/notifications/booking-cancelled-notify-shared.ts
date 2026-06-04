@@ -8,7 +8,10 @@ import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
-import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import {
+  upsertNotificationLog,
+  type NotificationLogUpdatePatch,
+} from "@/lib/notifications/notification-log-update"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesInsert } from "@/types/database"
 
@@ -152,13 +155,32 @@ export function buildBookingCancelledMessages(
   return { sms, emailSubject, emailText, emailHtml }
 }
 
-async function insertLog(row: TablesInsert<"notification_logs">) {
-  const admin = getServiceRoleClient()
-  if (!admin) return
-  const result = await insertNotificationLog(admin, row, "[booking-cancelled.notify.log]")
-  if (!result.ok) {
-    console.error("[booking-cancelled.notify.log]", result.message)
-  }
+type CancelLogAdmin = NonNullable<ReturnType<typeof getServiceRoleClient>>
+
+async function persistCancelledChannelLog(
+  admin: CancelLogAdmin,
+  booking: Tables<"bookings">,
+  logType: BookingCancelledLogType,
+  channel: "sms" | "email",
+  recipient: string,
+  patch: NotificationLogUpdatePatch,
+): Promise<void> {
+  await upsertNotificationLog(
+    admin,
+    { booking_id: booking.id, type: logType, channel },
+    {
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      channel,
+      type: logType,
+      recipient,
+      status: "pending",
+      subject: null,
+      body: null,
+    },
+    patch,
+    "[booking-cancelled.notify.log]",
+  )
 }
 
 function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notification_logs">["status"] {
@@ -184,6 +206,10 @@ export async function sendBookingCancelledConfirmation(args: {
   sendEmail?: boolean
 }): Promise<{ notice: "sent" | "queued" }> {
   const { booking, business, language, logType } = args
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    console.error("[booking-cancelled.notify.log] service_role_missing — SMS/e-mail bez wpisu w historii")
+  }
   const appUrl = getPublicAppOrigin()
   const slug = business.slug?.trim() ?? ""
   const linkRezerwacji = slug ? `${appUrl}/rezerwacje/${encodeURIComponent(slug)}` : appUrl
@@ -219,20 +245,18 @@ export async function sendBookingCancelledConfirmation(args: {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
-    await insertLog({
-      business_id: booking.business_id,
-      booking_id: booking.id,
-      channel: "sms",
-      type: logType,
-      recipient: phone,
-      status,
-      subject: null,
-      body: messages.sms,
-      provider: smsRes.ok ? smsRes.provider : null,
-      provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
-      error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
-      sent_at: smsRes.ok ? nowIso : null,
-    })
+    if (admin) {
+      await persistCancelledChannelLog(admin, booking, logType, "sms", phone, {
+        status,
+        subject: null,
+        body: messages.sms,
+        provider: smsRes.ok ? smsRes.provider : null,
+        provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
+        error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
+        sent_at: smsRes.ok ? nowIso : null,
+        recipient: phone,
+      })
+    }
   }
 
   const email = booking.client_email?.trim() ?? ""
@@ -245,20 +269,18 @@ export async function sendBookingCancelledConfirmation(args: {
     })
     const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
     if (emailRes.ok) anySent = true
-    await insertLog({
-      business_id: booking.business_id,
-      booking_id: booking.id,
-      channel: "email",
-      type: logType,
-      recipient: email,
-      status,
-      subject: messages.emailSubject,
-      body: messages.emailText,
-      provider: emailRes.ok ? emailRes.provider : null,
-      provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
-      error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
-      sent_at: emailRes.ok ? nowIso : null,
-    })
+    if (admin) {
+      await persistCancelledChannelLog(admin, booking, logType, "email", email, {
+        status,
+        subject: messages.emailSubject,
+        body: messages.emailText,
+        provider: emailRes.ok ? emailRes.provider : null,
+        provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
+        error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
+        sent_at: emailRes.ok ? nowIso : null,
+        recipient: email,
+      })
+    }
   }
 
   return { notice: anySent ? "sent" : "queued" }

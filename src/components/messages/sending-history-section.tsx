@@ -838,9 +838,12 @@ function canonicalStatus(
     if (
       entry.row.sent_at?.trim() &&
       st !== "failed" &&
-      st !== "skipped" &&
-      st !== "not_configured"
+      st !== "not_configured" &&
+      (st !== "skipped" || isTransactionalDbLog(entry.row))
     ) {
+      return "sent"
+    }
+    if (st === "queued" && isTransactionalDbLog(entry.row) && entry.row.sent_at?.trim()) {
       return "sent"
     }
     return st

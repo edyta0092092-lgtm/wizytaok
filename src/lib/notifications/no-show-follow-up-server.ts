@@ -7,7 +7,10 @@ import {
 } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
-import { insertNotificationLog } from "@/lib/notifications/notification-log-insert"
+import {
+  upsertNotificationLog,
+  type NotificationLogUpdatePatch,
+} from "@/lib/notifications/notification-log-update"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesInsert } from "@/types/database"
 
@@ -80,6 +83,33 @@ function mapChannelStatus(ok: boolean, code?: string): TablesInsert<"notificatio
   if (ok) return "sent"
   if (code === "simulated_dev" || code === "not_configured") return "queued"
   return "failed"
+}
+
+type FollowUpLogAdmin = NonNullable<ReturnType<typeof getServiceRoleClient>>
+
+async function persistFollowUpChannelLog(
+  admin: FollowUpLogAdmin,
+  booking: Tables<"bookings">,
+  channel: "sms" | "email",
+  recipient: string,
+  patch: NotificationLogUpdatePatch,
+): Promise<void> {
+  await upsertNotificationLog(
+    admin,
+    { booking_id: booking.id, type: LOG_TYPE, channel },
+    {
+      business_id: booking.business_id,
+      booking_id: booking.id,
+      channel,
+      type: LOG_TYPE,
+      recipient,
+      status: "pending",
+      subject: null,
+      body: null,
+    },
+    patch,
+    "[no-show-follow-up.log]",
+  )
 }
 
 /**
@@ -170,25 +200,18 @@ export async function notifyNoShowFollowUp(args: {
   const phone = booking.client_phone?.trim() ?? ""
   if (sendSms && phone) {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: smsText })
+    const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
-    await insertNotificationLog(
-      admin,
-      {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "sms",
-        type: LOG_TYPE,
-        recipient: phone,
-        status: mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code),
-        subject: null,
-        body: smsText,
-        provider: smsRes.ok ? smsRes.provider : null,
-        provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
-        error: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
-        sent_at: smsRes.ok ? nowIso : null,
-      },
-      "[no-show-follow-up.log]"
-    )
+    await persistFollowUpChannelLog(admin, booking, "sms", phone, {
+      status,
+      subject: null,
+      body: smsText,
+      provider: smsRes.ok ? smsRes.provider : null,
+      provider_message_id: smsRes.ok ? smsRes.messageId ?? null : null,
+      error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
+      sent_at: smsRes.ok ? nowIso : null,
+      recipient: phone,
+    })
   }
 
   const email = booking.client_email?.trim() ?? ""
@@ -199,25 +222,18 @@ export async function notifyNoShowFollowUp(args: {
       textBody: emailText,
       htmlBody: emailHtml,
     })
+    const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
     if (emailRes.ok) anySent = true
-    await insertNotificationLog(
-      admin,
-      {
-        business_id: booking.business_id,
-        booking_id: booking.id,
-        channel: "email",
-        type: LOG_TYPE,
-        recipient: email,
-        status: mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code),
-        subject: emailSubject,
-        body: emailText,
-        provider: emailRes.ok ? emailRes.provider : null,
-        provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
-        error: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
-        sent_at: emailRes.ok ? nowIso : null,
-      },
-      "[no-show-follow-up.log]"
-    )
+    await persistFollowUpChannelLog(admin, booking, "email", email, {
+      status,
+      subject: emailSubject,
+      body: emailText,
+      provider: emailRes.ok ? emailRes.provider : null,
+      provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
+      error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
+      sent_at: emailRes.ok ? nowIso : null,
+      recipient: email,
+    })
   }
 
   return { notice: anySent ? "sent" : "queued" }
