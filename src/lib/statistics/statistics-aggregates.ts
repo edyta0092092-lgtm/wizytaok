@@ -1,4 +1,5 @@
 import {
+  appointmentShowsNeedsActionStatus,
   countStatisticsNeedsActionVisits,
   isPlannedVisitForDashboardStats,
 } from "@/lib/appointments/stats-rules"
@@ -14,6 +15,7 @@ import type {
 } from "@/lib/statistics/statistics-types"
 
 const STATUS_ORDER: Array<StatisticsStatusItem["status"]> = [
+  "needs_action",
   "completed",
   "cancelled",
   "no_show",
@@ -249,15 +251,34 @@ function buildTopStaff(
   ).slice(0, 6)
 }
 
-function buildStatuses(appointments: Appointment[]): StatisticsStatusItem[] {
-  const total = appointments.filter((appointment) =>
-    STATUS_ORDER.includes(appointment.status as StatisticsStatusItem["status"])
-  ).length
+function buildStatuses(appointments: Appointment[], at: Date): StatisticsStatusItem[] {
+  const counts: Record<StatisticsStatusItem["status"], number> = {
+    needs_action: 0,
+    completed: 0,
+    cancelled: 0,
+    no_show: 0,
+  }
 
-  return STATUS_ORDER.map((status) => {
-    const count = appointments.filter((appointment) => appointment.status === status).length
-    return { status, count, percent: percent(count, total) }
-  })
+  for (const appointment of appointments) {
+    if (appointmentShowsNeedsActionStatus(appointment, at)) {
+      counts.needs_action += 1
+    } else if (appointment.status === "completed") {
+      counts.completed += 1
+    } else if (appointment.status === "cancelled") {
+      counts.cancelled += 1
+    } else if (appointment.status === "no_show") {
+      counts.no_show += 1
+    }
+  }
+
+  const total =
+    counts.needs_action + counts.completed + counts.cancelled + counts.no_show
+
+  return STATUS_ORDER.map((status) => ({
+    status,
+    count: counts[status],
+    percent: percent(counts[status], total),
+  }))
 }
 
 function isSentStatus(status: string): boolean {
@@ -421,11 +442,8 @@ export function buildStatisticsDataset({
     return {
       key: bucket.key,
       label: bucket.label,
-      confirmed: bucketAppointments.filter(
-        (appointment) =>
-          appointment.status === "confirmed" ||
-          appointment.status === "booked" ||
-          appointment.status === "pending"
+      needsAction: bucketAppointments.filter((appointment) =>
+        appointmentShowsNeedsActionStatus(appointment, today),
       ).length,
       completed: bucketAppointments.filter((appointment) => appointment.status === "completed").length,
       cancelled: bucketAppointments.filter((appointment) => appointment.status === "cancelled").length,
@@ -473,7 +491,7 @@ export function buildStatisticsDataset({
     chart,
     topServices: buildTopServices(appointmentsInRange, services),
     topStaff: buildTopStaff(appointmentsInRange, staff, locale),
-    statuses: buildStatuses(appointmentsInRange),
+    statuses: buildStatuses(appointmentsInRange, today),
     notifications: buildNotificationStats(notificationSources, appointmentsInRange),
     busyDays: heatmap.busyDays,
     busyHours: heatmap.busyHours,

@@ -10,11 +10,14 @@ export type StatisticsRange =
 export type StatisticsChartPoint = {
   key: string
   label: string
-  confirmed: number
+  needsAction: number
   completed: number
   cancelled: number
   noShow: number
 }
+
+/** Statusy wizualizowane na wykresie „Statusy wizyt” (zgodne z KPI Łącznie). */
+export type StatisticsVisitStatus = "needs_action" | "completed" | "cancelled" | "no_show"
 
 export type StatisticsKpis = {
   // All-time totals (cumulative, regardless of the selected range / month).
@@ -38,7 +41,7 @@ export type StatisticsRankItem = {
 }
 
 export type StatisticsStatusItem = {
-  status: Extract<AppointmentStatus, "confirmed" | "completed" | "cancelled" | "no_show">
+  status: StatisticsVisitStatus
   count: number
   percent: number
 }

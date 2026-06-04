@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 
 export type StatisticsMonthOption = { value: StatisticsRange; label: string }
 
-type SeriesKey = "completed" | "cancelled" | "noShow"
+type SeriesKey = "needsAction" | "completed" | "cancelled" | "noShow"
 
 const TOTAL_FILL = "#0f766e"
 
@@ -30,6 +30,7 @@ const SERIES: Array<{
   dataKey: SeriesKey
   fill: string
 }> = [
+  { key: "needsAction", dataKey: "needsAction", fill: "#8b5cf6" },
   { key: "completed", dataKey: "completed", fill: "#10b981" },
   { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
   { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
@@ -79,10 +80,11 @@ export function StatisticsLineChart({
   const isYearRange = range.startsWith("year:")
   const chartData = points.map((point) => ({
     label: point.label,
+    needsAction: point.needsAction,
     completed: point.completed,
     cancelled: point.cancelled,
     noShow: point.noShow,
-    total: point.completed + point.cancelled + point.noShow,
+    total: point.needsAction + point.completed + point.cancelled + point.noShow,
   }))
   const tickInterval = xAxisTickInterval(chartData.length)
 

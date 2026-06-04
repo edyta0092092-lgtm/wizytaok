@@ -2492,12 +2492,12 @@ Pozdrawiamy,
     statistics: {
       statusTitle: "Statusy wizyt",
       statusSubtitle:
-        "Ile wizyt w wybranym zakresie ma dany status końcowy lub aktywny.",
+        "Ile wizyt w wybranym zakresie ma dany status: wymaga działania, zrealizowane, anulowane lub nieobecność.",
       statusEmpty: "Brak wizyt z rozpoznawalnym statusem w wybranym zakresie.",
       statusAxisY: "Liczba wizyt",
       statusHint: {
-        confirmed:
-          "Potwierdzone — aktywna wizyta (termin jeszcze przed Tobą lub klient potwierdził).",
+        needsAction:
+          "Wymaga działania — miniona wizyta bez statusu końcowego (oznacz jako zrealizowane lub nieobecność).",
         completed: "Zrealizowane — wizyta się odbyła.",
         cancelled: "Anulowane — wizyta została odwołana, termin nie blokuje kalendarza.",
         noShow: "Nieobecność klienta — klient nie przyszedł na umówioną wizytę.",
@@ -4947,11 +4947,13 @@ Regards,
     },
     statistics: {
       statusTitle: "Visit statuses",
-      statusSubtitle: "How many visits in the selected range have each status.",
+      statusSubtitle:
+        "How many visits in the selected range are needs action, completed, cancelled, or no-show.",
       statusEmpty: "No visits with a recognized status in the selected range.",
       statusAxisY: "Visit count",
       statusHint: {
-        confirmed: "Confirmed — active visit (upcoming or client confirmed).",
+        needsAction:
+          "Needs action — past visit without a final status (mark as completed or no-show).",
         completed: "Completed — the visit took place.",
         cancelled: "Cancelled — visit was called off; the slot is free again.",
         noShow: "Client did not attend — the client did not show up.",

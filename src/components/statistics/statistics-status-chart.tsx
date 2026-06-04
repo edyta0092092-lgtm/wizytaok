@@ -22,21 +22,21 @@ import type {
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE: Record<StatisticsStatusItem["status"], string> = {
-  confirmed: "#0ea5e9",
+  needs_action: "#8b5cf6",
   completed: "#10b981",
   cancelled: "#f59e0b",
   no_show: "#f43f5e",
 }
 
 const STATUS_LABEL_KEY: Record<StatisticsStatusItem["status"], string> = {
-  confirmed: "appointments.confirmed",
+  needs_action: "appointments.filterNeedsAction",
   completed: "appointments.completed",
   cancelled: "appointments.cancelled",
   no_show: "appointments.noShow",
 }
 
 const STATUS_HINT_KEY: Record<StatisticsStatusItem["status"], string> = {
-  confirmed: "statistics.statusHint.confirmed",
+  needs_action: "statistics.statusHint.needsAction",
   completed: "statistics.statusHint.completed",
   cancelled: "statistics.statusHint.cancelled",
   no_show: "statistics.statusHint.noShow",

@@ -50,7 +50,7 @@ const COPY = {
         "12m": "12 mies.",
       },
       series: {
-        confirmed: "Potwierdzone",
+        needsAction: "Wymaga działania",
         completed: "Zrealizowane",
         cancelled: "Anulowane",
         noShow: "Nieobecność klienta",
@@ -139,7 +139,7 @@ const COPY = {
         "12m": "12 mo.",
       },
       series: {
-        confirmed: "Confirmed",
+        needsAction: "Needs action",
         completed: "Completed",
         cancelled: "Cancelled",
         noShow: "Client did not attend",
