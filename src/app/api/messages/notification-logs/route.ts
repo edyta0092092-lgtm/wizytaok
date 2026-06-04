@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 
-import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
+import { resolveActiveBusinessMemberForUser } from "@/lib/auth/resolve-active-business-member-server"
+import { canViewMessageSendHistory } from "@/lib/auth/permissions"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -20,9 +21,12 @@ function normalizeLogRow(raw: Record<string, unknown>) {
 }
 
 export async function GET() {
-  const resolution = await resolveAdminBusinessForUser()
+  const resolution = await resolveActiveBusinessMemberForUser()
   if (!resolution.ok) {
     return NextResponse.json({ ok: false, error: resolution.error }, { status: resolution.status })
+  }
+  if (!canViewMessageSendHistory(resolution.effectiveRole)) {
+    return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 })
   }
 
   const admin = getServiceRoleClient()

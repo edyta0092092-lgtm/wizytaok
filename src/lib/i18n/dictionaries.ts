@@ -325,10 +325,17 @@ export const dictionaries = {
       alreadyUsed: "To zaproszenie zostało już wykorzystane.",
       staffAccount: "Konto pracownika",
       joinPrompt: "Zaloguj się lub utwórz konto, aby dołączyć do firmy.",
-      invitationCreated: "Zaproszenie utworzone. Skopiuj link i prześlij pracownikowi ręcznie.",
+      invitationCreated: "Zaproszenie utworzone. E-mail z linkiem został wysłany.",
       invitationCreateError: "Nie udało się utworzyć zaproszenia.",
+      invitationEmailSent: "Wysłano e-mail z zaproszeniem do panelu.",
+      invitationEmailFailed: "Nie udało się wysłać e-maila. Skopiuj link zaproszenia i prześlij go ręcznie.",
+      invitationEmailNotConfigured:
+        "E-mail nie jest skonfigurowany na serwerze (RESEND_API_KEY). Skopiuj link i prześlij go ręcznie.",
+      resendInvitationEmail: "Wyślij e-mail ponownie",
+      pendingInvitationsEmailHint:
+        "Zaproszenia są wysyłane automatycznie na adres e-mail. W razie potrzeby możesz skopiować link lub wysłać e-mail ponownie.",
       noEmailBackend:
-        "Aplikacja nie wysyła jeszcze e-maila automatycznie. Skopiuj link i prześlij go ręcznie.",
+        "Zaproszenia są wysyłane automatycznie na e-mail. Możesz też skopiować link poniżej.",
       membersWithAccess: "Osoby z dostępem do panelu",
       pendingLabel: "Oczekujące",
       staffRoleOption: "Obsługa",
@@ -1892,10 +1899,10 @@ Pozdrawiamy,
       panelAccessSection: "Dostęp do panelu",
       contactEmail: "E-mail",
       emailHelp:
-        "Po zapisaniu osoby utworzysz link zaproszenia dla tego adresu e-mail i wyślesz go ręcznie.",
+        "Po zapisaniu osoby wyślemy zaproszenie na ten adres e-mail. Osoba ustawi hasło samodzielnie.",
       panelAccessIntro:
-        "Po zapisaniu osoby otrzymasz link zaproszenia. Osoba ustawi hasło samodzielnie.",
-      invitationAfterSave: "Osoba {name} została zapisana. Wyślij jej link poniżej.",
+        "Po zapisaniu osoby wyślemy zaproszenie e-mailem. Osoba ustawi hasło samodzielnie po otwarciu linku.",
+      invitationAfterSave: "Osoba {name} została zapisana. Zaproszenie zostało wysłane e-mailem.",
       panelRole: "Rola w panelu",
       panelRoleOwnerHint:
         "Pełny dostęp do ustawień firmy, usług, dostępności, zespołu i wizyt.",
@@ -2896,10 +2903,17 @@ Pozdrawiamy,
       alreadyUsed: "This invitation has already been used.",
       staffAccount: "Staff account",
       joinPrompt: "Sign in or create an account to join the business.",
-      invitationCreated: "Invitation created. Copy the link and send it to the staff member manually.",
+      invitationCreated: "Invitation created. An email with the link was sent.",
       invitationCreateError: "Could not create the invitation.",
+      invitationEmailSent: "Invitation email sent.",
+      invitationEmailFailed: "Could not send the email. Copy the invitation link and send it manually.",
+      invitationEmailNotConfigured:
+        "Email is not configured on the server (RESEND_API_KEY). Copy the link and send it manually.",
+      resendInvitationEmail: "Resend invitation email",
+      pendingInvitationsEmailHint:
+        "Invitations are sent automatically by email. You can also copy the link or resend the email.",
       noEmailBackend:
-        "The app does not send email automatically yet. Copy the link and send it manually.",
+        "Invitations are sent automatically by email. You can also copy the link below.",
       membersWithAccess: "People with panel access",
       pendingLabel: "Pending",
       staffRoleOption: "Staff",
@@ -4443,10 +4457,10 @@ Regards,
       panelAccessSection: "Panel access",
       contactEmail: "Email",
       emailHelp:
-        "After saving the person, you will generate an invitation link for this email and send it manually.",
+        "After saving the person, we will send an invitation to this email. They will set their password themselves.",
       panelAccessIntro:
-        "After saving the person, you will get an invitation link. The person will set their password themselves.",
-      invitationAfterSave: "{name} was saved. Send them the link below.",
+        "After saving the person, we will email an invitation. They set their password when opening the link.",
+      invitationAfterSave: "{name} was saved. The invitation email was sent.",
       panelRole: "Panel role",
       panelRoleOwnerHint:
         "Full access to business settings, services, availability, team and appointments.",

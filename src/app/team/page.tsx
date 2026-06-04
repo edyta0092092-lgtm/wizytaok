@@ -1146,6 +1146,10 @@ export default function TeamPage() {
             inviteToken = panelOut.invitationToken
           }
         }
+        if (inviteToken) {
+          const emailOutcome = await sendInvitationEmailByToken(inviteToken)
+          partialNotices = appendInvitationEmailNotice(partialNotices, emailOutcome)
+        }
         if (client && bid && isSupabaseConfigured()) {
           const syncOutCreate = await syncBusinessMemberRoleForStaff(
             client,
@@ -1326,6 +1330,10 @@ export default function TeamPage() {
           editInviteToken = panelOut.invitationToken
         }
       }
+      if (editInviteToken) {
+        const emailOutcome = await sendInvitationEmailByToken(editInviteToken)
+        partialNotices = appendInvitationEmailNotice(partialNotices, emailOutcome)
+      }
       await load()
       let editHighlightId: string | null = null
       if (client && bid && editInviteToken) {
@@ -1484,6 +1492,46 @@ export default function TeamPage() {
     } catch {
       setNotice(url)
     }
+  }
+
+  type InvitationEmailSendOutcome = "sent" | "not_configured" | "failed"
+
+  const sendInvitationEmailByToken = async (token: string): Promise<InvitationEmailSendOutcome> => {
+    try {
+      const res = await fetch("/api/team/send-invitation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, language }),
+      })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
+      if (json?.ok) return "sent"
+      const err = json?.error
+      if (err === "not_configured" || err === "simulated_dev") return "not_configured"
+      return "failed"
+    } catch {
+      return "failed"
+    }
+  }
+
+  const invitationEmailNoticeForOutcome = (outcome: InvitationEmailSendOutcome): string | null => {
+    if (outcome === "sent") return t("invitations.invitationEmailSent")
+    if (outcome === "not_configured") return t("invitations.invitationEmailNotConfigured")
+    if (outcome === "failed") return t("invitations.invitationEmailFailed")
+    return null
+  }
+
+  const appendInvitationEmailNotice = (
+    notices: string[],
+    outcome: InvitationEmailSendOutcome,
+  ): string[] => {
+    const line = invitationEmailNoticeForOutcome(outcome)
+    return line ? [...notices, line] : notices
+  }
+
+  const resendInvitationEmail = async (token: string) => {
+    const outcome = await sendInvitationEmailByToken(token)
+    const line = invitationEmailNoticeForOutcome(outcome)
+    if (line) setNotice(line)
   }
 
   const cancelInvitation = async (invitationId: string) => {
@@ -1682,7 +1730,7 @@ export default function TeamPage() {
 
                   {access.ready && access.canManageInvitations ? (
                     <TabsContent value="invites" className="mt-0 space-y-3">
-                      <p className="text-xs text-muted-foreground">{t("invitations.noEmailBackend")}</p>
+                      <p className="text-xs text-muted-foreground">{t("invitations.pendingInvitationsEmailHint")}</p>
                       {pendingInvites.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("team.pendingInvitationsEmpty")}</p>
                       ) : (
@@ -1715,7 +1763,7 @@ export default function TeamPage() {
                                     {t("team.inviteStatus")}: {inviteStatusLabel(inv.status)}
                                   </p>
                                 </div>
-                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                <div className="mt-3 flex flex-col gap-2">
                                   <Button
                                     type="button"
                                     variant="outline"
@@ -1724,6 +1772,14 @@ export default function TeamPage() {
                                   >
                                     <Copy className="size-4" aria-hidden />
                                     {t("invitations.copyInvitationLink")}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="h-10 w-full rounded-xl"
+                                    onClick={() => void resendInvitationEmail(inv.token)}
+                                  >
+                                    {t("invitations.resendInvitationEmail")}
                                   </Button>
                                   <Button
                                     type="button"

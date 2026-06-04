@@ -141,7 +141,7 @@ export function canAccessMessages(role: PanelRole | null): boolean {
 }
 
 export function canViewMessageSendHistory(role: PanelRole | null): boolean {
-  return canAccessMessages(role)
+  return role === "admin" || role === "staff"
 }
 
 export function canManageInvitations(role: PanelRole | null): boolean {

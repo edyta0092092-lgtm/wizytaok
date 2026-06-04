@@ -5,6 +5,7 @@ import {
   billingRecoveryRedirectPath,
   resolveBusinessPanelAccess,
 } from "@/lib/auth/resolve-business-panel-access"
+import { isStaffForbiddenPanelPath } from "@/lib/auth/panel-route-access"
 import {
   isAuthRequiredPanelPath,
   isOperationalPanelPath,
@@ -128,6 +129,9 @@ export async function middleware(request: NextRequest) {
     const access = await resolveBusinessPanelAccess(supabase, user.id)
     if (!access.hasActiveAccess) {
       return redirectToBillingRecovery(request, billingRecoveryRedirectPath(access))
+    }
+    if (access.effectiveRole === "staff" && isStaffForbiddenPanelPath(pathname)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url))
     }
   }
 
