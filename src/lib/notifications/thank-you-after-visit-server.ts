@@ -80,8 +80,8 @@ async function persistThankYouChannelLog(
   channel: "sms" | "email",
   recipient: string,
   patch: NotificationLogUpdatePatch,
-): Promise<void> {
-  await persistTransactionalChannelLog(
+): Promise<boolean> {
+  return persistTransactionalChannelLog(
     admin,
     booking,
     THANK_YOU_AFTER_VISIT_LOG_TYPE,
@@ -92,17 +92,26 @@ async function persistThankYouChannelLog(
   )
 }
 
-async function alreadyThanked(admin: LogAdmin, bookingId: string): Promise<boolean> {
+export async function hasThankYouAfterVisitHistoryLog(
+  admin: LogAdmin,
+  bookingId: string,
+): Promise<boolean> {
   const { data } = await admin
     .from("notification_logs")
-    .select("status, provider, provider_message_id")
+    .select("status, body, recipient")
     .eq("booking_id", bookingId)
     .eq("type", THANK_YOU_AFTER_VISIT_LOG_TYPE)
-    .eq("status", "sent")
 
-  return (data ?? []).some(
-    (row) => Boolean(row.provider?.trim()) || Boolean(row.provider_message_id?.trim()),
-  )
+  return (data ?? []).some((row) => {
+    const st = String(row.status ?? "").trim().toLowerCase()
+    const hasContent = Boolean(row.body?.trim()) || Boolean(row.recipient?.trim())
+    if (!hasContent) return false
+    return st === "sent" || st === "skipped" || st === "queued"
+  })
+}
+
+async function alreadyThanked(admin: LogAdmin, bookingId: string): Promise<boolean> {
+  return hasThankYouAfterVisitHistoryLog(admin, bookingId)
 }
 
 /**
@@ -167,13 +176,14 @@ export async function notifyThankYouAfterVisit(args: {
 
   const nowIso = new Date().toISOString()
   let anySent = false
+  let logsOk = true
 
   const phone = booking.client_phone?.trim() ?? ""
   if (sendSms && phone) {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: smsText })
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
-    await persistThankYouChannelLog(admin, booking, "sms", phone, {
+    const logged = await persistThankYouChannelLog(admin, booking, "sms", phone, {
       status,
       subject: null,
       body: smsText,
@@ -182,6 +192,7 @@ export async function notifyThankYouAfterVisit(args: {
       error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
       sent_at: smsRes.ok ? nowIso : null,
     })
+    if (smsRes.ok && !logged) logsOk = false
   }
 
   const email = booking.client_email?.trim() ?? ""
@@ -194,7 +205,7 @@ export async function notifyThankYouAfterVisit(args: {
     })
     const status = mapChannelStatus(emailRes.ok, emailRes.ok ? undefined : emailRes.code)
     if (emailRes.ok) anySent = true
-    await persistThankYouChannelLog(admin, booking, "email", email, {
+    const logged = await persistThankYouChannelLog(admin, booking, "email", email, {
       status,
       subject: emailSubject,
       body: emailText,
@@ -202,6 +213,13 @@ export async function notifyThankYouAfterVisit(args: {
       provider_message_id: emailRes.ok ? emailRes.messageId ?? null : null,
       error_message: emailRes.ok ? null : `${emailRes.code}${emailRes.error ? `: ${emailRes.error}` : ""}`,
       sent_at: emailRes.ok ? nowIso : null,
+    })
+    if (emailRes.ok && !logged) logsOk = false
+  }
+
+  if (anySent && !logsOk) {
+    console.error("[thank-you-after-visit] sent_but_log_persist_failed", {
+      bookingId: booking.id,
     })
   }
 

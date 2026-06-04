@@ -35,7 +35,7 @@ function errorFieldValue(patch: NotificationLogUpdatePatch): string | null {
   return patch.error_message ?? patch.error ?? null
 }
 
-async function updateNotificationLogRow(
+export async function updateNotificationLogRow(
   admin: AdminClient,
   filters: { booking_id: string; type: string; channel: string },
   patch: NotificationLogUpdatePatch,

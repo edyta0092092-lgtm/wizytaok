@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
 import {
+  hasThankYouAfterVisitHistoryLog,
   notifyThankYouAfterVisit,
-  THANK_YOU_AFTER_VISIT_LOG_TYPE,
 } from "@/lib/notifications/thank-you-after-visit-server"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
@@ -15,18 +15,6 @@ type Body = {
   language?: "pl" | "en"
   /** Domyślnie `true` — SMS/e-mail z podziękowaniem. */
   notifyClient?: boolean
-}
-
-async function hasThankYouNotificationLog(bookingId: string): Promise<boolean> {
-  const admin = getServiceRoleClient()
-  if (!admin) return false
-  const { count } = await admin
-    .from("notification_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("booking_id", bookingId)
-    .eq("type", THANK_YOU_AFTER_VISIT_LOG_TYPE)
-    .eq("status", "sent")
-  return (count ?? 0) > 0
 }
 
 export async function POST(req: Request) {
@@ -80,8 +68,10 @@ export async function POST(req: Request) {
   let notice: "saved" | "queued" | "sent" | "skipped" = "saved"
   let notificationSkipped = false
 
+  const admin = getServiceRoleClient()
+
   if (shouldNotifyClient && profile) {
-    if (alreadyCompleted && (await hasThankYouNotificationLog(bookingUuid))) {
+    if (admin && alreadyCompleted && (await hasThankYouAfterVisitHistoryLog(admin, bookingUuid))) {
       try {
         await dispatchCustomTemplatesForEvent({ bookingId: bookingUuid, eventKey: "completed" })
       } catch {

@@ -861,7 +861,17 @@ function canonicalStatus(
   }
   if (entry.kind === "db") {
     const st = entry.row.status.trim().toLowerCase()
+    const hasContent =
+      Boolean(entry.row.body?.trim()) || Boolean(entry.row.recipient?.trim())
     if (st === "sent") return "sent"
+    if (
+      isTransactionalDbLog(entry.row) &&
+      hasContent &&
+      st !== "failed" &&
+      st !== "not_configured"
+    ) {
+      return "sent"
+    }
     if (
       entry.row.sent_at?.trim() &&
       st !== "failed" &&

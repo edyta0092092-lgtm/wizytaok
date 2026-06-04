@@ -97,22 +97,34 @@ async function upgradeNotificationLogToSent(
   payload: NotificationLogInsert,
 ): Promise<void> {
   const sentAt = payload.sent_at ?? new Date().toISOString()
-  await admin
+  const patch = {
+    status: "sent" as const,
+    sent_at: sentAt,
+    recipient: payload.recipient ?? null,
+    subject: payload.subject ?? null,
+    body: payload.body ?? null,
+    provider: payload.provider ?? null,
+    provider_message_id: payload.provider_message_id ?? null,
+    error_message: null,
+  }
+  const modern = await admin
     .from("notification_logs")
-    .update({
-      status: "sent",
-      sent_at: sentAt,
-      recipient: payload.recipient ?? null,
-      subject: payload.subject ?? null,
-      body: payload.body ?? null,
-      provider: payload.provider ?? null,
-      provider_message_id: payload.provider_message_id ?? null,
-      error_message: null,
-    })
+    .update(patch)
     .eq("booking_id", payload.booking_id!)
     .eq("type", payload.type!)
     .eq("channel", payload.channel)
-    .neq("status", "sent")
+    .select("id")
+    .maybeSingle()
+  if (!modern.error && modern.data?.id) return
+
+  if (modern.error && isMissingErrorMessageColumn(modern.error.message)) {
+    await admin
+      .from("notification_logs")
+      .update({ ...patch, error: null } as Database["public"]["Tables"]["notification_logs"]["Update"])
+      .eq("booking_id", payload.booking_id!)
+      .eq("type", payload.type!)
+      .eq("channel", payload.channel)
+  }
 }
 
 /** Zapisuje lub uaktualnia wpis „sent” (np. po duplikacie lub wcześniejszym skipped). */
@@ -135,9 +147,7 @@ export async function upsertSentNotificationLog(
     .maybeSingle()
 
   if (existing?.id) {
-    if (String(existing.status ?? "").trim().toLowerCase() !== "sent") {
-      await upgradeNotificationLogToSent(admin, payload)
-    }
+    await upgradeNotificationLogToSent(admin, payload)
     return { ok: true, duplicate: true }
   }
 
