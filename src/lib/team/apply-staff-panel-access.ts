@@ -52,7 +52,7 @@ export async function syncBusinessMemberRoleForStaff(
 }
 
 export type ApplyStaffPanelAccessResult =
-  | { ok: true; invitationToken: string | null }
+  | { ok: true; invitationToken: string | null; alreadyHasPanelAccess?: boolean }
   | { ok: false; messageKey: string; detail?: string }
 
 export async function applyStaffPanelAccess(
@@ -74,7 +74,7 @@ export async function applyStaffPanelAccess(
     .eq("staff_member_id", staffMemberId)
     .maybeSingle()
 
-  if (memberRow) {
+  if (memberRow?.user_id) {
     await client
       .from("business_invitations")
       .update({ status: "cancelled" })
@@ -97,8 +97,7 @@ export async function applyStaffPanelAccess(
     if (pendingTok) {
       return { ok: true, invitationToken: pendingTok }
     }
-    // Konto panelu już istnieje — nie wymaga nowego zaproszenia.
-    return { ok: true, invitationToken: null }
+    return { ok: true, invitationToken: null, alreadyHasPanelAccess: true }
   }
 
   await client
@@ -122,7 +121,30 @@ export async function applyStaffPanelAccess(
     emailRows?.find((row) => (row.email ?? "").trim().toLowerCase() === em) ?? emailRows?.[0] ?? null
 
   if (emailRow?.status === "accepted") {
-    return { ok: false, messageKey: "team.panelInviteEmailConflict" }
+    const linkedStaffId = emailRow.staff_member_id
+    if (linkedStaffId === staffMemberId) {
+      return { ok: true, invitationToken: null, alreadyHasPanelAccess: true }
+    }
+    if (linkedStaffId && linkedStaffId !== staffMemberId) {
+      return { ok: false, messageKey: "team.panelInviteEmailConflict" }
+    }
+    const token = crypto.randomUUID()
+    const { error: reopenErr } = await client
+      .from("business_invitations")
+      .update({
+        status: "pending",
+        email: em,
+        role: form.panelMemberRole,
+        staff_member_id: staffMemberId,
+        invited_by: invitedBy,
+        token,
+        accepted_at: null,
+      })
+      .eq("id", emailRow.id)
+    if (reopenErr) {
+      return { ok: false, messageKey: "invitations.invitationCreateError", detail: reopenErr.message }
+    }
+    return { ok: true, invitationToken: token }
   }
   if (
     emailRow?.status === "pending" &&

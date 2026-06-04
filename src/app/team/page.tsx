@@ -616,13 +616,37 @@ export default function TeamPage() {
     }
     setServiceIdsByStaff(nextMap)
 
-    if (client && bid && access.canManageInvitations) {
-      const invRes = await client
-        .from("business_invitations")
-        .select("id,email,status,token,created_at,staff_member_id,role")
-        .eq("business_id", bid)
-        .order("created_at", { ascending: false })
-      setPanelInvites((invRes.data as PanelInviteRow[] | null) ?? [])
+    if (bid && access.canManageInvitations && isSupabaseConfigured()) {
+      try {
+        const invApiRes = await fetch("/api/team/invitations", { cache: "no-store" })
+        const invApiJson = (await invApiRes.json().catch(() => null)) as {
+          ok?: boolean
+          rows?: PanelInviteRow[]
+        } | null
+        if (invApiJson?.ok && Array.isArray(invApiJson.rows)) {
+          setPanelInvites(invApiJson.rows)
+        } else if (client) {
+          const invRes = await client
+            .from("business_invitations")
+            .select("id,email,status,token,created_at,staff_member_id,role")
+            .eq("business_id", bid)
+            .order("created_at", { ascending: false })
+          setPanelInvites((invRes.data as PanelInviteRow[] | null) ?? [])
+        } else {
+          setPanelInvites([])
+        }
+      } catch {
+        if (client) {
+          const invRes = await client
+            .from("business_invitations")
+            .select("id,email,status,token,created_at,staff_member_id,role")
+            .eq("business_id", bid)
+            .order("created_at", { ascending: false })
+          setPanelInvites((invRes.data as PanelInviteRow[] | null) ?? [])
+        } else {
+          setPanelInvites([])
+        }
+      }
     } else {
       setPanelInvites([])
     }
@@ -1045,18 +1069,54 @@ export default function TeamPage() {
         language === "en"
           ? "Staff member was saved. Some additional settings need to be saved again."
           : "Osoba została zapisana. Niektóre dodatkowe ustawienia wymagają ponownego zapisania."
-      const panelAccessNoticeForFailure = (messageKey?: string, detail?: string) => {
-        const key =
-          messageKey === "team.panelEmailRequired"
-            ? "team.panelEmailRequired"
-            : messageKey === "team.panelInviteEmailConflict"
-              ? "team.panelInviteEmailConflict"
-              : "invitations.invitationCreateError"
+      const panelAccessNoticeForFailure = (
+        messageKey?: string,
+        detail?: string,
+        serverError?: string,
+      ) => {
+        let key = "invitations.invitationCreateError"
+        if (messageKey === "team.panelEmailRequired") key = "team.panelEmailRequired"
+        else if (messageKey === "team.panelInviteEmailConflict") key = "team.panelInviteEmailConflict"
+        else if (
+          messageKey === "team.invitationServerNotConfigured" ||
+          serverError === "supabase_unconfigured"
+        ) {
+          key = "team.invitationServerNotConfigured"
+        } else if (messageKey) key = messageKey
         const line = t(key as "team.panelEmailRequired")
         if (process.env.NODE_ENV === "development" && detail?.trim()) {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
+        } else if (detail?.trim()) {
+          setNoticeDetail(`${t("team.errorDetailsPrefix")} ${detail.trim()}`)
+        } else {
+          setNoticeDetail(null)
         }
         return line
+      }
+      const panelAccessNoticeForSuccess = (panelRes: {
+        invitationToken: string | null
+        alreadyHasPanelAccess?: boolean
+        emailOutcome?: "sent" | "not_configured" | "failed"
+      }) => {
+        const notices: string[] = []
+        if (panelRes.alreadyHasPanelAccess) {
+          notices.push(t("team.panelAlreadyHasAccess"))
+          return notices
+        }
+        if (panelRes.invitationToken) {
+          const emailLine = panelRes.emailOutcome
+            ? panelRes.emailOutcome === "sent"
+              ? t("invitations.invitationEmailSent")
+              : panelRes.emailOutcome === "not_configured"
+                ? t("invitations.invitationEmailNotConfigured")
+                : t("invitations.invitationEmailFailed")
+            : null
+          if (emailLine) notices.push(emailLine)
+          else notices.push(t("invitations.invitationCreated"))
+          return notices
+        }
+        notices.push(t("invitations.invitationCreateError"))
+        return notices
       }
       const setSaveErrorWithDetail = (message: string, detail?: string) => {
         setNotice(message)
@@ -1143,13 +1203,16 @@ export default function TeamPage() {
           if (!panelRes.ok) {
             partialNotices = [
               ...partialNotices,
-              panelAccessNoticeForFailure(panelRes.messageKey, panelRes.detail),
+              panelAccessNoticeForFailure(
+                panelRes.messageKey,
+                panelRes.detail,
+                panelRes.serverError,
+              ),
             ]
           } else {
             inviteToken = panelRes.invitationToken
-            if (panelRes.emailOutcome) {
-              partialNotices = appendInvitationEmailNotice(partialNotices, panelRes.emailOutcome)
-            }
+            partialNotices = [...partialNotices, ...panelAccessNoticeForSuccess(panelRes)]
+            if (inviteToken) setSidebarTab("invites")
           }
         }
         if (client && bid && isSupabaseConfigured()) {
@@ -1320,13 +1383,16 @@ export default function TeamPage() {
         if (!panelRes.ok) {
           partialNotices = [
             ...partialNotices,
-            panelAccessNoticeForFailure(panelRes.messageKey, panelRes.detail),
+            panelAccessNoticeForFailure(
+              panelRes.messageKey,
+              panelRes.detail,
+              panelRes.serverError,
+            ),
           ]
         } else {
           editInviteToken = panelRes.invitationToken
-          if (panelRes.emailOutcome) {
-            partialNotices = appendInvitationEmailNotice(partialNotices, panelRes.emailOutcome)
-          }
+          partialNotices = [...partialNotices, ...panelAccessNoticeForSuccess(panelRes)]
+          if (editInviteToken) setSidebarTab("invites")
         }
       }
       await load()
@@ -1499,9 +1565,10 @@ export default function TeamPage() {
     | {
         ok: true
         invitationToken: string | null
+        alreadyHasPanelAccess?: boolean
         emailOutcome?: InvitationEmailSendOutcome
       }
-    | { ok: false; messageKey?: string; detail?: string }
+    | { ok: false; messageKey?: string; detail?: string; serverError?: string }
   > => {
     try {
       const res = await fetch("/api/team/apply-panel-access", {
@@ -1520,13 +1587,21 @@ export default function TeamPage() {
         invitationToken?: string | null
         messageKey?: string
         detail?: string | null
+        error?: string
+        alreadyHasPanelAccess?: boolean
         email?: { sent?: boolean; code?: string }
       } | null
       if (!json?.ok) {
+        const serverError = typeof json?.error === "string" ? json.error : undefined
         return {
           ok: false,
-          messageKey: json?.messageKey,
+          messageKey:
+            json?.messageKey ??
+            (serverError === "supabase_unconfigured"
+              ? "team.invitationServerNotConfigured"
+              : undefined),
           detail: json?.detail ?? undefined,
+          serverError,
         }
       }
       const token =
@@ -1545,7 +1620,12 @@ export default function TeamPage() {
           emailOutcome = "failed"
         }
       }
-      return { ok: true, invitationToken: token, emailOutcome }
+      return {
+        ok: true,
+        invitationToken: token,
+        alreadyHasPanelAccess: json.alreadyHasPanelAccess === true,
+        emailOutcome,
+      }
     } catch {
       return { ok: false, messageKey: "invitations.invitationCreateError" }
     }

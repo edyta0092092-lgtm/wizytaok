@@ -114,6 +114,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     invitationToken: panelOut.invitationToken,
+    alreadyHasPanelAccess: panelOut.alreadyHasPanelAccess === true,
     email: emailResult,
   })
 }

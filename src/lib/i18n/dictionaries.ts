@@ -1912,6 +1912,10 @@ Pozdrawiamy,
       panelAccessPending: "Zaproszenie oczekujące",
       panelEmailRequired: "Podaj adres e-mail, aby utworzyć zaproszenie do panelu.",
       panelInviteEmailConflict: "Ten adres jest już użyty w innym zaproszeniu lub koncie.",
+      panelAlreadyHasAccess:
+        "Ta osoba ma już dostęp do panelu — nowe zaproszenie nie jest potrzebne.",
+      invitationServerNotConfigured:
+        "Serwer nie ma skonfigurowanego SUPABASE_SERVICE_ROLE_KEY — zaproszenie nie mogło zostać zapisane.",
       errorDetailsPrefix: "Szczegóły:",
       servicesShort: "Usługi",
       noServicesAssigned: "Brak przypisanych usług",
@@ -4470,6 +4474,10 @@ Regards,
       panelAccessPending: "Pending invitation",
       panelEmailRequired: "Enter an email address to create a panel invitation.",
       panelInviteEmailConflict: "This address is already used for another invitation or account.",
+      panelAlreadyHasAccess:
+        "This person already has panel access — a new invitation is not required.",
+      invitationServerNotConfigured:
+        "SUPABASE_SERVICE_ROLE_KEY is not configured on the server — the invitation could not be saved.",
       errorDetailsPrefix: "Details:",
       servicesShort: "Services",
       noServicesAssigned: "No services assigned",
