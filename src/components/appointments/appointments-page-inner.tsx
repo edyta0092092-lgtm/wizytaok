@@ -6,8 +6,8 @@ import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
+import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
 import { ManualAppointmentSheet } from "@/components/appointments/manual-appointment-sheet"
-import { Button } from "@/components/ui/button"
 import { useAppointmentsStore } from "@/lib/appointments/appointments-store"
 import {
   APPOINTMENTS_PANEL_DISMISSED_EVENT,
@@ -224,9 +224,7 @@ export function AppointmentsPageInner() {
       title={t("navigation.appointments")}
       pageDescription={t("appointments.description")}
       primaryAction={
-        <Button type="button" size="sm" className="h-9 rounded-xl" onClick={openManualAppointmentCreate}>
-          {t("common.addAppointment")}
-        </Button>
+        <AddAppointmentHeaderButton onClick={openManualAppointmentCreate} />
       }
     >
       <PageShell>
