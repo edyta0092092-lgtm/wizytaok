@@ -84,6 +84,26 @@ export async function POST(req: Request) {
     )
   }
 
+  if ("alreadyHasPanelAccess" in panelOut && panelOut.alreadyHasPanelAccess) {
+    return NextResponse.json({
+      ok: true,
+      invitationToken: panelOut.invitationToken ?? null,
+      alreadyHasPanelAccess: true,
+      email: { sent: false },
+    })
+  }
+
+  if (!("invitationToken" in panelOut) || !panelOut.invitationToken) {
+    return NextResponse.json(
+      {
+        ok: false,
+        messageKey: "invitations.invitationCreateError",
+        detail: "invitation_token_missing",
+      },
+      { status: 500 },
+    )
+  }
+
   const sendEmail = body.sendEmail !== false
   const language = normalizeLanguage(body.language)
   let emailResult: { sent: boolean; code?: string } = { sent: false }
@@ -114,7 +134,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     invitationToken: panelOut.invitationToken,
-    alreadyHasPanelAccess: panelOut.alreadyHasPanelAccess === true,
+    alreadyHasPanelAccess: false,
     email: emailResult,
   })
 }

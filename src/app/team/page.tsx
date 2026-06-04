@@ -1103,7 +1103,7 @@ export default function TeamPage() {
           notices.push(t("team.panelAlreadyHasAccess"))
           return notices
         }
-        if (panelRes.invitationToken) {
+        if (panelRes.invitationToken && panelRes.invitationToken.length > 0) {
           const emailLine = panelRes.emailOutcome
             ? panelRes.emailOutcome === "sent"
               ? t("invitations.invitationEmailSent")
