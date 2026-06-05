@@ -14,21 +14,26 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 import type { AppointmentStatus } from "@/types/domain"
 
 const actionBarClassName =
-  "flex w-full min-w-0 flex-wrap items-center justify-end gap-2 overflow-visible"
+  "flex w-full min-w-0 flex-wrap items-stretch gap-2 sm:items-center sm:justify-end"
 
 const outlineActionClassName =
-  "h-9 w-auto shrink-0 select-none justify-center rounded-xl whitespace-nowrap active:bg-muted active:text-foreground"
+  "h-9 min-h-9 w-full shrink-0 select-none justify-center rounded-xl whitespace-nowrap active:bg-muted active:text-foreground sm:w-auto"
+
+const cancelActionClassName =
+  "h-9 min-h-9 w-full shrink-0 select-none justify-center rounded-xl whitespace-nowrap border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
 
 const deleteActionClassName =
-  "h-9 w-auto shrink-0 select-none justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive [&_svg]:size-3.5"
+  "h-9 min-h-9 w-full shrink-0 select-none justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive sm:w-auto [&_svg]:size-3.5"
 
 export type AppointmentRowActionsProps = {
   status: AppointmentStatus
   statusOrder: readonly AppointmentStatus[]
   onEditVisit: () => void
   onChangeStatus: (status: AppointmentStatus) => void
+  onQuickCancelPress?: () => void
+  quickCancelConfirmOpen?: boolean
+  isCancellingVisit?: boolean
   onDelete: () => void
-  /** Gdy false, ukryj trwałe usunięcie wizyty (np. dla personelu bez prawa delete). */
   allowAppointmentDelete?: boolean
 }
 
@@ -37,11 +42,16 @@ export function AppointmentRowActions({
   statusOrder,
   onEditVisit,
   onChangeStatus,
+  onQuickCancelPress,
+  quickCancelConfirmOpen = false,
+  isCancellingVisit = false,
   onDelete,
   allowAppointmentDelete = true,
 }: AppointmentRowActionsProps) {
   const { t } = useTranslations()
   const visitLocked = isAppointmentVisitLocked(status)
+  const canQuickCancel =
+    !visitLocked && status !== "cancelled" && typeof onQuickCancelPress === "function"
 
   return (
     <div className={actionBarClassName}>
@@ -73,6 +83,18 @@ export function AppointmentRowActions({
               ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      ) : null}
+      {canQuickCancel && !quickCancelConfirmOpen ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="default"
+          className={cancelActionClassName}
+          onClick={onQuickCancelPress}
+          disabled={isCancellingVisit}
+        >
+          {t("appointments.cancelVisit")}
+        </Button>
       ) : null}
       {allowAppointmentDelete ? (
         <Button type="button" variant="ghost" size="default" className={deleteActionClassName} onClick={onDelete}>

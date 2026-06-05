@@ -9,6 +9,7 @@ import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-sta
 import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentsDayGroupFilter, AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
+import type { AppointmentsSourceFilter } from "@/lib/appointments/appointments-source-filter"
 import {
   buildAppointmentReminderSections,
   groupAppointmentReminderRowsByBookingId,
@@ -44,6 +45,7 @@ export type AppointmentsListPresentationBundle = {
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
   dayGroupFilter: AppointmentsDayGroupFilter
+  sourceFilter: AppointmentsSourceFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
   reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
@@ -96,6 +98,9 @@ export type AppointmentsListWithRowsProps = {
   handlers: AppointmentsListRowHandlersBundle
   deleteFlow: AppointmentsListDeleteFlowBundle
   propose: AppointmentsListProposePanelBundle
+  bookingPagePath: string
+  hasActiveSecondaryFilters: boolean
+  onClearSecondaryFilters: () => void
 }
 
 export function AppointmentsListWithRows({
@@ -103,6 +108,9 @@ export function AppointmentsListWithRows({
   handlers,
   deleteFlow,
   propose,
+  bookingPagePath,
+  hasActiveSecondaryFilters,
+  onClearSecondaryFilters,
 }: AppointmentsListWithRowsProps) {
   const {
     grouped,
@@ -110,6 +118,7 @@ export function AppointmentsListWithRows({
     staffFilter,
     listFilter,
     dayGroupFilter,
+    sourceFilter,
     formatWhen,
     reminderPanelLabels,
     listUiLanguage,
@@ -213,6 +222,7 @@ export function AppointmentsListWithRows({
     proposeStaffListForService,
     onCloseEditPanel,
     saveDirectVisitChange,
+    executeCancelVisit,
     executeRemoveVisit,
     isSavingDirectEdit,
     isCancellingVisit,
@@ -222,7 +232,17 @@ export function AppointmentsListWithRows({
   } = propose
 
   if (isEmpty) {
-    return <AppointmentsListEmpty staffFilter={staffFilter} listFilter={listFilter} dayGroupFilter={dayGroupFilter} />
+    return (
+      <AppointmentsListEmpty
+        staffFilter={staffFilter}
+        listFilter={listFilter}
+        dayGroupFilter={dayGroupFilter}
+        sourceFilter={sourceFilter}
+        hasActiveFilters={hasActiveSecondaryFilters}
+        bookingPagePath={bookingPagePath}
+        onClearFilters={onClearSecondaryFilters}
+      />
+    )
   }
 
   return (
@@ -296,6 +316,7 @@ export function AppointmentsListWithRows({
             confirmCancelVisitOpen={confirmCancelVisitForId === row.id}
             onCancelVisitPress={() => onCancelVisitPress(row)}
             onCancelVisitConfirm={onCancelVisitDismiss}
+            onQuickCancelConfirm={() => executeCancelVisit(row)}
             onRemoveVisitConfirm={() => executeRemoveVisit(row)}
             isCancellingVisit={isCancellingVisit}
           />

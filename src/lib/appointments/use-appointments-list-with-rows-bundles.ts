@@ -5,6 +5,7 @@ import * as React from "react"
 import type { AppointmentsListWithRowsProps } from "@/components/appointments/appointments-list-with-rows"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentGroupKey, AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
+import type { AppointmentsSourceFilter } from "@/lib/appointments/appointments-source-filter"
 import type { AppointmentReminderPanelLabels } from "@/lib/appointments/appointment-reminder-panel-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import type { Appointment, AppointmentStatus, StaffMember } from "@/types/domain"
@@ -15,6 +16,7 @@ export type AppointmentsListWithRowsBundlesParams = {
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
   dayGroupFilter: AppointmentsDayGroupFilter
+  sourceFilter: AppointmentsSourceFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
   reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
@@ -60,6 +62,7 @@ export function useAppointmentsListWithRowsBundles({
   staffFilter,
   listFilter,
   dayGroupFilter,
+  sourceFilter,
   formatWhen,
   reminderPanelLabels,
   listUiLanguage,
@@ -97,7 +100,10 @@ export function useAppointmentsListWithRowsBundles({
   isSavingDirectEdit,
   isCancellingVisit,
   confirmCancelVisitForId,
-}: AppointmentsListWithRowsBundlesParams): AppointmentsListWithRowsProps {
+}: AppointmentsListWithRowsBundlesParams): Omit<
+  AppointmentsListWithRowsProps,
+  "bookingPagePath" | "hasActiveSecondaryFilters" | "onClearSecondaryFilters"
+> {
   return React.useMemo(
     () => ({
       presentation: {
@@ -106,6 +112,7 @@ export function useAppointmentsListWithRowsBundles({
         staffFilter,
         listFilter,
         dayGroupFilter,
+        sourceFilter,
         formatWhen,
         reminderPanelLabels,
         listUiLanguage,
@@ -184,6 +191,7 @@ export function useAppointmentsListWithRowsBundles({
       staffFilter,
       listFilter,
       dayGroupFilter,
+      sourceFilter,
       formatWhen,
       reminderPanelLabels,
       listUiLanguage,

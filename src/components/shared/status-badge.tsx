@@ -1,5 +1,6 @@
 "use client"
 
+import { appointmentStatusTone } from "@/lib/appointments/appointment-status-visual"
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import type { AppointmentStatus } from "@/types/domain"
@@ -7,18 +8,6 @@ import type { AppointmentStatus } from "@/types/domain"
 function normalizeStatus(status: AppointmentStatus | "scheduled"): AppointmentStatus {
   if (status === "scheduled" || status === "booked" || status === "pending") return "confirmed"
   return status
-}
-
-const statusTone: Record<
-  AppointmentStatus,
-  "success" | "warning" | "info" | "danger" | "neutral"
-> = {
-  booked: "success",
-  pending: "success",
-  confirmed: "success",
-  cancelled: "neutral",
-  completed: "neutral",
-  no_show: "warning",
 }
 
 type StatusBadgeProps = {
@@ -44,7 +33,7 @@ export function StatusBadge({ status, needsAction, className }: StatusBadgeProps
       ? t("labels.appointmentStatusDescription.no_show")
       : undefined
   return (
-    <span className={semanticStatusBadgeClass(statusTone[key], className)} title={description}>
+    <span className={semanticStatusBadgeClass(appointmentStatusTone(key), className)} title={description}>
       {label}
     </span>
   )

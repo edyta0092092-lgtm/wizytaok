@@ -3,10 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 
-import { AppointmentRowActions } from "@/components/appointments/appointment-row-actions"
+import { AppointmentListCard } from "@/components/appointments/appointment-list-card"
 import { SendCustomMessageButton } from "@/components/appointments/send-custom-message-button"
-import { AppointmentStaffCaption } from "@/components/shared/appointment-staff-caption"
-import { StatusBadge } from "@/components/shared/status-badge"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,10 +17,7 @@ import {
   useAppointmentAttachments,
   type AppointmentAttachment,
 } from "@/lib/appointments/appointment-attachments"
-import { getBookingActionReason } from "@/lib/bookings/booking-needs-action"
-import { appointmentShowsNeedsActionStatus } from "@/lib/appointments/stats-rules"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
-import { inferBookingStaffDisplayName } from "@/lib/staff/staff-display"
 import type { AppointmentReminderSection } from "@/lib/appointments/appointment-reminder-panel-display"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -70,6 +65,7 @@ export type AppointmentListRowProps = {
   confirmCancelVisitOpen: boolean
   onCancelVisitPress: () => void
   onCancelVisitConfirm: () => void
+  onQuickCancelConfirm: () => void
   onRemoveVisitConfirm: () => void
   isCancellingVisit: boolean
 }
@@ -116,6 +112,7 @@ export function AppointmentListRow({
   confirmCancelVisitOpen,
   onCancelVisitPress,
   onCancelVisitConfirm,
+  onQuickCancelConfirm,
   onRemoveVisitConfirm,
   isCancellingVisit,
 }: AppointmentListRowProps) {
@@ -179,192 +176,138 @@ export function AppointmentListRow({
     return () => window.cancelAnimationFrame(frame)
   }, [editOpen, row.id])
 
+  const detailsSlot =
+    customerNote ||
+    attachments.length > 0 ||
+    (row.id.startsWith("sb-") &&
+      (reminderSections.length > 0 ||
+        Boolean(reminderNoRowsMessage) ||
+        row.serviceId)) ? (
+      <div className="space-y-3 text-sm">
+        {customerNote ? (
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs leading-relaxed">
+            <p className="font-semibold text-muted-foreground">{t("appointments.customerNoteLabel")}</p>
+            <p className="mt-0.5 whitespace-pre-wrap text-foreground">{customerNote}</p>
+          </div>
+        ) : null}
+        {attachments.length > 0 ? (
+          <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs">
+            <p className="font-semibold text-muted-foreground">{t("appointments.attachmentsLabel")}</p>
+            <ul className="mt-1.5 space-y-1.5">
+              {attachments.map((attachment) => (
+                <li
+                  key={attachment.id}
+                  className="flex flex-col gap-1 rounded-lg border border-border/60 bg-background/80 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-foreground">{attachment.name}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatAttachmentSize(attachment.size)}
+                    </p>
+                  </div>
+                  <Button
+                    asChild
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 shrink-0 rounded-lg px-2 text-xs"
+                  >
+                    <a href={attachment.dataUrl} download={attachment.name}>
+                      {t("appointments.attachmentDownload")}
+                    </a>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {row.id.startsWith("sb-") &&
+        row.serviceId &&
+        staffByService[row.serviceId] !== undefined &&
+        staffByService[row.serviceId]!.length === 0 &&
+        hasActiveTeamMembers &&
+        !(row.staffId?.trim() || row.staffName?.trim()) ? (
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-900 dark:text-amber-100">
+            <p>{t("appointments.manualNoStaffForService")}</p>
+            <Link
+              href="/team"
+              className="mt-1 inline-block font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {t("appointments.manualAssignStaffInTeam")}
+            </Link>
+          </div>
+        ) : null}
+        {row.id.startsWith("sb-") &&
+        row.serviceId &&
+        (staffByService[row.serviceId]?.length ?? 0) >= 1 ? (
+          <NativeSelect
+            wrapperClassName="max-w-full"
+            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+            value={row.staffId ?? ""}
+            onChange={(e) => onStaffChange(e.target.value)}
+            aria-label={t("appointments.manualStaffField")}
+          >
+            <option value="">{t("appointments.staffNotAssignedShort")}</option>
+            {(staffByService[row.serviceId] ?? []).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </NativeSelect>
+        ) : null}
+        {row.id.startsWith("sb-") ? (
+          <p className="text-xs text-muted-foreground">{remindersAutomatedPolicy}</p>
+        ) : null}
+        {row.id.startsWith("sb-") && reminderSections.length > 0
+          ? reminderSections.map((section) => (
+              <div key={`${row.id}-${section.title}`} className="space-y-0.5 text-xs text-muted-foreground">
+                <p className="font-medium">{section.title}</p>
+                <ul className="list-none space-y-0.5 pl-0">
+                  {section.channels.map((channel) => (
+                    <li key={`${section.title}-${channel.channelLabel}`}>
+                      {channel.channelLabel}: {channel.statusLabel}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
+          : null}
+        {row.id.startsWith("sb-") && reminderSections.length === 0 && reminderNoRowsMessage ? (
+          <p className="text-xs text-muted-foreground">{reminderNoRowsMessage}</p>
+        ) : null}
+        {row.id.startsWith("sb-") && row.status !== "cancelled" ? (
+          <SendCustomMessageButton appointmentId={row.id} />
+        ) : null}
+      </div>
+    ) : null
+
   return (
     <React.Fragment>
-      <div
-        className={cn(
-          "grid grid-cols-1 gap-3 px-4 py-3 md:grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] md:items-start",
-          !isLastInSection && "border-b border-border",
-        )}
-      >
-        <div>
-          <p className="text-sm font-semibold text-primary">{dateLabel}</p>
-          <p className="text-sm text-muted-foreground">{timeLabel}</p>
-        </div>
-
-        <div className="min-w-0">
-          <p className="font-semibold text-foreground">{row.clientName}</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">{row.serviceLabel}</p>
-          {customerNote ? (
-            <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-foreground">
-              <p className="font-semibold text-muted-foreground">
-                {t("appointments.customerNoteLabel")}
-              </p>
-              <p className="mt-0.5 whitespace-pre-wrap">{customerNote}</p>
-            </div>
-          ) : null}
-          {attachments.length > 0 ? (
-            <div className="mt-2 rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs leading-relaxed text-foreground">
-              <p className="font-semibold text-muted-foreground">
-                {t("appointments.attachmentsLabel")}
-              </p>
-              <ul className="mt-1.5 space-y-1.5">
-                {attachments.map((attachment) => (
-                  <li
-                    key={attachment.id}
-                    className="flex flex-col gap-1 rounded-lg border border-border/60 bg-background/80 px-2.5 py-2 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-foreground">{attachment.name}</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatAttachmentSize(attachment.size)}
-                      </p>
-                    </div>
-                    <Button
-                      asChild
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 shrink-0 rounded-lg px-2 text-xs"
-                    >
-                      <a href={attachment.dataUrl} download={attachment.name}>
-                        {t("appointments.attachmentDownload")}
-                      </a>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {showNeedsActionReason ? (
-            <p className="mt-1 max-w-full text-xs leading-snug text-amber-800 dark:text-amber-200/95">
-              {getBookingActionReason(row, language)}
-            </p>
-          ) : null}
-          <AppointmentStaffCaption
-            appointment={row}
-            className="mt-0.5"
-            resolvedDisplayName={inferBookingStaffDisplayName(
-              row.staffId,
-              row.staffName,
-              row.serviceId ? staffByService[row.serviceId] : undefined,
-            )}
-          />
-          {row.id.startsWith("sb-") &&
-          row.serviceId &&
-          staffByService[row.serviceId] !== undefined &&
-          staffByService[row.serviceId]!.length === 0 &&
-          hasActiveTeamMembers &&
-          !(row.staffId?.trim() || row.staffName?.trim()) ? (
-            <div className="mt-1 rounded-lg border border-amber-500/25 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-900 dark:text-amber-100">
-              <p>{t("appointments.manualNoStaffForService")}</p>
-              <Link
-                href="/team"
-                className="mt-1 inline-block font-medium text-primary underline-offset-4 hover:underline"
-              >
-                {t("appointments.manualAssignStaffInTeam")}
-              </Link>
-            </div>
-          ) : null}
-          {row.id.startsWith("sb-") &&
-          row.serviceId &&
-          (staffByService[row.serviceId]?.length ?? 0) >= 1 ? (
-            <NativeSelect
-              wrapperClassName="mt-1 max-w-full"
-              className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-              value={row.staffId ?? ""}
-              onChange={(e) => onStaffChange(e.target.value)}
-              aria-label={t("appointments.manualStaffField")}
-            >
-              <option value="">{t("appointments.staffNotAssignedShort")}</option>
-              {(staffByService[row.serviceId] ?? []).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </NativeSelect>
-          ) : null}
-          {row.id.startsWith("sb-") ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {remindersAutomatedPolicy}
-            </p>
-          ) : null}
-          {row.id.startsWith("sb-") && reminderSections.length > 0
-            ? reminderSections.map((section) => (
-                <div
-                  key={`${row.id}-${section.title}`}
-                  className="mt-1 space-y-0.5 text-xs text-muted-foreground"
-                >
-                  <p className="font-medium text-muted-foreground">{section.title}</p>
-                  <ul className="list-none space-y-0.5 pl-0">
-                    {section.channels.map((channel) => (
-                      <li key={`${section.title}-${channel.channelLabel}`}>
-                        {channel.channelLabel}: {channel.statusLabel}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            : null}
-          {row.id.startsWith("sb-") && reminderSections.length === 0 && reminderNoRowsMessage ? (
-            <p className="mt-1 text-xs text-muted-foreground">{reminderNoRowsMessage}</p>
-          ) : null}
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-2 md:max-w-full md:items-end">
-          <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-            <StatusBadge status={row.status} needsAction={appointmentShowsNeedsActionStatus(row)} />
-          </div>
-          <AppointmentRowActions
-            status={row.status}
-            statusOrder={statusOrder}
-            onEditVisit={onEditVisit}
-            onChangeStatus={onChangeStatus}
-            allowAppointmentDelete={allowAppointmentDelete}
-            onDelete={onDeleteRequest}
-          />
-          {row.id.startsWith("sb-") && row.status !== "cancelled" ? (
-            <div className="mt-2">
-              <SendCustomMessageButton appointmentId={row.id} />
-            </div>
-          ) : null}
-        </div>
+      <div className={cn(!isLastInSection && "border-b border-border")}>
+        <AppointmentListCard
+          row={row}
+          dateLabel={dateLabel}
+          timeLabel={timeLabel}
+          showNeedsActionReason={showNeedsActionReason}
+          language={language}
+          staffByService={staffByService}
+          statusOrder={statusOrder}
+          allowAppointmentDelete={allowAppointmentDelete}
+          onChangeStatus={onChangeStatus}
+          onEditVisit={onEditVisit}
+          onQuickCancelPress={onCancelVisitPress}
+          quickCancelConfirmOpen={confirmCancelVisitOpen}
+          onQuickCancelDismiss={onCancelVisitConfirm}
+          onQuickCancelConfirm={onQuickCancelConfirm}
+          isCancellingVisit={isCancellingVisit}
+          onDeleteRequest={onDeleteRequest}
+          showDeleteConfirm={showDeleteConfirm}
+          onDeleteConfirmDismiss={onDeleteConfirmDismiss}
+          onDeleteConfirm={onDeleteConfirm}
+          isDeletingAppointment={isDeletingAppointment}
+          detailsSlot={detailsSlot}
+        />
       </div>
-
-      {showDeleteConfirm ? (
-        <div className="mt-2 w-full rounded-xl border border-destructive/30 bg-destructive/5 p-3">
-          <p className="text-sm font-semibold text-foreground">
-            {t("appointments.deleteConfirmTitle")}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {t("appointments.deleteConfirmDescription")}
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl"
-              onClick={onDeleteConfirmDismiss}
-              disabled={isDeletingAppointment}
-            >
-              {t("appointments.deleteConfirmCancel")}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              className="h-9 rounded-xl"
-              onClick={onDeleteConfirm}
-              disabled={isDeletingAppointment}
-            >
-              {isDeletingAppointment
-                ? t("appointments.deleteConfirmActionLoading")
-                : t("appointments.deleteConfirmAction")}
-            </Button>
-          </div>
-        </div>
-      ) : null}
 
       {editOpen ? (
         <div

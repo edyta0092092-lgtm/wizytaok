@@ -6,6 +6,7 @@ export type SemanticStatusTone =
   | "info"
   | "danger"
   | "neutral"
+  | "violet"
 
 /** Kontrastowy, stonowany zestaw dla jasnego i ciemnego motywu. */
 const toneClass: Record<SemanticStatusTone, string> = {
@@ -19,6 +20,8 @@ const toneClass: Record<SemanticStatusTone, string> = {
     "border border-red-400/85 bg-red-50 text-red-950 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)] shadow-sm dark:border-red-500/40 dark:bg-red-950/58 dark:text-red-50 dark:shadow-none",
   neutral:
     "border border-border/90 bg-muted/90 text-slate-900 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.45)] shadow-sm dark:border-muted-foreground/35 dark:bg-slate-900/72 dark:text-slate-50 dark:shadow-none",
+  violet:
+    "border border-violet-400/80 bg-violet-50 text-violet-950 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.5)] shadow-sm dark:border-violet-500/40 dark:bg-violet-950/60 dark:text-violet-50 dark:shadow-none",
 }
 
 export function semanticStatusBadgeClass(tone: SemanticStatusTone, className?: string) {
