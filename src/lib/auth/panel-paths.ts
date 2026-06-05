@@ -21,6 +21,7 @@ const AUTH_REQUIRED_PREFIXES = [
   "/start-trial",
   "/subscription-required",
   "/activate-access",
+  "/konto",
 ] as const
 
 /** Operacyjny panel — wymaga `trialing` lub `active`. */

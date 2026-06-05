@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { CLIENT_ACCOUNT_TYPE } from "@/lib/client-portal/client-portal-auth"
 import {
   mapAuthCallbackExchangeError,
   mapOAuthCallbackQueryError,
@@ -88,9 +89,18 @@ export async function GET(request: Request) {
       return NextResponse.redirect(dest)
     }
 
-    const prepare = await prepareBusinessProfileForStartTrial()
-    if (prepare.ok === false && prepare.error === "missing_account_type") {
-      /* OAuth / brak metadanych z formularza — profil uzupełnia się w /settings?setup=business */
+    const clientPortalIntent =
+      requestedNext?.startsWith("/konto") ?? false
+
+    if (clientPortalIntent) {
+      await supabase.auth.updateUser({
+        data: { account_type: CLIENT_ACCOUNT_TYPE },
+      })
+    } else {
+      const prepare = await prepareBusinessProfileForStartTrial()
+      if (prepare.ok === false && prepare.error === "missing_account_type") {
+        /* OAuth / brak metadanych z formularza — profil uzupełnia się w /settings?setup=business */
+      }
     }
   }
 

@@ -15,6 +15,11 @@ import {
   isChangePasswordExemptPath,
   userMustChangePassword,
 } from "@/lib/auth/must-change-password"
+import {
+  isClientAccountUser,
+  isClientPortalLoginPath,
+  isClientPortalPath,
+} from "@/lib/client-portal/client-portal-auth"
 import { updateSession } from "@/lib/supabase/middleware"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 
@@ -36,7 +41,22 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/start-trial") return true
   if (pathname === "/subscription-required") return true
   if (pathname === "/activate-access") return true
+  if (isClientPortalLoginPath(pathname)) return true
   return false
+}
+
+async function userIsActiveBusinessMember(
+  supabase: Awaited<ReturnType<typeof updateSession>>["supabase"],
+  userId: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("business_members")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle()
+  return Boolean(data?.id)
 }
 
 function isSettingsStripeReturnPath(searchParams: URLSearchParams): boolean {
@@ -106,6 +126,28 @@ export async function middleware(request: NextRequest) {
     }
     // Brak rozpoznanej firmy — pozwalamy fallback page'owi /rezerwacje obsłużyć błąd.
     return response
+  }
+
+  if (isClientPortalPath(pathname) && !isClientPortalLoginPath(pathname)) {
+    if (!user) {
+      const loginUrl = new URL("/konto/logowanie", request.url)
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`)
+      return NextResponse.redirect(loginUrl)
+    }
+    if (!isClientAccountUser(user)) {
+      const isMember = await userIsActiveBusinessMember(supabase, user.id)
+      if (isMember) {
+        return NextResponse.redirect(new URL("/dashboard", request.url))
+      }
+      return NextResponse.redirect(
+        new URL("/konto/logowanie?error=client_account_required", request.url),
+      )
+    }
+    return response
+  }
+
+  if (isClientPortalLoginPath(pathname) && user && isClientAccountUser(user)) {
+    return NextResponse.redirect(new URL("/konto", request.url))
   }
 
   if (isPublicPath(pathname)) {

@@ -6,6 +6,7 @@ import {
   resolveEffectiveSubscriptionStatus,
 } from "@/lib/billing/subscription-status"
 import { evaluateTrialStartEligibility } from "@/lib/billing/trial-eligibility-server"
+import { isClientAccountUser } from "@/lib/client-portal/client-portal-auth"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
@@ -65,6 +66,15 @@ export async function resolvePostAuthRedirect(
   const email = user.email?.trim()
   if (!email) {
     return `${BUSINESS_SETUP_PATH}&oauth_warning=no_email`
+  }
+
+  if (isClientAccountUser(user)) {
+    if (requestedNext?.startsWith("/konto")) return requestedNext
+    return "/konto"
+  }
+
+  if (requestedNext?.startsWith("/konto")) {
+    return "/konto/logowanie"
   }
 
   let memberBusinessId = await readMemberBusinessId(supabase, user.id)
@@ -134,6 +144,9 @@ export async function resolvePostAuthRedirect(
 
 export function oauthErrorReturnPath(requestedNextRaw: string | null | undefined): string {
   const next = safeInternalRedirect(requestedNextRaw)
+  if (next?.startsWith("/konto")) {
+    return "/konto/logowanie"
+  }
   if (next?.startsWith("/signup")) {
     return "/signup"
   }
