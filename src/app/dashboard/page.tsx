@@ -30,6 +30,10 @@ import {
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
 import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import {
+  APPOINTMENTS_PANEL_DISMISSED_EVENT,
+  filterDismissedAppointments,
+} from "@/lib/appointments/appointments-panel-dismissed"
+import {
   getAppointmentsForToday,
   updateAppointmentStatus,
   useAppointmentsStore,
@@ -120,6 +124,16 @@ export default function DashboardPage() {
     ready: appointmentsReady,
     loadError: appointmentsLoadError,
   } = useAppointmentsStore(accessReady ? businessId : undefined)
+  const [dismissTick, setDismissTick] = React.useState(0)
+  React.useEffect(() => {
+    const onDismissed = () => setDismissTick((n) => n + 1)
+    window.addEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
+    return () => window.removeEventListener(APPOINTMENTS_PANEL_DISMISSED_EVENT, onDismissed)
+  }, [])
+  const appointments = React.useMemo(
+    () => filterDismissedAppointments(allAppointments, businessId),
+    [allAppointments, businessId, dismissTick],
+  )
   const appToday = React.useMemo(() => getAppToday(), [])
   const [statusNotice, setStatusNotice] = React.useState("")
   const [statsLoading, setStatsLoading] = React.useState(true)
@@ -158,8 +172,8 @@ export default function DashboardPage() {
 
 
   const todaysList = React.useMemo(
-    () => getAppointmentsForToday(allAppointments, appToday),
-    [allAppointments, appToday]
+    () => getAppointmentsForToday(appointments, appToday),
+    [appointments, appToday],
   )
   const plannedToday = React.useMemo(
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a, currentTime)),
