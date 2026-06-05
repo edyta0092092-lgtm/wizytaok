@@ -5,6 +5,7 @@ import {
   useOnboardingPanelProgress,
 } from "@/components/onboarding/onboarding-panel"
 import {
+  getStepConfig,
   isOnboardingFullyComplete,
   onboardingStepCount,
 } from "@/lib/onboarding/onboarding-steps"
@@ -22,6 +23,7 @@ export function OnboardingDashboardCard() {
     continueSetup,
     startSetupFromBeginning,
     skipForNow,
+    snapshot,
   } = useOnboarding()
   const { loading, progress } = useOnboardingPanelProgress()
 
@@ -30,6 +32,10 @@ export function OnboardingDashboardCard() {
   const { done, total } = onboardingStepCount(progress, isAdmin)
   const allDone = isOnboardingFullyComplete(progress, isAdmin)
   const showStartFromBeginning = done > 0 && !allDone
+  const resumeStepId = snapshot?.record.meta.resumeStepId
+  const cardLead = resumeStepId
+    ? `${t("onboarding.cardLeadResumePrefix")} ${t(getStepConfig(resumeStepId).shortKey)}.`
+    : t(isAdmin ? "onboarding.cardLead" : "onboarding.staffCardLead")
 
   return (
     <Card className="overflow-hidden rounded-2xl border border-primary/15 bg-card shadow-sm shadow-slate-900/[0.04]">
@@ -38,7 +44,7 @@ export function OnboardingDashboardCard() {
         <OnboardingPanel
           t={t}
           title={t(isAdmin ? "onboarding.cardTitle" : "onboarding.staffCardTitle")}
-          lead={t(isAdmin ? "onboarding.cardLead" : "onboarding.staffCardLead")}
+          lead={cardLead}
           loading={loading}
           progress={progress}
           activeStepId={activeStepId}

@@ -47,9 +47,10 @@ export function OnboardingPanel({
   variant = "modal",
   className,
 }: OnboardingPanelProps) {
-  const { isAdmin } = useOnboarding()
+  const { isAdmin, snapshot } = useOnboarding()
   const { done, total } = onboardingStepCount(progress, isAdmin)
   const allDone = isOnboardingFullyComplete(progress, isAdmin)
+  const hasResumeStep = Boolean(snapshot?.record.meta.resumeStepId)
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -95,7 +96,7 @@ export function OnboardingPanel({
           onClick={() => onPrimary()}
           disabled={loading || allDone}
         >
-          {t(onboardingPrimaryCtaKey(done, allDone))}
+          {t(onboardingPrimaryCtaKey(done, allDone, hasResumeStep))}
           {!allDone ? <ArrowRight className="ml-2 size-4" aria-hidden /> : null}
         </Button>
         {showStartFromBeginning && onStartFromBeginning ? (

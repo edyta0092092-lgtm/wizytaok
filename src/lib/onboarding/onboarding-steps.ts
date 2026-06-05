@@ -184,10 +184,11 @@ export function onboardingStepCount(
 export function onboardingPrimaryCtaKey(
   done: number,
   allDone: boolean,
+  hasResumeStep: boolean,
 ): "onboarding.allDone" | "onboarding.startCta" | "onboarding.continueCta" {
   if (allDone) return "onboarding.allDone"
-  if (done === 0) return "onboarding.startCta"
-  return "onboarding.continueCta"
+  if (done > 0 || hasResumeStep) return "onboarding.continueCta"
+  return "onboarding.startCta"
 }
 
 export function getStepConfig(id: OnboardingStepId): OnboardingStepConfig {
