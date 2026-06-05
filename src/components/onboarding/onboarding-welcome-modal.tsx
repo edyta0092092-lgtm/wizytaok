@@ -25,6 +25,8 @@ export function OnboardingWelcomeModal() {
     eligible,
     loading,
     snapshot,
+    flowActive,
+    activeStepId,
     dismissWelcome,
     continueSetup,
     startSetupFromBeginning,
@@ -75,7 +77,12 @@ export function OnboardingWelcomeModal() {
                 max={total}
                 label={t("onboarding.progressLabel")}
               />
-              <OnboardingStepList progress={progress} activeStepId={null} t={t} />
+              <OnboardingStepList
+                progress={progress}
+                activeStepId={flowActive ? activeStepId : null}
+                t={t}
+                interactive
+              />
             </>
           )}
 

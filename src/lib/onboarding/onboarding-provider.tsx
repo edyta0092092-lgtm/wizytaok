@@ -8,6 +8,7 @@ import {
   fetchOnboardingProgress,
   type OnboardingProgressSnapshot,
 } from "@/lib/onboarding/fetch-onboarding-progress"
+import { syncOnboardingStepsFromBusiness } from "@/lib/onboarding/sync-business-onboarding-steps"
 import { buildOnboardingScope } from "@/lib/onboarding/onboarding-scope"
 import {
   persistOnboardingComplete,
@@ -58,6 +59,7 @@ type OnboardingContextValue = {
   refreshProgress: () => Promise<void>
   skipForNow: () => void
   markActiveStepComplete: () => void
+  jumpToStep: (stepId: OnboardingStepId) => void
 }
 
 const OnboardingContext = React.createContext<OnboardingContextValue | null>(null)
@@ -145,10 +147,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         userId: scope.userId,
       })
 
-      setSnapshot(fetched)
+      const progress = await syncOnboardingStepsFromBusiness(
+        client,
+        businessId,
+        scope,
+        fetched.progress,
+      )
+
+      const synced = { ...fetched, progress }
+      setSnapshot(synced)
       setLoading(false)
 
-      if (flowActive && isOnboardingFullyComplete(fetched.progress, isAdmin)) {
+      if (flowActive && isOnboardingFullyComplete(progress, isAdmin)) {
         await finishOnboardingFlow()
       }
     } catch {
@@ -176,23 +186,6 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       void refreshProgress()
     })
   }, [access.ready, eligible, scope, refreshProgress])
-
-  React.useEffect(() => {
-    if (!flowActive || !eligible) return
-    const id = window.setInterval(() => {
-      void refreshProgress()
-    }, 4000)
-    const onDataChange = () => void refreshProgress()
-    window.addEventListener("pw-bookings", onDataChange)
-    window.addEventListener("pw-services", onDataChange)
-    window.addEventListener("pw-staff", onDataChange)
-    return () => {
-      window.clearInterval(id)
-      window.removeEventListener("pw-bookings", onDataChange)
-      window.removeEventListener("pw-services", onDataChange)
-      window.removeEventListener("pw-staff", onDataChange)
-    }
-  }, [flowActive, eligible, refreshProgress])
 
   React.useEffect(() => {
     if (typeof window === "undefined" || !access.ready || !businessId) return
@@ -307,10 +300,46 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [scope, userId, businessId])
 
   const skipForNow = React.useCallback(() => {
-    dismissWelcome()
-    setFlowActive(false)
-    setActiveStepId(null)
-  }, [dismissWelcome])
+    void refreshProgress().finally(() => {
+      dismissWelcome()
+      setFlowActive(false)
+      setActiveStepId(null)
+    })
+  }, [dismissWelcome, refreshProgress])
+
+  const jumpToStep = React.useCallback(
+    (stepId: OnboardingStepId) => {
+      const progress =
+        snapshot?.progress ?? (emptyOnboardingProgress(isAdmin) as OnboardingProgressSnapshot["progress"])
+      goToStep(stepId, progress)
+    },
+    [snapshot?.progress, isAdmin, goToStep],
+  )
+
+  React.useEffect(() => {
+    if (!eligible || !scope) return
+    const onDataChange = () => void refreshProgress()
+    window.addEventListener("pw-bookings", onDataChange)
+    window.addEventListener("pw-services", onDataChange)
+    window.addEventListener("pw-staff", onDataChange)
+    return () => {
+      window.removeEventListener("pw-bookings", onDataChange)
+      window.removeEventListener("pw-services", onDataChange)
+      window.removeEventListener("pw-staff", onDataChange)
+    }
+  }, [eligible, scope, refreshProgress])
+
+  React.useEffect(() => {
+    if (!flowActive || !eligible) return
+    const id = window.setInterval(() => void refreshProgress(), 4000)
+    return () => window.clearInterval(id)
+  }, [flowActive, eligible, refreshProgress])
+
+  React.useEffect(() => {
+    if (!scope || isAdmin) return
+    if (!pathname.startsWith("/dashboard")) return
+    void markStep("staff_day_plan")
+  }, [pathname, scope, isAdmin, markStep])
 
   const markActiveStepComplete = React.useCallback(async () => {
     if (!activeStepId) return
@@ -416,8 +445,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       (snapshot?.userFlags.welcomeDismissed || isOnboardingWelcomeDismissed(scope)),
   )
 
-  const showDashboardCard =
-    eligible && Boolean(scope) && !welcomeDismissed && !setupComplete
+  const showDashboardCard = eligible && Boolean(scope) && !setupComplete
 
   const value = React.useMemo<OnboardingContextValue>(
     () => ({
@@ -438,6 +466,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       refreshProgress,
       skipForNow,
       markActiveStepComplete,
+      jumpToStep,
     }),
     [
       ready,
@@ -457,6 +486,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       refreshProgress,
       skipForNow,
       markActiveStepComplete,
+      jumpToStep,
     ],
   )
 

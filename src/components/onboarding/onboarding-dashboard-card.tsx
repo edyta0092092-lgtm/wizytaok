@@ -67,6 +67,7 @@ export function OnboardingDashboardCard() {
               progress={progress}
               activeStepId={flowActive ? activeStepId : null}
               t={t}
+              interactive
             />
           </>
         )}
