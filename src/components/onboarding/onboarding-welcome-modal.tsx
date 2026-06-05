@@ -7,7 +7,10 @@ import {
   onboardingStepCount,
   OnboardingStepList,
 } from "@/components/onboarding/onboarding-step-list"
-import { isOnboardingFullyComplete } from "@/lib/onboarding/onboarding-steps"
+import {
+  isOnboardingFullyComplete,
+  onboardingPrimaryCtaKey,
+} from "@/lib/onboarding/onboarding-steps"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { emptyOnboardingProgress } from "@/lib/onboarding/onboarding-steps"
@@ -81,10 +84,10 @@ export function OnboardingWelcomeModal() {
               type="button"
               size="lg"
               className="h-11 rounded-xl"
-              onClick={() => continueSetup()}
+              onClick={() => void continueSetup()}
               disabled={loading}
             >
-              {t("onboarding.continueCta")}
+              {t(onboardingPrimaryCtaKey(done, allDone))}
               <ArrowRight className="ml-2 size-4" />
             </Button>
             {showStartFromBeginning ? (

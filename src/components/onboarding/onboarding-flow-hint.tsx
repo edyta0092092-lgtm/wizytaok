@@ -26,7 +26,6 @@ export function OnboardingFlowHint() {
     snapshot,
     continueSetup,
     skipForNow,
-    markActiveStepComplete,
   } = useOnboarding()
   const [highlightRect, setHighlightRect] = React.useState<HighlightRect | null>(null)
   const stepPath = activeStepId ? getStepConfig(activeStepId).path : null
@@ -163,10 +162,7 @@ export function OnboardingFlowHint() {
               type="button"
               size="sm"
               className="h-9 rounded-xl"
-              onClick={() => {
-                markActiveStepComplete()
-                continueSetup()
-              }}
+              onClick={() => void continueSetup()}
             >
               {t("onboarding.flowNext")}
             </Button>

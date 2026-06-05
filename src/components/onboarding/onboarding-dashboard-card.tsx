@@ -9,7 +9,11 @@ import {
 } from "@/components/onboarding/onboarding-step-list"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { emptyOnboardingProgress, isOnboardingFullyComplete } from "@/lib/onboarding/onboarding-steps"
+import {
+  emptyOnboardingProgress,
+  isOnboardingFullyComplete,
+  onboardingPrimaryCtaKey,
+} from "@/lib/onboarding/onboarding-steps"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -70,10 +74,10 @@ export function OnboardingDashboardCard() {
           <Button
             type="button"
             className="h-11 flex-1 rounded-xl sm:min-w-[12rem]"
-            onClick={() => continueSetup()}
+            onClick={() => void continueSetup()}
             disabled={loading || allDone}
           >
-            {allDone ? t("onboarding.allDone") : t("onboarding.continueCta")}
+            {t(onboardingPrimaryCtaKey(done, allDone))}
             {!allDone ? <ArrowRight className="ml-2 size-4" aria-hidden /> : null}
           </Button>
           {showStartFromBeginning ? (

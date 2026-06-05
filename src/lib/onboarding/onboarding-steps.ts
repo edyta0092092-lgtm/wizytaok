@@ -175,6 +175,16 @@ export function completedStepCount(
   return getOnboardingStepIds(isAdmin).filter((id) => progress[id]).length
 }
 
+/** Klucz i18n głównego przycisku kreatora (start vs kontynuacja). */
+export function onboardingPrimaryCtaKey(
+  done: number,
+  allDone: boolean,
+): "onboarding.allDone" | "onboarding.startCta" | "onboarding.continueCta" {
+  if (allDone) return "onboarding.allDone"
+  if (done === 0) return "onboarding.startCta"
+  return "onboarding.continueCta"
+}
+
 export function getStepConfig(id: OnboardingStepId): OnboardingStepConfig {
   const step =
     ONBOARDING_ADMIN_STEPS.find((s) => s.id === id) ??
