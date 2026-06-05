@@ -42,6 +42,8 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/subscription-required") return true
   if (pathname === "/activate-access") return true
   if (isClientPortalLoginPath(pathname)) return true
+  if (pathname === "/szukaj") return true
+  if (pathname.startsWith("/public/company/")) return true
   return false
 }
 
