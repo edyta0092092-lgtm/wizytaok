@@ -47,7 +47,10 @@ export async function getBusinessInvitationPublic(
   if (!inv?.id) {
     return { ok: false, error: "not_found" }
   }
-  if (inv.status !== "pending") {
+  if (inv.status === "cancelled") {
+    return { ok: false, error: "cancelled", status: inv.status }
+  }
+  if (inv.status !== "pending" && inv.status !== "accepted") {
     return { ok: false, error: "not_pending", status: inv.status }
   }
 
@@ -91,7 +94,22 @@ export async function acceptBusinessInvitationForUser(
   if (invErr || !inv?.id) {
     return { ok: false, error: "not_found" }
   }
+  const invEmail = (inv.email ?? "").trim().toLowerCase()
+  const authEmail = userEmail.trim().toLowerCase()
+  if (!invEmail || !authEmail || invEmail !== authEmail) {
+    return { ok: false, error: "email_mismatch" }
+  }
+
   if (inv.status === "accepted") {
+    const { data: existingMember } = await admin
+      .from("business_members")
+      .select("id")
+      .eq("business_id", inv.business_id)
+      .eq("user_id", userId)
+      .maybeSingle()
+    if (existingMember?.id) {
+      return { ok: true, businessId: inv.business_id }
+    }
     return { ok: false, error: "already_used" }
   }
   if (inv.status === "cancelled") {
@@ -99,12 +117,6 @@ export async function acceptBusinessInvitationForUser(
   }
   if (inv.status !== "pending") {
     return { ok: false, error: "invalid_status" }
-  }
-
-  const invEmail = (inv.email ?? "").trim().toLowerCase()
-  const authEmail = userEmail.trim().toLowerCase()
-  if (!invEmail || !authEmail || invEmail !== authEmail) {
-    return { ok: false, error: "email_mismatch" }
   }
 
   const memberBase = {

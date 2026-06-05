@@ -51,8 +51,13 @@ export async function POST(req: Request) {
           ? 403
           : result.error === "not_found"
             ? 404
-            : 400
-    return NextResponse.json(result, { status })
+            : result.error === "already_used"
+              ? 409
+              : 400
+    return NextResponse.json(
+      { ok: false, error: result.error, detail: result.error },
+      { status },
+    )
   }
 
   return NextResponse.json({ ok: true, business_id: result.businessId })

@@ -42,12 +42,13 @@ export default function AcceptInvitePage() {
   const [actionMsg, setActionMsg] = React.useState<string | null>(null)
 
   const dashboardNext = encodeURIComponent("/dashboard")
+  const inviteQuery = token ? `&invite=${encodeURIComponent(token)}` : ""
   const loginHref = preview?.email
-    ? `/login?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}`
-    : `/login?next=${dashboardNext}`
+    ? `/login?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}${inviteQuery}`
+    : `/login?next=${dashboardNext}${inviteQuery}`
   const signupHref = preview?.email
-    ? `/signup-staff?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}`
-    : `/signup-staff?next=${dashboardNext}`
+    ? `/signup-staff?next=${dashboardNext}&email=${encodeURIComponent(preview.email)}${inviteQuery}`
+    : `/signup-staff?next=${dashboardNext}${inviteQuery}`
 
   React.useEffect(() => {
     let cancelled = false
@@ -166,12 +167,38 @@ export default function AcceptInvitePage() {
         router.refresh()
       }
 
-      const mapAcceptError = (err: string) => {
+      const mapAcceptError = (err: string, detail?: string) => {
         if (err === "email_mismatch") setActionMsg(t("invitations.emailMismatch"))
         else if (err === "already_used") setActionMsg(t("invitations.alreadyUsed"))
         else if (err === "cancelled") setActionMsg(t("invitations.cancelled"))
         else if (err === "not_authenticated") setActionMsg(t("invitations.joinPrompt"))
+        else if (detail?.trim()) setActionMsg(`${t("invitations.invalidOrExpired")} (${detail.trim()})`)
         else setActionMsg(t("invitations.invalidOrExpired"))
+      }
+
+      try {
+        await fetch("/api/auth/accept-pending-invitations", {
+          method: "POST",
+          credentials: "same-origin",
+        })
+      } catch {
+        // ignore
+      }
+
+      const apiRes = await fetch("/api/public/accept-business-invitation", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      })
+      const apiJson = (await apiRes.json().catch(() => null)) as {
+        ok?: boolean
+        error?: string
+        detail?: string
+      } | null
+      if (apiJson?.ok) {
+        finishAccept()
+        return
       }
 
       const { data, error } = await client.rpc("accept_business_invitation", { p_token: token })
@@ -181,27 +208,15 @@ export default function AcceptInvitePage() {
           finishAccept()
           return
         }
-        const err = typeof row?.error === "string" ? row.error : "unknown"
-        if (err !== "not_found") {
-          mapAcceptError(err)
+        const rpcErr = typeof row?.error === "string" ? row.error : "unknown"
+        const rpcDetail = typeof row?.detail === "string" ? row.detail : undefined
+        if (rpcErr === "email_mismatch" || rpcErr === "already_used" || rpcErr === "cancelled") {
+          mapAcceptError(rpcErr, rpcDetail)
           return
         }
       }
 
-      const apiRes = await fetch("/api/public/accept-business-invitation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      })
-      const apiJson = (await apiRes.json().catch(() => null)) as {
-        ok?: boolean
-        error?: string
-      } | null
-      if (apiJson?.ok) {
-        finishAccept()
-        return
-      }
-      mapAcceptError(apiJson?.error ?? "unknown")
+      mapAcceptError(apiJson?.error ?? "unknown", apiJson?.detail)
     } finally {
       setBusy(false)
     }
