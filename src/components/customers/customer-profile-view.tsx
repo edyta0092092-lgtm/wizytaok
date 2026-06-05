@@ -5,6 +5,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react"
 
 import { CustomerSegmentBadge } from "@/components/customers/customer-segment-badge"
 import { CustomerStatsGrid } from "@/components/customers/customer-stats-grid"
+import { CustomerLoyaltyPanel } from "@/components/loyalty/customer-loyalty-panel"
 import { CustomerVisitHistory } from "@/components/customers/customer-visit-history"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -66,6 +67,8 @@ export function CustomerProfileView({ customer }: { customer: CustomerCrmRow }) 
         <h2 className="text-sm font-semibold text-foreground">{t("customers.profile.statsTitle")}</h2>
         <CustomerStatsGrid customer={customer} />
       </section>
+
+      <CustomerLoyaltyPanel customer={customer} />
 
       <section className="space-y-3">
         <CustomerVisitHistory visits={customer.visits} />
