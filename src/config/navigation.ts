@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   BriefcaseBusiness,
   Calendar,
   CalendarClock,
@@ -36,6 +37,7 @@ const adminNav: NavItem[] = [
   { href: "/messages", icon: MessageSquare, labelKey: "navigation.messages" },
   { href: "/marketing", icon: Megaphone, labelKey: "navigation.marketing" },
   { href: "/lojalnosc", icon: HeartHandshake, labelKey: "navigation.loyalty" },
+  { href: "/ai-recepcjonistka", icon: Bot, labelKey: "navigation.aiReceptionist" },
   { href: "/settings", icon: Settings, labelKey: "navigation.settings" },
   { href: "/account", icon: UserCircle, labelKey: "navigation.myAccount" },
   { href: "/help", icon: LifeBuoy, labelKey: "navigation.help" },
