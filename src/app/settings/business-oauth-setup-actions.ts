@@ -20,6 +20,8 @@ import { resolvePostBusinessSetupRedirect } from "@/lib/auth/post-business-setup
 import { isPolishNip10Valid } from "@/lib/validation/polish-nip"
 import { getServerAuthUser } from "@/lib/supabase/auth"
 import { getServerClient } from "@/lib/supabase/server"
+import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
+import { tryLinkStaffAfterAuth } from "@/lib/team/accept-pending-invitations"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Database } from "@/types/database"
 
@@ -190,6 +192,18 @@ export async function completeOAuthBusinessSetupAction(
 ): Promise<CompleteOAuthBusinessSetupResult> {
   const user = await getServerAuthUser()
   if (!user) return { ok: false, code: "unauthorized" }
+
+  if (isStaffInviteUser(user)) {
+    const linkedBusinessId = await tryLinkStaffAfterAuth(user.id, user.email?.trim() ?? "")
+    if (linkedBusinessId) {
+      return {
+        ok: false,
+        code: "unknown",
+        details: "staff_already_linked",
+      }
+    }
+    return { ok: false, code: "unknown", details: "staff_cannot_create_business" }
+  }
 
   const client = await getServerClient()
   if (!client) return { ok: false, code: "unknown" }
@@ -385,12 +399,33 @@ export async function loadOAuthSetupPrefillAction(): Promise<{
   hasProfile: boolean
   redirectTo?: string
   businessId?: string
+  staffInvite?: boolean
 }> {
   const user = await getServerAuthUser()
   if (!user) {
     return { email: "", firstName: "", lastName: "", hasProfile: false }
   }
   const names = parseOwnerNameFromUserMetadata(user.user_metadata as Record<string, unknown>)
+  const linkedBusinessId = await tryLinkStaffAfterAuth(user.id, user.email?.trim() ?? "")
+  if (linkedBusinessId) {
+    return {
+      email: user.email?.trim() ?? "",
+      firstName: names.firstName,
+      lastName: names.lastName,
+      hasProfile: true,
+      redirectTo: "/dashboard",
+      businessId: linkedBusinessId,
+    }
+  }
+  if (isStaffInviteUser(user)) {
+    return {
+      email: user.email?.trim() ?? "",
+      firstName: names.firstName,
+      lastName: names.lastName,
+      hasProfile: false,
+      staffInvite: true,
+    }
+  }
   const admin = getServiceRoleClient()
   if (!admin) {
     return {

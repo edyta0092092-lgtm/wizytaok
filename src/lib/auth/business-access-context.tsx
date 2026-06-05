@@ -31,6 +31,7 @@ import {
   invalidateCachedBusinessProfileId,
   setCachedBusinessProfileId,
 } from "@/lib/auth/business-profile-cache"
+import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 export type BusinessAccessState = {
@@ -99,88 +100,81 @@ async function loadAccessState(): Promise<BusinessAccessState> {
   if (!user) {
     return { ...defaultState, ready: true }
   }
-  try {
-    await client.rpc("ensure_owner_membership")
-  } catch {
-    // Starsze bazy lub chwilowe błędy RPC nie powinny wyłączać całego panelu.
-  }
-  const { data: owned } = await client
-    .from("business_profiles")
-    .select("id, business_name, owner_name")
-    .eq("owner_id", user.id)
-    .maybeSingle()
-  if (owned?.id) {
-    const name = typeof owned.owner_name === "string" ? owned.owner_name.trim() : ""
-    const label = name.length > 0 ? name : owned.business_name
-    return {
-      ready: true,
-      businessId: owned.id,
-      isOwner: true,
-      panelRole: "admin",
-      displayName: label,
-      userEmail: user.email ?? null,
-    }
-  }
-  let memberQuery = await client
-    .from("business_members")
-    .select("business_id, role, display_name, email")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-  if (
-    memberQuery.error?.message &&
-    memberQuery.error.message.toLowerCase().includes("is_active") &&
-    memberQuery.error.message.toLowerCase().includes("does not exist")
-  ) {
-    memberQuery = await client
+  const staffInvite = isStaffInviteUser(user)
+
+  const queryMember = async () => {
+    let memberQuery = await client
       .from("business_members")
       .select("business_id, role, display_name, email")
       .eq("user_id", user.id)
+      .eq("is_active", true)
       .limit(1)
-  }
-  let member = memberQuery.data?.[0]
-  if (!member?.business_id && user.email?.trim()) {
-    try {
-      await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
-      let retryQuery = await client
+    if (
+      memberQuery.error?.message &&
+      memberQuery.error.message.toLowerCase().includes("is_active") &&
+      memberQuery.error.message.toLowerCase().includes("does not exist")
+    ) {
+      memberQuery = await client
         .from("business_members")
         .select("business_id, role, display_name, email")
         .eq("user_id", user.id)
-        .eq("is_active", true)
         .limit(1)
-      if (
-        retryQuery.error?.message &&
-        retryQuery.error.message.toLowerCase().includes("is_active") &&
-        retryQuery.error.message.toLowerCase().includes("does not exist")
-      ) {
-        retryQuery = await client
-          .from("business_members")
-          .select("business_id, role, display_name, email")
-          .eq("user_id", user.id)
-          .limit(1)
-      }
-      member = retryQuery.data?.[0]
+    }
+    return memberQuery.data?.[0]
+  }
+
+  let member = await queryMember()
+  if (!member?.business_id && user.email?.trim()) {
+    try {
+      await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+      member = await queryMember()
     } catch {
-      // ignore — pokażemy setup tylko gdy nadal brak członkostwa
+      // ignore
     }
   }
-  if (!member?.business_id) {
+  if (member?.business_id) {
+    const r = normalizeBusinessMemberPanelRole(member.role)
     return {
       ready: true,
-      businessId: null,
+      businessId: member.business_id,
       isOwner: false,
-      panelRole: null,
-      displayName: null,
+      panelRole: r,
+      displayName: member.display_name?.trim() || member.email || user.email || null,
       userEmail: user.email ?? null,
     }
   }
-  const r = normalizeBusinessMemberPanelRole(member.role)
+
+  if (!staffInvite) {
+    try {
+      await client.rpc("ensure_owner_membership")
+    } catch {
+      // Starsze bazy lub chwilowe błędy RPC nie powinny wyłączać całego panelu.
+    }
+    const { data: owned } = await client
+      .from("business_profiles")
+      .select("id, business_name, owner_name")
+      .eq("owner_id", user.id)
+      .maybeSingle()
+    if (owned?.id) {
+      const name = typeof owned.owner_name === "string" ? owned.owner_name.trim() : ""
+      const label = name.length > 0 ? name : owned.business_name
+      return {
+        ready: true,
+        businessId: owned.id,
+        isOwner: true,
+        panelRole: "admin",
+        displayName: label,
+        userEmail: user.email ?? null,
+      }
+    }
+  }
+
   return {
     ready: true,
-    businessId: member.business_id,
+    businessId: null,
     isOwner: false,
-    panelRole: r,
-    displayName: member.display_name?.trim() || member.email || user.email || null,
+    panelRole: null,
+    displayName: null,
     userEmail: user.email ?? null,
   }
 }

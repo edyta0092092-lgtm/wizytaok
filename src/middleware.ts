@@ -126,9 +126,17 @@ export async function middleware(request: NextRequest) {
   }
 
   if (user && isOperationalPanelPath(pathname)) {
-    const access = await resolveBusinessPanelAccess(supabase, user.id, user.email)
+    const staffInvite =
+      user.user_metadata?.staff_invite === true ||
+      user.user_metadata?.staff_invite === "true"
+    const access = await resolveBusinessPanelAccess(supabase, user.id, user.email, {
+      staffInvite,
+    })
     if (!access.hasActiveAccess) {
-      return redirectToBillingRecovery(request, billingRecoveryRedirectPath(access))
+      return redirectToBillingRecovery(
+        request,
+        billingRecoveryRedirectPath(access, { staffInvite }),
+      )
     }
     if (access.effectiveRole === "staff" && isStaffForbiddenPanelPath(pathname)) {
       return NextResponse.redirect(new URL("/dashboard", request.url))
@@ -142,7 +150,12 @@ export async function middleware(request: NextRequest) {
       isSettingsStripeReturnPath(searchParams) ||
       isSettingsBillingRecoveryPath(searchParams)
     if (!settingsExempt) {
-      const access = await resolveBusinessPanelAccess(supabase, user.id, user.email)
+      const staffInvite =
+        user.user_metadata?.staff_invite === true ||
+        user.user_metadata?.staff_invite === "true"
+      const access = await resolveBusinessPanelAccess(supabase, user.id, user.email, {
+        staffInvite,
+      })
       if (!access.hasActiveAccess && !access.canManageBilling) {
         return redirectToBillingRecovery(request, "/subscription-required")
       }

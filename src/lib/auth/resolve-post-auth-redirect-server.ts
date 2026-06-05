@@ -9,6 +9,7 @@ import { evaluateTrialStartEligibility } from "@/lib/billing/trial-eligibility-s
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
+import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import type { Database } from "@/types/database"
 
 const BUSINESS_SETUP_PATH = "/settings?setup=business"
@@ -66,13 +67,23 @@ export async function resolvePostAuthRedirect(
     return `${BUSINESS_SETUP_PATH}&oauth_warning=no_email`
   }
 
+  let memberBusinessId = await readMemberBusinessId(supabase, user.id)
+  if (!memberBusinessId) {
+    await acceptPendingInvitationsForUser(user.id, email)
+    memberBusinessId = await readMemberBusinessId(supabase, user.id)
+  }
+  if (memberBusinessId) {
+    return requestedNext ?? "/dashboard"
+  }
+
+  const staffInvite = isStaffInviteUser(user)
   const { data: owned } = await supabase
     .from("business_profiles")
     .select("id, subscription_status, stripe_subscription_status")
     .eq("owner_id", user.id)
     .maybeSingle()
 
-  if (owned?.id) {
+  if (owned?.id && !staffInvite) {
     const status = resolveEffectiveSubscriptionStatus(
       owned.subscription_status,
       owned.stripe_subscription_status,
@@ -108,13 +119,8 @@ export async function resolvePostAuthRedirect(
     return "/dashboard"
   }
 
-  let memberBusinessId = await readMemberBusinessId(supabase, user.id)
-  if (!memberBusinessId) {
-    await acceptPendingInvitationsForUser(user.id, email)
-    memberBusinessId = await readMemberBusinessId(supabase, user.id)
-  }
-  if (memberBusinessId) {
-    return requestedNext ?? "/dashboard"
+  if (staffInvite) {
+    return requestedNext?.includes("setup=business") ? "/dashboard" : requestedNext ?? "/dashboard"
   }
 
   if (requestedNext?.includes("setup=business")) {

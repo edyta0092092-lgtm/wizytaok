@@ -44,6 +44,8 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
   const { refresh } = useBusinessAccess()
   const [loadingPrefill, setLoadingPrefill] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  const [linkingStaff, setLinkingStaff] = React.useState(false)
+  const [staffInviteMode, setStaffInviteMode] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   const [businessName, setBusinessName] = React.useState("")
@@ -71,6 +73,7 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
         router.refresh()
         return
       }
+      setStaffInviteMode(prefill.staffInvite === true)
       setEmail(prefill.email)
       setOwnerFirstName(prefill.firstName)
       setOwnerLastName(prefill.lastName)
@@ -170,6 +173,11 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
           setError(t("settings.businessAddressPickFromList"))
           return
         }
+        if (result.details === "staff_cannot_create_business") {
+          setError(t("auth.staffInviteJoinLead"))
+          setStaffInviteMode(true)
+          return
+        }
         if (result.code === "missing_tax_id") {
           setError(t("auth.signupTaxIdRequiredHint"))
           return
@@ -200,12 +208,56 @@ export function BusinessOAuthSetupPanel({ onProfileSaved }: BusinessOAuthSetupPa
     }
   }
 
+  const retryStaffLink = async () => {
+    setLinkingStaff(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean } | null
+      if (json?.ok) {
+        await refresh()
+        onProfileSaved?.()
+        router.replace("/dashboard")
+        router.refresh()
+        return
+      }
+      setError(t("invitations.invitationCreateError"))
+    } catch {
+      setError(t("invitations.invitationCreateError"))
+    } finally {
+      setLinkingStaff(false)
+    }
+  }
+
   if (loadingPrefill) {
     return (
       <Card className="rounded-2xl border border-primary/20 bg-primary/5 shadow-sm">
         <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           ...
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (staffInviteMode) {
+    return (
+      <Card className="rounded-2xl border border-primary/25 bg-primary/5 shadow-sm shadow-slate-900/5">
+        <CardHeader className="border-b border-primary/15 py-4">
+          <CardTitle className="text-base font-semibold">{t("auth.staffInviteJoinTitle")}</CardTitle>
+          <CardDescription className="text-sm leading-relaxed">
+            {t("auth.staffInviteJoinLead")}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 pt-4">
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button type="button" disabled={linkingStaff} onClick={() => void retryStaffLink()}>
+            {linkingStaff ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
+            {t("auth.staffInviteJoinRetry")}
+          </Button>
+          <Button type="button" variant="outline" asChild>
+            <a href="/login">{t("auth.staffInviteJoinLogout")}</a>
+          </Button>
         </CardContent>
       </Card>
     )

@@ -11,6 +11,7 @@ import {
   type PanelRole,
 } from "@/lib/auth/permissions"
 import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
+import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import type { Database } from "@/types/database"
 
 export type BusinessPanelAccess = {
@@ -50,6 +51,7 @@ export async function resolveBusinessPanelAccess(
   supabase: SupabaseClient<Database>,
   userId: string,
   userEmail?: string | null,
+  options?: { staffInvite?: boolean },
 ): Promise<BusinessPanelAccess> {
   const empty: BusinessPanelAccess = {
     businessId: null,
@@ -59,35 +61,6 @@ export async function resolveBusinessPanelAccess(
     panelRole: null,
     effectiveRole: null,
     canManageBilling: false,
-  }
-
-  try {
-    await supabase.rpc("ensure_owner_membership")
-  } catch {
-    // RPC może być niedostępne w starszej bazie — kontynuujemy odczyt profilu.
-  }
-
-  const { data: owned } = await supabase
-    .from("business_profiles")
-    .select("id, subscription_status, stripe_subscription_status")
-    .eq("owner_id", userId)
-    .maybeSingle()
-
-  if (owned?.id) {
-    const subscriptionStatus = resolveEffectiveSubscriptionStatus(
-      owned.subscription_status,
-      owned.stripe_subscription_status,
-    )
-    const effectiveRole: PanelRole = "admin"
-    return {
-      businessId: owned.id,
-      subscriptionStatus,
-      hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
-      isOwner: true,
-      panelRole: effectiveRole,
-      effectiveRole,
-      canManageBilling: true,
-    }
   }
 
   let memberQuery = await supabase
@@ -131,44 +104,77 @@ export async function resolveBusinessPanelAccess(
     }
     member = retryQuery.data?.[0]
   }
-  if (!member?.business_id) {
-    return empty
-  }
 
-  const panelRole = normalizeBusinessMemberPanelRole(member.role)
-  const effectiveRole = getCurrentUserRole(false, panelRole)
-  const canManageBilling = isAdminRole(effectiveRole)
-
-  const profile = await loadProfileSubscription(supabase, member.business_id)
-  if (!profile) {
+  if (member?.business_id) {
+    const panelRole = normalizeBusinessMemberPanelRole(member.role)
+    const effectiveRole = getCurrentUserRole(false, panelRole)
+    const canManageBilling = isAdminRole(effectiveRole)
+    const profile = await loadProfileSubscription(supabase, member.business_id)
+    if (!profile) {
+      return {
+        ...empty,
+        businessId: member.business_id,
+        panelRole,
+        effectiveRole,
+        canManageBilling,
+      }
+    }
+    const subscriptionStatus = resolveEffectiveSubscriptionStatus(
+      profile.subscription_status,
+      profile.stripe_subscription_status,
+    )
     return {
-      ...empty,
-      businessId: member.business_id,
+      businessId: profile.id,
+      subscriptionStatus,
+      hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
+      isOwner: false,
       panelRole,
       effectiveRole,
       canManageBilling,
     }
   }
 
-  const subscriptionStatus = resolveEffectiveSubscriptionStatus(
-    profile.subscription_status,
-    profile.stripe_subscription_status,
-  )
-
-  return {
-    businessId: profile.id,
-    subscriptionStatus,
-    hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
-    isOwner: false,
-    panelRole,
-    effectiveRole,
-    canManageBilling,
+  const staffInvite = options?.staffInvite === true
+  if (!staffInvite) {
+    try {
+      await supabase.rpc("ensure_owner_membership")
+    } catch {
+      // RPC może być niedostępne w starszej bazie — kontynuujemy odczyt profilu.
+    }
   }
+
+  const { data: owned } = await supabase
+    .from("business_profiles")
+    .select("id, subscription_status, stripe_subscription_status")
+    .eq("owner_id", userId)
+    .maybeSingle()
+
+  if (owned?.id && !staffInvite) {
+    const subscriptionStatus = resolveEffectiveSubscriptionStatus(
+      owned.subscription_status,
+      owned.stripe_subscription_status,
+    )
+    const effectiveRole: PanelRole = "admin"
+    return {
+      businessId: owned.id,
+      subscriptionStatus,
+      hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
+      isOwner: true,
+      panelRole: effectiveRole,
+      effectiveRole,
+      canManageBilling: true,
+    }
+  }
+
+  return empty
 }
 
-export function billingRecoveryRedirectPath(access: BusinessPanelAccess): string {
+export function billingRecoveryRedirectPath(
+  access: BusinessPanelAccess,
+  options?: { staffInvite?: boolean },
+): string {
   if (!access.businessId) {
-    return "/settings?setup=business"
+    return options?.staffInvite ? "/dashboard" : "/settings?setup=business"
   }
   if (!access.canManageBilling) {
     return "/subscription-required"

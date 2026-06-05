@@ -32,6 +32,7 @@ export async function POST() {
       {
         ok: false,
         error: result.error ?? "not_linked",
+        detail: result.detail ?? null,
       },
       { status: result.error === "no_invitation" ? 404 : 409 },
     )

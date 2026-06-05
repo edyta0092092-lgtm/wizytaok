@@ -26,6 +26,7 @@ import {
 } from "@/lib/auth/signup-confirmation-client"
 import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
+import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -137,21 +138,38 @@ export function LoginForm() {
         return
       }
 
+      let linkedBusinessId: string | null = null
       if (inviteTokenFromUrl) {
         try {
-          await fetch("/api/public/accept-business-invitation", {
+          const tokenRes = await fetch("/api/public/accept-business-invitation", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token: inviteTokenFromUrl }),
           })
+          const tokenJson = (await tokenRes.json().catch(() => null)) as {
+            ok?: boolean
+            business_id?: string
+          } | null
+          if (tokenJson?.ok && tokenJson.business_id) {
+            linkedBusinessId = tokenJson.business_id
+          }
         } catch {
           // fallback: accept-pending-invitations poniżej
         }
       }
-      try {
-        await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
-      } catch {
-        // brak zaproszenia — normalny flow właściciela
+      if (!linkedBusinessId) {
+        try {
+          const linkRes = await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+          const linkJson = (await linkRes.json().catch(() => null)) as {
+            ok?: boolean
+            business_id?: string | null
+          } | null
+          if (linkJson?.ok && linkJson.business_id) {
+            linkedBusinessId = linkJson.business_id
+          }
+        } catch {
+          // brak zaproszenia — normalny flow właściciela
+        }
       }
 
       const { data: profile } = await client
@@ -190,44 +208,50 @@ export function LoginForm() {
         }
       }
 
-      let memberBusinessId: string | null = null
-      if (!profile?.id) {
-        let memberQuery = await client
+      let memberBusinessId: string | null = linkedBusinessId
+      let memberQuery = await client
+        .from("business_members")
+        .select("business_id")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+      if (
+        memberQuery.error?.message?.toLowerCase().includes("is_active") &&
+        memberQuery.error.message.toLowerCase().includes("does not exist")
+      ) {
+        memberQuery = await client
           .from("business_members")
           .select("business_id")
           .eq("user_id", user.id)
-          .eq("is_active", true)
           .limit(1)
-        if (
-          memberQuery.error?.message?.toLowerCase().includes("is_active") &&
-          memberQuery.error.message.toLowerCase().includes("does not exist")
-        ) {
-          memberQuery = await client
-            .from("business_members")
-            .select("business_id")
-            .eq("user_id", user.id)
-            .limit(1)
-        }
-        memberBusinessId = memberQuery.data?.[0]?.business_id ?? null
       }
+      memberBusinessId = memberBusinessId ?? memberQuery.data?.[0]?.business_id ?? null
 
-      let dest =
-        postLoginPath ??
-        (profile?.id || memberBusinessId ? "/dashboard" : "/settings?setup=business")
+      const staffInvite = isStaffInviteUser(user)
+      const hasStaffAccess = Boolean(memberBusinessId)
+      const hasOwnerProfile = Boolean(profile?.id)
 
-      if (!postLoginPath && shouldStartTrialAfterLogin) {
-        if (!profile?.id) {
+      let dest = postLoginPath ?? "/dashboard"
+      if (!postLoginPath) {
+        if (hasStaffAccess) {
+          dest = "/dashboard"
+        } else if (staffInvite && inviteTokenFromUrl) {
+          dest = `/accept-invite/${encodeURIComponent(inviteTokenFromUrl)}`
+        } else if (hasOwnerProfile && !staffInvite) {
+          dest = "/dashboard"
+          if (
+            !isActiveSubscriptionStatus(profile?.subscription_status) &&
+            !isActiveSubscriptionStatus(profile?.stripe_subscription_status)
+          ) {
+            dest = await resolveBillingChoiceRedirect()
+          } else if (shouldStartTrialAfterLogin) {
+            dest = await resolveBillingChoiceRedirect()
+          }
+        } else if (!staffInvite) {
           dest = "/settings?setup=business"
         } else {
-          dest = await resolveBillingChoiceRedirect()
+          dest = "/login?email=" + encodeURIComponent(email.trim())
         }
-      } else if (
-        !postLoginPath &&
-        profile?.id &&
-        !isActiveSubscriptionStatus(profile.subscription_status) &&
-        !isActiveSubscriptionStatus(profile.stripe_subscription_status)
-      ) {
-        dest = await resolveBillingChoiceRedirect()
       }
 
       router.replace(dest)

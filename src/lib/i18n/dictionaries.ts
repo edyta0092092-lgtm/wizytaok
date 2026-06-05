@@ -549,6 +549,11 @@ export const dictionaries = {
       oauthCancelled: "Logowanie zostało anulowane.",
       oauthNoEmail:
         "Konto zewnętrzne nie udostępniło adresu e-mail. Użyj logowania e-mail i hasła lub innego konta.",
+      staffInviteJoinTitle: "Dołącz do zespołu firmy",
+      staffInviteJoinLead:
+        "To konto jest zaproszeniem do panelu jako pracownik. Nie zakładaj własnej firmy — użyj linku z e-maila lub poproś administratora o ponowne wysłanie zaproszenia.",
+      staffInviteJoinRetry: "Spróbuj ponownie połączyć z firmą",
+      staffInviteJoinLogout: "Wyloguj się",
       oauthSetupTitle: "Uzupełnij dane firmy",
       oauthSetupDescription:
         "Aby korzystać z panelu i okresu próbnego, podaj dane firmy. Adres e-mail możesz potwierdzić poniżej.",
@@ -3136,6 +3141,11 @@ Pozdrawiamy,
       oauthCancelled: "Sign-in was cancelled.",
       oauthNoEmail:
         "The external account did not provide an email address. Use email and password or another account.",
+      staffInviteJoinTitle: "Join your team",
+      staffInviteJoinLead:
+        "This account is a staff invitation to the panel. Do not create your own business — use the link from the email or ask the administrator to resend the invitation.",
+      staffInviteJoinRetry: "Try linking to the business again",
+      staffInviteJoinLogout: "Sign out",
       oauthSetupTitle: "Complete your business details",
       oauthSetupDescription:
         "To use the panel and trial period, enter your business details. You can confirm your email below.",
