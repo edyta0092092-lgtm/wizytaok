@@ -2,9 +2,10 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
+import { ArrowRight, Check } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { getStepConfig } from "@/lib/onboarding/onboarding-steps"
+import { getOnboardingStepIndex, getStepConfig } from "@/lib/onboarding/onboarding-steps"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -24,15 +25,16 @@ export function OnboardingFlowHint() {
     flowActive,
     activeStepId,
     snapshot,
-    continueSetup,
+    advanceFlowStep,
     skipForNow,
   } = useOnboarding()
   const [highlightRect, setHighlightRect] = React.useState<HighlightRect | null>(null)
+  const [advancing, setAdvancing] = React.useState(false)
+
   const stepPath = activeStepId ? getStepConfig(activeStepId).path : null
-  const stepProgressDone = activeStepId && snapshot ? snapshot.progress[activeStepId] : false
+  const stepDone = Boolean(activeStepId && snapshot?.progress[activeStepId])
   const canShowStep =
-    Boolean(flowActive && activeStepId && snapshot && stepPath && pathname.startsWith(stepPath)) &&
-    !stepProgressDone
+    Boolean(flowActive && activeStepId && snapshot && stepPath && pathname.startsWith(stepPath))
 
   React.useEffect(() => {
     if (canShowStep) return
@@ -55,23 +57,11 @@ export function OnboardingFlowHint() {
           return
         }
         const rect = target.getBoundingClientRect()
-        setHighlightRect((prev) => {
-          const next = {
-            top: Math.round(rect.top - 6),
-            left: Math.round(rect.left - 6),
-            width: Math.round(rect.width + 12),
-            height: Math.round(rect.height + 12),
-          }
-          if (
-            prev &&
-            prev.top === next.top &&
-            prev.left === next.left &&
-            prev.width === next.width &&
-            prev.height === next.height
-          ) {
-            return prev
-          }
-          return next
+        setHighlightRect({
+          top: Math.round(rect.top - 8),
+          left: Math.round(rect.left - 8),
+          width: Math.round(rect.width + 16),
+          height: Math.round(rect.height + 16),
         })
       })
     }
@@ -92,7 +82,7 @@ export function OnboardingFlowHint() {
       updateRect()
       if (scrollTimer) window.clearTimeout(scrollTimer)
       scrollTimer = window.setTimeout(() => {
-        target?.scrollIntoView({ block: "center" })
+        target?.scrollIntoView({ block: "center", behavior: "smooth" })
         updateRect()
       }, 120)
     }
@@ -123,50 +113,67 @@ export function OnboardingFlowHint() {
   if (!canShowStep || !activeStepId) return null
 
   const step = getStepConfig(activeStepId)
+  const stepNumber = getOnboardingStepIndex(activeStepId, isAdmin)
+  const total = isAdmin ? 6 : 5
 
   return (
     <>
       <style>
         {`
           [data-onboarding-highlight="true"] {
-            scroll-margin: 7rem;
+            scroll-margin: 6rem;
           }
         `}
       </style>
       {highlightRect ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed z-[149] rounded-2xl border-[3px] border-primary"
+          className="pointer-events-none fixed z-[149] rounded-xl border-2 border-primary shadow-[0_0_0_6px_color-mix(in_srgb,var(--primary)_12%,transparent)]"
           style={{
             top: highlightRect.top,
             left: highlightRect.left,
             width: highlightRect.width,
             height: highlightRect.height,
-            boxShadow: "0 0 0 8px color-mix(in srgb, var(--primary) 14%, transparent)",
           }}
         />
       ) : null}
-      <div
-        className={cn(
-          "fixed bottom-4 left-4 right-4 z-[150] mx-auto max-w-md sm:left-auto sm:right-6",
-        )}
-      >
-        <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-lg shadow-slate-900/10">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            {t(isAdmin ? "onboarding.flowBadge" : "onboarding.staffFlowBadge")}
-          </p>
-          <p className="mt-1 text-sm font-medium text-foreground">{t(step.titleKey)}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{t(step.hintKey)}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+      <div className="fixed bottom-4 left-4 right-4 z-[150] mx-auto max-w-md sm:left-auto sm:right-5 sm:bottom-5">
+        <div className="rounded-2xl border border-border/80 bg-card/95 p-4 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-xs font-medium text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 tabular-nums">
+              {stepNumber}/{total}
+            </span>
+            <span>{t(isAdmin ? "onboarding.flowBadge" : "onboarding.staffFlowBadge")}</span>
+          </div>
+          <p className="mt-2 text-base font-semibold text-foreground">{t(step.titleKey)}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t(step.hintKey)}</p>
+          {stepDone ? (
+            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-primary">
+              <Check className="size-3.5" aria-hidden />
+              {t("onboarding.stepDetected")}
+            </p>
+          ) : (
+            <p className="mt-2 text-xs text-muted-foreground">{t("onboarding.stepAutoDetect")}</p>
+          )}
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button
               type="button"
-              size="sm"
-              className="h-9 rounded-xl"
-              onClick={() => void continueSetup()}
+              className={cn("h-10 flex-1 rounded-xl", !stepDone && "sm:flex-none")}
+              disabled={advancing}
+              onClick={() => {
+                setAdvancing(true)
+                void advanceFlowStep().finally(() => setAdvancing(false))
+              }}
             >
-              {t("onboarding.flowNext")}
+              {stepDone ? t("onboarding.flowContinue") : t("onboarding.flowCheck")}
+              <ArrowRight className="ml-2 size-4" aria-hidden />
             </Button>
-            <Button type="button" size="sm" variant="ghost" className="h-9" onClick={() => skipForNow()}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 rounded-xl text-muted-foreground"
+              onClick={() => skipForNow()}
+            >
               {t("onboarding.skipCard")}
             </Button>
           </div>

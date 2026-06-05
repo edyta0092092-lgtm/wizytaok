@@ -3,8 +3,8 @@
 import { Check } from "lucide-react"
 
 import {
-  completedStepCount,
   getOnboardingSteps,
+  onboardingStepCount,
   type OnboardingStepId,
 } from "@/lib/onboarding/onboarding-steps"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
@@ -98,16 +98,4 @@ export function OnboardingStepList({
   )
 }
 
-export function onboardingStepCount(
-  progress: Record<OnboardingStepId, boolean>,
-  isAdmin: boolean,
-): {
-  done: number
-  total: number
-} {
-  const total = getOnboardingSteps(isAdmin).length
-  return {
-    done: completedStepCount(progress, isAdmin),
-    total,
-  }
-}
+export { onboardingStepCount }

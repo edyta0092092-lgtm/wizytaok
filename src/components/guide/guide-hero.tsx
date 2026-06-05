@@ -1,6 +1,7 @@
 "use client"
 
-import { Sparkles } from "lucide-react"
+import Link from "next/link"
+import { BookOpen } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,10 +11,9 @@ type GuideHeroProps = {
   title: string
   description: string
   subtitle?: string
-  startTourLabel: string
-  onStartTour: () => void
-  /** Cel podświetlenia w onboardingu obsługi (`data-tour`). */
-  tourTargetId?: string
+  /** Link do konfiguracji na dashboardzie (osobno od onboardingu). */
+  setupCtaLabel?: string
+  setupCtaHref?: string
 }
 
 export function GuideHero({
@@ -21,28 +21,22 @@ export function GuideHero({
   title,
   description,
   subtitle,
-  startTourLabel,
-  onStartTour,
-  tourTargetId,
+  setupCtaLabel,
+  setupCtaHref = "/dashboard",
 }: GuideHeroProps) {
   return (
-    <div
-      className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-[color:var(--nav-active-bg)] via-card/90 to-card shadow-sm shadow-slate-900/5 dark:shadow-black/20"
-      {...(tourTargetId ? { "data-tour": tourTargetId } : {})}
-    >
+    <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-muted/30 via-card to-card shadow-sm">
       <div
-        className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
+        className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full bg-primary/8 blur-3xl"
         aria-hidden
       />
-      <div className="relative space-y-5 px-5 py-7 sm:px-8 sm:py-8">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant="outline"
-            className="rounded-full border-primary/30 bg-primary/10 px-3 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-primary dark:border-primary/40 dark:bg-primary/15"
-          >
-            {badge}
-          </Badge>
-        </div>
+      <div className="relative space-y-5 px-5 py-7 sm:px-8 sm:py-8" data-tour="guide-intro">
+        <Badge
+          variant="outline"
+          className="rounded-full border-primary/25 bg-primary/8 px-3 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-primary"
+        >
+          {badge}
+        </Badge>
         <div className="space-y-3">
           <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             {title}
@@ -51,22 +45,19 @@ export function GuideHero({
             {description}
           </p>
           {subtitle ? (
-            <p className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground/95 sm:text-base">
+            <p className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground/90">
               {subtitle}
             </p>
           ) : null}
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-          <Button
-            type="button"
-            size="lg"
-            className="h-11 w-full rounded-2xl sm:w-auto sm:min-w-48"
-            onClick={onStartTour}
-          >
-            <Sparkles className="mr-2 size-4 shrink-0" aria-hidden />
-            {startTourLabel}
+        {setupCtaLabel ? (
+          <Button type="button" variant="outline" size="lg" className="h-11 rounded-xl" asChild>
+            <Link href={setupCtaHref}>
+              <BookOpen className="mr-2 size-4 shrink-0" aria-hidden />
+              {setupCtaLabel}
+            </Link>
           </Button>
-        </div>
+        ) : null}
       </div>
     </div>
   )

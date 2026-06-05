@@ -62,6 +62,7 @@ type OnboardingContextValue = {
   refreshProgress: () => Promise<void>
   skipForNow: () => void
   markActiveStepComplete: () => void
+  advanceFlowStep: () => Promise<void>
   jumpToStep: (stepId: OnboardingStepId) => void
 }
 
@@ -102,6 +103,8 @@ function eventStepsForSync(
       return isAdmin ? ["team_member", "staff_service"] : null
     case "pw-staff-services-saved":
       return isAdmin ? ["staff_service"] : null
+    case "pw-availability":
+      return isAdmin ? ["working_hours"] : null
     default:
       return null
   }
@@ -449,6 +452,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     const onBookings = () => scheduleSync("pw-bookings")
     const onServices = () => scheduleSync("pw-services")
     const onStaff = () => scheduleSync("pw-staff")
+    const onAvailability = () => scheduleSync("pw-availability")
     const onStaffServicesSaved = () => {
       if (!isAdmin) return
       void markStep("staff_service")
@@ -457,6 +461,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     window.addEventListener("pw-bookings", onBookings)
     window.addEventListener("pw-services", onServices)
     window.addEventListener("pw-staff", onStaff)
+    window.addEventListener("pw-availability", onAvailability)
     window.addEventListener("pw-staff-services-saved", onStaffServicesSaved)
 
     return () => {
@@ -464,6 +469,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       window.removeEventListener("pw-bookings", onBookings)
       window.removeEventListener("pw-services", onServices)
       window.removeEventListener("pw-staff", onStaff)
+      window.removeEventListener("pw-availability", onAvailability)
       window.removeEventListener("pw-staff-services-saved", onStaffServicesSaved)
     }
   }, [eligible, scope, isAdmin, syncBusinessSteps, markStep])
@@ -493,6 +499,31 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     [snapshot?.progress, isAdmin, finishOnboardingFlow, goToStep],
   )
 
+  const advanceFlowStep = React.useCallback(async () => {
+    if (!activeStepId) return
+    const steps: OnboardingStepId[] = [activeStepId]
+    if (activeStepId === "staff_appointments") steps.push("staff_first_visit")
+    await syncBusinessSteps(steps)
+    const synced = panelStateToSnapshot(
+      {
+        record: recordRef.current,
+        slug: snapshot?.slug ?? null,
+        bookingPath: snapshot?.bookingPath ?? null,
+      },
+      isAdmin,
+    ).progress
+    if (synced[activeStepId]) {
+      await advanceAfterStep(synced)
+    }
+  }, [
+    activeStepId,
+    syncBusinessSteps,
+    snapshot?.slug,
+    snapshot?.bookingPath,
+    isAdmin,
+    advanceAfterStep,
+  ])
+
   const continueSetup = React.useCallback(async () => {
     setWelcomeOpen(false)
     if (scope) {
@@ -514,13 +545,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }
 
     if (flowActive && activeStepId) {
-      const merged = { ...baseProgress, [activeStepId]: true }
-      await markStep(activeStepId)
-      if (activeStepId === "staff_appointments") {
-        merged.staff_first_visit = true
-        await markStep("staff_first_visit")
+      await syncBusinessSteps([activeStepId])
+      const synced = panelStateToSnapshot(
+        {
+          record: recordRef.current,
+          slug: snapshot?.slug ?? null,
+          bookingPath: snapshot?.bookingPath ?? null,
+        },
+        isAdmin,
+      ).progress
+      if (synced[activeStepId]) {
+        await advanceAfterStep(synced)
       }
-      await advanceAfterStep(merged)
       return
     }
 
@@ -548,6 +584,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     finishOnboardingFlow,
     goToStep,
     applyRecord,
+    syncBusinessSteps,
   ])
 
   const resetOnboardingProgress = React.useCallback(
@@ -618,6 +655,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       refreshProgress: reloadFromDb,
       skipForNow,
       markActiveStepComplete,
+      advanceFlowStep,
       jumpToStep,
     }),
     [
@@ -638,6 +676,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       reloadFromDb,
       skipForNow,
       markActiveStepComplete,
+      advanceFlowStep,
       jumpToStep,
     ],
   )

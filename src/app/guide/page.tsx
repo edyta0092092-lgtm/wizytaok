@@ -2,23 +2,19 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { BookOpen, RotateCcw } from "lucide-react"
 
 import { GuideHero } from "@/components/guide/guide-hero"
 import { GuideReferencePanel } from "@/components/guide/guide-reference-panel"
 import { GuideRoleOverview } from "@/components/guide/guide-role-overview"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { Button } from "@/components/ui/button"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { HELP_CENTER_FAQ_KEYS } from "@/lib/guide/help-center-sections"
-import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 export default function GuidePage() {
   const { t } = useTranslations()
-  const { restartOnboarding } = useOnboarding()
   const { businessId, effectiveRole } = useBusinessAccess()
   const isAdmin = effectiveRole === "admin"
   const [bookingSlug, setBookingSlug] = React.useState("")
@@ -54,22 +50,20 @@ export default function GuidePage() {
             title={t("guide.helpCenterTitle")}
             description={t("guide.helpCenterDescription")}
             subtitle={t("guide.helpCenterSubtitle")}
-            startTourLabel={t("onboarding.restart")}
-            onStartTour={() => restartOnboarding()}
-            tourTargetId="guide-intro"
           />
 
           {isAdmin ? (
-            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-              <BookOpen className="size-4 shrink-0 text-primary" aria-hidden />
-              <span className="flex-1">{t("guide.helpCenterSetupNote")}</span>
-              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => restartOnboarding()}>
-                <RotateCcw className="size-3.5" />
-                {t("onboarding.restart")}
-              </Button>
-            </div>
+            <p className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              {t("guide.helpCenterSetupNote")}{" "}
+              <Link
+                href="/dashboard"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {t("guide.helpCenterSetupLink")}
+              </Link>
+            </p>
           ) : (
-            <p className="rounded-2xl border border-border/80 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            <p className="rounded-xl border border-border/60 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
               {t("guide.helpCenterStaffSetupNote")}
             </p>
           )}
@@ -105,7 +99,7 @@ export default function GuidePage() {
               {HELP_CENTER_FAQ_KEYS.map((faq) => (
                 <details
                   key={faq.q}
-                  className="group rounded-2xl border border-border/60 bg-muted/20 p-4 dark:bg-muted/10"
+                  className="group rounded-xl border border-border/60 bg-muted/15 p-4"
                 >
                   <summary className="cursor-pointer list-none text-sm font-semibold [&::-webkit-details-marker]:hidden">
                     <span>{t(faq.q)}</span>

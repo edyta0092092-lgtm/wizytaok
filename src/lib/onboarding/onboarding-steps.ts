@@ -1,9 +1,9 @@
-/** Kroki pierwszej konfiguracji — osobno dla administratora i obsługi. */
+/** Kroki pierwszej konfiguracji — administrator (kolejność setupu) i obsługa. */
 
 export const ONBOARDING_ADMIN_STEP_IDS = [
   "working_hours",
-  "service",
   "team_member",
+  "service",
   "staff_service",
   "booking_page",
   "first_visit",
@@ -15,7 +15,6 @@ export const ONBOARDING_STAFF_STEP_IDS = [
   "staff_first_visit",
   "staff_schedule",
   "staff_messages",
-  "staff_guide",
 ] as const
 
 export type AdminOnboardingStepId = (typeof ONBOARDING_ADMIN_STEP_IDS)[number]
@@ -41,20 +40,20 @@ export const ONBOARDING_ADMIN_STEPS: OnboardingStepConfig[] = [
     hintKey: "onboarding.steps.working_hours.hint",
   },
   {
-    id: "service",
-    path: "/services",
-    targetSelector: '[data-tour="services-form"]',
-    titleKey: "onboarding.steps.service.title",
-    shortKey: "onboarding.steps.service.short",
-    hintKey: "onboarding.steps.service.hint",
-  },
-  {
     id: "team_member",
     path: "/team",
     targetSelector: '[data-tour="team-person-form"]',
     titleKey: "onboarding.steps.team_member.title",
     shortKey: "onboarding.steps.team_member.short",
     hintKey: "onboarding.steps.team_member.hint",
+  },
+  {
+    id: "service",
+    path: "/services",
+    targetSelector: '[data-tour="services-form"]',
+    titleKey: "onboarding.steps.service.title",
+    shortKey: "onboarding.steps.service.short",
+    hintKey: "onboarding.steps.service.hint",
   },
   {
     id: "staff_service",
@@ -123,20 +122,7 @@ export const ONBOARDING_STAFF_STEPS: OnboardingStepConfig[] = [
     shortKey: "onboarding.steps.staff_messages.short",
     hintKey: "onboarding.steps.staff_messages.hint",
   },
-  {
-    id: "staff_guide",
-    path: "/guide",
-    targetSelector: '[data-tour="guide-intro"]',
-    titleKey: "onboarding.steps.staff_guide.title",
-    shortKey: "onboarding.steps.staff_guide.short",
-    hintKey: "onboarding.steps.staff_guide.hint",
-  },
 ]
-
-/** @deprecated Użyj getOnboardingStepIds(isAdmin) */
-export const ONBOARDING_STEP_IDS = ONBOARDING_ADMIN_STEP_IDS
-/** @deprecated Użyj getOnboardingSteps(isAdmin) */
-export const ONBOARDING_STEPS = ONBOARDING_ADMIN_STEPS
 
 export function getOnboardingStepIds(isAdmin: boolean): readonly OnboardingStepId[] {
   return isAdmin ? ONBOARDING_ADMIN_STEP_IDS : ONBOARDING_STAFF_STEP_IDS
@@ -144,6 +130,15 @@ export function getOnboardingStepIds(isAdmin: boolean): readonly OnboardingStepI
 
 export function getOnboardingSteps(isAdmin: boolean): OnboardingStepConfig[] {
   return isAdmin ? ONBOARDING_ADMIN_STEPS : ONBOARDING_STAFF_STEPS
+}
+
+export function getOnboardingStepIndex(
+  stepId: OnboardingStepId,
+  isAdmin: boolean,
+): number {
+  const ids = getOnboardingStepIds(isAdmin)
+  const index = ids.indexOf(stepId)
+  return index >= 0 ? index + 1 : 0
 }
 
 export function emptyOnboardingProgress(isAdmin: boolean): Record<OnboardingStepId, boolean> {
@@ -175,7 +170,17 @@ export function completedStepCount(
   return getOnboardingStepIds(isAdmin).filter((id) => progress[id]).length
 }
 
-/** Klucz i18n głównego przycisku kreatora (start vs kontynuacja). */
+export function onboardingStepCount(
+  progress: Record<OnboardingStepId, boolean>,
+  isAdmin: boolean,
+): { done: number; total: number } {
+  const total = getOnboardingStepIds(isAdmin).length
+  return {
+    done: completedStepCount(progress, isAdmin),
+    total,
+  }
+}
+
 export function onboardingPrimaryCtaKey(
   done: number,
   allDone: boolean,
