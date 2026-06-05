@@ -7,6 +7,7 @@ import { PageShell } from "@/components/layout/page-shell"
 import { AppointmentsPageBanners } from "@/components/appointments/appointments-page-banners"
 import { AppointmentsFiltersAndListSection } from "@/components/appointments/appointments-filters-and-list-section"
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
+import { AppointmentsExportButton } from "@/components/exports/appointments-export-button"
 import { EMPTY_MANUAL_APPOINTMENT_FORM } from "@/lib/appointments/manual-appointment-form-defaults"
 import { useManualAppointmentSheetData } from "@/lib/appointments/use-manual-appointment-sheet-data"
 import { useBusinessBookingPagePath } from "@/lib/business/use-business-booking-page-path"
@@ -241,6 +242,7 @@ export function AppointmentsPageInner() {
     onDateToChange: setDateTo,
     onClearFilters: clearSecondaryFilters,
     hasActiveFilters: hasActiveSecondaryFilters,
+    toolbarAction: <AppointmentsExportButton rows={filtered} />,
   })
 
   return (

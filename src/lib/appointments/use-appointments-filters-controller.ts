@@ -32,6 +32,7 @@ export type UseAppointmentsFiltersControllerParams = {
   onDateToChange: (next: string) => void
   onClearFilters: () => void
   hasActiveFilters: boolean
+  toolbarAction?: React.ReactNode
 }
 
 export function useAppointmentsFiltersController({
@@ -58,6 +59,7 @@ export function useAppointmentsFiltersController({
   onDateToChange,
   onClearFilters,
   hasActiveFilters,
+  toolbarAction,
 }: UseAppointmentsFiltersControllerParams) {
   return React.useMemo(
     () => ({
@@ -84,6 +86,7 @@ export function useAppointmentsFiltersController({
       onDateToChange,
       onClearFilters,
       hasActiveFilters,
+      toolbarAction,
     }),
     [
       staffFilter,
@@ -109,6 +112,7 @@ export function useAppointmentsFiltersController({
       onDateToChange,
       onClearFilters,
       hasActiveFilters,
+      toolbarAction,
     ],
   )
 }

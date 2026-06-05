@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { CustomersExportButton } from "@/components/exports/customers-export-button"
 import { CustomersEmptyState } from "@/components/customers/customers-empty-state"
 import { CustomersFiltersBar } from "@/components/customers/customers-filters-bar"
 import { CustomersKpiGrid } from "@/components/customers/customers-kpi-grid"
@@ -42,12 +43,17 @@ export function CustomersPage() {
     <div className="flex flex-col gap-6">
       <CustomersKpiGrid kpis={kpis} copy={kpiCopy} />
 
-      <CustomersFiltersBar
-        query={query}
-        onQueryChange={setQuery}
-        segment={segment}
-        onSegmentChange={setSegment}
-      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <CustomersFiltersBar
+            query={query}
+            onQueryChange={setQuery}
+            segment={segment}
+            onSegmentChange={setSegment}
+          />
+        </div>
+        <CustomersExportButton rows={filtered} className="shrink-0 self-start" />
+      </div>
 
       {!ready ? <CustomersListSkeleton /> : null}
 

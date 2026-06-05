@@ -3,6 +3,7 @@
 import * as React from "react"
 import { AlertCircle, BarChart3 } from "lucide-react"
 
+import { StatisticsExportButton } from "@/components/exports/statistics-export-button"
 import { StatisticsBookingsCard } from "@/components/statistics/statistics-bookings-card"
 import { StatisticsHeatmap } from "@/components/statistics/statistics-heatmap"
 import { StatisticsKpiGrid } from "@/components/statistics/statistics-kpi-grid"
@@ -268,13 +269,16 @@ export function StatisticsDashboard() {
               </p>
             </div>
             {dataset ? (
-              <div className="shrink-0 rounded-xl border border-border/60 bg-background/90 px-5 py-4 shadow-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {copy.rangeLabel}
-                </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                  {dataset.totalInRange}
-                </p>
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                <StatisticsExportButton dataset={dataset} range={range} />
+                <div className="rounded-xl border border-border/60 bg-background/90 px-5 py-4 shadow-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {copy.rangeLabel}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                    {dataset.totalInRange}
+                  </p>
+                </div>
               </div>
             ) : null}
           </div>

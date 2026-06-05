@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { Filter } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -53,6 +54,7 @@ export type AppointmentsFiltersBarProps = {
   onDateToChange: (next: string) => void
   onClearFilters?: () => void
   hasActiveFilters?: boolean
+  toolbarAction?: React.ReactNode
 }
 
 export function AppointmentsFiltersBar({
@@ -79,16 +81,20 @@ export function AppointmentsFiltersBar({
   onDateToChange,
   onClearFilters,
   hasActiveFilters = false,
+  toolbarAction,
 }: AppointmentsFiltersBarProps) {
   const { t } = useTranslations()
 
   return (
     <Card className="rounded-2xl border border-border shadow-sm shadow-slate-900/5">
       <CardHeader className="space-y-1 px-4 pb-2 pt-4 sm:px-5">
-        <CardTitle className="flex items-center gap-2 text-base font-semibold">
-          <Filter className="size-4 text-muted-foreground" aria-hidden />
-          {t("appointments.filtersTitle")}
-        </CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Filter className="size-4 text-muted-foreground" aria-hidden />
+            {t("appointments.filtersTitle")}
+          </CardTitle>
+          {toolbarAction}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5 px-4 pb-5 sm:px-5">
         <div className="flex min-w-0 flex-wrap gap-2">
