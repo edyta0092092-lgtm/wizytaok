@@ -6,6 +6,7 @@ import {
   mergeUserOnboardingSteps,
   type UserOnboardingFlags,
 } from "@/lib/onboarding/persist-member-onboarding"
+import { detectStaffServiceAssignment } from "@/lib/onboarding/detect-staff-service-assignment"
 import { buildOnboardingScope } from "@/lib/onboarding/onboarding-scope"
 import {
   emptyOnboardingProgress,
@@ -134,29 +135,8 @@ export async function detectAdminBusinessStepReady(
         .eq("is_active", true)
       return (count ?? 0) >= 1
     }
-    case "staff_service": {
-      const { data: staffRows } = await client
-        .from("staff_members")
-        .select("id")
-        .eq("business_id", bid)
-        .eq("is_active", true)
-      const staffIds = (staffRows ?? []).map((r) => r.id).filter(Boolean)
-      if (staffIds.length === 0) return false
-      const { data: linked } = await client
-        .from("staff_services")
-        .select("staff_id, staff_member_id, service_id")
-        .eq("business_id", bid)
-        .limit(20)
-      return (
-        linked?.some((row) => {
-          const sid =
-            (typeof row.staff_id === "string" && row.staff_id) ||
-            (typeof row.staff_member_id === "string" && row.staff_member_id) ||
-            ""
-          return Boolean(sid && staffIds.includes(sid) && row.service_id)
-        }) ?? false
-      )
-    }
+    case "staff_service":
+      return detectStaffServiceAssignment(client, bid)
     case "booking_page": {
       const { data: bp } = await client
         .from("business_profiles")
