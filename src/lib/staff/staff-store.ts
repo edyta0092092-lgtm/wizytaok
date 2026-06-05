@@ -87,7 +87,7 @@ function toUniqueServiceIds(serviceIds: string[]): string[] {
 }
 
 /** Wiersz staff_services może mieć staff_id (standard) albo staff_member_id (starsze / fallback insert). */
-function staffMemberIdFromStaffServiceRow(row: Record<string, unknown>): string | null {
+export function staffMemberIdFromStaffServiceRow(row: Record<string, unknown>): string | null {
   const a = row.staff_member_id
   const b = row.staff_id
   if (typeof a === "string" && a.trim().length > 0) return a.trim()
@@ -761,6 +761,87 @@ export async function getStaffMembersForService(
     })
     .filter((m): m is StaffMember => Boolean(m))
   return rpcStaff.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+}
+
+/** Mapowanie personel → usługi (ta sama logika co ekran Zespół). */
+export async function loadServiceIdsByStaffMap(
+  client: StaffStoreClient | null,
+  businessId: string | null,
+  staffIds: string[],
+): Promise<Record<string, string[]>> {
+  const nextMap: Record<string, string[]> = {}
+  const currentStaffIds = new Set(staffIds.filter(Boolean))
+  if (!isSupabaseStaffPath(client, businessId) || currentStaffIds.size === 0) {
+    return nextMap
+  }
+
+  const bid = businessId!
+  const ssRes = await client!.from("staff_services").select("*").eq("business_id", bid)
+  let staffServiceRows = (ssRes.data as Array<Record<string, unknown>> | null) ?? []
+  if (
+    ssRes.error &&
+    ssRes.error.message.toLowerCase().includes("staff_services.business_id") &&
+    ssRes.error.message.toLowerCase().includes("does not exist")
+  ) {
+    const fallbackSsRes = await client!.from("staff_services").select("*")
+    staffServiceRows = (fallbackSsRes.data as Array<Record<string, unknown>> | null) ?? []
+  }
+
+  for (const row of staffServiceRows) {
+    const sid = staffMemberIdFromStaffServiceRow(row)
+    const serviceIdRaw = row.service_id
+    const serviceId =
+      typeof serviceIdRaw === "string"
+        ? serviceIdRaw
+        : serviceIdRaw != null
+          ? String(serviceIdRaw)
+          : ""
+    if (!sid || !currentStaffIds.has(sid) || !serviceId) continue
+    const arr = nextMap[sid] ?? []
+    arr.push(serviceId)
+    nextMap[sid] = arr
+  }
+
+  return nextMap
+}
+
+/** Czy co najmniej jedna osoba ma przypisaną usługę (odczyt jak w Zespół + pokrycie katalogu). */
+export async function hasAnyStaffServiceAssignment(
+  client: StaffStoreClient | null,
+  businessId: string | null,
+): Promise<boolean> {
+  if (!isSupabaseStaffPath(client, businessId)) return false
+  const bid = businessId!
+
+  const staff = await getStaffMembers(client, bid)
+  const activeStaffIds = staff.filter((s) => s.isActive).map((s) => s.id)
+  const allStaffIds = staff.map((s) => s.id)
+  if (allStaffIds.length === 0) return false
+
+  for (const ids of [activeStaffIds, allStaffIds]) {
+    const map = await loadServiceIdsByStaffMap(client, bid, ids)
+    if (Object.values(map).some((serviceIds) => serviceIds.length > 0)) {
+      return true
+    }
+  }
+
+  const { data: services } = await client!
+    .from("services")
+    .select("id")
+    .eq("business_id", bid)
+    .eq("is_active", true)
+
+  const serviceRows = services ?? []
+  if (serviceRows.length === 0 || activeStaffIds.length === 0) return false
+
+  for (const row of serviceRows) {
+    const serviceId = typeof row.id === "string" ? row.id : String(row.id ?? "")
+    if (!serviceId) continue
+    const performers = await getStaffMembersForService(client, bid, serviceId)
+    if (performers.length === 0) return false
+  }
+
+  return true
 }
 
 export async function getStaffServiceIds(

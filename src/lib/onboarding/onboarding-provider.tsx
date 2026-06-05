@@ -322,12 +322,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     window.addEventListener("pw-bookings", onDataChange)
     window.addEventListener("pw-services", onDataChange)
     window.addEventListener("pw-staff", onDataChange)
+    const onStaffServicesSaved = () => {
+      if (!scope || !isAdmin) return
+      void markStep("staff_service").then(() => refreshProgress())
+    }
+    window.addEventListener("pw-staff-services-saved", onStaffServicesSaved)
     return () => {
       window.removeEventListener("pw-bookings", onDataChange)
       window.removeEventListener("pw-services", onDataChange)
       window.removeEventListener("pw-staff", onDataChange)
+      window.removeEventListener("pw-staff-services-saved", onStaffServicesSaved)
     }
-  }, [eligible, scope, refreshProgress])
+  }, [eligible, scope, refreshProgress, isAdmin, markStep])
 
   React.useEffect(() => {
     if (!flowActive || !eligible) return

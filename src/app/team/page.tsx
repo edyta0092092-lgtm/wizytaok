@@ -35,6 +35,7 @@ import {
   getStaffAvailabilityContextForBusiness,
   getStaffMembers,
   getStaffServiceIds,
+  loadServiceIdsByStaffMap,
   normalizeStaffRole,
   normalizeStaffAvailabilityRulesForEditor,
   saveStaffAvailabilityExceptions,
@@ -580,40 +581,11 @@ export default function TeamPage() {
     setStaffLoadError(false)
     setServices(svc)
 
-    const currentStaffIds = new Set(rows.map((x) => x.id))
-    const nextMap: Record<string, string[]> = {}
-    if (client && bid) {
-      const ssRes = await client.from("staff_services").select("*").eq("business_id", bid)
-      let staffServiceRows = (ssRes.data as Array<Record<string, unknown>> | null) ?? []
-      if (
-        ssRes.error &&
-        ssRes.error.message.toLowerCase().includes("staff_services.business_id") &&
-        ssRes.error.message.toLowerCase().includes("does not exist")
-      ) {
-        const fallbackSsRes = await client.from("staff_services").select("*")
-        staffServiceRows = (fallbackSsRes.data as Array<Record<string, unknown>> | null) ?? []
-      }
-      for (const row of staffServiceRows) {
-        const sid =
-          (typeof row.staff_id === "string" && row.staff_id) ||
-          (typeof row.staff_member_id === "string" && row.staff_member_id) ||
-          ""
-        const serviceIdRaw = row.service_id
-        const serviceId =
-          typeof serviceIdRaw === "string"
-            ? serviceIdRaw
-            : serviceIdRaw != null
-              ? String(serviceIdRaw)
-              : ""
-        if (!sid) continue
-        if (!currentStaffIds.has(sid)) continue
-        if (!serviceId) continue
-        const arr = nextMap[sid] ?? []
-        arr.push(serviceId)
-        nextMap[sid] = arr
-      }
-    }
+    const nextMap = client && bid ? await loadServiceIdsByStaffMap(client, bid, rows.map((x) => x.id)) : {}
     setServiceIdsByStaff(nextMap)
+    if (Object.values(nextMap).some((ids) => ids.length > 0)) {
+      window.dispatchEvent(new Event("pw-staff-services-saved"))
+    }
 
     if (bid && access.canManageInvitations && isSupabaseConfigured()) {
       try {
@@ -1178,6 +1150,9 @@ export default function TeamPage() {
         if (created.servicesLinked === false) {
           partialNotices = [...partialNotices, t("team.servicesPartialSaved")]
         }
+        if (form.serviceIds.length > 0) {
+          window.dispatchEvent(new Event("pw-staff-services-saved"))
+        }
         if (isDev) {
           console.debug("[team.schedule.save.call] create", {
             staffId: newStaffId,
@@ -1379,6 +1354,9 @@ export default function TeamPage() {
       await refetchStaffMembers(client, bid)
       if (out.servicesLinked === false) {
         partialNotices = [...partialNotices, t("team.servicesPartialSaved")]
+      }
+      if (form.serviceIds.length > 0) {
+        window.dispatchEvent(new Event("pw-staff-services-saved"))
       }
       const rulesOut = await saveStaffAvailabilityRules(
         client,
