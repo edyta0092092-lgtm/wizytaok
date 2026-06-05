@@ -1,7 +1,8 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import { appConfig } from "@/config/app"
+import { PWA_THEME_COLOR } from "@/config/pwa"
 import { AppProviders } from "@/components/providers/app-providers"
 
 import "./globals.css"
@@ -27,6 +28,26 @@ export const metadata: Metadata = {
     template: `%s · ${appConfig.name}`,
   },
   description: appConfig.description,
+  applicationName: appConfig.name,
+  appleWebApp: {
+    capable: true,
+    title: appConfig.name,
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [{ url: "/icon", type: "image/png" }],
+    apple: [{ url: "/apple-icon", type: "image/png", sizes: "180x180" }],
+  },
+  manifest: "/manifest.webmanifest",
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: PWA_THEME_COLOR,
+  colorScheme: "light",
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
