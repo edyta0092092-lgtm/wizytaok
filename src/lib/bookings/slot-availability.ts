@@ -246,6 +246,10 @@ export async function getBookedSlotsForBusiness(
       row.service_duration_minutes != null
         ? Math.max(1, Math.floor(Number(row.service_duration_minutes) || 0))
         : undefined,
+    service_break_minutes:
+      row.service_break_minutes != null
+        ? Math.max(0, Math.floor(Number(row.service_break_minutes) || 0))
+        : undefined,
   }))
 }
 

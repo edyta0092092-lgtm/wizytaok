@@ -33,7 +33,7 @@ import {
   getAvailabilityForBusinessSlug,
   getServiceAvailabilityForBusinessSlug,
 } from "@/lib/availability/availability-store"
-import { resolveBreakMinutes } from "@/lib/bookings/break-minutes"
+import { resolveServiceBreakMinutes } from "@/lib/bookings/break-minutes"
 import { createOnlineBooking } from "@/lib/bookings/bookings-store"
 import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import {
@@ -307,9 +307,8 @@ export default function PublicBookingPage() {
           1,
           catalog.find((s) => s.id === selectedServiceId)?.durationMinutes ?? 0
         )
-        const selectedBreak = resolveBreakMinutes(
+        const selectedBreak = resolveServiceBreakMinutes(
           catalog.find((s) => s.id === selectedServiceId)?.breakMinutes,
-          defaultBreakMinutes,
         )
         setBlockedSlotKeys(
           toBlockedSlotKeySetForStaff(rows, selectedStaffId, selectedDuration, selectedBreak),
@@ -325,7 +324,7 @@ export default function PublicBookingPage() {
       cancelled = true
       window.removeEventListener("pw-bookings", onBookings)
     }
-  }, [normalizedSlug, clientToday, selectedStaffId, selectedServiceId, catalog, defaultBreakMinutes])
+  }, [normalizedSlug, clientToday, selectedStaffId, selectedServiceId, catalog])
 
   React.useEffect(() => {
     let cancelled = false
@@ -465,8 +464,8 @@ export default function PublicBookingPage() {
   )
 
   const selectedBreakMinutes = React.useMemo(
-    () => resolveBreakMinutes(selectedService?.breakMinutes, defaultBreakMinutes),
-    [selectedService?.breakMinutes, defaultBreakMinutes],
+    () => resolveServiceBreakMinutes(selectedService?.breakMinutes),
+    [selectedService?.breakMinutes],
   )
 
   /** Supabase: bez przypisanego staffu nie pokazuj kalendarza (terminy bez sensu). */
@@ -583,7 +582,7 @@ export default function PublicBookingPage() {
     if (!clientToday || !availabilityReady || !staffAvailabilityReady) return null
     const svc = catalog.find((s) => s.id === selectedServiceId)
     const duration = svc?.durationMinutes ?? 60
-    const breakMinutes = resolveBreakMinutes(svc?.breakMinutes, defaultBreakMinutes)
+    const breakMinutes = resolveServiceBreakMinutes(svc?.breakMinutes)
     if (useMergedAnyStaffSlots && svc) {
       const first = findFirstDateKeyWithMergedStaffSlots(
         clientToday,
@@ -618,7 +617,6 @@ export default function PublicBookingPage() {
     useMergedAnyStaffSlots,
     resolveDaysForServiceStaffMember,
     publicBookedRows,
-    defaultBreakMinutes,
   ])
 
   const selectedDayKey = dayOverride ?? defaultDayKey

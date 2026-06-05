@@ -3,7 +3,19 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/database"
 
 /**
- * Przerwa po usłudze: null na usłudze = domyślna firmy; brak obu = 0.
+ * Przerwa po usłudze w rezerwacji / slotach: tylko wartość z usługi; brak = 0.
+ */
+export function resolveServiceBreakMinutes(
+  serviceBreakMinutes: number | null | undefined,
+): number {
+  if (serviceBreakMinutes != null && Number.isFinite(serviceBreakMinutes)) {
+    return Math.max(0, Math.floor(serviceBreakMinutes))
+  }
+  return 0
+}
+
+/**
+ * Przerwa z usługi lub domyślna firmy (np. panel przy braku pola na usłudze).
  */
 export function resolveBreakMinutes(
   serviceBreakMinutes: number | null | undefined,

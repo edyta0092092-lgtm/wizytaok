@@ -13,7 +13,7 @@ import {
 } from "@/lib/booking/effective-availability"
 import { getSlotsForSelectedDate } from "@/lib/booking/availability-slots"
 import { getAppToday } from "@/lib/date/current-date"
-import { resolveBreakMinutes } from "@/lib/bookings/break-minutes"
+import { resolveServiceBreakMinutes } from "@/lib/bookings/break-minutes"
 import {
   hasStaffSchedulingIntervalOverlap,
   normalizeSlotTimeLabel,
@@ -62,7 +62,7 @@ async function isManualBookingTimeInAllowedSlots(
   const dayKey = appointmentDate.trim().slice(0, 10)
   const cellDate = parseYmd(dayKey)
   const duration = Math.max(1, Math.floor(service.durationMinutes || 0))
-  const breakMinutes = resolveBreakMinutes(service.breakMinutes, defaultBreakMinutes)
+  const breakMinutes = resolveServiceBreakMinutes(service.breakMinutes)
 
   const [bookingAvailability, exceptions, serviceRules] = await Promise.all([
     getAvailabilityRules(client, businessId),
@@ -149,7 +149,7 @@ export async function resolveManualBookingStaffSelection(
   }
 
   const durationMin = Math.max(1, Math.floor(Number(input.service.durationMinutes ?? 0) || 0))
-  const breakMin = resolveBreakMinutes(input.service.breakMinutes, input.defaultBreakMinutes)
+  const breakMin = resolveServiceBreakMinutes(input.service.breakMinutes)
   const ex = input.excludeBookingId?.trim()
 
   const sorted = [...input.candidates].sort((a, b) =>
@@ -266,7 +266,7 @@ export async function isStaffAvailableForSlot(input: {
   defaultBreakMinutes?: number | null
 }): Promise<boolean> {
   const durationMin = Math.max(1, Math.floor(Number(input.service.durationMinutes ?? 0) || 0))
-  const breakMin = resolveBreakMinutes(input.service.breakMinutes, input.defaultBreakMinutes)
+  const breakMin = resolveServiceBreakMinutes(input.service.breakMinutes)
   const overlap = await hasStaffSchedulingIntervalOverlap(
     input.client,
     input.businessId,

@@ -13,7 +13,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import {
+  formatServiceBreakMinutesOption,
+  parseServiceBreakMinutesFormValue,
+  SERVICE_BREAK_MINUTES_OPTIONS,
+} from "@/lib/services/service-break-options"
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -41,7 +53,7 @@ const emptyForm = (): ServiceFormState => ({
   name: "",
   description: "",
   durationMinutes: "60",
-  breakMinutes: "",
+  breakMinutes: "0",
   price: "",
   isActive: true,
 })
@@ -51,10 +63,11 @@ function formFromService(service: Service): ServiceFormState {
     name: service.name,
     description: service.description ?? "",
     durationMinutes: String(service.durationMinutes),
-    breakMinutes:
+    breakMinutes: formatServiceBreakMinutesOption(
       service.breakMinutes != null && Number.isFinite(Number(service.breakMinutes))
-        ? String(service.breakMinutes)
-        : "",
+        ? Number(service.breakMinutes)
+        : 0,
+    ),
     price: String(service.price),
     isActive: service.isActive,
   }
@@ -149,16 +162,7 @@ export default function ServicesPage() {
       return
     }
 
-    const breakRaw = form.breakMinutes.trim()
-    let breakMinutes: number | null = null
-    if (breakRaw !== "") {
-      const parsedBreak = Number(breakRaw)
-      if (!Number.isFinite(parsedBreak) || parsedBreak < 0) {
-        setActionNotice(t("services.invalidBreakMinutes"))
-        return
-      }
-      breakMinutes = Math.floor(parsedBreak)
-    }
+    const breakMinutes = parseServiceBreakMinutesFormValue(form.breakMinutes)
 
     const price = Number(form.price)
     if (!Number.isFinite(price) || price < 0) {
@@ -412,24 +416,23 @@ export default function ServicesPage() {
                 </div>
                 <div className="space-y-1.5 sm:max-w-xs">
                   <Label htmlFor="service-break">{t("services.breakMinutesLabel")}</Label>
-                  <div className="relative">
-                    <Input
-                      id="service-break"
-                      type="number"
-                      min={0}
-                      step={1}
-                      placeholder={t("services.placeholderBreakMinutes")}
-                      value={form.breakMinutes}
-                      onChange={(event) => setForm((prev) => ({ ...prev, breakMinutes: event.target.value }))}
-                      className="pr-10"
-                    />
-                    <span
-                      className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
-                      aria-hidden
-                    >
-                      {t("services.min")}
-                    </span>
-                  </div>
+                  <Select
+                    value={form.breakMinutes}
+                    onValueChange={(value) =>
+                      setForm((prev) => ({ ...prev, breakMinutes: value }))
+                    }
+                  >
+                    <SelectTrigger id="service-break" className="h-11 w-full rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_BREAK_MINUTES_OPTIONS.map((minutes) => (
+                        <SelectItem key={minutes} value={formatServiceBreakMinutesOption(minutes)}>
+                          {formatServiceBreakMinutesOption(minutes)} {t("services.min")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">{t("services.breakMinutesHint")}</p>
                 </div>
                 <div className="grid gap-3 rounded-xl border border-border/70 bg-muted/20 px-3 py-3">

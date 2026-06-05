@@ -208,7 +208,7 @@ export type Service = {
   name: string
   description?: string
   durationMinutes: number
-  /** null = domyślna przerwa firmy (default_break_minutes). */
+  /** Przerwa po usłudze (min); brak/null traktowane jako 0 przy liczeniu slotów. */
   breakMinutes?: number | null
   price: number
   /** Kod waluty z Supabase (np. PLN); brak przy starym localStorage. */

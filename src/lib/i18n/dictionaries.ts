@@ -1043,7 +1043,7 @@ export const dictionaries = {
       durationMinutesLabel: "Czas trwania w minutach",
       breakMinutesLabel: "Przerwa po usłudze",
       breakMinutesHint:
-        "Po zakończeniu tej usługi system zablokuje kolejne terminy na wskazaną liczbę minut.",
+        "System zablokuje kolejne terminy po zakończeniu tej usługi na wskazaną liczbę minut.",
       priceLabel: "Cena",
       activeLabel: "Aktywna",
       addServiceTitle: "Dodaj usługę",
