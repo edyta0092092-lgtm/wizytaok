@@ -17,6 +17,7 @@ import { AccountCredentialsPanel } from "@/components/account/account-credential
 import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
 import { AccessDenied } from "@/components/shared/access-denied"
+import { SettingsIntegrationsLinkCard } from "@/components/settings/settings-integrations-link-card"
 import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
 import {
   BusinessAddressAutocomplete,
@@ -807,6 +808,7 @@ export default function SettingsPage() {
 
             {/* Prawa kolumna: subskrypcja, onboarding, informacje prawne */}
             <div className="flex min-w-0 flex-col gap-6">
+              {canManageSettings ? <SettingsIntegrationsLinkCard /> : null}
               <TestBillingSettingsCard />
 
               <SettingsOnboardingCard />

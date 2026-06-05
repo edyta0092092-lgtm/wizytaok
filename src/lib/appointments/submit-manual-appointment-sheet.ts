@@ -1,5 +1,6 @@
 import type { ManualAppointmentFormState } from "@/components/appointments/manual-appointment-sheet"
 import { manualAppointmentFormPhoneE164 } from "@/lib/appointments/can-submit-manual-appointment"
+import { requestGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-client"
 import { notifyBookingCreatedViaApi } from "@/lib/bookings/notify-booking-created-client"
 import { createOnlineBooking, updateBooking } from "@/lib/bookings/bookings-store"
 import { fetchDefaultBreakMinutesForBusiness } from "@/lib/bookings/break-minutes"
@@ -128,6 +129,7 @@ export async function submitManualAppointmentSheet(input: {
     if (!patched.ok) {
       return { ok: false, reason: { code: "create_failed", error: "other" } }
     }
+    requestGoogleCalendarBookingSync(created.id, "upsert")
     if (created.confirmationToken) {
       try {
         const notifyResult = await notifyBookingCreatedViaApi(created.confirmationToken, language)

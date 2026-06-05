@@ -13,6 +13,7 @@ import {
   SB_BOOKING_PREFIX,
 } from "@/lib/bookings/bookings-store"
 import type { TransactionalHistoryMirror } from "@/lib/notifications/transactional-history-mirror"
+import { queueGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-server"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { getServerClient } from "@/lib/supabase/server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -146,6 +147,7 @@ export async function POST(req: Request) {
     if (upErrMsg) {
       return NextResponse.json({ ok: false, error: upErrMsg }, { status: 400 })
     }
+    queueGoogleCalendarBookingSync(bookingUuid, "cancel")
   }
 
   const shouldNotifyClient = body.notifyClient !== false
