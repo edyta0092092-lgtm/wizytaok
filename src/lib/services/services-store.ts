@@ -656,29 +656,31 @@ export async function getCurrentBusinessProfileIdForClient(
     .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
+
   if (!memErr && memberRows?.length) {
     const id = memberRows[0].business_id ?? null
     setCachedBusinessProfileId(id)
     return id
   }
+
   const isMissingIsActive =
     typeof memErr?.message === "string" &&
     memErr.message.toLowerCase().includes("is_active") &&
     memErr.message.toLowerCase().includes("does not exist")
-  if (!isMissingIsActive) {
-    setCachedBusinessProfileId(null)
-    return null
+
+  if (!memErr || isMissingIsActive) {
+    const { data: fallbackMembers, error: fallbackErr } = await client
+      .from("business_members")
+      .select("business_id")
+      .eq("user_id", user.id)
+      .limit(1)
+    if (!fallbackErr && fallbackMembers?.length) {
+      const id = fallbackMembers[0].business_id ?? null
+      setCachedBusinessProfileId(id)
+      return id
+    }
   }
-  const { data: fallbackMembers, error: fallbackErr } = await client
-    .from("business_members")
-    .select("business_id")
-    .eq("user_id", user.id)
-    .limit(1)
-  if (fallbackErr || !fallbackMembers?.length) {
-    setCachedBusinessProfileId(null)
-    return null
-  }
-  const id = fallbackMembers[0].business_id ?? null
-  setCachedBusinessProfileId(id)
-  return id
+
+  setCachedBusinessProfileId(null)
+  return null
 }

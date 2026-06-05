@@ -119,6 +119,12 @@ async function loadAccessState(): Promise<BusinessAccessState> {
         .select("business_id, role, display_name, email")
         .eq("user_id", user.id)
         .limit(1)
+    } else if (!memberQuery.data?.[0]) {
+      memberQuery = await client
+        .from("business_members")
+        .select("business_id, role, display_name, email")
+        .eq("user_id", user.id)
+        .limit(1)
     }
     return memberQuery.data?.[0]
   }
@@ -133,6 +139,7 @@ async function loadAccessState(): Promise<BusinessAccessState> {
     }
   }
   if (member?.business_id) {
+    setCachedBusinessProfileId(member.business_id)
     const r = normalizeBusinessMemberPanelRole(member.role)
     return {
       ready: true,

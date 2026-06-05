@@ -25,7 +25,9 @@ import {
   isEmailNotConfirmedAuthError,
 } from "@/lib/auth/signup-confirmation-client"
 import { fetchTrialStartEligibility } from "@/lib/billing/trial-eligibility-client"
+import { changePasswordRequiredUrl, userMustChangePassword } from "@/lib/auth/must-change-password"
 import { safeInternalRedirect } from "@/lib/auth/safe-internal-redirect"
+import { invalidateCachedBusinessProfileId, setCachedBusinessProfileId } from "@/lib/auth/business-profile-cache"
 import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -244,6 +246,17 @@ export function LoginForm() {
       const staffInvite = isStaffInviteUser(user)
       const hasStaffAccess = Boolean(memberBusinessId)
       const hasOwnerProfile = Boolean(profile?.id)
+
+      if (memberBusinessId) {
+        setCachedBusinessProfileId(memberBusinessId)
+      } else {
+        invalidateCachedBusinessProfileId()
+      }
+
+      if (userMustChangePassword(user)) {
+        window.location.assign(changePasswordRequiredUrl(postLoginPath ?? "/dashboard"))
+        return
+      }
 
       let dest: string
       if (hasStaffAccess) {

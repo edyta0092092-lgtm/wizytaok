@@ -10,6 +10,11 @@ import {
   isAuthRequiredPanelPath,
   isOperationalPanelPath,
 } from "@/lib/auth/panel-paths"
+import {
+  changePasswordRequiredUrl,
+  isChangePasswordExemptPath,
+  userMustChangePassword,
+} from "@/lib/auth/must-change-password"
 import { updateSession } from "@/lib/supabase/middleware"
 import { isSupabaseConfigured } from "@/lib/supabase/server"
 
@@ -127,6 +132,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL(afterLogin, request.url))
     }
     return response
+  }
+
+  if (user && userMustChangePassword(user) && !isChangePasswordExemptPath(pathname)) {
+    const requiredUrl = new URL(changePasswordRequiredUrl(request.nextUrl.pathname), request.url)
+    return NextResponse.redirect(requiredUrl)
   }
 
   if (isAuthRequiredPanelPath(pathname) && !user) {
