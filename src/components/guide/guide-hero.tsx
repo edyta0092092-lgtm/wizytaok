@@ -12,6 +12,8 @@ type GuideHeroProps = {
   subtitle?: string
   startTourLabel: string
   onStartTour: () => void
+  /** Cel podświetlenia w onboardingu obsługi (`data-tour`). */
+  tourTargetId?: string
 }
 
 export function GuideHero({
@@ -21,9 +23,13 @@ export function GuideHero({
   subtitle,
   startTourLabel,
   onStartTour,
+  tourTargetId,
 }: GuideHeroProps) {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-[color:var(--nav-active-bg)] via-card/90 to-card shadow-sm shadow-slate-900/5 dark:shadow-black/20">
+    <div
+      className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-[color:var(--nav-active-bg)] via-card/90 to-card shadow-sm shadow-slate-900/5 dark:shadow-black/20"
+      {...(tourTargetId ? { "data-tour": tourTargetId } : {})}
+    >
       <div
         className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full bg-primary/10 blur-3xl dark:bg-primary/15"
         aria-hidden

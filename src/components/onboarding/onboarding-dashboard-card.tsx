@@ -16,6 +16,7 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 export function OnboardingDashboardCard() {
   const { t } = useTranslations()
   const {
+    isAdmin,
     showDashboardCard,
     loading,
     snapshot,
@@ -28,9 +29,9 @@ export function OnboardingDashboardCard() {
 
   if (!showDashboardCard) return null
 
-  const progress = snapshot?.progress ?? emptyOnboardingProgress()
-  const { done, total } = onboardingStepCount(progress)
-  const allDone = isOnboardingFullyComplete(progress)
+  const progress = snapshot?.progress ?? emptyOnboardingProgress(isAdmin)
+  const { done, total } = onboardingStepCount(progress, isAdmin)
+  const allDone = isOnboardingFullyComplete(progress, isAdmin)
   const showStartFromBeginning = done > 0 && !allDone
 
   return (
@@ -40,9 +41,13 @@ export function OnboardingDashboardCard() {
           <span className="flex size-8 items-center justify-center rounded-xl bg-primary/15 text-primary">
             <Sparkles className="size-4" aria-hidden />
           </span>
-          <CardTitle className="text-base font-semibold">{t("onboarding.cardTitle")}</CardTitle>
+          <CardTitle className="text-base font-semibold">
+            {t(isAdmin ? "onboarding.cardTitle" : "onboarding.staffCardTitle")}
+          </CardTitle>
         </div>
-        <p className="text-sm text-muted-foreground">{t("onboarding.cardLead")}</p>
+        <p className="text-sm text-muted-foreground">
+          {t(isAdmin ? "onboarding.cardLead" : "onboarding.staffCardLead")}
+        </p>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
         {loading ? (

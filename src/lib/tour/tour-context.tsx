@@ -18,6 +18,7 @@ import {
   isPublicTourBlockedPath,
 } from "@/lib/tour/tour-path-guard"
 import { usePanelOnboardingEligibility } from "@/lib/tour/use-panel-onboarding-eligibility"
+import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 function setLegacyWelcomeDismissed() {
   try {
@@ -51,6 +52,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const { businessId, ready: accessReady } = useBusinessAccess()
 
+  const [userId, setUserId] = React.useState("")
   const [tourReady, setTourReady] = React.useState(false)
   const [welcomeOpen, setWelcomeOpen] = React.useState(false)
   const [tourActive, setTourActive] = React.useState(false)
@@ -70,16 +72,34 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  React.useEffect(() => {
+    if (!accessReady) return
+    if (!isSupabaseConfigured()) {
+      queueMicrotask(() => setUserId("local-dev"))
+      return
+    }
+    const client = getBrowserClient()
+    if (!client) return
+    let cancelled = false
+    void client.auth.getUser().then(({ data }) => {
+      if (!cancelled) setUserId(data.user?.id ?? "")
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [accessReady])
+
   const handleWelcomeConsumed = React.useCallback(() => {
     const id = businessId?.trim()
-    if (id) {
-      markWelcomeHandledForBusiness(id)
+    const uid = userId.trim()
+    if (id && uid) {
+      markWelcomeHandledForBusiness(id, uid)
     } else {
       clearPanelAccessJustActivated()
     }
     setLegacyWelcomeDismissed()
     setWelcomeOpen(false)
-  }, [businessId])
+  }, [businessId, userId])
 
   React.useEffect(() => {
     queueMicrotask(() => {
@@ -113,7 +133,8 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     const id = businessId?.trim()
     if (!id) return
     if (!isPanelWelcomePopupPath(pathname)) return
-    if (isWelcomeHandledForBusiness(id)) {
+    const uid = userId.trim()
+    if (uid && isWelcomeHandledForBusiness(id, uid)) {
       clearPanelAccessJustActivated()
       return
     }
@@ -130,6 +151,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     tourActive,
     welcomeOpen,
     businessId,
+    userId,
     pathname,
   ])
 
@@ -205,9 +227,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
       /* ignore */
     }
     const id = businessId?.trim()
-    if (id) markWelcomeHandledForBusiness(id)
+    const uid = userId.trim()
+    if (id && uid) markWelcomeHandledForBusiness(id, uid)
     setLegacyWelcomeDismissed()
-  }, [persistStep, businessId])
+  }, [persistStep, businessId, userId])
 
   const nextStep = React.useCallback(() => {
     if (stepIndex >= TOUR_STEPS.length - 1) return
@@ -223,9 +246,10 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     setTourActive(false)
     persistStep(false, 0)
     const id = businessId?.trim()
-    if (id) markWelcomeHandledForBusiness(id)
+    const uid = userId.trim()
+    if (id && uid) markWelcomeHandledForBusiness(id, uid)
     setLegacyWelcomeDismissed()
-  }, [persistStep, businessId])
+  }, [persistStep, businessId, userId])
 
   const finishTour = React.useCallback(() => {
     finishTourCompletely()

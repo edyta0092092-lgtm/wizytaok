@@ -56,6 +56,7 @@ export default function GuidePage() {
             subtitle={t("guide.helpCenterSubtitle")}
             startTourLabel={t("onboarding.restart")}
             onStartTour={() => restartOnboarding()}
+            tourTargetId="guide-intro"
           />
 
           {isAdmin ? (

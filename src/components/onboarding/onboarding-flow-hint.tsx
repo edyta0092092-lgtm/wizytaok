@@ -4,19 +4,10 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
-import { getStepConfig, type OnboardingStepId } from "@/lib/onboarding/onboarding-steps"
+import { getStepConfig } from "@/lib/onboarding/onboarding-steps"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
-
-const STEP_PATHS: Record<OnboardingStepId, string> = {
-  working_hours: "/availability",
-  team_member: "/team",
-  service: "/services",
-  staff_service: "/team",
-  booking_page: "/settings",
-  first_visit: "/appointments",
-}
 
 type HighlightRect = {
   top: number
@@ -28,9 +19,17 @@ type HighlightRect = {
 export function OnboardingFlowHint() {
   const { t } = useTranslations()
   const pathname = usePathname()
-  const { flowActive, activeStepId, snapshot, continueSetup, skipForNow } = useOnboarding()
+  const {
+    isAdmin,
+    flowActive,
+    activeStepId,
+    snapshot,
+    continueSetup,
+    skipForNow,
+    markActiveStepComplete,
+  } = useOnboarding()
   const [highlightRect, setHighlightRect] = React.useState<HighlightRect | null>(null)
-  const stepPath = activeStepId ? STEP_PATHS[activeStepId] : null
+  const stepPath = activeStepId ? getStepConfig(activeStepId).path : null
   const stepProgressDone = activeStepId && snapshot ? snapshot.progress[activeStepId] : false
   const canShowStep =
     Boolean(flowActive && activeStepId && snapshot && stepPath && pathname.startsWith(stepPath)) &&
@@ -155,12 +154,20 @@ export function OnboardingFlowHint() {
       >
         <div className="rounded-2xl border border-border bg-card px-4 py-3 shadow-lg shadow-slate-900/10">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-            {t("onboarding.flowBadge")}
+            {t(isAdmin ? "onboarding.flowBadge" : "onboarding.staffFlowBadge")}
           </p>
           <p className="mt-1 text-sm font-medium text-foreground">{t(step.titleKey)}</p>
           <p className="mt-1 text-xs text-muted-foreground">{t(step.hintKey)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button type="button" size="sm" className="h-9 rounded-xl" onClick={() => continueSetup()}>
+            <Button
+              type="button"
+              size="sm"
+              className="h-9 rounded-xl"
+              onClick={() => {
+                markActiveStepComplete()
+                continueSetup()
+              }}
+            >
               {t("onboarding.flowNext")}
             </Button>
             <Button type="button" size="sm" variant="ghost" className="h-9" onClick={() => skipForNow()}>

@@ -4,15 +4,22 @@ import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import { fetchOnboardingProgress, type OnboardingProgressSnapshot } from "@/lib/onboarding/fetch-onboarding-progress"
+import {
+  detectAdminBusinessStepReady,
+  fetchOnboardingProgress,
+  type OnboardingProgressSnapshot,
+} from "@/lib/onboarding/fetch-onboarding-progress"
+import { buildOnboardingScope } from "@/lib/onboarding/onboarding-scope"
+import {
+  persistOnboardingComplete,
+  persistOnboardingRestart,
+  persistOnboardingStepComplete,
+  persistOnboardingWelcomeDismissed,
+} from "@/lib/onboarding/persist-member-onboarding"
 import {
   consumeOnboardingRestart,
   isOnboardingMarkedComplete,
-  isOnboardingStepMarkedComplete,
   isOnboardingWelcomeDismissed,
-  markOnboardingComplete,
-  markOnboardingStepComplete,
-  markOnboardingWelcomeDismissed,
   requestOnboardingRestart,
 } from "@/lib/onboarding/onboarding-storage"
 import {
@@ -21,6 +28,7 @@ import {
   getStepConfig,
   isOnboardingFullyComplete,
   type OnboardingStepId,
+  type StaffOnboardingStepId,
 } from "@/lib/onboarding/onboarding-steps"
 import {
   clearPanelAccessJustActivated,
@@ -49,6 +57,7 @@ type OnboardingContextValue = {
   restartOnboarding: () => void
   refreshProgress: () => Promise<void>
   skipForNow: () => void
+  markActiveStepComplete: () => void
 }
 
 const OnboardingContext = React.createContext<OnboardingContextValue | null>(null)
@@ -57,18 +66,13 @@ function isBusinessAdmin(access: ReturnType<typeof useBusinessAccess>): boolean 
   return access.isOwner || access.effectiveRole === "admin" || access.canManageSettings
 }
 
-function applyLocalOnboardingProgress(
-  snapshot: OnboardingProgressSnapshot,
-  businessId: string,
-): OnboardingProgressSnapshot {
-  return {
-    ...snapshot,
-    progress: {
-      ...snapshot.progress,
-      booking_page: isOnboardingStepMarkedComplete(businessId, "booking_page"),
-    },
-  }
-}
+const STAFF_PATH_STEP: ReadonlyArray<{ path: string; stepId: StaffOnboardingStepId }> = [
+  { path: "/dashboard", stepId: "staff_day_plan" },
+  { path: "/appointments", stepId: "staff_appointments" },
+  { path: "/schedule", stepId: "staff_schedule" },
+  { path: "/messages", stepId: "staff_messages" },
+  { path: "/guide", stepId: "staff_guide" },
+]
 
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -77,6 +81,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const [ready, setReady] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
+  const [userId, setUserId] = React.useState("")
   const [snapshot, setSnapshot] = React.useState<OnboardingProgressSnapshot | null>(null)
   const [welcomeOpen, setWelcomeOpen] = React.useState(false)
   const [flowActive, setFlowActive] = React.useState(false)
@@ -84,13 +89,55 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const { ready: eligibilityReady, eligible: panelEligible } = usePanelOnboardingEligibility(flowActive)
   const isAdmin = isBusinessAdmin(access)
-  const eligible = panelEligible && isAdmin
-
+  const eligible = panelEligible
   const businessId = access.businessId?.trim() ?? ""
 
+  const scope = React.useMemo(
+    () => buildOnboardingScope(userId, businessId, isAdmin),
+    [userId, businessId, isAdmin],
+  )
+
+  React.useEffect(() => {
+    if (!access.ready) return
+    if (!isSupabaseConfigured()) {
+      queueMicrotask(() => setUserId("local-dev"))
+      return
+    }
+    const client = getBrowserClient()
+    if (!client) return
+    let cancelled = false
+    void client.auth.getUser().then(({ data }) => {
+      if (!cancelled) setUserId(data.user?.id ?? "")
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [access.ready])
+
+  const finishOnboardingFlow = React.useCallback(async () => {
+    const client = getBrowserClient()
+    if (scope) {
+      await persistOnboardingComplete(client, scope)
+      if (userId) markWelcomeHandledForBusiness(businessId, userId)
+    }
+    setFlowActive(false)
+    setActiveStepId(null)
+    setWelcomeOpen(false)
+  }, [scope, userId, businessId])
+
   const refreshProgress = React.useCallback(async () => {
-    if (!businessId || !isSupabaseConfigured()) {
+    if (!businessId || !scope) {
       setSnapshot(null)
+      setLoading(false)
+      return
+    }
+    if (!isSupabaseConfigured()) {
+      setSnapshot({
+        progress: emptyOnboardingProgress(isAdmin) as OnboardingProgressSnapshot["progress"],
+        slug: null,
+        bookingPath: null,
+        userFlags: { welcomeDismissed: false, completed: false },
+      })
       setLoading(false)
       return
     }
@@ -101,33 +148,45 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       return
     }
     try {
-      const fetched = await fetchOnboardingProgress(client, businessId)
-      const next = applyLocalOnboardingProgress(fetched, businessId)
-      setSnapshot(next)
+      let fetched = await fetchOnboardingProgress(client, businessId, {
+        isAdmin,
+        userId: scope.userId,
+      })
+
+      if (flowActive && isAdmin && activeStepId) {
+        const ready = await detectAdminBusinessStepReady(client, businessId, activeStepId)
+        if (ready) {
+          await persistOnboardingStepComplete(client, scope, activeStepId)
+          fetched = {
+            ...fetched,
+            progress: { ...fetched.progress, [activeStepId]: true },
+          }
+        }
+      }
+
+      setSnapshot(fetched)
       setLoading(false)
-      if (flowActive && isOnboardingFullyComplete(next.progress) && businessId) {
-        markOnboardingComplete(businessId)
-        markWelcomeHandledForBusiness(businessId)
-        setFlowActive(false)
-        setActiveStepId(null)
-        setWelcomeOpen(false)
+
+      if (flowActive && isOnboardingFullyComplete(fetched.progress, isAdmin)) {
+        await finishOnboardingFlow()
       }
     } catch {
       setSnapshot({
-        progress: emptyOnboardingProgress(),
+        progress: emptyOnboardingProgress(isAdmin) as OnboardingProgressSnapshot["progress"],
         slug: null,
         bookingPath: null,
+        userFlags: { welcomeDismissed: false, completed: false },
       })
       setLoading(false)
     }
-  }, [businessId, flowActive])
+  }, [businessId, scope, isAdmin, flowActive, activeStepId, finishOnboardingFlow])
 
   React.useEffect(() => {
     queueMicrotask(() => setReady(true))
   }, [])
 
   React.useEffect(() => {
-    if (!access.ready || !eligible) {
+    if (!access.ready || !eligible || !scope) {
       queueMicrotask(() => setLoading(false))
       return
     }
@@ -135,7 +194,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       setLoading(true)
       void refreshProgress()
     })
-  }, [access.ready, eligible, businessId, refreshProgress])
+  }, [access.ready, eligible, scope, refreshProgress])
 
   React.useEffect(() => {
     if (!flowActive || !eligible) return
@@ -155,28 +214,26 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   React.useEffect(() => {
     if (!flowActive || !snapshot || !activeStepId) return
     if (snapshot.progress[activeStepId]) {
-      const next = firstIncompleteStepId(snapshot.progress)
+      const next = firstIncompleteStepId(snapshot.progress, isAdmin)
       if (!next) {
         queueMicrotask(() => {
-          setFlowActive(false)
-          setActiveStepId(null)
+          void finishOnboardingFlow()
         })
         return
       }
       queueMicrotask(() => setActiveStepId(next))
       const step = getStepConfig(next)
       const href = step.path
-      const needsNavigation = pathname !== step.path || href !== step.path
-      if (next === "booking_page" && snapshot.bookingPath) {
+      const needsNavigation = !pathname.startsWith(step.path)
+      if (isAdmin && next === "booking_page" && snapshot.bookingPath) {
         window.open(snapshot.bookingPath, "_blank", "noopener,noreferrer")
         if (needsNavigation) router.push(href)
         return
       }
       if (needsNavigation) router.push(href)
     }
-  }, [flowActive, snapshot, activeStepId, pathname, router])
+  }, [flowActive, snapshot, activeStepId, pathname, router, isAdmin, finishOnboardingFlow])
 
-  /** ?onboarding=welcome po aktywacji dostępu */
   React.useEffect(() => {
     if (typeof window === "undefined" || !access.ready || !businessId) return
     const params = new URLSearchParams(window.location.search)
@@ -188,24 +245,28 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [access.ready, businessId, pathname, router])
 
   React.useEffect(() => {
-    if (!ready || !eligibilityReady || !eligible || !businessId) return
+    if (!ready || !eligibilityReady || !eligible || !scope) return
     if (welcomeOpen || flowActive) return
     if (!isPanelWelcomePopupPath(pathname)) return
     if (loading) return
 
-    const restart = consumeOnboardingRestart(businessId)
+    const restart = consumeOnboardingRestart(scope)
     const pendingActivation = hasPendingAccessActivationForBusiness(businessId)
-    const markedComplete = isOnboardingMarkedComplete(businessId)
-    const dismissed = isOnboardingWelcomeDismissed(businessId)
-    const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress) : false
+    const markedComplete =
+      snapshot?.userFlags.completed ||
+      isOnboardingMarkedComplete(scope)
+    const dismissed =
+      snapshot?.userFlags.welcomeDismissed ||
+      isOnboardingWelcomeDismissed(scope)
+    const dataComplete = snapshot ? isOnboardingFullyComplete(snapshot.progress, isAdmin) : false
 
     if (restart || pendingActivation) {
       if (pendingActivation && dismissed) {
-        markWelcomeHandledForBusiness(businessId)
+        if (userId) markWelcomeHandledForBusiness(businessId, userId)
         return
       }
       if (pendingActivation && (dataComplete || markedComplete)) {
-        markWelcomeHandledForBusiness(businessId)
+        if (userId) markWelcomeHandledForBusiness(businessId, userId)
         return
       }
 
@@ -225,23 +286,55 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     ready,
     eligibilityReady,
     eligible,
+    scope,
     businessId,
+    userId,
     welcomeOpen,
     flowActive,
     loading,
     pathname,
-    router,
     snapshot,
+    isAdmin,
   ])
+
+  const markStep = React.useCallback(
+    async (stepId: OnboardingStepId) => {
+      if (!scope) return
+      const client = getBrowserClient()
+      await persistOnboardingStepComplete(client, scope, stepId)
+      setSnapshot((prev) =>
+        prev
+          ? {
+              ...prev,
+              progress: { ...prev.progress, [stepId]: true },
+            }
+          : prev,
+      )
+    },
+    [scope],
+  )
+
+  React.useEffect(() => {
+    if (!flowActive || !scope || isAdmin) return
+    for (const { path, stepId } of STAFF_PATH_STEP) {
+      if (!pathname.startsWith(path)) continue
+      void markStep(stepId)
+      if (stepId === "staff_appointments" && pathname.startsWith("/appointments")) {
+        void markStep("staff_first_visit")
+      }
+      break
+    }
+  }, [pathname, flowActive, scope, isAdmin, markStep])
 
   const dismissWelcome = React.useCallback(() => {
     clearPanelAccessJustActivated()
-    if (businessId) {
-      markOnboardingWelcomeDismissed(businessId)
-      markWelcomeHandledForBusiness(businessId)
+    if (scope) {
+      const client = getBrowserClient()
+      void persistOnboardingWelcomeDismissed(client, scope)
+      if (userId) markWelcomeHandledForBusiness(businessId, userId)
     }
     setWelcomeOpen(false)
-  }, [businessId])
+  }, [scope, userId, businessId])
 
   const skipForNow = React.useCallback(() => {
     dismissWelcome()
@@ -249,36 +342,31 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setActiveStepId(null)
   }, [dismissWelcome])
 
+  const markActiveStepComplete = React.useCallback(() => {
+    if (!activeStepId) return
+    void markStep(activeStepId)
+  }, [activeStepId, markStep])
+
   const navigateToStep = React.useCallback(
     (stepId: OnboardingStepId) => {
       const step = getStepConfig(stepId)
       const href = step.path
-      const needsNavigation = pathname !== step.path || href !== step.path
+      const needsNavigation = !pathname.startsWith(step.path)
       setActiveStepId(stepId)
       setFlowActive(true)
       setWelcomeOpen(false)
-      if (businessId) markOnboardingWelcomeDismissed(businessId)
+      if (scope) {
+        const client = getBrowserClient()
+        void persistOnboardingWelcomeDismissed(client, scope)
+      }
 
-      if (stepId === "booking_page" && snapshot?.bookingPath) {
-        if (businessId) {
-          markOnboardingStepComplete(businessId, "booking_page")
-          setSnapshot((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  progress: {
-                    ...prev.progress,
-                    booking_page: true,
-                  },
-                }
-              : prev,
-          )
-        }
+      if (isAdmin && stepId === "booking_page" && snapshot?.bookingPath) {
+        void markStep("booking_page")
         window.open(snapshot.bookingPath, "_blank", "noopener,noreferrer")
         if (needsNavigation) router.push(href)
         return
       }
-      if (stepId === "first_visit" && snapshot?.bookingPath) {
+      if (isAdmin && stepId === "first_visit" && snapshot?.bookingPath) {
         const useBooking = !snapshot.progress.first_visit
         if (useBooking) {
           window.open(snapshot.bookingPath, "_blank", "noopener,noreferrer")
@@ -289,7 +377,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       }
       if (needsNavigation) router.push(href)
     },
-    [businessId, pathname, router, snapshot],
+    [scope, isAdmin, pathname, router, snapshot, markStep],
   )
 
   const continueSetup = React.useCallback(() => {
@@ -297,42 +385,51 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       void refreshProgress()
       setFlowActive(true)
       setWelcomeOpen(false)
-      if (businessId) markOnboardingWelcomeDismissed(businessId)
-      router.push("/availability")
+      if (scope) {
+        const client = getBrowserClient()
+        void persistOnboardingWelcomeDismissed(client, scope)
+      }
+      router.push(isAdmin ? "/availability" : "/dashboard")
       return
     }
-    const next = firstIncompleteStepId(snapshot.progress)
+    const next = firstIncompleteStepId(snapshot.progress, isAdmin)
     if (!next) {
-      if (businessId) markOnboardingComplete(businessId)
-      setWelcomeOpen(false)
-      setFlowActive(false)
+      void finishOnboardingFlow()
       return
     }
     navigateToStep(next)
-  }, [snapshot, refreshProgress, businessId, navigateToStep, router])
+  }, [snapshot, refreshProgress, scope, navigateToStep, router, isAdmin, finishOnboardingFlow])
 
   const startSetupFromBeginning = React.useCallback(() => {
-    navigateToStep("working_hours")
-  }, [navigateToStep])
+    const first = isAdmin ? "working_hours" : "staff_day_plan"
+    navigateToStep(first)
+  }, [navigateToStep, isAdmin])
 
   const restartOnboarding = React.useCallback(() => {
-    if (!businessId) return
-    requestOnboardingRestart(businessId)
+    if (!scope) return
+    requestOnboardingRestart(scope)
+    const client = getBrowserClient()
+    void persistOnboardingRestart(client, scope)
     setWelcomeOpen(true)
     setFlowActive(false)
     setActiveStepId(null)
     void refreshProgress()
     if (pathname !== "/dashboard") router.push("/dashboard")
-  }, [businessId, refreshProgress, pathname, router])
+  }, [scope, refreshProgress, pathname, router])
 
-  const setupComplete =
-    Boolean(businessId) &&
-    (isOnboardingMarkedComplete(businessId) ||
-      Boolean(snapshot && isOnboardingFullyComplete(snapshot.progress)))
-  const welcomeDismissed = Boolean(businessId) && isOnboardingWelcomeDismissed(businessId)
+  const setupComplete = Boolean(
+    scope &&
+      (snapshot?.userFlags.completed ||
+        isOnboardingMarkedComplete(scope) ||
+        Boolean(snapshot && isOnboardingFullyComplete(snapshot.progress, isAdmin))),
+  )
+  const welcomeDismissed = Boolean(
+    scope &&
+      (snapshot?.userFlags.welcomeDismissed || isOnboardingWelcomeDismissed(scope)),
+  )
 
   const showDashboardCard =
-    eligible && Boolean(businessId) && !welcomeDismissed && !setupComplete
+    eligible && Boolean(scope) && !welcomeDismissed && !setupComplete
 
   const value = React.useMemo<OnboardingContextValue>(
     () => ({
@@ -352,6 +449,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       restartOnboarding,
       refreshProgress,
       skipForNow,
+      markActiveStepComplete,
     }),
     [
       ready,
@@ -370,6 +468,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       restartOnboarding,
       refreshProgress,
       skipForNow,
+      markActiveStepComplete,
     ],
   )
 

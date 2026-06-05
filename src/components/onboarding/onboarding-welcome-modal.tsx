@@ -17,6 +17,7 @@ import { useTranslations } from "@/lib/i18n/use-translations"
 export function OnboardingWelcomeModal() {
   const { t } = useTranslations()
   const {
+    isAdmin,
     welcomeOpen,
     eligible,
     loading,
@@ -29,9 +30,9 @@ export function OnboardingWelcomeModal() {
 
   if (!eligible || !welcomeOpen) return null
 
-  const progress = snapshot?.progress ?? emptyOnboardingProgress()
-  const { done, total } = onboardingStepCount(progress)
-  const allDone = isOnboardingFullyComplete(progress)
+  const progress = snapshot?.progress ?? emptyOnboardingProgress(isAdmin)
+  const { done, total } = onboardingStepCount(progress, isAdmin)
+  const allDone = isOnboardingFullyComplete(progress, isAdmin)
   const showStartFromBeginning = done > 0 && !allDone
 
   return (
@@ -55,10 +56,10 @@ export function OnboardingWelcomeModal() {
         <CardContent className="space-y-5 px-6 py-6 pt-8">
           <div className="space-y-2 pr-6">
             <h2 id="onboarding-welcome-title" className="text-xl font-semibold tracking-tight">
-              {t("onboarding.welcomeTitle")}
+              {t(isAdmin ? "onboarding.welcomeTitle" : "onboarding.staffWelcomeTitle")}
             </h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              {t("onboarding.welcomeLead")}
+              {t(isAdmin ? "onboarding.welcomeLead" : "onboarding.staffWelcomeLead")}
             </p>
           </div>
 
