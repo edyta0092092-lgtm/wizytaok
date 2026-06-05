@@ -26,6 +26,8 @@ export function hasActiveBusinessAccessFromProfile(input: {
   subscriptionStatus?: string | null
   stripeSubscriptionStatus?: string | null
   subscriptionTrialEndsAt?: string | null
+  trialStartedAt?: string | null
+  stripeSubscriptionId?: string | null
 }): boolean {
   const status = resolveEffectiveSubscriptionStatus(
     input.subscriptionStatus,

@@ -4,6 +4,7 @@ import {
   hasActiveBusinessAccessFromProfile,
   resolveEffectiveSubscriptionStatus,
 } from "@/lib/billing/subscription-status"
+import { loadBusinessMemberSubscription } from "@/lib/auth/load-business-member-subscription"
 import {
   getCurrentUserRole,
   isAdminRole,
@@ -11,7 +12,6 @@ import {
   type PanelRole,
 } from "@/lib/auth/permissions"
 import { acceptPendingInvitationsForUser } from "@/lib/team/accept-pending-invitations"
-import { isStaffInviteUser } from "@/lib/team/staff-invite-user"
 import type { Database } from "@/types/database"
 
 export type BusinessPanelAccess = {
@@ -25,66 +25,59 @@ export type BusinessPanelAccess = {
   canManageBilling: boolean
 }
 
-type ProfileSubscriptionRow = {
-  id: string
-  subscription_status: string | null
-  stripe_subscription_status: string | null
-  subscription_trial_ends_at?: string | null
+type MemberRow = {
+  business_id: string
+  role: string | null
 }
 
-function readRpcSubscriptionRow(
-  businessId: string,
-  rpc: unknown,
-): ProfileSubscriptionRow | null {
-  if (!rpc || typeof rpc !== "object") return null
-  const row = rpc as Record<string, unknown>
-  if (row.ok !== true) return null
-  return {
-    id: businessId,
-    subscription_status:
-      typeof row.subscription_status === "string" ? row.subscription_status : null,
-    stripe_subscription_status:
-      typeof row.stripe_subscription_status === "string"
-        ? row.stripe_subscription_status
-        : null,
-    subscription_trial_ends_at:
-      typeof row.subscription_trial_ends_at === "string"
-        ? row.subscription_trial_ends_at
-        : null,
-  }
-}
-
-async function loadProfileSubscription(
+async function queryMembership(
   supabase: SupabaseClient<Database>,
-  businessId: string,
-): Promise<ProfileSubscriptionRow | null> {
-  let { data, error } = await supabase
-    .from("business_profiles")
-    .select(
-      "id, subscription_status, stripe_subscription_status, subscription_trial_ends_at",
-    )
-    .eq("id", businessId)
-    .maybeSingle()
+  userId: string,
+  activeOnly: boolean,
+): Promise<MemberRow | null> {
+  let query = supabase
+    .from("business_members")
+    .select("business_id, role")
+    .eq("user_id", userId)
+    .limit(1)
+
+  if (activeOnly) {
+    query = query.eq("is_active", true)
+  }
+
+  const { data, error } = await query
 
   if (
+    activeOnly &&
     error?.message &&
-    error.message.toLowerCase().includes("subscription_trial_ends_at")
+    error.message.toLowerCase().includes("is_active") &&
+    error.message.toLowerCase().includes("does not exist")
   ) {
-    const retry = await supabase
-      .from("business_profiles")
-      .select("id, subscription_status, stripe_subscription_status")
-      .eq("id", businessId)
-      .maybeSingle()
-    data = retry.data ? { ...retry.data, subscription_trial_ends_at: null } : null
-    error = retry.error
+    return queryMembership(supabase, userId, false)
   }
 
-  if (data?.id) return data
+  return data?.[0] ?? null
+}
 
-  const { data: rpc } = await supabase.rpc("get_business_member_subscription_access", {
-    p_business_id: businessId,
-  })
-  return readRpcSubscriptionRow(businessId, rpc)
+async function findMembershipForUser(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  userEmail?: string | null,
+): Promise<MemberRow | null> {
+  let member = await queryMembership(supabase, userId, true)
+  if (!member?.business_id) {
+    member = await queryMembership(supabase, userId, false)
+  }
+
+  if (!member?.business_id && userEmail?.trim()) {
+    await acceptPendingInvitationsForUser(userId, userEmail)
+    member = await queryMembership(supabase, userId, true)
+    if (!member?.business_id) {
+      member = await queryMembership(supabase, userId, false)
+    }
+  }
+
+  return member
 }
 
 /**
@@ -107,53 +100,17 @@ export async function resolveBusinessPanelAccess(
     canManageBilling: false,
   }
 
-  let memberQuery = await supabase
-    .from("business_members")
-    .select("business_id, role")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .limit(1)
-
-  if (
-    memberQuery.error?.message &&
-    memberQuery.error.message.toLowerCase().includes("is_active") &&
-    memberQuery.error.message.toLowerCase().includes("does not exist")
-  ) {
-    memberQuery = await supabase
-      .from("business_members")
-      .select("business_id, role")
-      .eq("user_id", userId)
-      .limit(1)
-  }
-
-  let member = memberQuery.data?.[0]
-  if (!member?.business_id && userEmail?.trim()) {
-    await acceptPendingInvitationsForUser(userId, userEmail)
-    let retryQuery = await supabase
-      .from("business_members")
-      .select("business_id, role")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .limit(1)
-    if (
-      retryQuery.error?.message &&
-      retryQuery.error.message.toLowerCase().includes("is_active") &&
-      retryQuery.error.message.toLowerCase().includes("does not exist")
-    ) {
-      retryQuery = await supabase
-        .from("business_members")
-        .select("business_id, role")
-        .eq("user_id", userId)
-        .limit(1)
-    }
-    member = retryQuery.data?.[0]
-  }
+  const member = await findMembershipForUser(supabase, userId, userEmail)
 
   if (member?.business_id) {
     const panelRole = normalizeBusinessMemberPanelRole(member.role)
     const effectiveRole = getCurrentUserRole(false, panelRole)
     const canManageBilling = isAdminRole(effectiveRole)
-    const profile = await loadProfileSubscription(supabase, member.business_id)
+    const profile = await loadBusinessMemberSubscription(
+      supabase,
+      userId,
+      member.business_id,
+    )
     if (!profile) {
       return {
         ...empty,
@@ -174,6 +131,8 @@ export async function resolveBusinessPanelAccess(
         subscriptionStatus: profile.subscription_status,
         stripeSubscriptionStatus: profile.stripe_subscription_status,
         subscriptionTrialEndsAt: profile.subscription_trial_ends_at,
+        trialStartedAt: profile.trial_started_at,
+        stripeSubscriptionId: profile.stripe_subscription_id,
       }),
       isOwner: false,
       panelRole,
@@ -193,7 +152,9 @@ export async function resolveBusinessPanelAccess(
 
   const { data: owned } = await supabase
     .from("business_profiles")
-    .select("id, subscription_status, stripe_subscription_status")
+    .select(
+      "id, subscription_status, stripe_subscription_status, subscription_trial_ends_at, trial_started_at, stripe_subscription_id",
+    )
     .eq("owner_id", userId)
     .maybeSingle()
 
@@ -209,6 +170,9 @@ export async function resolveBusinessPanelAccess(
       hasActiveAccess: hasActiveBusinessAccessFromProfile({
         subscriptionStatus: owned.subscription_status,
         stripeSubscriptionStatus: owned.stripe_subscription_status,
+        subscriptionTrialEndsAt: owned.subscription_trial_ends_at,
+        trialStartedAt: owned.trial_started_at,
+        stripeSubscriptionId: owned.stripe_subscription_id,
       }),
       isOwner: true,
       panelRole: effectiveRole,

@@ -4,10 +4,8 @@ import * as React from "react"
 import { usePathname } from "next/navigation"
 
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
-import {
-  hasActiveBusinessAccessFromProfile,
-  resolveEffectiveSubscriptionStatus,
-} from "@/lib/billing/subscription-status"
+import { hasActiveBusinessAccessFromProfile } from "@/lib/billing/subscription-status"
+import { loadBusinessMemberSubscription } from "@/lib/auth/load-business-member-subscription"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import {
   isPanelWelcomePath,
@@ -65,45 +63,22 @@ export function usePanelOnboardingEligibility(
 
     void (async () => {
       const businessId = access.businessId!
-      let subscriptionStatus: string | null = null
-      let stripeSubscriptionStatus: string | null = null
-      let subscriptionTrialEndsAt: string | null = null
-
-      const { data, error } = await client
-        .from("business_profiles")
-        .select(
-          "subscription_status, stripe_subscription_status, subscription_trial_ends_at",
-        )
-        .eq("id", businessId)
-        .maybeSingle()
-
-      if (data) {
-        subscriptionStatus = data.subscription_status
-        stripeSubscriptionStatus = data.stripe_subscription_status
-        subscriptionTrialEndsAt = data.subscription_trial_ends_at
-      } else {
-        const { data: rpc } = await client.rpc("get_business_member_subscription_access", {
-          p_business_id: businessId,
-        })
-        if (rpc && typeof rpc === "object" && (rpc as { ok?: boolean }).ok === true) {
-          const row = rpc as Record<string, unknown>
-          subscriptionStatus =
-            typeof row.subscription_status === "string" ? row.subscription_status : null
-          stripeSubscriptionStatus =
-            typeof row.stripe_subscription_status === "string"
-              ? row.stripe_subscription_status
-              : null
-        } else if (error) {
-          if (cancelled) return
+      const {
+        data: { user },
+      } = await client.auth.getUser()
+      if (!user) {
+        if (!cancelled) {
           setSubscriptionActive(false)
           setSubscriptionChecked(true)
-          return
         }
+        return
       }
+
+      const profile = await loadBusinessMemberSubscription(client, user.id, businessId)
 
       if (cancelled) return
 
-      if (!subscriptionStatus && !stripeSubscriptionStatus && !subscriptionTrialEndsAt) {
+      if (!profile) {
         setSubscriptionActive(false)
         setSubscriptionChecked(true)
         return
@@ -111,9 +86,11 @@ export function usePanelOnboardingEligibility(
 
       setSubscriptionActive(
         hasActiveBusinessAccessFromProfile({
-          subscriptionStatus,
-          stripeSubscriptionStatus,
-          subscriptionTrialEndsAt,
+          subscriptionStatus: profile.subscription_status,
+          stripeSubscriptionStatus: profile.stripe_subscription_status,
+          subscriptionTrialEndsAt: profile.subscription_trial_ends_at,
+          trialStartedAt: profile.trial_started_at,
+          stripeSubscriptionId: profile.stripe_subscription_id,
         }),
       )
       setSubscriptionChecked(true)
