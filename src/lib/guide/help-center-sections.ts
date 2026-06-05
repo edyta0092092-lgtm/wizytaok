@@ -503,7 +503,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     id: "clients",
     category: "appointments-statuses",
     titleKey: "guide.hcClientsTitle",
-    href: "/clients",
+    href: "/klienci",
     ctaKey: "guide.navClients",
     searchTags: ["klienci", "notatki"],
     blocks: [

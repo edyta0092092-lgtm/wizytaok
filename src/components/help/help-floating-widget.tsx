@@ -17,7 +17,7 @@ const PANEL_PREFIXES = [
   "/services",
   "/team",
   "/availability",
-  "/clients",
+  "/klienci",
   "/messages",
   "/settings",
   "/account",
