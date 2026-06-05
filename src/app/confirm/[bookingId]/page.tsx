@@ -14,7 +14,9 @@ import {
   publicBookingSyncSignature,
   type PublicBooking,
 } from "@/lib/bookings/public-bookings"
+import { PublicReschedulePicker } from "@/components/booking/public-reschedule-picker"
 import { cancelPublicBookingViaApi } from "@/lib/bookings/public-cancel-booking-client"
+import { reschedulePublicBookingViaApi } from "@/lib/bookings/public-reschedule-booking-client"
 import { getBookingByConfirmationToken } from "@/lib/bookings/bookings-store"
 import { getBookingStaffDetailValue, shouldShowStaffDetailRow } from "@/lib/staff/staff-display"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -31,6 +33,8 @@ export default function PublicConfirmAppointmentPage() {
   const bookingPollSigRef = React.useRef("")
   const [remoteRefreshHint, setRemoteRefreshHint] = React.useState(false)
   const [cancelling, setCancelling] = React.useState(false)
+  const [rescheduling, setRescheduling] = React.useState(false)
+  const [showReschedule, setShowReschedule] = React.useState(false)
   const [dataSource, setDataSource] = React.useState<"supabase" | "local" | null>(null)
   const confirmToken = React.useMemo(
     () => decodeURIComponent(bookingId || "").trim(),
@@ -158,6 +162,56 @@ export default function PublicConfirmAppointmentPage() {
     [language],
   )
 
+  const confirmReschedule = React.useCallback(
+    (newDate: string, newTime: string) => {
+      if (rescheduling || !booking) return
+      void (async () => {
+        const token = (booking.confirmationToken ?? confirmToken).trim()
+        setRescheduling(true)
+        setSlotFlowError(null)
+        try {
+          if (dataSource === "supabase") {
+            if (!token) {
+              setSlotFlowError(t("confirmPublic.rescheduleActionFailed"))
+              return
+            }
+            const apiRes = await reschedulePublicBookingViaApi(token, newDate, newTime, language)
+            if (!apiRes.ok) {
+              const err = apiRes.error ?? ""
+              if (err === "same_slot") {
+                setSlotFlowError(t("confirmPublic.rescheduleSameSlot"))
+              } else if (err === "slot_unavailable") {
+                setSlotFlowError(t("confirmPublic.rescheduleSlotUnavailable"))
+              } else {
+                setSlotFlowError(t("confirmPublic.rescheduleActionFailed"))
+              }
+              return
+            }
+            await refreshSupabaseBooking()
+            setShowReschedule(false)
+            setSuccessMessage(t("confirmPublic.successRescheduled"))
+            return
+          }
+          applyLocalPatch({ date: newDate, time: newTime, lastUpdatedBy: "customer" })
+          setShowReschedule(false)
+          setSuccessMessage(t("confirmPublic.successRescheduled"))
+        } finally {
+          setRescheduling(false)
+        }
+      })()
+    },
+    [
+      applyLocalPatch,
+      booking,
+      confirmToken,
+      dataSource,
+      language,
+      refreshSupabaseBooking,
+      rescheduling,
+      t,
+    ],
+  )
+
   const cancelAppointment = React.useCallback(() => {
     if (cancelling || !booking) return
     void (async () => {
@@ -236,6 +290,11 @@ export default function PublicConfirmAppointmentPage() {
     booking.status === "booked" ||
     booking.status === "pending"
   const canCancel = isActiveVisit && !successMessage
+  const canReschedule =
+    isActiveVisit &&
+    !successMessage &&
+    dataSource === "supabase" &&
+    Boolean(booking.serviceId || booking.serviceName)
 
   return (
     <main className="min-h-screen bg-background px-4 py-8">
@@ -308,12 +367,38 @@ export default function PublicConfirmAppointmentPage() {
               ) : null}
             </div>
 
-            {canCancel ? (
+            {showReschedule && canReschedule ? (
+              <PublicReschedulePicker
+                booking={booking}
+                submitting={rescheduling}
+                onCancel={() => {
+                  setShowReschedule(false)
+                  setSlotFlowError(null)
+                }}
+                onConfirm={confirmReschedule}
+              />
+            ) : null}
+
+            {!showReschedule && canReschedule ? (
+              <Button
+                type="button"
+                className="mt-2 w-full"
+                disabled={cancelling || rescheduling}
+                onClick={() => {
+                  setSlotFlowError(null)
+                  setShowReschedule(true)
+                }}
+              >
+                {t("confirmPublic.actionReschedule")}
+              </Button>
+            ) : null}
+
+            {!showReschedule && canCancel ? (
               <Button
                 type="button"
                 variant="outline"
                 className="mt-2 w-full"
-                disabled={cancelling}
+                disabled={cancelling || rescheduling}
                 onClick={() => cancelAppointment()}
               >
                 {cancelling ? t("bookings.loading") : t("confirmPublic.actionCancel")}

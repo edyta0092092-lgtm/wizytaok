@@ -144,6 +144,49 @@ export function toBlockedSlotKeySet(rows: readonly BookedAppointmentSlot[]): Set
   return set
 }
 
+export function blockedKeysOccupiedByBooking(
+  booking: BookedAppointmentSlot,
+  selectedDurationMinutes: number,
+  selectedBreakMinutes: number,
+  staffId: string | null,
+): Set<string> {
+  const set = new Set<string>()
+  const useOverlapModel = Number.isFinite(Number(selectedDurationMinutes)) && Number(selectedDurationMinutes) > 0
+  const candidateBreak = Math.max(0, Math.floor(Number(selectedBreakMinutes ?? 0) || 0))
+  const rowStaffId =
+    typeof booking.staff_id === "string" && booking.staff_id.trim().length > 0
+      ? booking.staff_id.trim()
+      : null
+  if (staffId) {
+    if (rowStaffId !== null && rowStaffId !== staffId) return set
+  }
+  if (useOverlapModel) {
+    appendOverlappingBlockedKeys(set, booking, Number(selectedDurationMinutes), candidateBreak)
+  } else {
+    set.add(blockedSlotKey(String(booking.appointment_date).slice(0, 10), booking.appointment_time))
+  }
+  return set
+}
+
+export function applyRescheduleSelfExcludeToBlockedKeys(
+  blocked: ReadonlySet<string>,
+  selfBooking: BookedAppointmentSlot,
+  selectedDurationMinutes: number,
+  selectedBreakMinutes: number,
+  staffId: string | null,
+): Set<string> {
+  const next = new Set(blocked)
+  for (const key of blockedKeysOccupiedByBooking(
+    selfBooking,
+    selectedDurationMinutes,
+    selectedBreakMinutes,
+    staffId,
+  )) {
+    next.delete(key)
+  }
+  return next
+}
+
 function appendOverlappingBlockedKeys(
   out: Set<string>,
   booking: BookedAppointmentSlot,

@@ -50,14 +50,20 @@ export function applyStaffOverlayToWeek(
   return applyStaffAvailabilityToDays(days, cellDate, staffRules, staffExceptions)
 }
 
-async function isManualBookingTimeInAllowedSlots(
+export type AppointmentSlotValidationOptions = {
+  defaultBreakMinutes?: number | null
+  excludeBookingId?: string | null
+}
+
+/** Ta sama logika co ręczna rezerwacja — do walidacji przełożenia wizyty. */
+export async function isAppointmentTimeInAllowedSlots(
   client: PanelClient,
   businessId: string,
   service: Pick<Service, "id" | "durationMinutes" | "breakMinutes" | "usesDefaultAvailability">,
   appointmentDate: string,
   appointmentTimeHm: string,
   staffId: string | null,
-  defaultBreakMinutes?: number | null,
+  options?: AppointmentSlotValidationOptions,
 ): Promise<boolean> {
   const dayKey = appointmentDate.trim().slice(0, 10)
   const cellDate = parseYmd(dayKey)
@@ -89,7 +95,11 @@ async function isManualBookingTimeInAllowedSlots(
   }
 
   const asOf = getAppToday()
-  const bookedRows = await getBookedSlotsForBusiness(client, businessId, dayKey, dayKey)
+  const excludeId = options?.excludeBookingId?.trim()
+  const bookedRowsRaw = await getBookedSlotsForBusiness(client, businessId, dayKey, dayKey)
+  const bookedRows = excludeId
+    ? bookedRowsRaw.filter((r) => r.id !== excludeId)
+    : bookedRowsRaw
   const blocked = toBlockedSlotKeySetForStaff(
     bookedRows,
     staffId?.trim() ?? null,
@@ -105,7 +115,42 @@ async function isManualBookingTimeInAllowedSlots(
     blocked,
   )
   const want = normalizeSlotTimeLabel(appointmentTimeHm)
-  return slots.some((s) => normalizeSlotTimeLabel(s) === want)
+  if (!slots.some((s) => normalizeSlotTimeLabel(s) === want)) return false
+
+  if (staffId?.trim()) {
+    const overlap = await hasStaffSchedulingIntervalOverlap(
+      client,
+      businessId,
+      dayKey,
+      appointmentTimeHm,
+      duration,
+      staffId.trim(),
+      { excludeBookingId: excludeId ?? undefined, breakMinutes },
+    )
+    if (overlap) return false
+  }
+
+  return true
+}
+
+async function isManualBookingTimeInAllowedSlots(
+  client: PanelClient,
+  businessId: string,
+  service: Pick<Service, "id" | "durationMinutes" | "breakMinutes" | "usesDefaultAvailability">,
+  appointmentDate: string,
+  appointmentTimeHm: string,
+  staffId: string | null,
+  defaultBreakMinutes?: number | null,
+): Promise<boolean> {
+  return isAppointmentTimeInAllowedSlots(
+    client,
+    businessId,
+    service,
+    appointmentDate,
+    appointmentTimeHm,
+    staffId,
+    { defaultBreakMinutes },
+  )
 }
 
 export type ResolveManualStaffInput = {

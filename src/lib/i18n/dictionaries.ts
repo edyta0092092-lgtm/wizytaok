@@ -1343,7 +1343,17 @@ export const dictionaries = {
       actionConfirm: "Potwierdź wizytę",
       actionChangeTime: "Zmień termin",
       actionChangeService: "Zmień usługę",
+      actionReschedule: "Przełóż wizytę",
       actionCancel: "Anuluj wizytę",
+      reschedulePickerIntro:
+        "Wybierz nowy termin. Usługa i pracownik pozostają bez zmian — widzisz tylko dostępne godziny.",
+      confirmReschedule: "Potwierdź przełożenie",
+      successRescheduled: "Wizyta została przełożona.",
+      rescheduleActionFailed: "Nie udało się przełożyć wizyty. Spróbuj ponownie.",
+      rescheduleSameSlot: "Wybierz inny termin niż obecny.",
+      rescheduleSlotUnavailable: "Ten termin nie jest już dostępny. Wybierz inną godzinę.",
+      rescheduleStaffRequired:
+        "Nie można przełożyć wizyty — brak przypisanego pracownika w rezerwacji.",
       placeholderChangeTime:
         "Napisz, jaki termin będzie dla Ciebie lepszy.",
       placeholderChangeService:
@@ -4606,7 +4616,17 @@ Pozdrawiamy,
       actionConfirm: "Confirm attendance",
       actionChangeTime: "Change time",
       actionChangeService: "Change service",
+      actionReschedule: "Reschedule appointment",
       actionCancel: "Cancel appointment",
+      reschedulePickerIntro:
+        "Pick a new time. The service and staff member stay the same — only available slots are shown.",
+      confirmReschedule: "Confirm reschedule",
+      successRescheduled: "Your appointment has been rescheduled.",
+      rescheduleActionFailed: "Could not reschedule the appointment. Please try again.",
+      rescheduleSameSlot: "Choose a different time than your current appointment.",
+      rescheduleSlotUnavailable: "This slot is no longer available. Pick another time.",
+      rescheduleStaffRequired:
+        "Cannot reschedule — no staff member is assigned to this booking.",
       placeholderChangeTime: "Write which time would work better for you.",
       placeholderChangeService:
         "Write which service you would like to choose.",
