@@ -7,7 +7,7 @@ import { isGoogleCalendarPersistenceReady } from "@/lib/integrations/google-cale
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-type Body = { calendarId?: string }
+type Body = { calendarId?: string; calendarSummary?: string }
 
 export async function POST(req: Request) {
   const auth = await requireGoogleCalendarMember()
@@ -31,6 +31,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "calendar_id_required" }, { status: 400 })
   }
 
-  const ok = await updateSelectedCalendar(auth.ctx.businessId, auth.ctx.userId, calendarId)
+  const calendarSummary =
+    typeof body.calendarSummary === "string" ? body.calendarSummary.trim() || null : null
+  const ok = await updateSelectedCalendar(
+    auth.ctx.businessId,
+    auth.ctx.userId,
+    calendarId,
+    calendarSummary,
+  )
   return NextResponse.json({ ok })
 }

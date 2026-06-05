@@ -2,6 +2,7 @@ import { updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appointments/manual-appointments"
 import { fetchCancelBookingByCompany } from "@/lib/bookings/cancel-booking-by-company-client"
 import { resolveSupabaseBookingRowUuidFromUiId } from "@/lib/bookings/bookings-store"
+import { requestGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-client"
 import { updatePublicBooking, unwrapPublicAppointmentId } from "@/lib/bookings/public-bookings"
 import {
   enqueueTransactionalHistoryMirror,
@@ -149,6 +150,7 @@ export async function cancelAppointmentFromRemove(
         data = minimal.data
       }
       notifyBookingsChanged()
+      requestGoogleCalendarBookingSync(bookingUuid, "cancel")
       return { ok: true, data }
     }
 

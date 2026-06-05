@@ -6,6 +6,7 @@ export type GoogleCalendarConnectionRow = {
   staff_member_id: string | null
   google_account_email: string | null
   google_calendar_id: string | null
+  google_calendar_summary: string | null
   connected_at: string
   disconnected_at: string | null
   updated_at: string

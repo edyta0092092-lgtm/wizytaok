@@ -8,7 +8,7 @@ let cachedReady: boolean | null = null
 let cachedAt = 0
 const CACHE_MS = 60_000
 
-/** Czy migracja `google_calendar_connections` jest wdrożona (bez commitowania migracji w repo). */
+/** Czy migracja `google_calendar_connections` jest wdrożona w bazie. */
 export async function isGoogleCalendarPersistenceReady(): Promise<boolean> {
   if (!isGoogleCalendarOAuthConfigured() || !isGoogleCalendarTokenEncryptionConfigured()) {
     return false
@@ -23,7 +23,7 @@ export async function isGoogleCalendarPersistenceReady(): Promise<boolean> {
     cachedAt = now
     return false
   }
-  const { error } = await admin.from("google_calendar_connections" as "business_members").select("id").limit(1)
+  const { error } = await admin.from("google_calendar_connections").select("id").limit(1)
   const ready = !error
   cachedReady = ready
   cachedAt = now

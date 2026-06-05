@@ -15,20 +15,16 @@ import { decryptRefreshToken } from "@/lib/integrations/google-calendar/token-cr
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables } from "@/types/database"
 
-const SKIP_STATUSES = new Set(["completed", "no_show"])
+const SKIP_UPSERT_STATUSES = new Set(["completed", "no_show"])
 
 async function persistBookingEventId(bookingId: string, eventId: string | null): Promise<void> {
   const admin = getServiceRoleClient()
   if (!admin) return
-  await admin
-    .from("bookings")
-    .update({ google_calendar_event_id: eventId } as never)
-    .eq("id", bookingId)
+  await admin.from("bookings").update({ google_calendar_event_id: eventId }).eq("id", bookingId)
 }
 
-async function readBookingEventId(booking: Tables<"bookings">): Promise<string | null> {
-  const row = booking as Tables<"bookings"> & { google_calendar_event_id?: string | null }
-  return row.google_calendar_event_id?.trim() || null
+function readBookingEventId(booking: Tables<"bookings">): string | null {
+  return booking.google_calendar_event_id?.trim() || null
 }
 
 async function resolveAccessForConnection(
@@ -69,13 +65,9 @@ export async function syncBookingToGoogleCalendar(
     return { ok: false, error: "booking_not_found" }
   }
 
-  const booking = bookingRow as Tables<"bookings">
+  const booking = bookingRow
 
-  if (action === "upsert" && SKIP_STATUSES.has(booking.status)) {
-    return { ok: true, skipped: true, reason: "terminal_status_unchanged" }
-  }
-
-  if (action === "cancel" && SKIP_STATUSES.has(booking.status)) {
+  if (action === "upsert" && SKIP_UPSERT_STATUSES.has(booking.status)) {
     return { ok: true, skipped: true, reason: "terminal_status_unchanged" }
   }
 
@@ -95,16 +87,17 @@ export async function syncBookingToGoogleCalendar(
     .eq("id", booking.business_id)
     .maybeSingle()
 
+  const isCancelled = action === "cancel" || booking.status === "cancelled"
   const eventPayload = buildGoogleCalendarEventFromBooking({
     booking,
     businessSlug: profile?.slug ?? null,
     businessName: profile?.business_name ?? null,
-    cancelled: action === "cancel" || booking.status === "cancelled",
+    cancelled: isCancelled,
   })
 
-  const existingEventId = await readBookingEventId(booking)
+  const existingEventId = readBookingEventId(booking)
 
-  if (action === "cancel") {
+  if (action === "cancel" || isCancelled) {
     if (!existingEventId) {
       return { ok: true, skipped: true, reason: "no_linked_event" }
     }

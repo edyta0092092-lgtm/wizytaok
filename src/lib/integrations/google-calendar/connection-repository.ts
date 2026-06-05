@@ -1,14 +1,8 @@
 import type { EncryptedTokenPayload } from "@/lib/integrations/google-calendar/token-crypto"
-import type { GoogleCalendarConnectionRow } from "@/lib/integrations/google-calendar/types"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import type { Database } from "@/types/database"
 
-const TABLE = "google_calendar_connections"
-
-type ConnectionRecord = GoogleCalendarConnectionRow & {
-  refresh_token_ciphertext: string
-  refresh_token_iv: string
-  refresh_token_tag: string
-}
+type ConnectionRecord = Database["public"]["Tables"]["google_calendar_connections"]["Row"]
 
 export async function loadActiveConnectionForUser(
   businessId: string,
@@ -17,14 +11,14 @@ export async function loadActiveConnectionForUser(
   const admin = getServiceRoleClient()
   if (!admin) return null
   const { data, error } = await admin
-    .from(TABLE as "business_members")
+    .from("google_calendar_connections")
     .select("*")
     .eq("business_id", businessId)
     .eq("user_id", userId)
     .is("disconnected_at", null)
     .maybeSingle()
   if (error || !data) return null
-  return data as unknown as ConnectionRecord
+  return data
 }
 
 export async function loadConnectionForBookingStaff(
@@ -36,7 +30,7 @@ export async function loadConnectionForBookingStaff(
 
   if (staffId) {
     const { data: byStaff } = await admin
-      .from(TABLE as "business_members")
+      .from("google_calendar_connections")
       .select("*")
       .eq("business_id", businessId)
       .eq("staff_member_id", staffId)
@@ -44,7 +38,18 @@ export async function loadConnectionForBookingStaff(
       .not("google_calendar_id", "is", null)
       .limit(1)
       .maybeSingle()
-    if (byStaff) return byStaff as unknown as ConnectionRecord
+    if (byStaff) return byStaff
+  }
+
+  const { data: profile } = await admin
+    .from("business_profiles")
+    .select("owner_id")
+    .eq("id", businessId)
+    .maybeSingle()
+
+  if (profile?.owner_id) {
+    const byOwner = await loadActiveConnectionForUser(businessId, profile.owner_id)
+    if (byOwner?.google_calendar_id) return byOwner
   }
 
   const { data: ownerMember } = await admin
@@ -74,7 +79,7 @@ export async function upsertConnection(input: {
   const admin = getServiceRoleClient()
   if (!admin) return false
   const now = new Date().toISOString()
-  const { error } = await admin.from(TABLE as "business_members").upsert(
+  const { error } = await admin.from("google_calendar_connections").upsert(
     {
       business_id: input.businessId,
       user_id: input.userId,
@@ -87,7 +92,7 @@ export async function upsertConnection(input: {
       connected_at: now,
       disconnected_at: null,
       updated_at: now,
-    } as never,
+    },
     { onConflict: "business_id,user_id" },
   )
   return !error
@@ -97,15 +102,17 @@ export async function updateSelectedCalendar(
   businessId: string,
   userId: string,
   calendarId: string,
+  calendarSummary: string | null,
 ): Promise<boolean> {
   const admin = getServiceRoleClient()
   if (!admin) return false
   const { error } = await admin
-    .from(TABLE as "business_members")
+    .from("google_calendar_connections")
     .update({
       google_calendar_id: calendarId,
+      google_calendar_summary: calendarSummary,
       updated_at: new Date().toISOString(),
-    } as never)
+    })
     .eq("business_id", businessId)
     .eq("user_id", userId)
     .is("disconnected_at", null)
@@ -117,15 +124,16 @@ export async function disconnectConnection(businessId: string, userId: string): 
   if (!admin) return false
   const now = new Date().toISOString()
   const { error } = await admin
-    .from(TABLE as "business_members")
+    .from("google_calendar_connections")
     .update({
       disconnected_at: now,
       google_calendar_id: null,
+      google_calendar_summary: null,
       refresh_token_ciphertext: "",
       refresh_token_iv: "",
       refresh_token_tag: "",
       updated_at: now,
-    } as never)
+    })
     .eq("business_id", businessId)
     .eq("user_id", userId)
     .is("disconnected_at", null)
@@ -139,3 +147,5 @@ export function connectionEncryptedPayload(row: ConnectionRecord): EncryptedToke
     tag: row.refresh_token_tag,
   }
 }
+
+export type { ConnectionRecord }

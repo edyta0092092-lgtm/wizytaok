@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import { queueGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-server"
 import type { Database, TablesUpdate } from "@/types/database"
 
 type Admin = SupabaseClient<Database>
@@ -60,6 +61,7 @@ export async function cancelPublicBookingById(
     return { ok: false, error: "status_not_cancelled" }
   }
 
+  queueGoogleCalendarBookingSync(id, "cancel")
   return { ok: true }
 }
 
@@ -88,6 +90,7 @@ export async function cancelPublicBookingByToken(
   })
   const rpcPayload = rpcData as { ok?: boolean; error?: string } | null
   if (!rpcErr && rpcPayload?.ok === true) {
+    queueGoogleCalendarBookingSync(bookingId, "cancel")
     return { ok: true, bookingId }
   }
 

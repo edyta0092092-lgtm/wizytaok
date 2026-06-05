@@ -11,6 +11,7 @@ import {
   buildTransactionalEmailText,
 } from "@/lib/notifications/transactional-email-layout"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import { queueGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export type BookingCreatedChannelStatus =
@@ -438,6 +439,8 @@ export async function sendBookingCreatedNotifications(
       sms: channelDetail("failed", { error_message: "booking_row_invalid" }),
     }
   }
+
+  queueGoogleCalendarBookingSync(booking.id, "upsert")
 
   const existing = await getBookingCreatedNotifyStatus(booking.id)
   if (!channelNeedsSendAttempt(existing.email.status) && !channelNeedsSendAttempt(existing.sms.status)) {

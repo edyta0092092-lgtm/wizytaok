@@ -10,6 +10,7 @@ import {
   applyPublicBookingPatchToSupabase,
   unwrapSupabaseBookingAppointmentId,
 } from "@/lib/bookings/bookings-store"
+import { requestGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-client"
 import {
   fetchDefaultBreakMinutesForBusiness,
   resolveBreakMinutes,
@@ -330,6 +331,7 @@ export function useAppointmentInlineActions(args: {
               setActionNotice(labels.proposalCouldNotSave)
               return
             }
+            requestGoogleCalendarBookingSync(uuidSb, "upsert")
             setProposeForId(null)
             setProposeDate("")
             setProposeTime("")

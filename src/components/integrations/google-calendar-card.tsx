@@ -99,10 +99,14 @@ export function GoogleCalendarCard() {
     if (!selectedId.trim()) return
     setBusy(true)
     try {
+      const picked = calendars.find((c) => c.id === selectedId.trim())
       const res = await fetch("/api/integrations/google-calendar/select-calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ calendarId: selectedId.trim() }),
+        body: JSON.stringify({
+          calendarId: selectedId.trim(),
+          calendarSummary: picked?.summary ?? null,
+        }),
       })
       const json = (await res.json()) as { ok?: boolean }
       if (json.ok) {
@@ -122,7 +126,10 @@ export function GoogleCalendarCard() {
   const hasCalendar = Boolean(status?.googleCalendarId)
 
   return (
-    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
+    <Card
+      id="google-calendar"
+      className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 scroll-mt-6"
+    >
       <CardHeader className="border-b border-border/70 py-4">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -156,6 +163,7 @@ export function GoogleCalendarCard() {
           <p className="font-medium text-foreground">{t("googleCalendarIntegration.syncTitle")}</p>
           <ul className="mt-2 list-inside list-disc space-y-1">
             <li>{t("googleCalendarIntegration.syncItemCreate")}</li>
+            <li>{t("googleCalendarIntegration.syncItemUpdate")}</li>
             <li>{t("googleCalendarIntegration.syncItemCancel")}</li>
             <li>{t("googleCalendarIntegration.syncItemTerminal")}</li>
           </ul>

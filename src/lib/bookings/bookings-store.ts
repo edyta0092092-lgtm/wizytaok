@@ -879,6 +879,8 @@ export async function getBookingByConfirmationToken(
     cancelled_at: typeof o.cancelled_at === "string" ? o.cancelled_at : null,
     cancelled_by: typeof o.cancelled_by === "string" ? o.cancelled_by : null,
     cancellation_note: typeof o.cancellation_note === "string" ? o.cancellation_note : null,
+    google_calendar_event_id:
+      typeof o.google_calendar_event_id === "string" ? o.google_calendar_event_id : null,
     created_at: String(o.created_at ?? ""),
     updated_at: String(o.updated_at ?? ""),
   }

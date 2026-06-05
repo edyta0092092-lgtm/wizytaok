@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import { isAppointmentTimeInAllowedSlots } from "@/lib/bookings/manual-booking-staff"
 import { normalizeSlotTimeLabel } from "@/lib/bookings/slot-availability"
+import { queueGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-server"
 import type { Database, Tables, TablesUpdate } from "@/types/database"
 
 type Admin = SupabaseClient<Database>
@@ -120,5 +121,6 @@ export async function reschedulePublicBookingByToken(
     return { ok: false, error: updateErr?.message ?? "update_failed" }
   }
 
+  queueGoogleCalendarBookingSync(bookingId, "upsert")
   return { ok: true, bookingId, booking: updated as Tables<"bookings"> }
 }

@@ -36,6 +36,15 @@ export function buildGoogleCalendarEventFromBooking(input: {
   const client = booking.client_name?.trim() || "—"
   const service = booking.service_name?.trim() || "Wizyta"
   const panelUrl = buildWizytaOkBookingPanelUrl(booking.id, businessSlug)
+  const token = booking.confirmation_token?.trim()
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    ""
+  const manageUrl =
+    token && origin
+      ? `${origin.replace(/\/$/, "")}/confirm/${encodeURIComponent(token)}`
+      : panelUrl
   const prefix = cancelled ? "[Anulowana] " : ""
   const summary = `${prefix}${service} — ${client}`
   const lines = [
@@ -44,7 +53,8 @@ export function buildGoogleCalendarEventFromBooking(input: {
     `Godzina: ${time}`,
     `Pracownik: ${staff}`,
     businessName ? `Firma: ${businessName}` : null,
-    `WizytaOK: ${panelUrl}`,
+    `Zarządzaj wizytą: ${manageUrl}`,
+    `Panel WizytaOK: ${panelUrl}`,
   ].filter(Boolean)
 
   return {

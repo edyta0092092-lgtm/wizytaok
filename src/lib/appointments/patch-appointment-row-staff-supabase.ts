@@ -2,6 +2,7 @@ import {
   applyPublicBookingPatchToSupabase,
   unwrapSupabaseBookingAppointmentId,
 } from "@/lib/bookings/bookings-store"
+import { requestGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-client"
 import { type PublicBooking } from "@/lib/bookings/public-bookings"
 import { getCurrentBusinessProfileIdForClient } from "@/lib/services/services-store"
 import { getBrowserClient } from "@/lib/supabase/client"
@@ -26,5 +27,8 @@ export async function patchAppointmentRowStaffSupabase(args: {
   const patch: Partial<PublicBooking> = nextStaffId.trim()
     ? { staffId: nextStaffId, staffName: picked?.name ?? "" }
     : { staffId: "", staffName: "" }
-  await applyPublicBookingPatchToSupabase(client, bid, uuid, patch)
+  const r = await applyPublicBookingPatchToSupabase(client, bid, uuid, patch)
+  if (r.ok) {
+    requestGoogleCalendarBookingSync(uuid, "upsert")
+  }
 }

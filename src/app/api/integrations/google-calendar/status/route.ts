@@ -37,7 +37,7 @@ export async function GET() {
         googleAccountEmail: row.google_account_email,
         googleCalendarId: row.google_calendar_id,
         connectedAt: row.connected_at,
-        selectedCalendarSummary: row.google_calendar_id,
+        selectedCalendarSummary: row.google_calendar_summary ?? row.google_calendar_id,
       }
     } else if (row) {
       status = {

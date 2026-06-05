@@ -583,6 +583,7 @@ export interface Database {
           cancelled_at: string | null
           cancelled_by: string | null
           cancellation_note: string | null
+          google_calendar_event_id: string | null
           created_at: string
           updated_at: string
         }
@@ -644,6 +645,7 @@ export interface Database {
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancellation_note?: string | null
+          google_calendar_event_id?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -705,6 +707,61 @@ export interface Database {
           cancelled_at?: string | null
           cancelled_by?: string | null
           cancellation_note?: string | null
+          google_calendar_event_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      google_calendar_connections: {
+        Row: {
+          id: string
+          business_id: string
+          user_id: string
+          business_member_id: string | null
+          staff_member_id: string | null
+          google_account_email: string | null
+          google_calendar_id: string | null
+          google_calendar_summary: string | null
+          refresh_token_ciphertext: string
+          refresh_token_iv: string
+          refresh_token_tag: string
+          connected_at: string
+          disconnected_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          business_id: string
+          user_id: string
+          business_member_id?: string | null
+          staff_member_id?: string | null
+          google_account_email?: string | null
+          google_calendar_id?: string | null
+          google_calendar_summary?: string | null
+          refresh_token_ciphertext?: string
+          refresh_token_iv?: string
+          refresh_token_tag?: string
+          connected_at?: string
+          disconnected_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          business_id?: string
+          user_id?: string
+          business_member_id?: string | null
+          staff_member_id?: string | null
+          google_account_email?: string | null
+          google_calendar_id?: string | null
+          google_calendar_summary?: string | null
+          refresh_token_ciphertext?: string
+          refresh_token_iv?: string
+          refresh_token_tag?: string
+          connected_at?: string
+          disconnected_at?: string | null
           created_at?: string
           updated_at?: string
         }
