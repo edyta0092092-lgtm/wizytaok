@@ -5,6 +5,7 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 
 import { GoogleCalendarCard } from "@/components/integrations/google-calendar-card"
+import { WhatsAppIntegrationCard } from "@/components/integrations/whatsapp-integration-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AccessDenied } from "@/components/shared/access-denied"
@@ -19,8 +20,8 @@ export default function SettingsIntegrationsPage() {
   if (ready && !canManageSettings) {
     return (
       <AppShell
-        title={t("googleCalendarIntegration.pageTitle")}
-        pageDescription={t("googleCalendarIntegration.pageDescription")}
+        title={t("integrationsPage.pageTitle")}
+        pageDescription={t("integrationsPage.pageDescription")}
       >
         <PageShell>
           <AccessDenied />
@@ -31,27 +32,28 @@ export default function SettingsIntegrationsPage() {
 
   return (
     <AppShell
-      title={t("googleCalendarIntegration.pageTitle")}
-      pageDescription={t("googleCalendarIntegration.pageDescription")}
+      title={t("integrationsPage.pageTitle")}
+      pageDescription={t("integrationsPage.pageDescription")}
     >
       <PageShell>
         <div className="mb-4">
           <Button variant="ghost" size="sm" className="h-9 rounded-xl px-2" asChild>
             <Link href="/settings">
               <ArrowLeft className="mr-1.5 size-4" aria-hidden />
-              {t("googleCalendarIntegration.backToSettings")}
+              {t("integrationsPage.backToSettings")}
             </Link>
           </Button>
         </div>
-        <div className="max-w-2xl space-y-6">
+        <div className="max-w-3xl space-y-6">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">
-              {t("googleCalendarIntegration.pageHeading")}
+              {t("integrationsPage.pageHeading")}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {t("googleCalendarIntegration.pageLead")}
+              {t("integrationsPage.pageLead")}
             </p>
           </div>
+          <WhatsAppIntegrationCard />
           <React.Suspense fallback={null}>
             <GoogleCalendarCard />
           </React.Suspense>
