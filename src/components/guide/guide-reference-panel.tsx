@@ -172,7 +172,7 @@ export function GuideReferencePanel({
             return (
               <div
                 key={cat.id}
-                id={cat.id === "admin" ? "guide-admin-section" : undefined}
+                id={cat.id === "billing-trial" ? "guide-admin-section" : undefined}
                 className="scroll-mt-24 space-y-3"
               >
                 <div>

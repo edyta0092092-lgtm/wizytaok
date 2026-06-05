@@ -125,7 +125,7 @@ export function OnboardingPanel({
         <span>
           {t("onboarding.helpCenterNote")}{" "}
           <Link href="/guide" className="font-medium text-primary underline-offset-4 hover:underline">
-            {t("onboarding.helpCenterLink")}
+            {t("navigation.guide")}
           </Link>
         </span>
       </p>

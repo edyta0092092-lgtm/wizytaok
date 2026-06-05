@@ -7,13 +7,16 @@
 import type { GuideReferenceSection } from "@/lib/guide/guide-reference"
 
 export type HelpCenterCategoryId =
-  | "getting-started"
-  | "appointments"
-  | "schedule"
+  | "first-setup"
+  | "schedule-availability"
+  | "schedule-exceptions"
+  | "team"
+  | "services"
+  | "appointments-statuses"
+  | "cancel-appointments"
+  | "online-booking"
   | "notifications"
-  | "booking"
-  | "admin"
-  | "other"
+  | "billing-trial"
 
 export type HelpCenterCategory = {
   id: HelpCenterCategoryId
@@ -23,22 +26,51 @@ export type HelpCenterCategory = {
   adminOnly?: boolean
 }
 
+/** Kolejność kart w Centrum pomocy (FAQ osobno na stronie). */
 export const HELP_CENTER_CATEGORIES: HelpCenterCategory[] = [
   {
-    id: "getting-started",
-    titleKey: "guide.catGettingStarted",
-    descriptionKey: "guide.catGettingStartedDesc",
+    id: "first-setup",
+    titleKey: "guide.catFirstSetup",
+    descriptionKey: "guide.catFirstSetupDesc",
   },
   {
-    id: "appointments",
-    titleKey: "guide.catAppointments",
-    descriptionKey: "guide.catAppointmentsDesc",
-  },
-  {
-    id: "schedule",
-    titleKey: "guide.catSchedule",
-    descriptionKey: "guide.catScheduleDesc",
+    id: "schedule-availability",
+    titleKey: "guide.catScheduleAvailability",
+    descriptionKey: "guide.catScheduleAvailabilityDesc",
     adminOnly: true,
+  },
+  {
+    id: "schedule-exceptions",
+    titleKey: "guide.catScheduleExceptions",
+    descriptionKey: "guide.catScheduleExceptionsDesc",
+    adminOnly: true,
+  },
+  {
+    id: "team",
+    titleKey: "guide.catTeam",
+    descriptionKey: "guide.catTeamDesc",
+    adminOnly: true,
+  },
+  {
+    id: "services",
+    titleKey: "guide.catServices",
+    descriptionKey: "guide.catServicesDesc",
+    adminOnly: true,
+  },
+  {
+    id: "appointments-statuses",
+    titleKey: "guide.catAppointmentsStatuses",
+    descriptionKey: "guide.catAppointmentsStatusesDesc",
+  },
+  {
+    id: "cancel-appointments",
+    titleKey: "guide.catCancelAppointments",
+    descriptionKey: "guide.catCancelAppointmentsDesc",
+  },
+  {
+    id: "online-booking",
+    titleKey: "guide.catOnlineBooking",
+    descriptionKey: "guide.catOnlineBookingDesc",
   },
   {
     id: "notifications",
@@ -46,20 +78,10 @@ export const HELP_CENTER_CATEGORIES: HelpCenterCategory[] = [
     descriptionKey: "guide.catNotificationsDesc",
   },
   {
-    id: "booking",
-    titleKey: "guide.catBooking",
-    descriptionKey: "guide.catBookingDesc",
-  },
-  {
-    id: "admin",
-    titleKey: "guide.catAdmin",
-    descriptionKey: "guide.catAdminDesc",
+    id: "billing-trial",
+    titleKey: "guide.catBillingTrial",
+    descriptionKey: "guide.catBillingTrialDesc",
     adminOnly: true,
-  },
-  {
-    id: "other",
-    titleKey: "guide.catOther",
-    descriptionKey: "guide.catOtherDesc",
   },
 ]
 
@@ -80,7 +102,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Start ——
   S({
     id: "welcome",
-    category: "getting-started",
+    category: "first-setup",
     titleKey: "guide.hcWelcomeTitle",
     href: "/dashboard",
     ctaKey: "guide.navDashboard",
@@ -93,7 +115,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "panel-menu",
-    category: "getting-started",
+    category: "first-setup",
     titleKey: "guide.hcPanelMenuTitle",
     searchTags: ["menu", "nawigacja", "zakładki", "boczne"],
     blocks: [
@@ -103,7 +125,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "statuses-reference",
-    category: "getting-started",
+    category: "first-setup",
     titleKey: "guide.hcStatusesTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -116,7 +138,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "roles-staff",
-    category: "getting-started",
+    category: "first-setup",
     titleKey: "guide.hcRolesStaffTitle",
     searchTags: ["rola", "obsługa", "uprawnienia", "dostęp"],
     blocks: [
@@ -128,7 +150,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Wizyty (admin + obsługa) ——
   S({
     id: "day-plan",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.modDayplanTitle",
     href: "/dashboard",
     ctaKey: "guide.navDashboard",
@@ -141,7 +163,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "first-setup",
-    category: "appointments",
+    category: "first-setup",
     titleKey: "guide.hcFirstSetupTitle",
     href: "/dashboard",
     ctaKey: "guide.navDashboard",
@@ -155,7 +177,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-list",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcApptListTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -167,7 +189,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-needs-action",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcNeedsActionTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -180,7 +202,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-add-manual",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcManualApptTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -192,7 +214,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-change-status",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcApptStatusMenuTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -205,7 +227,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-send-message",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcSendMessageTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -218,7 +240,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-client-change",
-    category: "appointments",
+    category: "appointments-statuses",
     titleKey: "guide.hcClientChangeTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -230,7 +252,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "appointments-cancel",
-    category: "appointments",
+    category: "cancel-appointments",
     titleKey: "guide.hcCancelTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
@@ -242,7 +264,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "schedule-month",
-    category: "appointments",
+    category: "schedule-availability",
     titleKey: "guide.modScheduleTitle",
     href: "/schedule",
     ctaKey: "guide.navCalendar",
@@ -257,7 +279,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Grafik i dostępność (admin) ——
   S({
     id: "availability-hours",
-    category: "schedule",
+    category: "schedule-availability",
     titleKey: "guide.hcAvailTitle",
     href: "/availability",
     ctaKey: "guide.navAvailability",
@@ -271,7 +293,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "availability-exceptions",
-    category: "schedule",
+    category: "schedule-exceptions",
     titleKey: "guide.hcAvailExTitle",
     href: "/availability",
     ctaKey: "guide.navAvailability",
@@ -284,7 +306,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "team-schedule-exceptions",
-    category: "schedule",
+    category: "schedule-exceptions",
     titleKey: "guide.hcStaffScheduleTitle",
     href: "/team",
     ctaKey: "guide.navTeam",
@@ -297,7 +319,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "slots-and-breaks",
-    category: "schedule",
+    category: "schedule-availability",
     titleKey: "guide.hcSlotsTitle",
     adminOnly: true,
     searchTags: ["slot", "przerwa", "zajęty"],
@@ -368,7 +390,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Rezerwacje online ——
   S({
     id: "booking-link",
-    category: "booking",
+    category: "online-booking",
     titleKey: "guide.hcBookingLinkTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
@@ -381,7 +403,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "booking-public-flow",
-    category: "booking",
+    category: "online-booking",
     titleKey: "guide.modBookingTitle",
     ctaKey: "guide.navBooking",
     searchTags: ["rezerwacja online", "klient"],
@@ -394,7 +416,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "booking-manage-page",
-    category: "booking",
+    category: "online-booking",
     titleKey: "guide.modManageTitle",
     searchTags: ["confirm", "link klienta"],
     blocks: [
@@ -407,7 +429,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Tylko administrator ——
   S({
     id: "admin-services",
-    category: "admin",
+    category: "services",
     titleKey: "guide.modServicesTitle",
     href: "/services",
     ctaKey: "guide.navServices",
@@ -422,7 +444,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "admin-team",
-    category: "admin",
+    category: "team",
     titleKey: "guide.modTeamTitle",
     href: "/team",
     ctaKey: "guide.navTeam",
@@ -436,7 +458,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "admin-settings",
-    category: "admin",
+    category: "first-setup",
     titleKey: "guide.modBusinessTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
@@ -450,7 +472,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "admin-billing",
-    category: "admin",
+    category: "billing-trial",
     titleKey: "guide.hcBillingTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
@@ -464,7 +486,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "admin-export",
-    category: "admin",
+    category: "billing-trial",
     titleKey: "guide.hcExportTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
@@ -479,7 +501,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   // —— Pozostałe ——
   S({
     id: "clients",
-    category: "other",
+    category: "appointments-statuses",
     titleKey: "guide.hcClientsTitle",
     href: "/clients",
     ctaKey: "guide.navClients",
@@ -492,7 +514,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "statistics",
-    category: "other",
+    category: "first-setup",
     titleKey: "guide.hcStatisticsTitle",
     href: "/statystyki",
     ctaKey: "guide.navStatistics",
@@ -505,7 +527,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "account",
-    category: "other",
+    category: "first-setup",
     titleKey: "guide.hcAccountTitle",
     href: "/account",
     ctaKey: "guide.navAccount",
@@ -517,7 +539,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
   }),
   S({
     id: "help-support",
-    category: "other",
+    category: "first-setup",
     titleKey: "guide.modHelpTitle",
     href: "/help",
     ctaKey: "guide.navHelp",
