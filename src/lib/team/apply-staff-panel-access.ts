@@ -60,19 +60,65 @@ async function readPendingToken(
   return byStaff?.token ? String(byStaff.token) : null
 }
 
+export type StaffBusinessMemberLink = {
+  memberId: string
+  userId: string | null
+}
+
+/** Znajdź członkostwo po staff_member_id lub po tym samym e-mailu (gdy brak powiązania FK). */
+export async function resolveStaffBusinessMemberLink(
+  client: Client,
+  businessId: string,
+  staffMemberId: string,
+  invitationEmail?: string,
+): Promise<StaffBusinessMemberLink | null> {
+  const { data: byStaffId } = await client
+    .from("business_members")
+    .select("id, user_id, email")
+    .eq("business_id", businessId)
+    .eq("staff_member_id", staffMemberId)
+    .maybeSingle()
+
+  if (byStaffId?.id) {
+    return { memberId: byStaffId.id, userId: byStaffId.user_id ?? null }
+  }
+
+  let emailNorm = normalizeEmail(invitationEmail ?? "")
+  if (!emailNorm) {
+    const { data: staffRow } = await client
+      .from("staff_members")
+      .select("email")
+      .eq("id", staffMemberId)
+      .eq("business_id", businessId)
+      .maybeSingle()
+    emailNorm = normalizeEmail(staffRow?.email ?? "")
+  }
+  if (!emailNorm) return null
+
+  const { data: members } = await client
+    .from("business_members")
+    .select("id, user_id, email")
+    .eq("business_id", businessId)
+
+  const byEmail = (members ?? []).find((m) => normalizeEmail(m.email ?? "") === emailNorm)
+  if (!byEmail?.id) return null
+  return { memberId: byEmail.id, userId: byEmail.user_id ?? null }
+}
+
 /** Czy osoba ma już konto powiązane z firmą (zalogowany członek zespołu). */
 export async function staffHasLinkedPanelAccount(
   client: Client,
   businessId: string,
   staffMemberId: string,
+  invitationEmail?: string,
 ): Promise<boolean> {
-  const { data: memberRow } = await client
-    .from("business_members")
-    .select("user_id")
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .maybeSingle()
-  return Boolean(memberRow?.user_id)
+  const link = await resolveStaffBusinessMemberLink(
+    client,
+    businessId,
+    staffMemberId,
+    invitationEmail,
+  )
+  return Boolean(link?.userId)
 }
 
 /** Uaktualnia rolę panelu przy istniejącym powiązaniu biznes‑członkostwo ↔ staff (bez wymuszania zaproszenia). */
@@ -81,23 +127,33 @@ export async function syncBusinessMemberRoleForStaff(
   businessId: string,
   staffMemberId: string,
   role: PanelRole,
-): Promise<{ ok: boolean; detail?: string }> {
-  const { data: memberRow } = await client
-    .from("business_members")
-    .select("id")
-    .eq("business_id", businessId)
-    .eq("staff_member_id", staffMemberId)
-    .maybeSingle()
-  if (!memberRow?.id) return { ok: true }
-  const { error } = await client
-    .from("business_members")
-    .update({
-      role,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", memberRow.id)
-  if (error) return { ok: false, detail: error.message }
-  return { ok: true }
+  invitationEmail?: string,
+): Promise<{ ok: boolean; detail?: string; updated: boolean }> {
+  const link = await resolveStaffBusinessMemberLink(
+    client,
+    businessId,
+    staffMemberId,
+    invitationEmail,
+  )
+  if (!link?.memberId) return { ok: true, updated: false }
+
+  const patch: Record<string, unknown> = {
+    role,
+    updated_at: new Date().toISOString(),
+    staff_member_id: staffMemberId,
+  }
+
+  let { error } = await client.from("business_members").update(patch).eq("id", link.memberId)
+
+  if (error?.message?.toLowerCase().includes("staff_member_id")) {
+    const { staff_member_id: _omit, ...withoutStaff } = patch
+    void _omit
+    const retry = await client.from("business_members").update(withoutStaff).eq("id", link.memberId)
+    error = retry.error
+  }
+
+  if (error) return { ok: false, detail: error.message, updated: false }
+  return { ok: true, updated: true }
 }
 
 /** Aktualizuje rolę w oczekującym zaproszeniu (bez wysyłki e-maila). */
@@ -106,14 +162,50 @@ export async function syncPendingInvitationRoleForStaff(
   businessId: string,
   staffMemberId: string,
   role: PanelRole,
+  invitationEmail?: string,
 ): Promise<{ ok: boolean; detail?: string }> {
-  const { error } = await client
+  let emailNorm = normalizeEmail(invitationEmail ?? "")
+  if (!emailNorm) {
+    const { data: staffRow } = await client
+      .from("staff_members")
+      .select("email")
+      .eq("id", staffMemberId)
+      .eq("business_id", businessId)
+      .maybeSingle()
+    emailNorm = normalizeEmail(staffRow?.email ?? "")
+  }
+
+  const { error: byStaffErr } = await client
     .from("business_invitations")
     .update({ role })
     .eq("business_id", businessId)
     .eq("staff_member_id", staffMemberId)
     .eq("status", "pending")
-  if (error) return { ok: false, detail: error.message }
+
+  if (byStaffErr) return { ok: false, detail: byStaffErr.message }
+
+  if (emailNorm) {
+    const { data: pending } = await client
+      .from("business_invitations")
+      .select("id, email")
+      .eq("business_id", businessId)
+      .eq("status", "pending")
+
+    const ids = (pending ?? [])
+      .filter((row) => normalizeEmail(row.email ?? "") === emailNorm)
+      .map((row) => row.id)
+      .filter(Boolean)
+
+    if (ids.length > 0) {
+      const { error: byEmailErr } = await client
+        .from("business_invitations")
+        .update({ role, staff_member_id: staffMemberId })
+        .eq("business_id", businessId)
+        .in("id", ids)
+      if (byEmailErr) return { ok: false, detail: byEmailErr.message }
+    }
+  }
+
   return { ok: true }
 }
 
@@ -196,13 +288,19 @@ async function applyStaffPanelAccessDirect(
   }
 
   const members = membersQuery.data ?? []
-  const activeMemberForStaff = members.find((m) => m.staff_member_id === staffMemberId && m.user_id)
-  if (activeMemberForStaff?.id) {
+  const linkedMember = await resolveStaffBusinessMemberLink(
+    client,
+    businessId,
+    staffMemberId,
+    em,
+  )
+  if (linkedMember?.userId) {
     const roleSync = await syncBusinessMemberRoleForStaff(
       client,
       businessId,
       staffMemberId,
       form.panelMemberRole,
+      em,
     )
     if (!roleSync.ok) {
       return {
@@ -216,6 +314,7 @@ async function applyStaffPanelAccessDirect(
       businessId,
       staffMemberId,
       form.panelMemberRole,
+      em,
     )
     return { ok: true, alreadyHasPanelAccess: true, invitationToken: null }
   }

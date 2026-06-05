@@ -144,13 +144,25 @@ export async function acceptPendingInvitationsForUser(
     return { linked: false, error: "email_required" }
   }
 
+  const rows = await findInvitationsForEmail(email)
+  const pending = rows.filter((row) => row.status === "pending")
+
   const existingBusinessId = await readMemberBusinessId(userId)
   if (existingBusinessId) {
+    for (const inv of pending) {
+      if (!inv.token) continue
+      const acceptOut = await acceptBusinessInvitationForUser(String(inv.token), userId, email)
+      if (acceptOut.ok) {
+        return {
+          linked: true,
+          businessId: acceptOut.businessId,
+          source: "existing_member_pending_accepted",
+        }
+      }
+    }
     return { linked: true, businessId: existingBusinessId, source: "existing_member" }
   }
 
-  const rows = await findInvitationsForEmail(email)
-  const pending = rows.filter((row) => row.status === "pending")
   const accepted = rows.filter((row) => row.status === "accepted")
 
   const acceptErrors: string[] = []

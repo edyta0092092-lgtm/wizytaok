@@ -102,13 +102,17 @@ export async function acceptBusinessInvitationForUser(
   }
 
   if (inv.status === "accepted") {
-    const { data: existingMember } = await admin
-      .from("business_members")
-      .select("id")
-      .eq("business_id", inv.business_id)
-      .eq("user_id", userId)
-      .maybeSingle()
-    if (existingMember?.id) {
+    const memberUpsert = await upsertBusinessMemberFromInvitation(admin, {
+      business_id: inv.business_id,
+      user_id: userId,
+      role: inv.role === "admin" ? "admin" : "staff",
+      email: inv.email,
+      is_active: true,
+      invited_by: inv.invited_by,
+      staff_member_id: inv.staff_member_id,
+      updated_at: new Date().toISOString(),
+    })
+    if (memberUpsert.ok) {
       return { ok: true, businessId: inv.business_id }
     }
     return { ok: false, error: "already_used" }

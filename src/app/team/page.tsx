@@ -1334,11 +1334,32 @@ export default function TeamPage() {
         setSaveErrorWithDetail(t("team.saveError"), out.error)
         return
       }
-      if (client && bid && isSupabaseConfigured()) {
-        const syncOut = await syncBusinessMemberRoleForStaff(client, bid, editing.id, form.panelMemberRole)
-        if (!syncOut.ok) {
-          if (process.env.NODE_ENV === "development" && syncOut.detail) {
-            console.warn("[team] business_members role sync:", syncOut.detail)
+      let syncRoleHasLinkedPanel = false
+      if (bid && isSupabaseConfigured() && emailTrim) {
+        try {
+          const syncRes = await fetch("/api/team/sync-member-role", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              staffMemberId: editing.id,
+              panelMemberRole: form.panelMemberRole,
+              invitationEmail: emailTrim,
+            }),
+          })
+          const syncJson = (await syncRes.json().catch(() => null)) as {
+            ok?: boolean
+            hasLinkedPanel?: boolean
+            error?: string
+          } | null
+          if (syncJson?.ok) {
+            syncRoleHasLinkedPanel = syncJson.hasLinkedPanel === true
+          } else if (process.env.NODE_ENV === "development" && syncJson?.error) {
+            console.warn("[team] sync-member-role:", syncJson.error)
+          }
+        } catch (err) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[team] sync-member-role failed", err)
           }
         }
       }
@@ -1401,7 +1422,11 @@ export default function TeamPage() {
       let editInviteToken: string | null = null
       if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim && client) {
         const roleChanged = form.panelMemberRole !== savedProfileState.panelMemberRole
-        const hasLinkedPanel = await staffHasLinkedPanelAccount(client, bid, editing.id)
+        const hasLinkedPanel =
+          syncRoleHasLinkedPanel ||
+          (client
+            ? await staffHasLinkedPanelAccount(client, bid, editing.id, emailTrim)
+            : false)
 
         if (hasLinkedPanel) {
           await syncPendingInvitationRoleForStaff(client, bid, editing.id, form.panelMemberRole)
