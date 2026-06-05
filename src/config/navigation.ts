@@ -33,6 +33,7 @@ const adminNav: NavItem[] = [
   { href: "/availability", icon: CalendarClock, labelKey: "navigation.availability" },
   { href: "/messages", icon: MessageSquare, labelKey: "navigation.messages" },
   { href: "/settings", icon: Settings, labelKey: "navigation.settings" },
+  { href: "/account", icon: UserCircle, labelKey: "navigation.myAccount" },
   { href: "/help", icon: LifeBuoy, labelKey: "navigation.help" },
 ]
 

@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 
+import { AccountCredentialsPanel } from "@/components/account/account-credentials-panel"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,9 @@ export default function AccountPage() {
     }
     setSaving(true)
     try {
-      await client.rpc("ensure_owner_membership")
+      if (access.isOwner) {
+        await client.rpc("ensure_owner_membership")
+      }
       const { error } = await client.rpc("set_business_member_display_name", {
         p_business_id: access.businessId,
         p_display_name: displayDraft.trim(),
@@ -80,95 +83,96 @@ export default function AccountPage() {
         ) : !access.businessId ? (
           <p className="text-sm text-muted-foreground">{t("account.noBusiness")}</p>
         ) : (
-          <Card className="max-w-lg rounded-2xl border border-border">
-            <CardHeader>
-              <CardTitle className="text-base">{t("account.title")}</CardTitle>
-              <CardDescription>{t("account.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="acc-email">{t("account.emailReadonly")}</Label>
-                <Input
-                  id="acc-email"
-                  readOnly
-                  value={access.userEmail ?? ""}
-                  className="h-11 rounded-xl bg-muted/40"
-                />
-              </div>
-              {panelRoleLabel ? (
-                <div className="space-y-2">
-                  <Label>{t("team.panelRole")}</Label>
-                  <Input readOnly value={panelRoleLabel} className="h-11 rounded-xl bg-muted/40" />
+          <div className="mx-auto flex w-full max-w-lg flex-col gap-6">
+            <AccountCredentialsPanel
+              businessId={access.businessId}
+              userEmail={access.userEmail}
+              isOwner={access.isOwner}
+            />
+
+            <Card className="rounded-2xl border border-border">
+              <CardHeader>
+                <CardTitle className="text-base">{t("account.title")}</CardTitle>
+                <CardDescription>{t("account.description")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {panelRoleLabel ? (
+                  <div className="space-y-2">
+                    <Label>{t("team.panelRole")}</Label>
+                    <Input readOnly value={panelRoleLabel} className="h-11 rounded-xl bg-muted/40" />
+                  </div>
+                ) : null}
+                <form className="space-y-3" onSubmit={(ev) => void onSaveDisplayName(ev)}>
+                  <div className="space-y-2">
+                    <Label htmlFor="acc-display">{t("account.displayName")}</Label>
+                    <Input
+                      id="acc-display"
+                      value={displayDraft}
+                      onChange={(ev) => setDisplayDraft(ev.target.value)}
+                      className="h-11 rounded-xl"
+                      autoComplete="name"
+                    />
+                  </div>
+                  <Button type="submit" className="h-10 rounded-xl" disabled={saving}>
+                    {t("account.saveDisplayName")}
+                  </Button>
+                  {saved ? (
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400">{t("account.saved")}</p>
+                  ) : null}
+                  {saveErr ? <p className="text-sm text-destructive">{t("account.saveError")}</p> : null}
+                </form>
+
+                <div className="rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
+                  <p className="font-semibold text-muted-foreground">{t("settings.language")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={language === "pl" ? "default" : "outline"}
+                      className="h-8 rounded-lg px-3"
+                      onClick={() => setLanguage("pl")}
+                    >
+                      PL
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={language === "en" ? "default" : "outline"}
+                      className="h-8 rounded-lg px-3"
+                      onClick={() => setLanguage("en")}
+                    >
+                      EN
+                    </Button>
+                  </div>
+                  <p className="mt-3 font-semibold text-muted-foreground">{t("settings.theme")}</p>
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={theme === "light" ? "default" : "outline"}
+                      className="h-8 rounded-lg px-3"
+                      onClick={() => setTheme("light")}
+                    >
+                      {t("settings.light")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={theme === "dark" ? "default" : "outline"}
+                      className="h-8 rounded-lg px-3"
+                      onClick={() => setTheme("dark")}
+                    >
+                      {t("settings.dark")}
+                    </Button>
+                  </div>
                 </div>
-              ) : null}
-              <form className="space-y-3" onSubmit={(ev) => void onSaveDisplayName(ev)}>
-                <div className="space-y-2">
-                  <Label htmlFor="acc-display">{t("account.displayName")}</Label>
-                  <Input
-                    id="acc-display"
-                    value={displayDraft}
-                    onChange={(ev) => setDisplayDraft(ev.target.value)}
-                    className="h-11 rounded-xl"
-                    autoComplete="name"
-                  />
-                </div>
-                <Button type="submit" className="h-10 rounded-xl" disabled={saving}>
-                  {t("account.saveDisplayName")}
+
+                <Button type="button" variant="outline" className="h-10 w-full rounded-xl" onClick={() => void logout()}>
+                  {t("auth.logOut")}
                 </Button>
-                {saved ? <p className="text-sm text-emerald-600 dark:text-emerald-400">{t("account.saved")}</p> : null}
-                {saveErr ? <p className="text-sm text-destructive">{t("account.saveError")}</p> : null}
-              </form>
-
-              <div className="rounded-xl border border-border/80 bg-muted/20 p-4 text-xs">
-                <p className="font-semibold text-muted-foreground">{t("settings.language")}</p>
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={language === "pl" ? "default" : "outline"}
-                    className="h-8 rounded-lg px-3"
-                    onClick={() => setLanguage("pl")}
-                  >
-                    PL
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={language === "en" ? "default" : "outline"}
-                    className="h-8 rounded-lg px-3"
-                    onClick={() => setLanguage("en")}
-                  >
-                    EN
-                  </Button>
-                </div>
-                <p className="mt-3 font-semibold text-muted-foreground">{t("settings.theme")}</p>
-                <div className="mt-2 flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={theme === "light" ? "default" : "outline"}
-                    className="h-8 rounded-lg px-3"
-                    onClick={() => setTheme("light")}
-                  >
-                    {t("settings.light")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={theme === "dark" ? "default" : "outline"}
-                    className="h-8 rounded-lg px-3"
-                    onClick={() => setTheme("dark")}
-                  >
-                    {t("settings.dark")}
-                  </Button>
-                </div>
-              </div>
-
-              <Button type="button" variant="outline" className="h-10 w-full rounded-xl" onClick={() => void logout()}>
-                {t("auth.logOut")}
-              </Button>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </PageShell>
     </AppShell>

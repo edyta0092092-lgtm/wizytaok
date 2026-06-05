@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
+import { AccountCredentialsPanel } from "@/components/account/account-credentials-panel"
 import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
 import { AccessDenied } from "@/components/shared/access-denied"
@@ -140,7 +141,7 @@ export default function SettingsPage() {
     if (typeof window === "undefined") return false
     return new URLSearchParams(window.location.search).get("setup") === "business"
   })
-  const { ready, businessId, canManageSettings, refresh } = useBusinessAccess()
+  const { ready, businessId, canManageSettings, isOwner, userEmail, refresh } = useBusinessAccess()
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -576,6 +577,14 @@ export default function SettingsPage() {
             <Check className="size-4 shrink-0 text-success" aria-hidden />
             {t("settings.savedBanner")}
           </div>
+        ) : null}
+
+        {ready && businessId ? (
+          <AccountCredentialsPanel
+            businessId={businessId}
+            userEmail={userEmail}
+            isOwner={isOwner}
+          />
         ) : null}
 
         <form id="settings-form" onSubmit={(e) => void saveAll(e)} className="space-y-6">

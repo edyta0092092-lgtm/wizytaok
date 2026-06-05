@@ -1444,6 +1444,10 @@ export interface Database {
         Args: { p_business_id: string; p_display_name: string }
         Returns: undefined
       }
+      set_business_member_auth_email: {
+        Args: { p_business_id: string; p_email: string }
+        Returns: undefined
+      }
       is_business_owner: {
         Args: { p_business_id: string }
         Returns: boolean
