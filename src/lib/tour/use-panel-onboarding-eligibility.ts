@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import {
-  hasActiveBusinessAccess,
+  hasActiveBusinessAccessFromProfile,
   resolveEffectiveSubscriptionStatus,
 } from "@/lib/billing/subscription-status"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -64,25 +64,58 @@ export function usePanelOnboardingEligibility(
     setSubscriptionChecked(false)
 
     void (async () => {
+      const businessId = access.businessId!
+      let subscriptionStatus: string | null = null
+      let stripeSubscriptionStatus: string | null = null
+      let subscriptionTrialEndsAt: string | null = null
+
       const { data, error } = await client
         .from("business_profiles")
-        .select("subscription_status, stripe_subscription_status")
-        .eq("id", access.businessId!)
+        .select(
+          "subscription_status, stripe_subscription_status, subscription_trial_ends_at",
+        )
+        .eq("id", businessId)
         .maybeSingle()
+
+      if (data) {
+        subscriptionStatus = data.subscription_status
+        stripeSubscriptionStatus = data.stripe_subscription_status
+        subscriptionTrialEndsAt = data.subscription_trial_ends_at
+      } else {
+        const { data: rpc } = await client.rpc("get_business_member_subscription_access", {
+          p_business_id: businessId,
+        })
+        if (rpc && typeof rpc === "object" && (rpc as { ok?: boolean }).ok === true) {
+          const row = rpc as Record<string, unknown>
+          subscriptionStatus =
+            typeof row.subscription_status === "string" ? row.subscription_status : null
+          stripeSubscriptionStatus =
+            typeof row.stripe_subscription_status === "string"
+              ? row.stripe_subscription_status
+              : null
+        } else if (error) {
+          if (cancelled) return
+          setSubscriptionActive(false)
+          setSubscriptionChecked(true)
+          return
+        }
+      }
 
       if (cancelled) return
 
-      if (error || !data) {
+      if (!subscriptionStatus && !stripeSubscriptionStatus && !subscriptionTrialEndsAt) {
         setSubscriptionActive(false)
         setSubscriptionChecked(true)
         return
       }
 
-      const status = resolveEffectiveSubscriptionStatus(
-        data.subscription_status,
-        data.stripe_subscription_status,
+      setSubscriptionActive(
+        hasActiveBusinessAccessFromProfile({
+          subscriptionStatus,
+          stripeSubscriptionStatus,
+          subscriptionTrialEndsAt,
+        }),
       )
-      setSubscriptionActive(hasActiveBusinessAccess(status))
       setSubscriptionChecked(true)
     })()
 

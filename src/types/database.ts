@@ -1460,6 +1460,10 @@ export interface Database {
         Args: { p_email: string }
         Returns: string | null
       }
+      get_business_member_subscription_access: {
+        Args: { p_business_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       appointment_status: AppointmentStatusDb

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
-  hasActiveBusinessAccess,
+  hasActiveBusinessAccessFromProfile,
   resolveEffectiveSubscriptionStatus,
 } from "@/lib/billing/subscription-status"
 import {
@@ -29,18 +29,62 @@ type ProfileSubscriptionRow = {
   id: string
   subscription_status: string | null
   stripe_subscription_status: string | null
+  subscription_trial_ends_at?: string | null
+}
+
+function readRpcSubscriptionRow(
+  businessId: string,
+  rpc: unknown,
+): ProfileSubscriptionRow | null {
+  if (!rpc || typeof rpc !== "object") return null
+  const row = rpc as Record<string, unknown>
+  if (row.ok !== true) return null
+  return {
+    id: businessId,
+    subscription_status:
+      typeof row.subscription_status === "string" ? row.subscription_status : null,
+    stripe_subscription_status:
+      typeof row.stripe_subscription_status === "string"
+        ? row.stripe_subscription_status
+        : null,
+    subscription_trial_ends_at:
+      typeof row.subscription_trial_ends_at === "string"
+        ? row.subscription_trial_ends_at
+        : null,
+  }
 }
 
 async function loadProfileSubscription(
   supabase: SupabaseClient<Database>,
   businessId: string,
 ): Promise<ProfileSubscriptionRow | null> {
-  const { data } = await supabase
+  let { data, error } = await supabase
     .from("business_profiles")
-    .select("id, subscription_status, stripe_subscription_status")
+    .select(
+      "id, subscription_status, stripe_subscription_status, subscription_trial_ends_at",
+    )
     .eq("id", businessId)
     .maybeSingle()
-  return data ?? null
+
+  if (
+    error?.message &&
+    error.message.toLowerCase().includes("subscription_trial_ends_at")
+  ) {
+    const retry = await supabase
+      .from("business_profiles")
+      .select("id, subscription_status, stripe_subscription_status")
+      .eq("id", businessId)
+      .maybeSingle()
+    data = retry.data ? { ...retry.data, subscription_trial_ends_at: null } : null
+    error = retry.error
+  }
+
+  if (data?.id) return data
+
+  const { data: rpc } = await supabase.rpc("get_business_member_subscription_access", {
+    p_business_id: businessId,
+  })
+  return readRpcSubscriptionRow(businessId, rpc)
 }
 
 /**
@@ -126,7 +170,11 @@ export async function resolveBusinessPanelAccess(
     return {
       businessId: profile.id,
       subscriptionStatus,
-      hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
+      hasActiveAccess: hasActiveBusinessAccessFromProfile({
+        subscriptionStatus: profile.subscription_status,
+        stripeSubscriptionStatus: profile.stripe_subscription_status,
+        subscriptionTrialEndsAt: profile.subscription_trial_ends_at,
+      }),
       isOwner: false,
       panelRole,
       effectiveRole,
@@ -158,7 +206,10 @@ export async function resolveBusinessPanelAccess(
     return {
       businessId: owned.id,
       subscriptionStatus,
-      hasActiveAccess: hasActiveBusinessAccess(subscriptionStatus),
+      hasActiveAccess: hasActiveBusinessAccessFromProfile({
+        subscriptionStatus: owned.subscription_status,
+        stripeSubscriptionStatus: owned.stripe_subscription_status,
+      }),
       isOwner: true,
       panelRole: effectiveRole,
       effectiveRole,

@@ -21,6 +21,25 @@ export function hasActiveBusinessAccess(status: string | null | undefined): bool
   return ACTIVE_BUSINESS_ACCESS_STATUSES.has(s)
 }
 
+/** Status subskrypcji lub niewygasły trial (gdy status w bazie jest pusty). */
+export function hasActiveBusinessAccessFromProfile(input: {
+  subscriptionStatus?: string | null
+  stripeSubscriptionStatus?: string | null
+  subscriptionTrialEndsAt?: string | null
+}): boolean {
+  const status = resolveEffectiveSubscriptionStatus(
+    input.subscriptionStatus,
+    input.stripeSubscriptionStatus,
+  )
+  if (hasActiveBusinessAccess(status)) return true
+
+  const trialEndRaw = input.subscriptionTrialEndsAt?.trim()
+  if (!trialEndRaw) return false
+  const trialEndMs = Date.parse(trialEndRaw)
+  if (Number.isNaN(trialEndMs)) return false
+  return trialEndMs > Date.now()
+}
+
 /** Preferuje `subscription_status`, potem legacy `stripe_subscription_status`. */
 export function resolveEffectiveSubscriptionStatus(
   subscriptionStatus: string | null | undefined,
