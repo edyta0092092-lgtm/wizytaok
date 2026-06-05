@@ -12,7 +12,7 @@ export type ProvisionInviteeAuthOptions = {
 /** Hasło spełniające politykę rejestracji (min. 8 znaków, wielka litera, znak specjalny). */
 export function generateStaffInviteTempPassword(): string {
   const chunk = crypto.randomUUID().replace(/-/g, "").slice(0, 10)
-  return `A${chunk}#1`
+  return `A${chunk}!1`
 }
 
 async function findAuthUserIdByEmailRpc(email: string): Promise<string | null> {
@@ -50,6 +50,28 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
   return findAuthUserIdByEmailList(email)
 }
 
+async function applyInviteCredentials(
+  userId: string,
+  tempPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const admin = getServiceRoleClient()
+  if (!admin) {
+    return { ok: false, error: "supabase_unconfigured" }
+  }
+  const { error: updateErr } = await admin.auth.admin.updateUserById(userId, {
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: {
+      staff_invite: true,
+      must_change_password: true,
+    },
+  })
+  if (updateErr) {
+    return { ok: false, error: updateErr.message }
+  }
+  return { ok: true }
+}
+
 export async function provisionInviteeAuthAccount(
   email: string,
   options: ProvisionInviteeAuthOptions = {},
@@ -64,7 +86,33 @@ export async function provisionInviteeAuthAccount(
     return { ok: false, error: "email_required" }
   }
 
+  const shouldResetExisting = options.resetPasswordForExisting !== false
   const tempPassword = generateStaffInviteTempPassword()
+
+  const existingId = await findAuthUserIdByEmail(normalized)
+  if (existingId) {
+    if (shouldResetExisting) {
+      const applied = await applyInviteCredentials(existingId, tempPassword)
+      if (!applied.ok) {
+        return { ok: false, error: applied.error }
+      }
+      return {
+        ok: true,
+        userId: existingId,
+        email: normalized,
+        tempPassword,
+        isNew: false,
+      }
+    }
+    return {
+      ok: true,
+      userId: existingId,
+      email: normalized,
+      tempPassword: null,
+      isNew: false,
+    }
+  }
+
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: normalized,
     password: tempPassword,
@@ -85,36 +133,20 @@ export async function provisionInviteeAuthAccount(
     }
   }
 
-  const existingId = await findAuthUserIdByEmail(normalized)
-  if (!existingId) {
-    return { ok: false, error: createErr?.message ?? "create_user_failed" }
+  const racedId = await findAuthUserIdByEmail(normalized)
+  if (racedId && shouldResetExisting) {
+    const applied = await applyInviteCredentials(racedId, tempPassword)
+    if (applied.ok) {
+      return {
+        ok: true,
+        userId: racedId,
+        email: normalized,
+        tempPassword,
+        isNew: false,
+      }
+    }
+    return { ok: false, error: applied.error }
   }
 
-  if (options.resetPasswordForExisting) {
-    const { error: updateErr } = await admin.auth.admin.updateUserById(existingId, {
-      password: tempPassword,
-      user_metadata: {
-        staff_invite: true,
-        must_change_password: true,
-      },
-    })
-    if (updateErr) {
-      return { ok: false, error: updateErr.message }
-    }
-    return {
-      ok: true,
-      userId: existingId,
-      email: normalized,
-      tempPassword,
-      isNew: false,
-    }
-  }
-
-  return {
-    ok: true,
-    userId: existingId,
-    email: normalized,
-    tempPassword: null,
-    isNew: false,
-  }
+  return { ok: false, error: createErr?.message ?? "create_user_failed" }
 }

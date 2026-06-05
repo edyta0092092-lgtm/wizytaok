@@ -553,6 +553,8 @@ export const dictionaries = {
       businessNotFoundTitle: "Nie znaleziono firmy",
       businessNotFoundBody: "Link rezerwacji może być nieprawidłowy.",
       authError: "Nie udało się zalogować. Sprawdź dane.",
+      inviteLoginHint:
+        "Użyj adresu e-mail i hasła tymczasowego z najnowszego zaproszenia (skopiuj hasło bez spacji). Po zalogowaniu zaakceptuj zaproszenie, jeśli pojawi się taki krok.",
       signupError: "Nie udało się utworzyć konta. Spróbuj ponownie.",
       slugCheckError: "Nie udało się sprawdzić dostępności adresu.",
       signupSlugReserveFailed:
@@ -3167,6 +3169,8 @@ Pozdrawiamy,
       businessNotFoundTitle: "Business not found",
       businessNotFoundBody: "The booking link may be invalid.",
       authError: "Could not sign in. Check your credentials.",
+      inviteLoginHint:
+        "Use the email and temporary password from your latest invitation (copy the password with no extra spaces). Accept the invitation after sign-in if prompted.",
       signupError: "Could not create account. Please try again.",
       slugCheckError: "Could not verify whether this booking page address is available.",
       signupSlugReserveFailed:

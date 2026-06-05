@@ -118,11 +118,13 @@ export function LoginForm() {
       setError(t("auth.authError"))
       return
     }
+    const loginEmail = email.trim().toLowerCase()
+    const loginPassword = password.trim()
     setLoading(true)
     try {
       const { data: signInData, error: signError } = await client.auth.signInWithPassword({
-        email: email.trim(),
-        password,
+        email: loginEmail,
+        password: loginPassword,
       })
       if (signError) {
         if (isEmailNotConfirmedAuthError(signError)) {
@@ -294,7 +296,7 @@ export function LoginForm() {
       setError(t("auth.supabaseNotConfigured"))
       return
     }
-    const trimmedEmail = email.trim()
+    const trimmedEmail = email.trim().toLowerCase()
     if (!trimmedEmail) {
       setError(t("auth.enterEmailForReset"))
       return
@@ -334,6 +336,9 @@ export function LoginForm() {
             <CardDescription className="text-sm leading-relaxed">
               {t("auth.loginDescription")}
             </CardDescription>
+            {inviteTokenFromUrl ? (
+              <p className="text-sm text-muted-foreground">{t("auth.inviteLoginHint")}</p>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-5">
             {!passwordResetMode ? (
