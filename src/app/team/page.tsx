@@ -26,7 +26,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
-import { syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
+import {
+  staffHasLinkedPanelAccount,
+  syncBusinessMemberRoleForStaff,
+  syncPendingInvitationRoleForStaff,
+} from "@/lib/team/apply-staff-panel-access"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -1395,21 +1399,61 @@ export default function TeamPage() {
         }
       }
       let editInviteToken: string | null = null
-      if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
-        const panelRes = await requestPanelAccessForStaff(editing.id, form.email, form.panelMemberRole)
-        if (!panelRes.ok) {
-          partialNotices = [
-            ...partialNotices,
-            panelAccessNoticeForFailure(
-              panelRes.messageKey,
-              panelRes.detail,
-              panelRes.serverError,
-            ),
-          ]
+      if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim && client) {
+        const roleChanged = form.panelMemberRole !== savedProfileState.panelMemberRole
+        const hasLinkedPanel = await staffHasLinkedPanelAccount(client, bid, editing.id)
+
+        if (hasLinkedPanel) {
+          await syncPendingInvitationRoleForStaff(client, bid, editing.id, form.panelMemberRole)
+          if (roleChanged) {
+            partialNotices = [...partialNotices, t("team.panelRoleUpdated")]
+          }
         } else {
-          editInviteToken = panelRes.invitationToken
-          partialNotices = [...partialNotices, ...panelAccessNoticeForSuccess(panelRes)]
-          if (editInviteToken) setSidebarTab("invites")
+          const { data: pendingInv } = await client
+            .from("business_invitations")
+            .select("id, email")
+            .eq("business_id", bid)
+            .eq("staff_member_id", editing.id)
+            .eq("status", "pending")
+            .maybeSingle()
+
+          const pendingEmail = (pendingInv?.email ?? "").trim().toLowerCase()
+          const emailChanged = Boolean(pendingInv?.id) && pendingEmail !== emailTrim.toLowerCase()
+
+          if (pendingInv?.id && !emailChanged) {
+            const invRoleOut = await syncPendingInvitationRoleForStaff(
+              client,
+              bid,
+              editing.id,
+              form.panelMemberRole,
+            )
+            if (!invRoleOut.ok && process.env.NODE_ENV === "development" && invRoleOut.detail) {
+              console.warn("[team] pending invitation role sync:", invRoleOut.detail)
+            }
+            if (roleChanged) {
+              partialNotices = [...partialNotices, t("team.panelRoleUpdated")]
+            }
+          } else {
+            const panelRes = await requestPanelAccessForStaff(
+              editing.id,
+              form.email,
+              form.panelMemberRole,
+            )
+            if (!panelRes.ok) {
+              partialNotices = [
+                ...partialNotices,
+                panelAccessNoticeForFailure(
+                  panelRes.messageKey,
+                  panelRes.detail,
+                  panelRes.serverError,
+                ),
+              ]
+            } else {
+              editInviteToken = panelRes.invitationToken
+              partialNotices = [...partialNotices, ...panelAccessNoticeForSuccess(panelRes)]
+              if (editInviteToken) setSidebarTab("invites")
+            }
+          }
         }
       }
       await load()
@@ -2310,6 +2354,11 @@ export default function TeamPage() {
                         <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                           {t("team.panelAccessIntro")}
                         </p>
+                        {editing ? (
+                          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                            {t("team.panelRoleChangeNoInviteHint")}
+                          </p>
+                        ) : null}
                       </div>
                       {editing ? (
                         <Button

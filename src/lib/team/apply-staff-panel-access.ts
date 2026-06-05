@@ -60,6 +60,21 @@ async function readPendingToken(
   return byStaff?.token ? String(byStaff.token) : null
 }
 
+/** Czy osoba ma już konto powiązane z firmą (zalogowany członek zespołu). */
+export async function staffHasLinkedPanelAccount(
+  client: Client,
+  businessId: string,
+  staffMemberId: string,
+): Promise<boolean> {
+  const { data: memberRow } = await client
+    .from("business_members")
+    .select("user_id")
+    .eq("business_id", businessId)
+    .eq("staff_member_id", staffMemberId)
+    .maybeSingle()
+  return Boolean(memberRow?.user_id)
+}
+
 /** Uaktualnia rolę panelu przy istniejącym powiązaniu biznes‑członkostwo ↔ staff (bez wymuszania zaproszenia). */
 export async function syncBusinessMemberRoleForStaff(
   client: Client,
@@ -81,6 +96,23 @@ export async function syncBusinessMemberRoleForStaff(
       updated_at: new Date().toISOString(),
     })
     .eq("id", memberRow.id)
+  if (error) return { ok: false, detail: error.message }
+  return { ok: true }
+}
+
+/** Aktualizuje rolę w oczekującym zaproszeniu (bez wysyłki e-maila). */
+export async function syncPendingInvitationRoleForStaff(
+  client: Client,
+  businessId: string,
+  staffMemberId: string,
+  role: PanelRole,
+): Promise<{ ok: boolean; detail?: string }> {
+  const { error } = await client
+    .from("business_invitations")
+    .update({ role })
+    .eq("business_id", businessId)
+    .eq("staff_member_id", staffMemberId)
+    .eq("status", "pending")
   if (error) return { ok: false, detail: error.message }
   return { ok: true }
 }
@@ -166,10 +198,26 @@ async function applyStaffPanelAccessDirect(
   const members = membersQuery.data ?? []
   const activeMemberForStaff = members.find((m) => m.staff_member_id === staffMemberId && m.user_id)
   if (activeMemberForStaff?.id) {
-    const pendingTok = await readPendingToken(client, businessId, staffMemberId, em)
-    if (pendingTok) {
-      return { ok: true, alreadyHasPanelAccess: true, invitationToken: pendingTok }
+    const roleSync = await syncBusinessMemberRoleForStaff(
+      client,
+      businessId,
+      staffMemberId,
+      form.panelMemberRole,
+    )
+    if (!roleSync.ok) {
+      return {
+        ok: false,
+        messageKey: "invitations.invitationCreateError",
+        detail: roleSync.detail,
+      }
     }
+    await syncPendingInvitationRoleForStaff(
+      client,
+      businessId,
+      staffMemberId,
+      form.panelMemberRole,
+    )
+    return { ok: true, alreadyHasPanelAccess: true, invitationToken: null }
   }
 
   const otherActiveMemberWithEmail = members.find((m) => {

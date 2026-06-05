@@ -1940,7 +1940,7 @@ Pozdrawiamy,
       panelRoleOwnerHint:
         "Pełny dostęp do ustawień firmy, usług, dostępności, zespołu i wizyt.",
       panelRoleStaffHint:
-        "Plan dnia, wizyty, klienci oraz podgląd historii wysyłek wiadomości. Brak dostępu do zespołu, dostępności, usług i ustawień firmy.",
+        "Plan dnia, wizyty, grafik, statystyki, klienci i wiadomości jak administrator. Brak dostępu do zespołu, dostępności, usług i ustawień firmy.",
       panelAccessNone: "Brak dostępu do panelu",
       panelAccessPending: "Zaproszenie oczekujące",
       panelEmailRequired: "Podaj adres e-mail, aby utworzyć zaproszenie do panelu.",
@@ -1949,6 +1949,10 @@ Pozdrawiamy,
         "Ten adres e-mail należy do konta właściciela firmy. Użyj innego adresu dla osoby z zespołu.",
       panelAlreadyHasAccess:
         "Ta osoba ma już dostęp do panelu — nowe zaproszenie nie jest potrzebne.",
+      panelRoleChangeNoInviteHint:
+        "Zmiana roli (obsługa ↔ administrator) nie wysyła nowego linku — ta sama osoba loguje się tymi samymi danymi; po zapisaniu i ponownym zalogowaniu widzi uprawnienia zgodne z rolą.",
+      panelRoleUpdated:
+        "Zaktualizowano rolę w panelu. Osoba zobaczy zmiany po ponownym zalogowaniu (lub odświeżeniu strony).",
       invitationServerNotConfigured:
         "Serwer nie ma skonfigurowanego SUPABASE_SERVICE_ROLE_KEY — zaproszenie nie mogło zostać zapisane.",
       migration082Required:
@@ -4539,7 +4543,7 @@ Regards,
       panelRoleOwnerHint:
         "Full access to business settings, services, availability, team and appointments.",
       panelRoleStaffHint:
-        "Day plan, appointments, clients and read-only sending history. No access to team, availability, services or business settings.",
+        "Day plan, appointments, schedule, statistics, clients and messages like an administrator. No access to team, availability, services or business settings.",
       panelAccessNone: "No panel access",
       panelAccessPending: "Pending invitation",
       panelEmailRequired: "Enter an email address to create a panel invitation.",
@@ -4548,6 +4552,10 @@ Regards,
         "This email belongs to the business owner account. Use a different address for this team member.",
       panelAlreadyHasAccess:
         "This person already has panel access — a new invitation is not required.",
+      panelRoleChangeNoInviteHint:
+        "Changing the role (staff ↔ administrator) does not send a new link — the same login credentials apply; after saving, they see permissions matching their role on next sign-in (or refresh).",
+      panelRoleUpdated:
+        "Panel role updated. The person will see the changes after signing in again (or refreshing the page).",
       invitationServerNotConfigured:
         "SUPABASE_SERVICE_ROLE_KEY is not configured on the server — the invitation could not be saved.",
       migration082Required:
