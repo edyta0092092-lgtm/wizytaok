@@ -1,35 +1,44 @@
 /**
- * Centrum pomocy — pełny opis funkcji panelu (zgodny z UI 2026).
- * Setup krok po kroku: onboarding na planie dnia (osobny kreator).
+ * Centrum pomocy / przewodnik panelu WizytaOK.
+ * Treść tłumaczeń: `dictionaries.ts` → `guide.*`
+ * Sekcje `adminOnly` widoczne tylko dla roli administrator.
  */
 
 import type { GuideReferenceSection } from "@/lib/guide/guide-reference"
 
 export type HelpCenterCategoryId =
-  | "schedule"
+  | "getting-started"
   | "appointments"
+  | "schedule"
   | "notifications"
   | "booking"
-  | "billing"
-  | "team"
+  | "admin"
   | "other"
 
 export type HelpCenterCategory = {
   id: HelpCenterCategoryId
   titleKey: string
   descriptionKey: string
+  /** Cała kategoria tylko dla administratora. */
+  adminOnly?: boolean
 }
 
 export const HELP_CENTER_CATEGORIES: HelpCenterCategory[] = [
   {
-    id: "schedule",
-    titleKey: "guide.catSchedule",
-    descriptionKey: "guide.catScheduleDesc",
+    id: "getting-started",
+    titleKey: "guide.catGettingStarted",
+    descriptionKey: "guide.catGettingStartedDesc",
   },
   {
     id: "appointments",
     titleKey: "guide.catAppointments",
     descriptionKey: "guide.catAppointmentsDesc",
+  },
+  {
+    id: "schedule",
+    titleKey: "guide.catSchedule",
+    descriptionKey: "guide.catScheduleDesc",
+    adminOnly: true,
   },
   {
     id: "notifications",
@@ -42,14 +51,10 @@ export const HELP_CENTER_CATEGORIES: HelpCenterCategory[] = [
     descriptionKey: "guide.catBookingDesc",
   },
   {
-    id: "billing",
-    titleKey: "guide.catBilling",
-    descriptionKey: "guide.catBillingDesc",
-  },
-  {
-    id: "team",
-    titleKey: "guide.catTeam",
-    descriptionKey: "guide.catTeamDesc",
+    id: "admin",
+    titleKey: "guide.catAdmin",
+    descriptionKey: "guide.catAdminDesc",
+    adminOnly: true,
   },
   {
     id: "other",
@@ -62,83 +67,72 @@ const S = (
   section: Omit<GuideReferenceSection, "searchTags"> & {
     searchTags: string[]
     category: HelpCenterCategoryId
+    adminOnly?: boolean
   },
 ): HelpCenterSection => section as HelpCenterSection
 
 export type HelpCenterSection = GuideReferenceSection & {
   category: HelpCenterCategoryId
+  adminOnly?: boolean
 }
 
 export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
+  // —— Start ——
   S({
-    id: "availability-hours",
-    category: "schedule",
-    titleKey: "guide.hcAvailTitle",
-    href: "/availability",
-    ctaKey: "guide.navAvailability",
-    searchTags: ["dostępność", "godziny", "tydzień", "otwarte", "zapisz"],
+    id: "welcome",
+    category: "getting-started",
+    titleKey: "guide.hcWelcomeTitle",
+    href: "/dashboard",
+    ctaKey: "guide.navDashboard",
+    searchTags: ["start", "pierwsze logowanie", "panel", "wprowadzenie"],
     blocks: [
-      { type: "lead", key: "guide.hcAvailLead" },
-      { type: "steps", key: "guide.hcAvailSteps" },
-      { type: "tip", key: "guide.hcAvailTip" },
+      { type: "lead", key: "guide.hcWelcomeLead" },
+      { type: "steps", key: "guide.hcWelcomeSteps" },
+      { type: "tip", key: "guide.hcWelcomeTip" },
     ],
   }),
   S({
-    id: "availability-exceptions",
-    category: "schedule",
-    titleKey: "guide.hcAvailExTitle",
-    href: "/availability",
-    ctaKey: "guide.navAvailability",
-    searchTags: ["święta", "urlop", "wyjątek", "dzień wolny", "nieczynne"],
+    id: "panel-menu",
+    category: "getting-started",
+    titleKey: "guide.hcPanelMenuTitle",
+    searchTags: ["menu", "nawigacja", "zakładki", "boczne"],
     blocks: [
-      { type: "lead", key: "guide.hcAvailExLead" },
-      { type: "steps", key: "guide.hcAvailExSteps" },
+      { type: "lead", key: "guide.hcPanelMenuLead" },
+      { type: "bullets", key: "guide.hcPanelMenuBullets" },
     ],
   }),
   S({
-    id: "schedule-month",
-    category: "schedule",
-    titleKey: "guide.modScheduleTitle",
-    href: "/schedule",
-    ctaKey: "guide.navCalendar",
-    searchTags: ["grafik", "kalendarz", "miesiąc", "dzień", "terminarz"],
+    id: "statuses-reference",
+    category: "getting-started",
+    titleKey: "guide.hcStatusesTitle",
+    href: "/appointments",
+    ctaKey: "guide.navAppointments",
+    searchTags: ["status", "zrealizowana", "anulowana", "nieobecność", "potwierdzona"],
     blocks: [
-      { type: "lead", key: "guide.modScheduleLead" },
-      { type: "bullets", key: "guide.modScheduleBullets" },
-      { type: "steps", key: "guide.modScheduleSteps" },
+      { type: "lead", key: "guide.hcStatusesLead" },
+      { type: "bullets", key: "guide.hcStatusesBullets" },
+      { type: "body", key: "guide.hcStatusesLocked" },
     ],
   }),
   S({
-    id: "team-schedule-exceptions",
-    category: "schedule",
-    titleKey: "guide.hcStaffScheduleTitle",
-    href: "/team",
-    ctaKey: "guide.navTeam",
-    searchTags: ["zespół", "grafik osoby", "urlop", "wyjątek", "pracownik"],
+    id: "roles-staff",
+    category: "getting-started",
+    titleKey: "guide.hcRolesStaffTitle",
+    searchTags: ["rola", "obsługa", "uprawnienia", "dostęp"],
     blocks: [
-      { type: "lead", key: "guide.hcStaffScheduleLead" },
-      { type: "steps", key: "guide.hcStaffScheduleSteps" },
+      { type: "lead", key: "guide.hcRolesStaffLead" },
+      { type: "bullets", key: "guide.hcRolesStaffBullets" },
     ],
   }),
-  S({
-    id: "slots-and-breaks",
-    category: "schedule",
-    titleKey: "guide.hcSlotsTitle",
-    searchTags: ["slot", "zajęty", "przerwa", "termin", "rezerwacja"],
-    blocks: [
-      { type: "lead", key: "guide.hcSlotsLead" },
-      { type: "bullets", key: "guide.hcSlotsBlocking" },
-      { type: "bullets", key: "guide.hcSlotsNonBlocking" },
-      { type: "body", key: "guide.hcSlotsBreakBody" },
-    ],
-  }),
+
+  // —— Wizyty (admin + obsługa) ——
   S({
     id: "day-plan",
     category: "appointments",
     titleKey: "guide.modDayplanTitle",
     href: "/dashboard",
     ctaKey: "guide.navDashboard",
-    searchTags: ["plan dnia", "dziś", "podpowiedź", "konfiguracja"],
+    searchTags: ["plan dnia", "dziś", "dashboard"],
     blocks: [
       { type: "lead", key: "guide.hcDayplanLead" },
       { type: "bullets", key: "guide.hcDayplanBullets" },
@@ -151,7 +145,8 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcFirstSetupTitle",
     href: "/dashboard",
     ctaKey: "guide.navDashboard",
-    searchTags: ["pierwsza konfiguracja", "onboarding", "kreator", "start"],
+    adminOnly: true,
+    searchTags: ["konfiguracja", "onboarding", "kreator"],
     blocks: [
       { type: "lead", key: "guide.hcFirstSetupLead" },
       { type: "steps", key: "guide.hcFirstSetupSteps" },
@@ -164,10 +159,9 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcApptListTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["wizyty", "lista", "filtr", "status", "dodaj"],
+    searchTags: ["wizyty", "lista", "filtr"],
     blocks: [
       { type: "lead", key: "guide.hcApptListLead" },
-      { type: "bullets", key: "guide.hcApptStatuses" },
       { type: "steps", key: "guide.hcApptListSteps" },
     ],
   }),
@@ -177,7 +171,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcNeedsActionTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["wymaga działania", "wymaga reakcji", "po wizycie", "status"],
+    searchTags: ["wymaga działania", "po wizycie"],
     blocks: [
       { type: "lead", key: "guide.hcNeedsActionLead" },
       { type: "bullets", key: "guide.hcNeedsActionBullets" },
@@ -190,7 +184,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcManualApptTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["dodaj wizytę", "ręcznie", "telefon", "klient"],
+    searchTags: ["dodaj wizytę", "ręcznie"],
     blocks: [
       { type: "lead", key: "guide.hcManualApptLead" },
       { type: "steps", key: "guide.hcManualApptSteps" },
@@ -202,11 +196,24 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcApptStatusMenuTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["zmień status", "zrealizowana", "nieobecność", "anuluj"],
+    searchTags: ["zmień status", "zrealizowana", "zablokowany"],
     blocks: [
       { type: "lead", key: "guide.hcApptStatusMenuLead" },
       { type: "bullets", key: "guide.hcApptStatusMenuBullets" },
       { type: "steps", key: "guide.hcApptStatusMenuSteps" },
+    ],
+  }),
+  S({
+    id: "appointments-send-message",
+    category: "appointments",
+    titleKey: "guide.hcSendMessageTitle",
+    href: "/appointments",
+    ctaKey: "guide.navAppointments",
+    searchTags: ["wyślij wiadomość", "szablon ręczny", "sms"],
+    blocks: [
+      { type: "lead", key: "guide.hcSendMessageLead" },
+      { type: "steps", key: "guide.hcSendMessageSteps" },
+      { type: "tip", key: "guide.hcSendMessageTip" },
     ],
   }),
   S({
@@ -215,7 +222,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcClientChangeTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["prośba klienta", "zmiana terminu", "confirm", "link"],
+    searchTags: ["prośba klienta", "confirm", "zmiana terminu"],
     blocks: [
       { type: "lead", key: "guide.hcClientChangeLead" },
       { type: "steps", key: "guide.hcClientChangeSteps" },
@@ -227,19 +234,103 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcCancelTitle",
     href: "/appointments",
     ctaKey: "guide.navAppointments",
-    searchTags: ["anuluj", "anulowana", "odwołanie"],
+    searchTags: ["anuluj", "anulowana"],
     blocks: [
       { type: "lead", key: "guide.hcCancelLead" },
       { type: "steps", key: "guide.hcCancelSteps" },
     ],
   }),
   S({
-    id: "messages-templates",
+    id: "schedule-month",
+    category: "appointments",
+    titleKey: "guide.modScheduleTitle",
+    href: "/schedule",
+    ctaKey: "guide.navCalendar",
+    searchTags: ["grafik", "kalendarz", "miesiąc"],
+    blocks: [
+      { type: "lead", key: "guide.modScheduleLead" },
+      { type: "bullets", key: "guide.modScheduleBullets" },
+      { type: "steps", key: "guide.modScheduleSteps" },
+    ],
+  }),
+
+  // —— Grafik i dostępność (admin) ——
+  S({
+    id: "availability-hours",
+    category: "schedule",
+    titleKey: "guide.hcAvailTitle",
+    href: "/availability",
+    ctaKey: "guide.navAvailability",
+    adminOnly: true,
+    searchTags: ["dostępność", "godziny"],
+    blocks: [
+      { type: "lead", key: "guide.hcAvailLead" },
+      { type: "steps", key: "guide.hcAvailSteps" },
+      { type: "tip", key: "guide.hcAvailTip" },
+    ],
+  }),
+  S({
+    id: "availability-exceptions",
+    category: "schedule",
+    titleKey: "guide.hcAvailExTitle",
+    href: "/availability",
+    ctaKey: "guide.navAvailability",
+    adminOnly: true,
+    searchTags: ["święta", "urlop", "wyjątek"],
+    blocks: [
+      { type: "lead", key: "guide.hcAvailExLead" },
+      { type: "steps", key: "guide.hcAvailExSteps" },
+    ],
+  }),
+  S({
+    id: "team-schedule-exceptions",
+    category: "schedule",
+    titleKey: "guide.hcStaffScheduleTitle",
+    href: "/team",
+    ctaKey: "guide.navTeam",
+    adminOnly: true,
+    searchTags: ["zespół", "grafik osoby"],
+    blocks: [
+      { type: "lead", key: "guide.hcStaffScheduleLead" },
+      { type: "steps", key: "guide.hcStaffScheduleSteps" },
+    ],
+  }),
+  S({
+    id: "slots-and-breaks",
+    category: "schedule",
+    titleKey: "guide.hcSlotsTitle",
+    adminOnly: true,
+    searchTags: ["slot", "przerwa", "zajęty"],
+    blocks: [
+      { type: "lead", key: "guide.hcSlotsLead" },
+      { type: "bullets", key: "guide.hcSlotsBlocking" },
+      { type: "bullets", key: "guide.hcSlotsNonBlocking" },
+      { type: "body", key: "guide.hcSlotsBreakBody" },
+    ],
+  }),
+
+  // —— Powiadomienia ——
+  S({
+    id: "messages-history",
     category: "notifications",
-    titleKey: "guide.modMsgsTitle",
+    titleKey: "guide.hcMsgHistoryTitle",
     href: "/messages",
     ctaKey: "guide.navMessages",
-    searchTags: ["szablony", "sms", "email", "przypomnienie", "48h"],
+    searchTags: ["historia wysyłek", "sms", "błąd"],
+    blocks: [
+      { type: "lead", key: "guide.hcMsgHistoryLead" },
+      { type: "bullets", key: "guide.hcMsgHistoryBullets" },
+      { type: "steps", key: "guide.hcMsgHistorySteps" },
+    ],
+  }),
+  S({
+    id: "messages-templates",
+    category: "notifications",
+    titleKey: "guide.hcTemplatesTitle",
+    href: "/messages",
+    ctaKey: "guide.navMessages",
+    adminOnly: true,
+    searchTags: ["szablony", "przypomnienie", "email"],
     blocks: [
       { type: "lead", key: "guide.hcMsgsLead" },
       { type: "bullets", key: "guide.hcMsgsBullets" },
@@ -252,23 +343,11 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcCustomTemplatesTitle",
     href: "/messages",
     ctaKey: "guide.navMessages",
-    searchTags: ["własny szablon", "ręczna wysyłka", "custom"],
+    adminOnly: true,
+    searchTags: ["własny szablon", "ręczny"],
     blocks: [
       { type: "lead", key: "guide.hcCustomTemplatesLead" },
       { type: "steps", key: "guide.hcCustomTemplatesSteps" },
-    ],
-  }),
-  S({
-    id: "messages-history",
-    category: "notifications",
-    titleKey: "guide.hcMsgHistoryTitle",
-    href: "/messages",
-    ctaKey: "guide.navMessages",
-    searchTags: ["historia wysyłek", "błąd", "pominięte", "wysłano"],
-    blocks: [
-      { type: "lead", key: "guide.hcMsgHistoryLead" },
-      { type: "bullets", key: "guide.hcMsgHistoryBullets" },
-      { type: "steps", key: "guide.hcMsgHistorySteps" },
     ],
   }),
   S({
@@ -277,20 +356,24 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcRemindersTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
-    searchTags: ["przypomnienia", "kanał", "sms", "drugie przypomnienie"],
+    adminOnly: true,
+    searchTags: ["przypomnienia", "kanał", "ustawienia"],
     blocks: [
       { type: "lead", key: "guide.hcRemindersLead" },
       { type: "bullets", key: "guide.hcRemindersBullets" },
       { type: "body", key: "guide.hcRemindersBody" },
     ],
   }),
+
+  // —— Rezerwacje online ——
   S({
     id: "booking-link",
     category: "booking",
     titleKey: "guide.hcBookingLinkTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
-    searchTags: ["link", "rezerwacje", "slug", "qr", "udostępnij"],
+    adminOnly: true,
+    searchTags: ["link", "rezerwacje"],
     blocks: [
       { type: "lead", key: "guide.hcBookingLinkLead" },
       { type: "steps", key: "guide.hcBookingLinkSteps" },
@@ -301,31 +384,35 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     category: "booking",
     titleKey: "guide.modBookingTitle",
     ctaKey: "guide.navBooking",
-    searchTags: ["rezerwacja online", "klient", "usługa", "termin", "strona"],
+    searchTags: ["rezerwacja online", "klient"],
     blocks: [
       { type: "lead", key: "guide.hcBookingFlowLead" },
       { type: "bullets", key: "guide.modBookingFlow" },
       { type: "steps", key: "guide.modBookingSteps" },
+      { type: "tip", key: "guide.modBookingTip" },
     ],
   }),
   S({
     id: "booking-manage-page",
     category: "booking",
     titleKey: "guide.modManageTitle",
-    searchTags: ["confirm", "potwierdź", "klient", "anuluj", "zmiana"],
+    searchTags: ["confirm", "link klienta"],
     blocks: [
       { type: "lead", key: "guide.modManageLead" },
       { type: "bullets", key: "guide.modManageFlow" },
       { type: "steps", key: "guide.modManageSteps" },
     ],
   }),
+
+  // —— Tylko administrator ——
   S({
-    id: "services",
-    category: "team",
+    id: "admin-services",
+    category: "admin",
     titleKey: "guide.modServicesTitle",
     href: "/services",
     ctaKey: "guide.navServices",
-    searchTags: ["usługi", "cena", "czas trwania", "przerwa", "godziny usługi"],
+    adminOnly: true,
+    searchTags: ["usługi", "cena", "przerwa"],
     blocks: [
       { type: "lead", key: "guide.modServicesLead" },
       { type: "steps", key: "guide.modServicesSteps" },
@@ -334,30 +421,73 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     ],
   }),
   S({
-    id: "team-members",
-    category: "team",
+    id: "admin-team",
+    category: "admin",
     titleKey: "guide.modTeamTitle",
     href: "/team",
     ctaKey: "guide.navTeam",
-    searchTags: ["zespół", "zaproszenie", "rola", "przypisanie usług"],
+    adminOnly: true,
+    searchTags: ["zespół", "zaproszenie", "rola"],
     blocks: [
       { type: "lead", key: "guide.modTeamLead" },
       { type: "steps", key: "guide.modTeamSteps" },
-      { type: "lead", key: "guide.modRolesTitle" },
-      { type: "bullets", key: "guide.modRolesBullets" },
+      { type: "bullets", key: "guide.hcAdminTeamRolesBullets" },
     ],
   }),
   S({
-    id: "billing-trial",
-    category: "billing",
+    id: "admin-settings",
+    category: "admin",
+    titleKey: "guide.modBusinessTitle",
+    href: "/settings",
+    ctaKey: "guide.navSettings",
+    adminOnly: true,
+    searchTags: ["ustawienia", "firma", "subskrypcja"],
+    blocks: [
+      { type: "lead", key: "guide.modBusinessLead" },
+      { type: "steps", key: "guide.modBusinessSteps" },
+      { type: "bullets", key: "guide.hcAdminSettingsBullets" },
+    ],
+  }),
+  S({
+    id: "admin-billing",
+    category: "admin",
     titleKey: "guide.hcBillingTitle",
     href: "/settings",
     ctaKey: "guide.navSettings",
-    searchTags: ["trial", "stripe", "subskrypcja", "płatność", "dostęp"],
+    adminOnly: true,
+    searchTags: ["trial", "stripe", "subskrypcja"],
     blocks: [
       { type: "lead", key: "guide.hcBillingLead" },
       { type: "bullets", key: "guide.hcBillingBullets" },
       { type: "steps", key: "guide.hcBillingSteps" },
+    ],
+  }),
+  S({
+    id: "admin-export",
+    category: "admin",
+    titleKey: "guide.hcExportTitle",
+    href: "/settings",
+    ctaKey: "guide.navSettings",
+    adminOnly: true,
+    searchTags: ["csv", "eksport"],
+    blocks: [
+      { type: "lead", key: "guide.hcExportLead" },
+      { type: "steps", key: "guide.hcExportSteps" },
+    ],
+  }),
+
+  // —— Pozostałe ——
+  S({
+    id: "clients",
+    category: "other",
+    titleKey: "guide.hcClientsTitle",
+    href: "/clients",
+    ctaKey: "guide.navClients",
+    searchTags: ["klienci", "notatki"],
+    blocks: [
+      { type: "lead", key: "guide.hcClientsLead" },
+      { type: "steps", key: "guide.hcClientsSteps" },
+      { type: "tip", key: "guide.hcClientsTip" },
     ],
   }),
   S({
@@ -366,7 +496,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.hcStatisticsTitle",
     href: "/statystyki",
     ctaKey: "guide.navStatistics",
-    searchTags: ["statystyki", "wykres", "kpi", "nieobecność", "anulowane"],
+    searchTags: ["statystyki", "wykres"],
     blocks: [
       { type: "lead", key: "guide.hcStatisticsLead" },
       { type: "bullets", key: "guide.hcStatisticsBullets" },
@@ -374,40 +504,15 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     ],
   }),
   S({
-    id: "business-settings",
+    id: "account",
     category: "other",
-    titleKey: "guide.modBusinessTitle",
-    href: "/settings",
-    ctaKey: "guide.navSettings",
-    searchTags: ["ustawienia", "firma", "nip", "język", "motyw"],
+    titleKey: "guide.hcAccountTitle",
+    href: "/account",
+    ctaKey: "guide.navAccount",
+    searchTags: ["konto", "hasło", "język"],
     blocks: [
-      { type: "lead", key: "guide.modBusinessLead" },
-      { type: "steps", key: "guide.modBusinessSteps" },
-    ],
-  }),
-  S({
-    id: "clients-secondary",
-    category: "other",
-    titleKey: "guide.hcClientsTitle",
-    href: "/clients",
-    ctaKey: "guide.navClients",
-    searchTags: ["klienci", "notatki", "kontakt", "eksport"],
-    blocks: [
-      { type: "lead", key: "guide.hcClientsLead" },
-      { type: "steps", key: "guide.hcClientsSteps" },
-      { type: "tip", key: "guide.hcClientsTip" },
-    ],
-  }),
-  S({
-    id: "export-csv",
-    category: "other",
-    titleKey: "guide.hcExportTitle",
-    href: "/settings",
-    ctaKey: "guide.navSettings",
-    searchTags: ["csv", "eksport", "excel"],
-    blocks: [
-      { type: "lead", key: "guide.hcExportLead" },
-      { type: "steps", key: "guide.hcExportSteps" },
+      { type: "lead", key: "guide.hcAccountLead" },
+      { type: "steps", key: "guide.hcAccountSteps" },
     ],
   }),
   S({
@@ -416,7 +521,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     titleKey: "guide.modHelpTitle",
     href: "/help",
     ctaKey: "guide.navHelp",
-    searchTags: ["pomoc", "support", "czat", "obsługa"],
+    searchTags: ["pomoc", "support", "czat"],
     blocks: [
       { type: "lead", key: "guide.modHelpLead" },
       { type: "steps", key: "guide.hcHelpSteps" },
@@ -439,4 +544,6 @@ export const HELP_CENTER_FAQ_KEYS = [
   { q: "guide.faqQ10", a: "guide.faqA10" },
   { q: "guide.faqQ11", a: "guide.faqA11" },
   { q: "guide.faqQ12", a: "guide.faqA12" },
+  { q: "guide.faqQ13", a: "guide.faqA13" },
+  { q: "guide.faqQ14", a: "guide.faqA14" },
 ] as const

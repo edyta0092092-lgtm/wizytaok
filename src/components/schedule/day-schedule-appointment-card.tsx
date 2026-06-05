@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ScheduleVisitCardDetails } from "@/components/schedule/schedule-visit-card-details"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
@@ -49,7 +50,7 @@ export function DayScheduleAppointmentCard({
   onCancelVisit,
 }: DayScheduleAppointmentCardProps) {
   const theme = scheduleCardTheme(entry)
-  const isCancelled = entry.status === "cancelled"
+  const visitLocked = isAppointmentVisitLocked(entry.status)
   const compactDetails = heightPx < 56
   const laneWidthPct = 100 / laneCount
   const laneLeftPct = laneIndex * laneWidthPct
@@ -79,7 +80,7 @@ export function DayScheduleAppointmentCard({
         />
 
         <div className="flex shrink-0 items-center gap-1">
-          {isCancelled ? (
+          {visitLocked ? (
             <span
               className={cn(
                 "inline-flex max-w-[5.75rem] items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium leading-4",
@@ -116,7 +117,7 @@ export function DayScheduleAppointmentCard({
             </DropdownMenu>
           )}
 
-          {!isCancelled ? (
+          {!visitLocked ? (
             <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <Button

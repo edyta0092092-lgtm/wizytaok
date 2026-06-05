@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { updateAppointmentStatus } from "@/lib/appointments/appointments-store"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
 import { unwrapManualAppointmentId, updateManualAppointment } from "@/lib/appointments/manual-appointments"
@@ -116,7 +117,7 @@ export function useAppointmentInlineActions(args: {
 
   const saveDirectVisitChange = React.useCallback(
     (row: Appointment) => {
-      if (row.status === "cancelled") {
+      if (isAppointmentVisitLocked(row.status)) {
         setProposeValidationError(labels.cannotEditCancelledVisit)
         return
       }

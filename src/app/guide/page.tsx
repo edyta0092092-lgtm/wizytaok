@@ -6,6 +6,7 @@ import { BookOpen, RotateCcw } from "lucide-react"
 
 import { GuideHero } from "@/components/guide/guide-hero"
 import { GuideReferencePanel } from "@/components/guide/guide-reference-panel"
+import { GuideRoleOverview } from "@/components/guide/guide-role-overview"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -18,7 +19,8 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 export default function GuidePage() {
   const { t } = useTranslations()
   const { restartOnboarding } = useOnboarding()
-  const { businessId } = useBusinessAccess()
+  const { businessId, effectiveRole } = useBusinessAccess()
+  const isAdmin = effectiveRole === "admin"
   const [bookingSlug, setBookingSlug] = React.useState("")
 
   React.useEffect(() => {
@@ -56,14 +58,35 @@ export default function GuidePage() {
             onStartTour={() => restartOnboarding()}
           />
 
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-            <BookOpen className="size-4 shrink-0 text-primary" aria-hidden />
-            <span className="flex-1">{t("guide.helpCenterSetupNote")}</span>
-            <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => restartOnboarding()}>
-              <RotateCcw className="size-3.5" />
-              {t("onboarding.restart")}
-            </Button>
-          </div>
+          {isAdmin ? (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-border/80 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              <BookOpen className="size-4 shrink-0 text-primary" aria-hidden />
+              <span className="flex-1">{t("guide.helpCenterSetupNote")}</span>
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" onClick={() => restartOnboarding()}>
+                <RotateCcw className="size-3.5" />
+                {t("onboarding.restart")}
+              </Button>
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-border/80 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+              {t("guide.helpCenterStaffSetupNote")}
+            </p>
+          )}
+
+          <GuideRoleOverview
+            isAdmin={isAdmin}
+            staffTitle={t("guide.roleOverviewStaffTitle")}
+            staffLead={t("guide.roleOverviewStaffLead")}
+            staffCanTitle={t("guide.roleOverviewStaffCanTitle")}
+            staffCanBody={t("guide.roleOverviewStaffCanBody")}
+            staffCannotTitle={t("guide.roleOverviewStaffCannotTitle")}
+            staffCannotBody={t("guide.roleOverviewStaffCannotBody")}
+            adminTitle={t("guide.roleOverviewAdminTitle")}
+            adminLead={t("guide.roleOverviewAdminLead")}
+            adminExtraTitle={t("guide.roleOverviewAdminExtraTitle")}
+            adminExtraBody={t("guide.roleOverviewAdminExtraBody")}
+            adminSectionAnchorLabel={t("guide.roleOverviewAdminAnchor")}
+          />
 
           <GuideReferencePanel
             searchPlaceholder={t("guide.moduleSearchPlaceholder")}
@@ -72,6 +95,7 @@ export default function GuidePage() {
             labelTip={t("guide.labelTip")}
             t={t}
             bookingPath={bookingPath}
+            isAdmin={isAdmin}
           />
 
           <section className="space-y-3">

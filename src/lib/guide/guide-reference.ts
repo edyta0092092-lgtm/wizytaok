@@ -14,6 +14,8 @@ export type GuideReferenceSection = {
   ctaKey?: string
   searchTags: string[]
   blocks: GuideReferenceBlock[]
+  /** Widoczne tylko dla roli administrator (właściciel firmy = administrator). */
+  adminOnly?: boolean
 }
 
 export {

@@ -754,7 +754,8 @@ export const dictionaries = {
         "Wizyta została anulowana. Wiadomość do klienta została dodana do kolejki wysyłki.",
       visitCancelledLocal: "Wizyta została anulowana.",
       changesSaved: "Zmiany zostały zapisane.",
-      cannotEditCancelledVisit: "Nie można edytować anulowanej wizyty.",
+      cannotEditCancelledVisit:
+        "Nie można edytować wizyty ze statusem końcowym (zrealizowana, nieobecność lub anulowana).",
       slotNotAvailableForStaff: "Ten termin nie jest dostępny dla wybranej osoby.",
       cancelVisitCouldNotComplete: "Nie udało się anulować wizyty. Spróbuj ponownie.",
       chooseProposalDateTime: "Wybierz datę i godzinę propozycji.",
@@ -2164,31 +2165,94 @@ Pozdrawiamy,
     },
     guide: {
       title: "Przewodnik WizytaOK",
-      helpCenterTitle: "Centrum pomocy",
-      helpCenterDescription: "Szukaj odpowiedzi o grafiku, wizytach, powiadomieniach i rezerwacjach online.",
-      helpCenterSubtitle: "To dokumentacja produktu — szybki setup znajdziesz na planie dnia.",
-      helpCenterBadge: "Pomoc",
+      helpCenterTitle: "Przewodnik panelu",
+      helpCenterDescription:
+        "Instrukcja krok po kroku: co możesz zrobić w panelu, jak obsługiwać wizyty, statusy i wiadomości. Treść dopasowuje się do Twojej roli.",
+      helpCenterSubtitle:
+        "Zacznij od sekcji „Pierwsze kroki”, potem rozwiń tematy poniżej. Administratorzy widzą dodatkową sekcję na końcu.",
+      helpCenterBadge: "Przewodnik",
       helpCenterSetupNote:
-        "Szybki start (kreator 6 kroków) jest na planie dnia — przycisk „Kontynuuj konfigurację”. Poniżej znajdziesz pełny opis każdej funkcji panelu.",
+        "Jako administrator: szybki kreator (6 kroków) uruchamiasz na planie dnia — „Kontynuuj konfigurację”. Możesz też włączyć przewodnik interaktywny przyciskiem powyżej.",
+      helpCenterStaffSetupNote:
+        "Konfigurację firmy (usługi, godziny, link rezerwacji, zespół) wykonuje administrator. Ty pracujesz na wizytach, grafiku, klientach i historii wysyłek — opis poniżej.",
       catAll: "Wszystko",
+      catGettingStarted: "Pierwsze kroki",
+      catGettingStartedDesc:
+        "Pierwsze logowanie, menu panelu, znaczenie statusów wizyt i Twoje uprawnienia.",
       catSchedule: "Grafik i dostępność",
       catScheduleDesc:
-        "Kiedy firma i osoby pracują, wyjątki kalendarza oraz jak liczone są wolne terminy.",
+        "Tylko administrator: godziny firmy, wyjątki, grafiki osób i zasady wolnych terminów.",
       catAppointments: "Wizyty",
       catAppointmentsDesc:
-        "Plan dnia, lista wizyt, statusy, filtr Wymaga działania i obsługa próśb klientów.",
+        "Plan dnia, lista wizyt, dodawanie ręczne, statusy, wysyłka wiadomości z wizyty i prośby klientów.",
       catNotifications: "Powiadomienia",
       catNotificationsDesc:
-        "Szablony SMS/e-mail, własne wiadomości, ustawienia kanału i historia wysyłek.",
+        "Historia wysyłek (wszyscy). Szablony i ustawienia przypomnień — administrator.",
       catBooking: "Rezerwacje online",
       catBookingDesc:
-        "Link dla klientów, przebieg rezerwacji na stronie publicznej i strona /confirm.",
-      catBilling: "Płatności",
-      catBillingDesc: "Trial, subskrypcja miesięczna i dostęp do panelu (Stripe).",
-      catTeam: "Zespół i usługi",
-      catTeamDesc: "Oferta usług, przypisanie do osób, zaproszenia i role w panelu.",
+        "Jak klient rezerwuje przez link i zarządza wizytą na stronie /confirm.",
+      catAdmin: "Dla administratora",
+      catAdminDesc:
+        "Usługi, zespół, ustawienia firmy, subskrypcja i eksport — tylko z rolą administrator.",
       catOther: "Pozostałe",
-      catOtherDesc: "Pierwsza konfiguracja, statystyki, ustawienia firmy, klienci i pomoc.",
+      catOtherDesc: "Klienci, statystyki, konto użytkownika i czat z obsługą WizytaOK.",
+      roleOverviewStaffTitle: "Rola: Obsługa",
+      roleOverviewStaffLead:
+        "Masz dostęp do codziennej pracy z wizytami. Nie zmieniasz ustawień firmy ani szablonów wiadomości.",
+      roleOverviewStaffCanTitle: "Możesz:",
+      roleOverviewStaffCanBody:
+        "Plan dnia i lista wizyt (filtry, dodawanie ręczne, zmiana statusu, anulowanie, edycja terminu).\nGrafik — podgląd i zmiana statusu na dniu.\nKlienci — przegląd i notatki.\nHistoria wysyłek wiadomości.\nStatystyki.\nMoje konto (imię, hasło).\nCzat z obsługą WizytaOK.",
+      roleOverviewStaffCannotTitle: "Nie masz dostępu do:",
+      roleOverviewStaffCannotBody:
+        "Usług, Zespołu, Dostępności, Ustawień firmy.\nEdycji szablonów SMS/e-mail (tylko podgląd historii wysyłek).\nZapraszania osób do panelu i zmiany ról.",
+      roleOverviewAdminTitle: "Rola: Administrator",
+      roleOverviewAdminLead:
+        "Pełna konfiguracja firmy i zespołu oraz wszystkie funkcje obsługi.",
+      roleOverviewAdminExtraTitle: "Dodatkowo jako administrator:",
+      roleOverviewAdminExtraBody:
+        "Usługi, dostępność, zespół i zaproszenia.\nSzablony wiadomości i ustawienia przypomnień.\nUstawienia firmy, link rezerwacji, subskrypcja, eksport CSV.\nKreator pierwszej konfiguracji na planie dnia.",
+      roleOverviewAdminAnchor: "Przejdź do sekcji dla administratora",
+      hcWelcomeTitle: "Pierwsze logowanie do panelu",
+      hcWelcomeLead:
+        "Po zalogowaniu trafiasz na plan dnia. To centrum pracy na dziś. Z menu po lewej przełączasz moduły — widoczne pozycje zależą od Twojej roli.",
+      hcWelcomeSteps:
+        "1. Sprawdź plan dnia — wizyty na dziś i szybka zmiana statusu.\n2. Otwórz Wizyty, gdy szukasz terminu w innym dniu lub używasz filtrów.\n3. Po każdej minionej wizycie ustaw status: Zrealizowana lub Nieobecność klienta (filtr Wymaga działania).\n4. Administrator: ukończ kreator konfiguracji na planie dnia, zanim udostępnisz link klientom.\n5. Masz pytanie techniczne? Menu → Pomoc (czat) lub ten przewodnik.",
+      hcWelcomeTip:
+        "Nie musisz od razu znać wszystkich zakładek. Wystarczy plan dnia + Wizyty; resztę doładujesz w miarę potrzeb.",
+      hcPanelMenuTitle: "Menu panelu (co gdzie jest)",
+      hcPanelMenuLead: "Poniżej standardowe pozycje menu. Obsługa widzi podzbiór — szczegóły w karcie ról powyżej.",
+      hcPanelMenuBullets:
+        "- Plan dnia — wizyty na dziś, liczniki, szybka zmiana statusu.\n- Wizyty — pełna lista, filtry, dodaj wizytę, edycja, anulowanie, wyślij wiadomość.\n- Grafik — kalendarz miesiąca i widok dnia.\n- Statystyki — podsumowanie okresu.\n- Klienci — katalog kontaktów (opcjonalny).\n- Wiadomości — szablony (admin) lub historia wysyłek (obsługa: tylko historia).\n- Usługi, Zespół, Dostępność, Ustawienia — tylko administrator.\n- Moje konto — profil i hasło.\n- Pomoc — czat z zespołem WizytaOK; Przewodnik — ta strona.",
+      hcStatusesTitle: "Statusy wizyt — co oznaczają",
+      hcStatusesLead:
+        "Status mówi, czy wizyta się odbędzie, już się odbyła, padła, czy klient nie przyszedł. Nowe rezerwacje (online i ręczne) w panelu widać jako Potwierdzona.",
+      hcStatusesBullets:
+        "- Potwierdzona — wizyta w kalendarzu przed terminem; blokuje slot dla innych.\n- Zrealizowana — usługa się odbyła; status końcowy.\n- Nieobecność klienta — klient nie przyszedł; status końcowy.\n- Anulowana — wizyta odwołana; slot znowu wolny.\n- Wymaga działania — to nie status, lecz filtr: minął termin, a wizyta nadal jest Potwierdzona — trzeba ustawić wynik.",
+      hcStatusesLocked:
+        "Po ustawieniu Zrealizowana, Nieobecność klienta lub Anulowana nie można już edytować wizyty ani zmieniać statusu (jak przy zamkniętej sprawie). Nadal możesz wysłać wiadomość z szablonu ręcznego (jeśli skonfigurowany) lub usunąć wizytę, gdy masz do tego uprawnienie.",
+      hcRolesStaffTitle: "Uprawnienia roli Obsługa",
+      hcRolesStaffLead:
+        "Osoba z rolą Obsługa pracuje operacyjnie — bez konfiguracji firmy.",
+      hcRolesStaffBullets:
+        "- Widzi: plan dnia, wizyty, grafik, statystyki, klientów, historię wysyłek.\n- Może: dodawać wizyty, zmieniać status (dopóki nie jest końcowy), edytować termin, anulować, przypisać osobę.\n- Nie widzi: usług, zespołu, dostępności, ustawień firmy, edycji szablonów.",
+      hcSendMessageTitle: "Wyślij wiadomość z karty wizyty",
+      hcSendMessageLead:
+        "Na liście wizyt (wizyty z bazy, nie anulowane) jest przycisk Wyślij wiadomość. Wysyła szablon oznaczony jako ręczny (własny szablon z wyzwalaczem „ręczny”).",
+      hcSendMessageSteps:
+        "1. Otwórz wizytę na liście Wizyty.\n2. Kliknij Wyślij wiadomość.\n3. Wybierz szablon z listy.\n4. Sprawdź wynik w Wiadomościach → Historia wysyłek.\n5. Bez telefonu lub e-mail u klienta wysyłka zostanie pominięta.",
+      hcSendMessageTip:
+        "Szablony ręczne dodaje administrator w Wiadomościach. Obsługa tylko wysyła z gotowej listy.",
+      hcTemplatesTitle: "Szablony wiadomości (SMS i e-mail)",
+      hcAccountTitle: "Moje konto",
+      hcAccountLead:
+        "Profil użytkownika panelu: wyświetlana nazwa, zmiana hasła. Nie mylić z danymi firmy w Ustawieniach (tylko admin).",
+      hcAccountSteps:
+        "1. Menu → Moje konto.\n2. Ustaw nazwę wyświetlaną i zapisz.\n3. Zmień hasło, gdy trzeba.\n4. Język interfejsu — jeśli dostępny w konfiguracji konta.",
+      hcAdminTeamRolesBullets:
+        "- Administrator — pełny panel, konfiguracja, szablony, zespół.\n- Obsługa — wizyty, grafik, klienci, historia wysyłek; bez usług i ustawień firmy.\n- Zmiana roli bez nowego e-maila: Zespół → edycja → Zapisz (osoba musi się przelogować).\n- Usunięcie dostępu do panelu odbiera logowanie do firmy, nie kasuje konta Auth.",
+      hcAdminSettingsBullets:
+        "- Dane firmy i link /rezerwacje/…\n- Kanał przypomnień i drugie przypomnienie\n- Subskrypcja i portal Stripe\n- Eksport CSV wizyt i klientów\n- Ponowna konfiguracja (kreator)",
+      navAccount: "Przejdź do mojego konta",
       hcAvailTitle: "Godziny pracy firmy",
       hcAvailLead:
         "To podstawa kalendarza rezerwacji. Określasz, w które dni tygodnia firma przyjmuje klientów i w jakich godzinach. Bez zapisanych godzin klienci nie zobaczą wolnych terminów.",
@@ -2216,11 +2280,11 @@ Pozdrawiamy,
       hcSlotsBreakBody:
         "Przerwa między wizytami: w Ustawieniach (domyślna przerwa firmy) i przy każdej usłudze (czas trwania + przerwa). Po wizycie 60 min + przerwa 15 min następny wolny slot zacznie się o 75 min od startu poprzedniej.",
       hcDayplanBullets:
-        "- lista wizyt na dziś ze szybką zmianą statusu\n- liczniki potwierdzonych i anulowanych na dziś\n- karta konfiguracji firmy (jeśli setup nie ukończony)\n- rotujące podpowiedzi z praktycznymi wskazówkami",
+        "- wszystkie wizyty na dziś (posortowane po godzinie)\n- badge statusu; przy statusie końcowym brak przycisku Zmień status\n- liczniki potwierdzonych / anulowanych / zrealizowanych\n- u administratora: karta kreatora konfiguracji, gdy setup nie ukończony",
       hcDayplanLead:
-        "Plan dnia to ekran startowy — widzisz, co dzieje się dziś, bez przechodzenia przez całą listę wizyt.",
+        "Plan dnia to ekran startowy po zalogowaniu. Widzisz dzisiejsze wizyty i możesz szybko oznaczyć wynik po wizycie.",
       hcDayplanSteps:
-        "1. Menu → Plan dnia.\n2. Przejrzyj wizyty na dziś i zmień status z menu na karcie.\n3. Użyj Dodaj wizytę, gdy wpisujesz termin telefonicznie.\n4. Pełne filtry, Wymaga działania i historia — w zakładce Wizyty.",
+        "1. Menu → Plan dnia.\n2. Przejrzyj listę na dziś — zmień status tylko u wizyt bez statusu końcowego.\n3. Dodaj wizytę (przycisk u góry) przy zapisie telefonicznym.\n4. Szczegóły, edycja terminu, prośby klienta — w zakładce Wizyty.",
       hcFirstSetupTitle: "Pierwsza konfiguracja (kreator)",
       hcFirstSetupLead:
         "Po aktywacji konta na planie dnia pojawia się kreator. Prowadzi przez 6 kroków: godziny, usługa, zespół, przypisanie usługi, link rezerwacji, pierwsza wizyta. Kroki odhaczają się same, gdy dane są już w systemie — nawet jeśli wcześniej pominąłeś krok.",
@@ -2230,11 +2294,9 @@ Pozdrawiamy,
         "Katalog klientów nie jest wymagany na start — wystarczy link rezerwacji i jedna usługa z godzinami.",
       hcApptListTitle: "Lista wizyt",
       hcApptListLead:
-        "Tu obsługujesz wszystkie terminy: przeszłe i przyszłe. To główne narzędzie po planie dnia, gdy szukasz wizyty po kliencie, usłudze lub statusie.",
-      hcApptStatuses:
-        "- Potwierdzona — wizyta jest w kalendarzu (rezerwacja online i ręczna).\n- Zrealizowana — usługa się odbyła.\n- Nieobecność klienta — klient nie przyszedł.\n- Anulowana — wizyta odwołana, termin wolny.\n- Wymaga działania — filtr: minął termin, a status nadal Potwierdzona (trzeba oznaczyć wynik wizyty).",
+        "Główne narzędzie do pracy z terminami: przeszłe i przyszłe, wyszukiwanie, filtry, edycja i wiadomości.",
       hcApptListSteps:
-        "1. Menu → Wizyty.\n2. Filtruj: Wszystkie, Potwierdzone, Zrealizowane, Nieobecność, Anulowane lub Wymaga działania.\n3. Użyj wyszukiwania i filtrów osoby / usługi.\n4. Odznaka źródła: Rezerwacja online lub Dodane ręcznie.\n5. Przycisk Dodaj wizytę — nowy termin z panelu.",
+        "1. Menu → Wizyty.\n2. Filtry statusów i Wymaga działania.\n3. Wyszukaj klienta; filtruj po osobie lub usłudze.\n4. Odznaka źródła: Rezerwacja online / Dodane ręcznie.\n5. Na karcie: Edytuj wizytę, Zmień status, Usuń, Wyślij wiadomość (gdy dostępne).\n6. Status końcowy (zrealizowana, nieobecność, anulowana) — bez edycji i zmiany statusu.",
       hcNeedsActionTitle: "Filtr „Wymaga działania”",
       hcNeedsActionLead:
         "Po upływie godziny wizyty system oczekuje, że oznaczysz wynik: zrealizowana lub nieobecność. Dopóki tego nie zrobisz, wizyta trafia do filtra Wymaga działania i do statystyk jako „wymaga działania”.",
@@ -2249,11 +2311,11 @@ Pozdrawiamy,
         "1. Plan dnia lub Wizyty → Dodaj wizytę.\n2. Wybierz usługę, osobę (jeśli dotyczy), datę i godzinę.\n3. Wpisz imię i nazwisko oraz telefon lub e-mail (przynajmniej jeden kontakt — do przypomnień).\n4. Zapisz — status będzie Potwierdzona, źródło: Dodane ręcznie.",
       hcApptStatusMenuTitle: "Zmiana statusu wizyty",
       hcApptStatusMenuLead:
-        "Status mówi, czy wizyta się odbędzie, się odbyła, padła albo klient nie przyszedł. Zmieniasz go po fakcie lub gdy klient anuluje.",
+        "Zmieniasz status, gdy wiesz wynik wizyty lub klient rezygnuje. Menu pokazuje tylko statusy inne niż bieżący.",
       hcApptStatusMenuBullets:
-        "- Potwierdzona — przed wizytą\n- Zrealizowana — po udanej wizycie\n- Nieobecność klienta — po terminie, gdy nikt nie przyszedł\n- Anulowana — rezygnacja",
+        "- Potwierdzona — przed wizytą (blokuje termin)\n- Zrealizowana / Nieobecność — po wizycie; od tej chwili brak edycji\n- Anulowana — odwołanie; brak edycji\n- Te same zasady na planie dnia, liście wizyt i w grafiku dnia",
       hcApptStatusMenuSteps:
-        "1. Na karcie wizyty (Wizyty, Plan dnia lub Grafik → dzień) otwórz menu Zmień status.\n2. Wybierz nowy status.\n3. Opcjonalnie dodaj notatkę dla zespołu.",
+        "1. Otwórz Zmień status (Wizyty, plan dnia lub grafik → dzień).\n2. Wybierz: Zrealizowana, Nieobecność klienta lub Anulowana.\n3. Po statusie końcowym przyciski Edytuj wizytę i Zmień status znikają.\n4. Edycja terminu i notatki — tylko przy Potwierdzonej (Edytuj wizytę).",
       hcClientChangeTitle: "Prośba klienta o zmianę",
       hcClientChangeLead:
         "Z linku w SMS/e-mail (/confirm/…) klient może poprosić o inny termin lub usługę. Prośba pojawia się na karcie wizyty — nie ma osobnego filtra na liście.",
@@ -2472,7 +2534,7 @@ Pozdrawiamy,
       modScheduleLead:
         "Osobna zakładka Grafik pokazuje miesiąc z podświetleniem dni, w których są wizyty. Po kliknięciu dnia otwierasz widok godzinowy z kolumnami osób.",
       modScheduleBullets:
-        "- filtr osoby (dla administratora)\n- anulowane wizyty domyślnie nie widać w grafiku\n- w oknie dnia: zmiana statusu, anulowanie wizyty, szczegóły klienta\n- zmiany są widoczne także na liście Wizyty",
+        "- filtr osoby (administrator)\n- anulowane wizyty w grafiku wygaszone\n- w widoku dnia: zmiana statusu tylko gdy status nie jest końcowy\n- te same statusy co na liście Wizyty",
       modScheduleSteps:
         "1. Wejdź w Grafik.\n2. Przewijaj miesiące strzałkami.\n3. Kliknij dzień z wizytą (żółte tło).\n4. W terminarzu wybierz wizytę i zmień status lub anuluj.\n5. Sprawdź tę samą wizytę na liście Wizyty.",
       modChangesTitle: "Prośby klienta o zmianę",
@@ -2488,7 +2550,7 @@ Pozdrawiamy,
       modNeedsActionTitle: "Wymaga reakcji",
       modNeedsActionLead: "To sprawy, które wymagają decyzji firmy.",
       modNeedsActionBullets:
-        "- klient poprosił o zmianę terminu\n- przypomnienie nie zostało wysłane\n- brakuje telefonu i e-maila\n- klient nie odpowiedział blisko terminu wizyty",
+        "- minął termin wizyty ze statusem Potwierdzona\n- oznacz Zrealizowana lub Nieobecność klienta\n- spójne z filtrem Wymaga działania i statystykami",
       modSettingsGuideTitle: "Ustawienia",
       modSettingsGuideLead:
         "W ustawieniach zmieniasz dane firmy, język, motyw, przypomnienia i informacje prawne. Wszystkie zmiany zapisują się dopiero po kliknięciu Zapisz zmiany.",
@@ -2501,8 +2563,7 @@ Pozdrawiamy,
         "Wiadomości zawierają szablony oraz historię wysyłek.",
       modMsgsSteps:
         "1. Szablony służą do treści automatycznych wiadomości.\n2. Historia wysyłek pokazuje wysłane, zaplanowane, błędne, pominięte i wpisy dev/symulacje.\n3. Podgląd pokazuje treść, odbiorcę, status i błąd, jeśli wystąpił.",
-      modMsgsMvp:
-        "Na etapie MVP wiadomości mogą być zapisywane jako symulacja. Prawdziwa wysyłka SMS lub e-mail wymaga podłączenia dostawcy.",
+      modMsgsMvp: "",
       modManageTitle: "Strona klienta (/confirm)",
       modManageLead:
         "Klient z linku w wiadomości otwiera swoją wizytę (adres typu /confirm/[id]).",
@@ -2547,9 +2608,9 @@ Pozdrawiamy,
         "Ma pełny dostęp do ustawień firmy, usług, dostępności, zespołu i wizyt.",
       staffRoleTitle: "Obsługa",
       staffRoleDesc:
-        "Może obsługiwać wizyty, klientów i wiadomości, ale nie zmienia ustawień firmy.",
+        "Plan dnia, wizyty, grafik, statystyki, klienci i historia wysyłek — bez usług, zespołu, dostępności i ustawień firmy.",
       modRolesBullets:
-        "- Właściciel panelu: pełny dostęp.\n- Obsługa: wizyty, klienci, wiadomości bez zmiany ustawień firmy.\n- Administrator dodaje osobę w Zespole, wybiera rolę i kopiuje link zaproszenia.\n- Zaproszona osoba ustawia hasło przez link zaproszenia.",
+        "- Właściciel konta firmy ma rolę administratora.\n- Administrator: konfiguracja + wszystko co obsługa.\n- Obsługa: praca operacyjna, bez szablonów i ustawień firmy.",
       modRolesSteps:
         "1. Jako administrator wejdź w Zespół.\n2. Dodaj osobę z e-mailem i rolą w panelu.\n3. Zapisz osobę i skopiuj link zaproszenia.\n4. Przekaż link ręcznie.\n5. Osoba zakłada konto lub loguje się i akceptuje zaproszenie.",
       modSettingsExtraTitle: "13. Depozyty i eksport danych CSV",
@@ -2575,7 +2636,13 @@ Pozdrawiamy,
         "To wizyty po terminie, które nadal mają status Potwierdzona. Oznacz je jako Zrealizowana lub Nieobecność klienta — wtedy znikną z filtra i zaktualizują statystyki.",
       faqQ3: "Czy mogę ręcznie wysłać standardowe przypomnienie?",
       faqA3:
-        "Nie — pierwsze i drugie przypomnienie wysyłają się automatycznie. Możesz wysłać własny szablon z Wiadomości ręcznie z karty wizyty.",
+        "Nie — przypomnienia 24 h i krótkie przed wizytą idą automatycznie. Z karty wizyty możesz wysłać szablon ręczny (własny), jeśli administrator go dodał.",
+      faqQ13: "Dlaczego nie mogę edytować zrealizowanej wizyty?",
+      faqA13:
+        "Statusy Zrealizowana, Nieobecność klienta i Anulowana są zamknięte — nie zmienia się termin ani status (jak przy archiwum).",
+      faqQ14: "Czym różni się obsługa od administratora?",
+      faqA14:
+        "Obsługa nie widzi Usług, Zespołu, Dostępności ani Ustawień firmy i nie edytuje szablonów — tylko historię wysyłek. Administrator konfiguruje firmę i zaprasza zespół.",
       faqQ4: "Gdzie ustawię 48 h przed wizytą zamiast 24 h?",
       faqA4:
         "Wiadomości → szablon pierwszego przypomnienia → Edytuj → pole czasu przed wizytą. Historia wysyłek zapisuje czas z momentu wysłania.",
@@ -3374,7 +3441,8 @@ Pozdrawiamy,
         "The visit was cancelled. The message to the client was added to the send queue.",
       visitCancelledLocal: "The visit was cancelled.",
       changesSaved: "Changes saved.",
-      cannotEditCancelledVisit: "You cannot edit a cancelled appointment.",
+      cannotEditCancelledVisit:
+        "You cannot edit an appointment with a final status (completed, no-show, or cancelled).",
       slotNotAvailableForStaff: "This time slot is not available for the selected staff member.",
       cancelVisitCouldNotComplete: "Could not cancel the visit. Please try again.",
       chooseProposalDateTime: "Choose a proposal date and time.",
@@ -4763,30 +4831,91 @@ Regards,
     },
     guide: {
       title: "WizytaOK Guide",
-      helpCenterTitle: "Help center",
-      helpCenterDescription: "Find answers about schedule, appointments, notifications and online booking.",
-      helpCenterSubtitle: "Product documentation — quick setup lives on the day plan.",
-      helpCenterBadge: "Help",
+      helpCenterTitle: "Panel guide",
+      helpCenterDescription:
+        "Step-by-step: what you can do in the panel, how to handle visits, statuses and messages. Content adapts to your role.",
+      helpCenterSubtitle:
+        "Start with Getting started, then expand topics below. Administrators see an extra section at the end.",
+      helpCenterBadge: "Guide",
       helpCenterSetupNote:
-        "Quick setup (6-step wizard) is on the day plan — Continue setup. Below is the full guide to every panel feature.",
+        "As an administrator: run the 6-step wizard from the day plan — Continue setup. You can also restart the interactive tour with the button above.",
+      helpCenterStaffSetupNote:
+        "Business setup (services, hours, booking link, team) is done by an administrator. You work with visits, schedule, clients and the send log — described below.",
       catAll: "All",
+      catGettingStarted: "Getting started",
+      catGettingStartedDesc:
+        "First login, panel menu, visit statuses and your permissions.",
       catSchedule: "Schedule & availability",
       catScheduleDesc:
-        "When the business and staff work, calendar exceptions, and how free slots are calculated.",
+        "Administrators only: business hours, exceptions, staff schedules and free-slot rules.",
       catAppointments: "Appointments",
       catAppointmentsDesc:
-        "Day plan, visit list, statuses, Needs action filter and client requests.",
+        "Day plan, visit list, manual booking, statuses, send message from a visit and client requests.",
       catNotifications: "Notifications",
       catNotificationsDesc:
-        "SMS/email templates, custom messages, channel settings and sending history.",
+        "Sending history (everyone). Templates and reminder settings — administrator.",
       catBooking: "Online booking",
-      catBookingDesc: "Client link, public booking flow and /confirm management page.",
-      catBilling: "Billing",
-      catBillingDesc: "Trial, monthly subscription and panel access (Stripe).",
-      catTeam: "Team & services",
-      catTeamDesc: "Services, staff assignment, invitations and panel roles.",
+      catBookingDesc: "How clients book via your link and manage visits on /confirm.",
+      catAdmin: "For administrators",
+      catAdminDesc:
+        "Services, team, business settings, subscription and export — administrator role only.",
       catOther: "Other",
-      catOtherDesc: "First-time setup, statistics, business settings, clients and support.",
+      catOtherDesc: "Clients, statistics, my account and WizytaOK support chat.",
+      roleOverviewStaffTitle: "Role: Staff",
+      roleOverviewStaffLead:
+        "You handle day-to-day visits. You cannot change business settings or message templates.",
+      roleOverviewStaffCanTitle: "You can:",
+      roleOverviewStaffCanBody:
+        "Day plan and appointments (filters, manual add, status change, cancel, edit time).\nSchedule — view and change status on the day board.\nClients — view and notes.\nMessage send history.\nStatistics.\nMy account (name, password).\nSupport chat with WizytaOK.",
+      roleOverviewStaffCannotTitle: "You cannot access:",
+      roleOverviewStaffCannotBody:
+        "Services, Team, Availability, Business settings.\nEditing SMS/email templates (send history only).\nInviting users or changing roles.",
+      roleOverviewAdminTitle: "Role: Administrator",
+      roleOverviewAdminLead:
+        "Full business setup and team management plus everything staff can do.",
+      roleOverviewAdminExtraTitle: "Additionally as administrator:",
+      roleOverviewAdminExtraBody:
+        "Services, availability, team and invitations.\nMessage templates and reminder settings.\nBusiness settings, booking link, subscription, CSV export.\nFirst-time setup wizard on the day plan.",
+      roleOverviewAdminAnchor: "Go to administrator section",
+      hcWelcomeTitle: "First login to the panel",
+      hcWelcomeLead:
+        "After sign-in you land on the day plan — today’s visits. Use the left menu to switch modules; visible items depend on your role.",
+      hcWelcomeSteps:
+        "1. Check the day plan — today’s visits and quick status changes.\n2. Open Appointments for other dates or advanced filters.\n3. After each past visit set Completed or Client did not attend (Needs action filter).\n4. Administrator: finish the setup wizard before sharing the booking link.\n5. Technical question? Menu → Help (chat) or this guide.",
+      hcWelcomeTip:
+        "You do not need every tab on day one. Day plan + Appointments is enough; add the rest when needed.",
+      hcPanelMenuTitle: "Panel menu (what is where)",
+      hcPanelMenuLead: "Standard menu items below. Staff see a subset — see the role card above.",
+      hcPanelMenuBullets:
+        "- Day plan — today’s visits and quick status.\n- Appointments — full list, filters, add visit, edit, cancel, send message.\n- Schedule — month calendar and day timeline.\n- Statistics — period summary.\n- Clients — contact catalog (optional).\n- Messages — templates (admin) or send history only (staff).\n- Services, Team, Availability, Settings — administrator only.\n- My account — profile and password.\n- Help — WizytaOK support chat; Guide — this page.",
+      hcStatusesTitle: "Visit statuses — what they mean",
+      hcStatusesLead:
+        "Status shows whether the visit will happen, already happened, was cancelled or the client no-showed. New bookings appear as Confirmed.",
+      hcStatusesBullets:
+        "- Confirmed — on the calendar before the visit; blocks the slot.\n- Completed — visit happened; final status.\n- Client did not attend — no-show; final status.\n- Cancelled — visit called off; slot free again.\n- Needs action — not a status but a filter: time passed while still Confirmed — mark the outcome.",
+      hcStatusesLocked:
+        "After Completed, Client did not attend or Cancelled you cannot edit the visit or change status. You can still send a manual template message (if configured) or delete the visit when allowed.",
+      hcRolesStaffTitle: "Staff role permissions",
+      hcRolesStaffLead: "Staff work operationally without business configuration.",
+      hcRolesStaffBullets:
+        "- Sees: day plan, appointments, schedule, statistics, clients, send history.\n- Can: add visits, change status (until final), edit time, cancel, assign staff.\n- Cannot see: services, team, availability, business settings, template editor.",
+      hcSendMessageTitle: "Send message from a visit card",
+      hcSendMessageLead:
+        "On the appointments list (database visits, not cancelled) use Send message. It sends a template marked as manual.",
+      hcSendMessageSteps:
+        "1. Open the visit under Appointments.\n2. Click Send message.\n3. Pick a template.\n4. Check Messages → Sending history.\n5. Without client phone or email sending is skipped.",
+      hcSendMessageTip: "Manual templates are added by an administrator in Messages. Staff only send from the list.",
+      hcTemplatesTitle: "Message templates (SMS & email)",
+      hcAccountTitle: "My account",
+      hcAccountLead:
+        "Your panel user profile: display name, password. Not the same as business settings (admin only).",
+      hcAccountSteps:
+        "1. Menu → My account.\n2. Set display name and save.\n3. Change password when needed.",
+      hcAdminTeamRolesBullets:
+        "- Administrator — full panel, setup, templates, team.\n- Staff — visits, schedule, clients, send history; no services or business settings.\n- Role change without a new email: Team → edit → Save (user must sign in again).\n- Revoking panel access blocks login to this business, not the Auth account.",
+      hcAdminSettingsBullets:
+        "- Business data and /bookings/… link\n- Reminder channel and second reminder\n- Subscription and Stripe portal\n- CSV export\n- Re-run setup wizard",
+      navAccount: "Go to my account",
       hcAvailTitle: "Business working hours",
       hcAvailLead:
         "This is the foundation of the booking calendar. You define which weekdays the business is open and the hours. Without saved hours, clients will not see available times.",
@@ -4814,11 +4943,11 @@ Regards,
       hcSlotsBreakBody:
         "Break between visits: default in Settings and per service (duration + break). After a 60 min visit with 15 min break, the next free slot starts 75 min after the previous start.",
       hcDayplanBullets:
-        "- today’s visit list with quick status change\n- confirmed and cancelled counts for today\n- setup card when onboarding is incomplete\n- rotating practical tips",
+        "- all visits today sorted by time\n- status badge; no Change status on final statuses\n- confirmed / cancelled / completed counts\n- administrators: setup wizard card when incomplete",
       hcDayplanLead:
-        "Day plan is your home screen — see what is happening today without opening the full appointments list.",
+        "Day plan is the home screen after login. See today’s visits and mark outcomes quickly.",
       hcDayplanSteps:
-        "1. Menu → Day plan.\n2. Review today’s visits and change status from the row menu.\n3. Use Add appointment for phone bookings.\n4. Full filters, Needs action and history — under Appointments.",
+        "1. Menu → Day plan.\n2. Review today — change status only when not final.\n3. Add appointment for phone bookings.\n4. Edit time, client requests — under Appointments.",
       hcFirstSetupTitle: "First-time setup (wizard)",
       hcFirstSetupLead:
         "After activation, a wizard appears on the day plan. It walks through 6 steps: hours, service, team, service assignment, booking link, first visit. Steps check off automatically when data already exists — even if you skipped a step earlier.",
@@ -4828,11 +4957,9 @@ Regards,
         "The client catalog is not required to go live — a booking link and one service with hours is enough.",
       hcApptListTitle: "Appointments list",
       hcApptListLead:
-        "Handle all visits here: past and upcoming. Main tool after day plan when you search by client, service or status.",
-      hcApptStatuses:
-        "- Confirmed — on the calendar (online and manual).\n- Completed — visit happened.\n- Client did not attend — no-show.\n- Cancelled — visit cancelled, slot free.\n- Needs action — filter: visit time passed but still Confirmed (mark the outcome).",
+        "Main tool for all visits: search, filters, edit and messages.",
       hcApptListSteps:
-        "1. Menu → Appointments.\n2. Filter: All, Confirmed, Completed, Client did not attend, Cancelled or Needs action.\n3. Search and filter by staff / service.\n4. Source badge: Online booking or Added manually.\n5. Add appointment — new visit from the panel.",
+        "1. Menu → Appointments.\n2. Status filters and Needs action.\n3. Search client; filter by staff or service.\n4. Source badge: Online booking / Added manually.\n5. Card actions: Edit visit, Change status, Delete, Send message.\n6. Final statuses — no edit or status change.",
       hcNeedsActionTitle: "“Needs action” filter",
       hcNeedsActionLead:
         "After the visit time passes, you should mark Completed or Client did not attend. Until then the visit appears under Needs action and in statistics as needs action.",
@@ -4847,11 +4974,11 @@ Regards,
         "1. Day plan or Appointments → Add appointment.\n2. Pick service, staff (if any), date and time.\n3. Enter name and phone or email (at least one — for reminders).\n4. Save — status Confirmed, source Added manually.",
       hcApptStatusMenuTitle: "Change visit status",
       hcApptStatusMenuLead:
-        "Status tells whether the visit will happen, happened, was cancelled or the client did not show. Change it after the fact or when the client cancels.",
+        "Change status when you know the outcome or the client cancels. The menu lists only statuses other than the current one.",
       hcApptStatusMenuBullets:
-        "- Confirmed — before the visit\n- Completed — after a successful visit\n- Client did not attend — after no-show\n- Cancelled — visit called off",
+        "- Confirmed — before the visit (blocks the slot)\n- Completed / Client did not attend — after the visit; no further edits\n- Cancelled — no further edits\n- Same rules on day plan, appointments list and schedule day view",
       hcApptStatusMenuSteps:
-        "1. On the visit card (Appointments, Day plan or Schedule → day) open Change status.\n2. Pick the new status.\n3. Optionally add a team note.",
+        "1. Open Change status (Appointments, day plan or schedule → day).\n2. Pick Completed, Client did not attend or Cancelled.\n3. After a final status Edit visit and Change status are hidden.\n4. Edit time and notes only while Confirmed.",
       hcClientChangeTitle: "Client change request",
       hcClientChangeLead:
         "From the SMS/email link (/confirm/…) a client can request another time or service. The request appears on the visit card — not as a separate list filter.",
@@ -5062,7 +5189,7 @@ Regards,
       modScheduleLead:
         "The Schedule tab shows a month view with days that have visits highlighted. Click a day to open the hourly board with staff columns.",
       modScheduleBullets:
-        "- staff filter (for administrators)\n- cancelled visits are hidden by default in the schedule\n- day modal: change status, cancel visit, client details\n- changes sync with the Appointments list",
+        "- staff filter (administrator)\n- cancelled visits faded in schedule\n- day view: change status only when not final\n- same status rules as Appointments list",
       modScheduleSteps:
         "1. Open Schedule.\n2. Move between months with arrows.\n3. Click a highlighted day.\n4. Pick a visit on the board and update status or cancel.\n5. Verify the same row under Appointments.",
       modChangesTitle: "Client change requests",
@@ -5091,8 +5218,7 @@ Regards,
         "Messages holds templates and sending history.",
       modMsgsSteps:
         "1. Templates power automated message content.\n2. Sending history shows sent, scheduled, failed, skipped and simulation/dev entries.\n3. The preview shows body, recipient, status and any error.",
-      modMsgsMvp:
-        "During MVP previews, transports may simulate delivery. Connecting a real telecom or ESP is a later integration milestone.",
+      modMsgsMvp: "",
       modManageTitle: "Booking management page",
       modManageLead:
         "Guests use /confirm/[id] or the management token from outbound mail.",
@@ -5131,7 +5257,7 @@ Regards,
         "Has full access to business settings, services, availability, team and appointments.",
       staffRoleTitle: "Staff",
       staffRoleDesc:
-        "Can manage appointments, clients and messages, but cannot change business settings.",
+        "Day plan, appointments, schedule, statistics, clients and send history — no services, team, availability or business settings.",
       modRolesTitle: "Roles",
       modRolesLead:
         "Roles define what each person can change in the panel.",
@@ -5162,7 +5288,13 @@ Regards,
         "Visits whose time has passed but status is still Confirmed. Mark Completed or Client did not attend — they leave the filter and update statistics.",
       faqQ3: "Can I send a standard reminder manually?",
       faqA3:
-        "No — first and second reminders are automatic. You can send a custom template manually from a visit when available.",
+        "No — 24h and short pre-visit reminders are automatic. You can send a manual template from a visit if an administrator added one.",
+      faqQ13: "Why can't I edit a completed visit?",
+      faqA13:
+        "Completed, Client did not attend and Cancelled are closed — time and status cannot change.",
+      faqQ14: "How is staff different from administrator?",
+      faqA14:
+        "Staff cannot open Services, Team, Availability or Business settings and cannot edit templates — only send history. Administrators configure the business and invite the team.",
       faqQ4: "Where do I set 48h before instead of 24h?",
       faqA4:
         "Messages → first reminder template → Edit → timing before visit. Sending history stores the timing used at send time.",

@@ -6,6 +6,7 @@ import { AppointmentListRow } from "@/components/appointments/appointment-list-r
 import { AppointmentsGroupedSections } from "@/components/appointments/appointments-grouped-sections"
 import { AppointmentsListEmpty } from "@/components/appointments/appointments-list-empty"
 import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentsDayGroupFilter, AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
 import {
@@ -266,13 +267,16 @@ export function AppointmentsListWithRows({
             allowAppointmentDelete={allowAppointmentDelete}
             onStaffChange={(next) => onStaffChange(row, next)}
             onEditVisit={() => onEditVisit(row)}
-            onChangeStatus={(s) => onChangeStatus(row.id, s)}
+            onChangeStatus={(s) => {
+              if (isAppointmentVisitLocked(row.status)) return
+              onChangeStatus(row.id, s)
+            }}
+            editOpen={proposeForId === row.id && !isAppointmentVisitLocked(row.status)}
             onDeleteRequest={() => onDeleteRequest(row.id)}
             showDeleteConfirm={effectiveRowId === row.id}
             onDeleteConfirmDismiss={onDeleteConfirmDismiss}
             onDeleteConfirm={onDeleteConfirm}
             isDeletingAppointment={isDeletingAppointment}
-            editOpen={proposeForId === row.id}
             proposeDate={proposeDate}
             proposeTime={proposeTime}
             proposeCustomerNote={proposeCustomerNote}

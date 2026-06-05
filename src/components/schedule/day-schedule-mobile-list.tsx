@@ -2,6 +2,7 @@
 
 import { ScheduleVisitCardDetails } from "@/components/schedule/schedule-visit-card-details"
 import { Button } from "@/components/ui/button"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { scheduleCardTheme } from "@/lib/schedule/schedule-day-board"
 import type { ScheduleDayEntry } from "@/lib/schedule/schedule-day-types"
 import { cn } from "@/lib/utils"
@@ -33,7 +34,7 @@ export function DayScheduleMobileList({
   return (
     <div className="divide-y divide-border/80 overflow-y-auto px-4 py-2">
       {entries.map((row) => {
-        const isCancelled = row.status === "cancelled"
+        const visitLocked = isAppointmentVisitLocked(row.status)
         return (
           <div key={row.id} className={cn("my-2 rounded-lg border px-3 py-3", scheduleCardTheme(row).cardClass)}>
             <ScheduleVisitCardDetails
@@ -41,7 +42,7 @@ export function DayScheduleMobileList({
               staffFallback={staffFallbackLabel}
               className="gap-3"
             />
-            {!isCancelled ? (
+            {!visitLocked ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <select
                   aria-label={changeStatusLabel}
@@ -67,7 +68,7 @@ export function DayScheduleMobileList({
                 </Button>
               </div>
             ) : (
-              <p className="mt-2 text-xs font-medium text-muted-foreground">{statusLabel("cancelled")}</p>
+              <p className="mt-2 text-xs font-medium text-muted-foreground">{statusLabel(row.status)}</p>
             )}
           </div>
         )

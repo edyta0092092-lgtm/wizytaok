@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import type { AppointmentStatus } from "@/types/domain"
 
@@ -40,10 +41,11 @@ export function AppointmentRowActions({
   allowAppointmentDelete = true,
 }: AppointmentRowActionsProps) {
   const { t } = useTranslations()
+  const visitLocked = isAppointmentVisitLocked(status)
 
   return (
     <div className={actionBarClassName}>
-      {status !== "cancelled" ? (
+      {!visitLocked ? (
         <Button
           type="button"
           variant="outline"
@@ -54,7 +56,7 @@ export function AppointmentRowActions({
           {t("appointments.editVisit")}
         </Button>
       ) : null}
-      {status !== "cancelled" ? (
+      {!visitLocked ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="outline" size="default" className={outlineActionClassName}>

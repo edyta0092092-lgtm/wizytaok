@@ -27,6 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import {
   getAppointmentsForToday,
   updateAppointmentStatus,
@@ -34,6 +36,7 @@ import {
 } from "@/lib/appointments/appointments-store"
 import { useBusinessBookingPagePath } from "@/lib/business/use-business-booking-page-path"
 import {
+  appointmentShowsNeedsActionStatus,
   isPlannedVisitForDashboardStats,
 } from "@/lib/appointments/stats-rules"
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
@@ -45,14 +48,6 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { AppointmentStatus } from "@/types/domain"
 
 const DASHBOARD_TIP_COUNT = 16
-
-const DASHBOARD_STATUS_OPTIONS: AppointmentStatus[] = [
-  "pending",
-  "confirmed",
-  "completed",
-  "no_show",
-  "cancelled",
-]
 
 function MiniStat({
   label,
@@ -80,15 +75,6 @@ function MiniStat({
     </Link>
   )
 }
-
-function dashboardStatusOptionLabel(
-  status: AppointmentStatus,
-  t: (key: string) => string
-): string {
-  if (status === "pending") return t("appointments.filterNeedsAction")
-  return t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")
-}
-
 
 function TipCard() {
   const { t } = useTranslations()
@@ -178,6 +164,13 @@ export default function DashboardPage() {
   const plannedToday = React.useMemo(
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a, currentTime)),
     [currentTime, todaysList]
+  )
+  const todaysListSorted = React.useMemo(
+    () =>
+      [...todaysList].sort(
+        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      ),
+    [todaysList],
   )
   const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
     const confirmedTodayCount = plannedToday.length
@@ -316,9 +309,14 @@ export default function DashboardPage() {
     return () => window.clearTimeout(tid)
   }, [statusNotice])
 
-  const changeStatusFromDashboard = (appointmentId: string, status: AppointmentStatus) => {
+  const changeStatusFromDashboard = (
+    appointmentId: string,
+    currentStatus: AppointmentStatus,
+    nextStatus: AppointmentStatus,
+  ) => {
+    if (isAppointmentVisitLocked(currentStatus) || currentStatus === nextStatus) return
     void (async () => {
-      const ok = await updateAppointmentStatus(appointmentId, status, {
+      const ok = await updateAppointmentStatus(appointmentId, nextStatus, {
         lastUpdatedBy: "business",
         lastStatusChangeSource: "manual",
       })
@@ -433,13 +431,15 @@ export default function DashboardPage() {
                     <li className="px-4 py-5 text-sm text-muted-foreground">
                       {appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")}
                     </li>
-                  ) : plannedToday.length === 0 ? (
+                  ) : todaysListSorted.length === 0 ? (
                     <li className="px-4 py-5 text-sm text-muted-foreground">
                       {t("dashboard.noAppointmentsTodayShort")}
                     </li>
                   ) : (
-                    plannedToday.map((row) => {
+                    todaysListSorted.map((row) => {
                     const when = new Date(row.startsAt)
+                    const visitLocked = isAppointmentVisitLocked(row.status)
+                    const statusOptions = APPOINTMENT_ROW_STATUS_ORDER.filter((s) => s !== row.status)
                     return (
                       <li key={row.id} className="flex items-start justify-between gap-3 px-4 py-3">
                         <div className="flex min-w-0 gap-3">
@@ -464,30 +464,31 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className="flex shrink-0 items-start gap-2 pt-0.5">
-                          <StatusBadge status={row.status} />
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button type="button" variant="outline" size="sm" className="h-8">
-                                {t("appointments.changeStatusAction")}
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <div className="px-2 pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                                {t("appointments.manualStatusChange")}
-                              </div>
-                              <div className="px-2 py-1 text-xs text-muted-foreground">
-                                {t("appointments.chooseStatus")}
-                              </div>
-                              {DASHBOARD_STATUS_OPTIONS.map((status) => (
-                                <DropdownMenuItem
-                                  key={status}
-                                  onClick={() => changeStatusFromDashboard(row.id, status)}
-                                >
-                                  {dashboardStatusOptionLabel(status, t)}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <StatusBadge
+                            status={row.status}
+                            needsAction={appointmentShowsNeedsActionStatus(row, currentTime)}
+                          />
+                          {!visitLocked && statusOptions.length > 0 ? (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button type="button" variant="outline" size="sm" className="h-8">
+                                  {t("appointments.changeStatusAction")}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                {statusOptions.map((status) => (
+                                  <DropdownMenuItem
+                                    key={status}
+                                    onClick={() =>
+                                      changeStatusFromDashboard(row.id, row.status, status)
+                                    }
+                                  >
+                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) : null}
                         </div>
                       </li>
                     )

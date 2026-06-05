@@ -324,7 +324,9 @@ export function AppointmentListRow({
             onDelete={onDeleteRequest}
           />
           {row.id.startsWith("sb-") && row.status !== "cancelled" ? (
-            <SendCustomMessageButton appointmentId={row.id} />
+            <div className="mt-2">
+              <SendCustomMessageButton appointmentId={row.id} />
+            </div>
           ) : null}
         </div>
       </div>

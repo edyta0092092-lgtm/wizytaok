@@ -57,6 +57,8 @@ type GuideReferencePanelProps = {
   labelTip: string
   t: (key: string) => string
   bookingPath: string
+  /** Gdy false, ukryte sekcje i kategorie oznaczone adminOnly. */
+  isAdmin: boolean
 }
 
 export function GuideReferencePanel({
@@ -66,14 +68,21 @@ export function GuideReferencePanel({
   labelTip,
   t,
   bookingPath,
+  isAdmin,
 }: GuideReferencePanelProps) {
   const [query, setQuery] = React.useState("")
   const [category, setCategory] = React.useState<HelpCenterCategoryId | "all">("all")
 
   const normalizedQuery = query.trim().toLowerCase()
 
+  const visibleCategories = React.useMemo(
+    () => HELP_CENTER_CATEGORIES.filter((cat) => isAdmin || !cat.adminOnly),
+    [isAdmin],
+  )
+
   const filtered = React.useMemo(() => {
     return HELP_CENTER_SECTIONS.filter((section) => {
+      if (!isAdmin && section.adminOnly) return false
       if (category !== "all" && section.category !== category) return false
       if (!normalizedQuery) return true
       const title = t(section.titleKey).toLowerCase()
@@ -84,7 +93,7 @@ export function GuideReferencePanel({
       }
       return false
     })
-  }, [category, normalizedQuery, t])
+  }, [category, isAdmin, normalizedQuery, t])
 
   const resolveHref = (section: HelpCenterSection) => {
     if (section.id === "booking-public-flow") return bookingPath
@@ -93,7 +102,7 @@ export function GuideReferencePanel({
 
   const grouped = React.useMemo(() => {
     const map = new Map<HelpCenterCategoryId, HelpCenterSection[]>()
-    for (const cat of HELP_CENTER_CATEGORIES) {
+    for (const cat of visibleCategories) {
       map.set(cat.id, [])
     }
     for (const section of filtered) {
@@ -102,7 +111,7 @@ export function GuideReferencePanel({
       map.set(section.category, list)
     }
     return map
-  }, [filtered])
+  }, [filtered, visibleCategories])
 
   return (
     <section className="space-y-4">
@@ -135,7 +144,7 @@ export function GuideReferencePanel({
           >
             {t("guide.catAll")}
           </button>
-          {HELP_CENTER_CATEGORIES.map((cat) => (
+          {visibleCategories.map((cat) => (
             <button
               key={cat.id}
               type="button"
@@ -157,11 +166,15 @@ export function GuideReferencePanel({
         <p className="text-sm text-muted-foreground">{t("guide.moduleSearchEmpty")}</p>
       ) : category === "all" ? (
         <div className="space-y-8">
-          {HELP_CENTER_CATEGORIES.map((cat) => {
+          {visibleCategories.map((cat) => {
             const sections = grouped.get(cat.id) ?? []
             if (sections.length === 0) return null
             return (
-              <div key={cat.id} className="space-y-3">
+              <div
+                key={cat.id}
+                id={cat.id === "admin" ? "guide-admin-section" : undefined}
+                className="scroll-mt-24 space-y-3"
+              >
                 <div>
                   <h3 className="text-base font-semibold text-foreground">{t(cat.titleKey)}</h3>
                   <p className="text-xs text-muted-foreground">{t(cat.descriptionKey)}</p>

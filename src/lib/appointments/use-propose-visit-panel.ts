@@ -2,6 +2,7 @@
 
 import * as React from "react"
 
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { useAppointmentInlineActions } from "@/lib/appointments/use-appointment-inline-actions"
 import {
   useProposeAvailableStaffLoadEffect,
@@ -68,7 +69,7 @@ export function useProposeVisitPanel(args: {
       const start = new Date(row.startsAt)
       const date = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`
       const time = `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`
-      if (row.status === "cancelled") return
+      if (isAppointmentVisitLocked(row.status)) return
       setConfirmCancelVisitForId(null)
       setProposeValidationError("")
       setProposeForId(row.id)
