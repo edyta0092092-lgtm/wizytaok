@@ -22,21 +22,21 @@ import type {
 import { cn } from "@/lib/utils"
 
 const STATUS_TONE: Record<StatisticsStatusItem["status"], string> = {
-  needs_action: "#8b5cf6",
+  confirmed: "#0d9488",
   completed: "#10b981",
   cancelled: "#f59e0b",
   no_show: "#f43f5e",
 }
 
 const STATUS_LABEL_KEY: Record<StatisticsStatusItem["status"], string> = {
-  needs_action: "appointments.filterNeedsAction",
+  confirmed: "appointments.confirmed",
   completed: "appointments.completed",
   cancelled: "appointments.cancelled",
   no_show: "appointments.noShow",
 }
 
 const STATUS_HINT_KEY: Record<StatisticsStatusItem["status"], string> = {
-  needs_action: "statistics.statusHint.needsAction",
+  confirmed: "statistics.statusHint.confirmed",
   completed: "statistics.statusHint.completed",
   cancelled: "statistics.statusHint.cancelled",
   no_show: "statistics.statusHint.noShow",
@@ -82,7 +82,7 @@ export function StatisticsStatusChart({
   }))
 
   return (
-    <Card className="rounded-3xl border-border/80 bg-card/95 shadow-sm shadow-slate-900/5">
+    <Card className="rounded-2xl border-border/60 bg-card shadow-sm shadow-slate-900/[0.04]">
       <CardHeader className="gap-3 px-5 sm:flex sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base">{title}</CardTitle>

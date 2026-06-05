@@ -1,10 +1,17 @@
+import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
+import { normalizeBookingSource } from "@/lib/bookings/booking-source"
 import {
-  appointmentShowsNeedsActionStatus,
-  countStatisticsNeedsActionVisits,
-  isPlannedVisitForDashboardStats,
-} from "@/lib/appointments/stats-rules"
-import type { Appointment, AppointmentStatus, Service, StaffMember } from "@/types/domain"
+  addDays,
+  buildRangeBuckets,
+  inStatisticsRange,
+  isSameStatisticsDay,
+  parseStatisticsDate,
+  rangeBounds,
+  startOfDay,
+  startOfMonth,
+} from "@/lib/statistics/statistics-range"
 import type {
+  StatisticsBookingChannels,
   StatisticsChartPoint,
   StatisticsDataset,
   StatisticsHeatmapItem,
@@ -13,9 +20,10 @@ import type {
   StatisticsRankItem,
   StatisticsStatusItem,
 } from "@/lib/statistics/statistics-types"
+import type { Appointment, Service, StaffMember } from "@/types/domain"
 
 const STATUS_ORDER: Array<StatisticsStatusItem["status"]> = [
-  "needs_action",
+  "confirmed",
   "completed",
   "cancelled",
   "no_show",
@@ -24,49 +32,17 @@ const STATUS_ORDER: Array<StatisticsStatusItem["status"]> = [
 const DAY_LABELS_PL = ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"]
 const DAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-function startOfDay(date: Date): Date {
-  const next = new Date(date)
-  next.setHours(0, 0, 0, 0)
-  return next
+function percent(part: number, total: number): number {
+  if (total <= 0) return 0
+  return Math.round((part / total) * 100)
 }
 
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date)
-  next.setDate(next.getDate() + days)
-  return next
+function round1(value: number): number {
+  return Math.round(value * 10) / 10
 }
 
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function monthKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-}
-
-function dayKey(date: Date): string {
-  return [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-")
-}
-
-function parseDate(value: string | undefined | null): Date | null {
-  if (!value) return null
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
-function inRange(date: Date | null, start: Date, end: Date): boolean {
-  if (!date) return false
-  const time = date.getTime()
-  return time >= start.getTime() && time < end.getTime()
-}
-
-function isSameDay(a: Date | null, b: Date): boolean {
-  if (!a) return false
-  return dayKey(a) === dayKey(b)
+function sortRank<T extends { count: number; name: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
 }
 
 function appointmentClientKey(appointment: Appointment): string {
@@ -78,118 +54,9 @@ function appointmentClientKey(appointment: Appointment): string {
   return preferred.trim().toLowerCase()
 }
 
-function buildRangeBuckets(
-  range: StatisticsRange,
-  today: Date,
-  locale: "pl" | "en"
-): Array<{ key: string; label: string; start: Date; end: Date }> {
-  const dayFormatter = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pl-PL", {
-    day: "2-digit",
-    month: "2-digit",
-  })
-  const monthFormatter = new Intl.DateTimeFormat(locale === "en" ? "en-US" : "pl-PL", {
-    month: "short",
-  })
-  const end = addDays(startOfDay(today), 1)
-
-  if (range.startsWith("month:")) {
-    const [year, month] = range
-      .slice("month:".length)
-      .split("-")
-      .map((value) => Number(value))
-    const monthStart = new Date(year, (month || 1) - 1, 1)
-    const monthEnd = new Date(year, month || 1, 1)
-    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
-    let cursor = monthStart
-    while (cursor < monthEnd) {
-      const bucketEnd = addDays(cursor, 1)
-      buckets.push({
-        key: dayKey(cursor),
-        label: dayFormatter.format(cursor),
-        start: cursor,
-        end: bucketEnd,
-      })
-      cursor = bucketEnd
-    }
-    return buckets
-  }
-
-  if (range.startsWith("year:")) {
-    const year = Number(range.slice("year:".length))
-    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
-    for (let month = 0; month < 12; month += 1) {
-      const start = new Date(year, month, 1)
-      const next = new Date(year, month + 1, 1)
-      buckets.push({
-        key: monthKey(start),
-        label: monthFormatter.format(start),
-        start,
-        end: next,
-      })
-    }
-    return buckets
-  }
-
-  if (range === "12m") {
-    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
-    for (let i = 11; i >= 0; i -= 1) {
-      const start = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      const next = new Date(start.getFullYear(), start.getMonth() + 1, 1)
-      buckets.push({
-        key: monthKey(start),
-        label: monthFormatter.format(start),
-        start,
-        end: next,
-      })
-    }
-    return buckets
-  }
-
-  if (range === "90d") {
-    const start = startOfDay(addDays(end, -90))
-    const buckets: Array<{ key: string; label: string; start: Date; end: Date }> = []
-    let cursor = start
-    while (cursor < end) {
-      const bucketEnd = addDays(cursor, 7)
-      const cappedEnd = bucketEnd.getTime() > end.getTime() ? end : bucketEnd
-      const lastDay = addDays(cappedEnd, -1)
-      buckets.push({
-        key: `${dayKey(cursor)}-week`,
-        label: `${dayFormatter.format(cursor)}–${dayFormatter.format(lastDay)}`,
-        start: cursor,
-        end: cappedEnd,
-      })
-      cursor = cappedEnd
-    }
-    return buckets
-  }
-
-  const days = range === "7d" ? 7 : 30
-  const start = addDays(end, -days)
-  return Array.from({ length: days }, (_, index) => {
-    const bucketStart = addDays(start, index)
-    const bucketEnd = addDays(bucketStart, 1)
-    return {
-      key: dayKey(bucketStart),
-      label: dayFormatter.format(bucketStart),
-      start: bucketStart,
-      end: bucketEnd,
-    }
-  })
-}
-
-function percent(part: number, total: number): number {
-  if (total <= 0) return 0
-  return Math.round((part / total) * 100)
-}
-
-function sortRank<T extends { count: number; name: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-}
-
 function buildTopServices(
   appointments: Appointment[],
-  services: Service[]
+  services: Service[],
 ): StatisticsRankItem[] {
   const serviceNames = new Map(services.map((service) => [service.id, service.name]))
   const counts = new Map<string, { name: string; count: number }>()
@@ -209,14 +76,14 @@ function buildTopServices(
       name: value.name,
       count: value.count,
       percent: percent(value.count, total),
-    }))
+    })),
   ).slice(0, 6)
 }
 
 function buildTopStaff(
   appointments: Appointment[],
   staff: StaffMember[],
-  locale: "pl" | "en"
+  locale: "pl" | "en",
 ): StatisticsRankItem[] {
   const staffNames = new Map(staff.map((member) => [member.id, member.name]))
   const counts = new Map<string, { name: string; count: number; completed: number }>()
@@ -247,38 +114,48 @@ function buildTopStaff(
       count: value.count,
       completed: value.completed,
       percent: percent(value.count, total),
-    }))
+    })),
   ).slice(0, 6)
 }
 
-function buildStatuses(appointments: Appointment[], at: Date): StatisticsStatusItem[] {
+function buildStatuses(appointments: Appointment[]): StatisticsStatusItem[] {
   const counts: Record<StatisticsStatusItem["status"], number> = {
-    needs_action: 0,
+    confirmed: 0,
     completed: 0,
     cancelled: 0,
     no_show: 0,
   }
 
   for (const appointment of appointments) {
-    if (appointmentShowsNeedsActionStatus(appointment, at)) {
-      counts.needs_action += 1
-    } else if (appointment.status === "completed") {
-      counts.completed += 1
-    } else if (appointment.status === "cancelled") {
-      counts.cancelled += 1
-    } else if (appointment.status === "no_show") {
-      counts.no_show += 1
-    }
+    if (appointment.status === "completed") counts.completed += 1
+    else if (appointment.status === "cancelled") counts.cancelled += 1
+    else if (appointment.status === "no_show") counts.no_show += 1
+    else counts.confirmed += 1
   }
 
   const total =
-    counts.needs_action + counts.completed + counts.cancelled + counts.no_show
+    counts.confirmed + counts.completed + counts.cancelled + counts.no_show
 
   return STATUS_ORDER.map((status) => ({
     status,
     count: counts[status],
     percent: percent(counts[status], total),
   }))
+}
+
+function buildBookingChannels(appointments: Appointment[]): StatisticsBookingChannels {
+  let online = 0
+  let manual = 0
+  for (const appointment of appointments) {
+    if (normalizeBookingSource(appointment.source) === "online") online += 1
+    else manual += 1
+  }
+  const total = online + manual
+  return {
+    online,
+    manual,
+    onlinePercent: percent(online, total),
+  }
 }
 
 function isSentStatus(status: string): boolean {
@@ -293,7 +170,8 @@ function isFailedStatus(status: string): boolean {
 
 function buildNotificationStats(
   notifications: StatisticsNotificationSource[],
-  appointments: Appointment[]
+  rangeStart: Date,
+  rangeEnd: Date,
 ) {
   let sentSms = 0
   let sentEmails = 0
@@ -302,6 +180,11 @@ function buildNotificationStats(
   let reminderFailed = 0
 
   for (const item of notifications) {
+    const at =
+      parseStatisticsDate(item.sentAt) ??
+      parseStatisticsDate(item.failedAt)
+    if (!inStatisticsRange(at, rangeStart, rangeEnd)) continue
+
     if (isSentStatus(item.status) || item.sentAt) {
       if (item.channel === "email") sentEmails += 1
       else sentSms += 1
@@ -313,21 +196,6 @@ function buildNotificationStats(
     }
   }
 
-  for (const appointment of appointments) {
-    const reminderPairs = [
-      [appointment.reminderStatus, appointment.reminderSentAt, appointment.reminderError],
-      [appointment.firstReminderStatus, appointment.firstReminderSentAt, appointment.reminderError],
-      [appointment.secondReminderStatus, appointment.secondReminderSentAt, appointment.secondReminderError],
-    ] as const
-    for (const [status, sentAt, error] of reminderPairs) {
-      if (sentAt || (status && isSentStatus(status))) reminderSent += 1
-      if (error || (status && isFailedStatus(status))) {
-        failed += 1
-        reminderFailed += 1
-      }
-    }
-  }
-
   return {
     sentSms,
     sentEmails,
@@ -336,13 +204,9 @@ function buildNotificationStats(
   }
 }
 
-function round1(value: number): number {
-  return Math.round(value * 10) / 10
-}
-
 function buildHeatmap(
   appointments: Appointment[],
-  locale: "pl" | "en"
+  locale: "pl" | "en",
 ): { busyDays: StatisticsHeatmapItem[]; busyHours: StatisticsHeatmapItem[] } {
   const dayLabels = locale === "en" ? DAY_LABELS_EN : DAY_LABELS_PL
   const dayCounts = Array.from({ length: 7 }, () => 0)
@@ -350,7 +214,7 @@ function buildHeatmap(
   let total = 0
 
   for (const appointment of appointments) {
-    const date = parseDate(appointment.startsAt)
+    const date = parseStatisticsDate(appointment.startsAt)
     if (!date) continue
     total += 1
     const dayIndex = (date.getDay() + 6) % 7
@@ -359,8 +223,6 @@ function buildHeatmap(
     hourCounts.set(hour, (hourCounts.get(hour) ?? 0) + 1)
   }
 
-  // Days: how often each weekday is chosen, as a share (%) of all visits in
-  // the range. Shows which weekdays are the most popular / busiest.
   const dayShares = dayCounts.map((count) => (total > 0 ? (count / total) * 100 : 0))
   const maxDayShare = Math.max(0.0001, ...dayShares)
   const busyDays = dayShares.map((share, index) => ({
@@ -370,11 +232,9 @@ function buildHeatmap(
     intensity: share / maxDayShare,
   }))
 
-  // Hours: how often each hour is chosen, as a share (%) of all visits in the
-  // range. Shows which time slots are the most popular / busiest.
   const hours = Array.from({ length: 16 }, (_, index) => index + 6)
   const hourShares = hours.map((hour) =>
-    total > 0 ? ((hourCounts.get(hour) ?? 0) / total) * 100 : 0
+    total > 0 ? ((hourCounts.get(hour) ?? 0) / total) * 100 : 0,
   )
   const maxShare = Math.max(0.0001, ...hourShares)
   const busyHours = hours.map((hour, index) => ({
@@ -405,96 +265,88 @@ export function buildStatisticsDataset({
   locale?: "pl" | "en"
 }): StatisticsDataset {
   const todayStart = startOfDay(today)
-  const tomorrowStart = addDays(todayStart, 1)
   const monthStart = startOfMonth(today)
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1)
   const buckets = buildRangeBuckets(range, today, locale)
-  const rangeStart = buckets[0]?.start ?? monthStart
-  const rangeEnd = buckets[buckets.length - 1]?.end ?? tomorrowStart
+  const { start: rangeStart, end: rangeEnd, dayCount: rangeDayCount } = rangeBounds(
+    range,
+    today,
+    locale,
+  )
 
   const appointmentsInMonth = appointments.filter((appointment) =>
-    inRange(parseDate(appointment.startsAt), monthStart, monthEnd)
+    inStatisticsRange(parseStatisticsDate(appointment.startsAt), monthStart, monthEnd),
   )
   const appointmentsInRange = appointments.filter((appointment) =>
-    inRange(parseDate(appointment.startsAt), rangeStart, rangeEnd)
+    inStatisticsRange(parseStatisticsDate(appointment.startsAt), rangeStart, rangeEnd),
   )
+
   const visitsToday = appointments.filter(
     (appointment) =>
-      isSameDay(parseDate(appointment.startsAt), todayStart) &&
-      isPlannedVisitForDashboardStats(appointment, today)
+      isSameStatisticsDay(parseStatisticsDate(appointment.startsAt), todayStart) &&
+      isPlannedVisitForDashboardStats(appointment, today),
   ).length
 
-  // Clients who made any reservation in the current month (by booking creation
-  // date, regardless of when the visit itself takes place). Scoped to this
-  // month, so the counter naturally resets when a new month starts.
   const clientsBookedThisMonth = new Set<string>()
   for (const appointment of appointments) {
-    const createdAt = parseDate(appointment.createdAt) ?? parseDate(appointment.startsAt)
-    if (!createdAt || !inRange(createdAt, monthStart, monthEnd)) continue
+    const createdAt =
+      parseStatisticsDate(appointment.createdAt) ??
+      parseStatisticsDate(appointment.startsAt)
+    if (!createdAt || !inStatisticsRange(createdAt, monthStart, monthEnd)) continue
     const key = appointmentClientKey(appointment)
     if (key) clientsBookedThisMonth.add(key)
   }
-  const newClients = clientsBookedThisMonth.size
+
   const chart: StatisticsChartPoint[] = buckets.map((bucket) => {
     const bucketAppointments = appointments.filter((appointment) =>
-      inRange(parseDate(appointment.startsAt), bucket.start, bucket.end)
+      inStatisticsRange(parseStatisticsDate(appointment.startsAt), bucket.start, bucket.end),
     )
     return {
       key: bucket.key,
       label: bucket.label,
-      needsAction: bucketAppointments.filter((appointment) =>
-        appointmentShowsNeedsActionStatus(appointment, today),
-      ).length,
-      completed: bucketAppointments.filter((appointment) => appointment.status === "completed").length,
-      cancelled: bucketAppointments.filter((appointment) => appointment.status === "cancelled").length,
-      noShow: bucketAppointments.filter((appointment) => appointment.status === "no_show").length,
+      created: bucketAppointments.length,
+      completed: bucketAppointments.filter((a) => a.status === "completed").length,
+      cancelled: bucketAppointments.filter((a) => a.status === "cancelled").length,
+      noShow: bucketAppointments.filter((a) => a.status === "no_show").length,
     }
   })
 
-  // All-time status totals (cumulative across every appointment, independent of
-  // the selected range / current month).
-  const statusCounts = appointments.reduce<Record<AppointmentStatus, number>>(
-    (acc, appointment) => {
-      acc[appointment.status] += 1
-      return acc
-    },
-    {
-      booked: 0,
-      pending: 0,
-      confirmed: 0,
-      cancelled: 0,
-      completed: 0,
-      no_show: 0,
-    }
-  )
-  const heatmapAppointments = appointmentsInRange.filter(
-    (appointment) => appointment.status !== "cancelled"
-  )
+  const bookingChannels = buildBookingChannels(appointmentsInRange)
+  const heatmapAppointments = appointmentsInRange.filter((a) => a.status !== "cancelled")
   const heatmap = buildHeatmap(heatmapAppointments, locale)
 
-  const needsAction = countStatisticsNeedsActionVisits(appointments, today)
-  const completed = statusCounts.completed
-  const cancelled = statusCounts.cancelled
-  const noShow = statusCounts.no_show
+  const completedAll = appointments.filter((a) => a.status === "completed").length
+  const cancelledAll = appointments.filter((a) => a.status === "cancelled").length
+  const noShowAll = appointments.filter((a) => a.status === "no_show").length
+
+  let onlineAll = 0
+  let manualAll = 0
+  for (const appointment of appointments) {
+    if (normalizeBookingSource(appointment.source) === "online") onlineAll += 1
+    else manualAll += 1
+  }
 
   return {
     kpis: {
-      totalVisits: completed + cancelled + noShow + needsAction,
-      needsAction,
-      completed,
-      cancelled,
-      noShow,
       visitsToday,
       visitsThisMonth: appointmentsInMonth.length,
-      newClients,
+      completed: completedAll,
+      cancelled: cancelledAll,
+      noShow: noShowAll,
+      newClients: clientsBookedThisMonth.size,
+      onlineBookings: onlineAll,
+      manualBookings: manualAll,
+      avgDailyVisits: round1(appointmentsInRange.length / rangeDayCount),
     },
     chart,
     topServices: buildTopServices(appointmentsInRange, services),
     topStaff: buildTopStaff(appointmentsInRange, staff, locale),
-    statuses: buildStatuses(appointmentsInRange, today),
-    notifications: buildNotificationStats(notificationSources, appointmentsInRange),
+    statuses: buildStatuses(appointmentsInRange),
+    bookingChannels,
+    notifications: buildNotificationStats(notificationSources, rangeStart, rangeEnd),
     busyDays: heatmap.busyDays,
     busyHours: heatmap.busyHours,
     totalInRange: appointmentsInRange.length,
+    rangeDayCount,
   }
 }

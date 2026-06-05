@@ -47,7 +47,7 @@ export function StatisticsNotificationsCard({
   ]
 
   return (
-    <Card className="rounded-3xl border-border/80 bg-card/95 shadow-sm shadow-slate-900/5">
+    <Card className="rounded-2xl border-border/60 bg-card shadow-sm shadow-slate-900/[0.04]">
       <CardHeader className="px-5">
         <CardTitle className="text-base">{title}</CardTitle>
         <p className="text-sm text-muted-foreground">{subtitle}</p>

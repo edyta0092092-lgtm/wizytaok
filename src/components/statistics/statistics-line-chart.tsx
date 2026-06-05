@@ -21,16 +21,14 @@ import { cn } from "@/lib/utils"
 
 export type StatisticsMonthOption = { value: StatisticsRange; label: string }
 
-type SeriesKey = "needsAction" | "completed" | "cancelled" | "noShow"
-
-const TOTAL_FILL = "#0f766e"
+type SeriesKey = "scheduled" | "completed" | "cancelled" | "noShow"
 
 const SERIES: Array<{
   key: SeriesKey
   dataKey: SeriesKey
   fill: string
 }> = [
-  { key: "needsAction", dataKey: "needsAction", fill: "#8b5cf6" },
+  { key: "scheduled", dataKey: "scheduled", fill: "#0d9488" },
   { key: "completed", dataKey: "completed", fill: "#10b981" },
   { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
   { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
@@ -47,7 +45,7 @@ type ChartCopy = {
   title: string
   subtitle: string
   ranges: Record<StatisticsPresetRange, string>
-  series: Record<SeriesKey, string>
+  series: Record<SeriesKey | "created", string>
   total: string
   empty: string
   monthPlaceholder: string
@@ -78,18 +76,24 @@ export function StatisticsLineChart({
 }) {
   const isMonthRange = range.startsWith("month:")
   const isYearRange = range.startsWith("year:")
-  const chartData = points.map((point) => ({
-    label: point.label,
-    needsAction: point.needsAction,
-    completed: point.completed,
-    cancelled: point.cancelled,
-    noShow: point.noShow,
-    total: point.needsAction + point.completed + point.cancelled + point.noShow,
-  }))
+  const chartData = points.map((point) => {
+    const scheduled = Math.max(
+      0,
+      point.created - point.completed - point.cancelled - point.noShow,
+    )
+    return {
+      label: point.label,
+      created: point.created,
+      scheduled,
+      completed: point.completed,
+      cancelled: point.cancelled,
+      noShow: point.noShow,
+    }
+  })
   const tickInterval = xAxisTickInterval(chartData.length)
 
   return (
-    <Card className="rounded-3xl border-border/80 bg-card/95 shadow-sm shadow-slate-900/5">
+    <Card className="rounded-2xl border-border/60 bg-card shadow-sm shadow-slate-900/[0.04]">
       <CardHeader className="gap-3 px-5 sm:flex sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base">{copy.title}</CardTitle>
@@ -221,10 +225,16 @@ export function StatisticsLineChart({
                           <div className="mb-2 flex items-center justify-between gap-4 border-b border-border/60 pb-2">
                             <span className="text-muted-foreground">{copy.total}</span>
                             <span className="font-semibold tabular-nums text-foreground">
-                              {row.total}
+                              {row.created}
                             </span>
                           </div>
                           <ul className="space-y-1">
+                            <li className="flex items-center justify-between gap-4">
+                              <span className="text-muted-foreground">{copy.series.created}</span>
+                              <span className="font-semibold tabular-nums text-foreground">
+                                {row.created}
+                              </span>
+                            </li>
                             {SERIES.map((series) => (
                               <li
                                 key={series.key}
@@ -249,13 +259,19 @@ export function StatisticsLineChart({
                     }}
                     cursor={{ fill: "var(--muted)", fillOpacity: 0.35 }}
                   />
-                  <Bar
-                    dataKey="total"
-                    name={copy.total}
-                    fill={TOTAL_FILL}
-                    radius={[4, 4, 0, 0]}
-                    maxBarSize={28}
-                  />
+                  {SERIES.map((series, index) => (
+                    <Bar
+                      key={series.key}
+                      dataKey={series.dataKey}
+                      name={copy.series[series.key]}
+                      stackId="visits"
+                      fill={series.fill}
+                      radius={
+                        index === SERIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
+                      }
+                      maxBarSize={36}
+                    />
+                  ))}
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -10,26 +10,33 @@ export type StatisticsRange =
 export type StatisticsChartPoint = {
   key: string
   label: string
-  needsAction: number
+  /** Wszystkie wizyty w bucketcie (wg daty wizyty). */
+  created: number
   completed: number
   cancelled: number
   noShow: number
 }
 
-/** Statusy wizualizowane na wykresie „Statusy wizyt” (zgodne z KPI Łącznie). */
-export type StatisticsVisitStatus = "needs_action" | "completed" | "cancelled" | "no_show"
+/** Statusy na wykresie „Statusy wizyt”. */
+export type StatisticsVisitStatus = "confirmed" | "completed" | "cancelled" | "no_show"
 
 export type StatisticsKpis = {
-  // All-time totals (cumulative, regardless of the selected range / month).
-  totalVisits: number
-  needsAction: number
+  visitsToday: number
+  visitsThisMonth: number
   completed: number
   cancelled: number
   noShow: number
-  // Current-month metrics.
-  visitsToday: number
-  visitsThisMonth: number
   newClients: number
+  onlineBookings: number
+  manualBookings: number
+  /** Średnia dzienna w wybranym zakresie trendu (zaokrąglona do 1 miejsca). */
+  avgDailyVisits: number
+}
+
+export type StatisticsBookingChannels = {
+  online: number
+  manual: number
+  onlinePercent: number
 }
 
 export type StatisticsRankItem = {
@@ -66,10 +73,12 @@ export type StatisticsDataset = {
   topServices: StatisticsRankItem[]
   topStaff: StatisticsRankItem[]
   statuses: StatisticsStatusItem[]
+  bookingChannels: StatisticsBookingChannels
   notifications: StatisticsNotifications
   busyDays: StatisticsHeatmapItem[]
   busyHours: StatisticsHeatmapItem[]
   totalInRange: number
+  rangeDayCount: number
 }
 
 export type StatisticsNotificationSource = {
@@ -78,3 +87,6 @@ export type StatisticsNotificationSource = {
   sentAt?: string | null
   failedAt?: string | null
 }
+
+/** @internal agregaty statusów DB */
+export type StatisticsRawStatusCounts = Record<AppointmentStatus, number>
