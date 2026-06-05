@@ -1,5 +1,6 @@
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import { acceptBusinessInvitationForUser } from "@/lib/team/business-invitation-public"
+import { upsertBusinessMemberFromInvitation } from "@/lib/team/upsert-business-member-from-invitation"
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
@@ -31,42 +32,19 @@ async function upsertMemberFromInvitation(
   const admin = getServiceRoleClient()
   if (!admin) return { ok: false, error: "supabase_unconfigured" }
 
-  const memberBase = {
+  const memberUpsert = await upsertBusinessMemberFromInvitation(admin, {
     business_id: invitation.business_id,
     user_id: userId,
     role: invitation.role === "admin" ? "admin" : "staff",
     email: invitation.email,
     is_active: true,
     invited_by: invitation.invited_by,
-    updated_at: new Date().toISOString(),
-  }
-
-  const memberWithStaff = {
-    ...memberBase,
     staff_member_id: invitation.staff_member_id,
-  }
+    updated_at: new Date().toISOString(),
+  })
 
-  let memberErr = (
-    await admin.from("business_members").upsert(memberWithStaff, {
-      onConflict: "business_id,user_id",
-    })
-  ).error
-
-  if (
-    memberErr &&
-    invitation.staff_member_id &&
-    (memberErr.message.toLowerCase().includes("staff_member_id") ||
-      memberErr.message.toLowerCase().includes("does not exist"))
-  ) {
-    memberErr = (
-      await admin.from("business_members").upsert(memberBase, {
-        onConflict: "business_id,user_id",
-      })
-    ).error
-  }
-
-  if (memberErr) {
-    return { ok: false, error: memberErr.message }
+  if (!memberUpsert.ok) {
+    return { ok: false, error: memberUpsert.error }
   }
   return { ok: true }
 }

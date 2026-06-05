@@ -1,4 +1,5 @@
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
+import { upsertBusinessMemberFromInvitation } from "@/lib/team/upsert-business-member-from-invitation"
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -119,42 +120,19 @@ export async function acceptBusinessInvitationForUser(
     return { ok: false, error: "invalid_status" }
   }
 
-  const memberBase = {
+  const memberUpsert = await upsertBusinessMemberFromInvitation(admin, {
     business_id: inv.business_id,
     user_id: userId,
     role: inv.role === "admin" ? "admin" : "staff",
     email: inv.email,
     is_active: true,
     invited_by: inv.invited_by,
-    updated_at: new Date().toISOString(),
-  }
-
-  const memberWithStaff = {
-    ...memberBase,
     staff_member_id: inv.staff_member_id,
-  }
+    updated_at: new Date().toISOString(),
+  })
 
-  let memberErr = (
-    await admin.from("business_members").upsert(memberWithStaff, {
-      onConflict: "business_id,user_id",
-    })
-  ).error
-
-  if (
-    memberErr &&
-    inv.staff_member_id &&
-    (memberErr.message.toLowerCase().includes("staff_member_id") ||
-      memberErr.message.toLowerCase().includes("does not exist"))
-  ) {
-    memberErr = (
-      await admin.from("business_members").upsert(memberBase, {
-        onConflict: "business_id,user_id",
-      })
-    ).error
-  }
-
-  if (memberErr) {
-    return { ok: false, error: memberErr.message || "member_upsert_failed" }
+  if (!memberUpsert.ok) {
+    return { ok: false, error: memberUpsert.error || "member_upsert_failed" }
   }
 
   const { error: updateErr } = await admin
