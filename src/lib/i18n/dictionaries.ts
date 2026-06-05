@@ -1950,7 +1950,7 @@ Pozdrawiamy,
       panelAlreadyHasAccess:
         "Ta osoba ma już dostęp do panelu — nowe zaproszenie nie jest potrzebne.",
       panelRoleChangeNoInviteHint:
-        "Zmiana roli (obsługa ↔ administrator) nie wysyła nowego linku — ta sama osoba loguje się tymi samymi danymi; po zapisaniu i ponownym zalogowaniu widzi uprawnienia zgodne z rolą.",
+        "Zmiana roli (obsługa ↔ administrator) przy zapisie osoby nie wysyła e-maila ani nie zmienia hasła — logowanie dotychczasowym hasłem; po ponownym zalogowaniu widać uprawnienia nowej roli.",
       panelRoleUpdated:
         "Zaktualizowano rolę w panelu. Osoba zobaczy zmiany po ponownym zalogowaniu (lub odświeżeniu strony).",
       invitationServerNotConfigured:
@@ -4553,7 +4553,7 @@ Regards,
       panelAlreadyHasAccess:
         "This person already has panel access — a new invitation is not required.",
       panelRoleChangeNoInviteHint:
-        "Changing the role (staff ↔ administrator) does not send a new link — the same login credentials apply; after saving, they see permissions matching their role on next sign-in (or refresh).",
+        "Changing the role (staff ↔ administrator) when saving does not send email or change the password — sign in with the existing password; after signing in again, the new role permissions apply.",
       panelRoleUpdated:
         "Panel role updated. The person will see the changes after signing in again (or refreshing the page).",
       invitationServerNotConfigured:

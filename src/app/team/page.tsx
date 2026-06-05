@@ -26,11 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
-import {
-  staffHasLinkedPanelAccount,
-  syncBusinessMemberRoleForStaff,
-  syncPendingInvitationRoleForStaff,
-} from "@/lib/team/apply-staff-panel-access"
+import { syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -1220,7 +1216,10 @@ export default function TeamPage() {
         }
         let inviteToken: string | null = null
         if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim) {
-          const panelRes = await requestPanelAccessForStaff(newStaffId, form.email, form.panelMemberRole)
+          const panelRes = await requestPanelAccessForStaff(newStaffId, form.email, form.panelMemberRole, {
+            sendEmail: true,
+            resetPassword: true,
+          })
           if (!panelRes.ok) {
             partialNotices = [
               ...partialNotices,
@@ -1419,80 +1418,11 @@ export default function TeamPage() {
           setNoticeDetail(`${t("team.errorDetailsPrefix")} ${excOut.error.trim()}`)
         }
       }
-      let editInviteToken: string | null = null
-      if (bid && access.canManageInvitations && isSupabaseConfigured() && emailTrim && client) {
-        const roleChanged = form.panelMemberRole !== savedProfileState.panelMemberRole
-        const hasLinkedPanel =
-          syncRoleHasLinkedPanel ||
-          (client
-            ? await staffHasLinkedPanelAccount(client, bid, editing.id, emailTrim)
-            : false)
-
-        if (hasLinkedPanel) {
-          await syncPendingInvitationRoleForStaff(client, bid, editing.id, form.panelMemberRole)
-          if (roleChanged) {
-            partialNotices = [...partialNotices, t("team.panelRoleUpdated")]
-          }
-        } else {
-          const { data: pendingInv } = await client
-            .from("business_invitations")
-            .select("id, email")
-            .eq("business_id", bid)
-            .eq("staff_member_id", editing.id)
-            .eq("status", "pending")
-            .maybeSingle()
-
-          const pendingEmail = (pendingInv?.email ?? "").trim().toLowerCase()
-          const emailChanged = Boolean(pendingInv?.id) && pendingEmail !== emailTrim.toLowerCase()
-
-          if (pendingInv?.id && !emailChanged) {
-            const invRoleOut = await syncPendingInvitationRoleForStaff(
-              client,
-              bid,
-              editing.id,
-              form.panelMemberRole,
-            )
-            if (!invRoleOut.ok && process.env.NODE_ENV === "development" && invRoleOut.detail) {
-              console.warn("[team] pending invitation role sync:", invRoleOut.detail)
-            }
-            if (roleChanged) {
-              partialNotices = [...partialNotices, t("team.panelRoleUpdated")]
-            }
-          } else {
-            const panelRes = await requestPanelAccessForStaff(
-              editing.id,
-              form.email,
-              form.panelMemberRole,
-            )
-            if (!panelRes.ok) {
-              partialNotices = [
-                ...partialNotices,
-                panelAccessNoticeForFailure(
-                  panelRes.messageKey,
-                  panelRes.detail,
-                  panelRes.serverError,
-                ),
-              ]
-            } else {
-              editInviteToken = panelRes.invitationToken
-              partialNotices = [...partialNotices, ...panelAccessNoticeForSuccess(panelRes)]
-              if (editInviteToken) setSidebarTab("invites")
-            }
-          }
-        }
+      const roleChangedOnEdit = form.panelMemberRole !== savedProfileState.panelMemberRole
+      if (roleChangedOnEdit) {
+        partialNotices = [...partialNotices, t("team.panelRoleUpdated")]
       }
       await load()
-      let editHighlightId: string | null = null
-      if (client && bid && editInviteToken) {
-        const { data: invRow } = await client
-          .from("business_invitations")
-          .select("id")
-          .eq("business_id", bid)
-          .eq("token", editInviteToken)
-          .maybeSingle()
-        if (invRow?.id) editHighlightId = invRow.id as string
-      }
-      if (editHighlightId) setInviteHighlightId(editHighlightId)
       if (partialNotices.length > 0) {
         setNotice(partialNotices[0] ?? msgPartialSaved)
         if (!noticeDetail) {
@@ -1664,6 +1594,7 @@ export default function TeamPage() {
     staffMemberId: string,
     invitationEmail: string,
     panelMemberRole: PanelRole,
+    options?: { sendEmail?: boolean; resetPassword?: boolean },
   ): Promise<
     | {
         ok: true
@@ -1684,7 +1615,8 @@ export default function TeamPage() {
           invitationEmail,
           panelMemberRole,
           language,
-          sendEmail: true,
+          sendEmail: options?.sendEmail !== false,
+          resetPassword: options?.resetPassword === true,
         }),
       })
       if (!res.ok) {
@@ -1817,7 +1749,8 @@ export default function TeamPage() {
         return
       }
       if (panelRes.alreadyHasPanelAccess) {
-        setNotice(t("team.panelAlreadyHasAccess"))
+        setNotice(t("team.panelRoleUpdated"))
+        setNoticeDetail(null)
       } else if (panelRes.invitationToken) {
         const emailLine =
           panelRes.emailOutcome === "sent"

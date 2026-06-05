@@ -50,6 +50,14 @@ async function findAuthUserIdByEmail(email: string): Promise<string | null> {
   return findAuthUserIdByEmailList(email)
 }
 
+/** Czy w Auth istnieje konto na ten adres (nie resetuj hasła przy zmianie roli). */
+export async function inviteeAuthAccountExists(email: string): Promise<boolean> {
+  const normalized = email.trim().toLowerCase()
+  if (!normalized) return false
+  const id = await findAuthUserIdByEmail(normalized)
+  return Boolean(id)
+}
+
 async function applyInviteCredentials(
   userId: string,
   tempPassword: string,

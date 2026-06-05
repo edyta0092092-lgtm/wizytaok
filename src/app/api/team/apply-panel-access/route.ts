@@ -3,8 +3,11 @@ import { NextResponse } from "next/server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import type { PanelRole } from "@/lib/auth/permissions"
 import type { Language } from "@/lib/i18n/dictionaries"
+import { staffHasLinkedPanelAccount } from "@/lib/team/apply-staff-panel-access"
 import { applyStaffPanelAccess } from "@/lib/team/apply-staff-panel-access"
 import { deliverStaffInvitation } from "@/lib/team/deliver-staff-invitation"
+import { inviteeAuthAccountExists } from "@/lib/team/provision-invitee-auth"
+import { syncStaffPanelRoleServer } from "@/lib/team/sync-staff-panel-role-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -15,6 +18,8 @@ type Body = {
   invitationEmail?: string
   language?: string
   sendEmail?: boolean
+  /** Tylko przy pierwszym zaproszeniu (nowe konto). Nigdy przy zmianie roli. */
+  resetPassword?: boolean
 }
 
 function normalizePanelRole(raw: string | undefined): PanelRole {
@@ -61,6 +66,32 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "staff_not_found" }, { status: 404 })
   }
 
+  const emailNorm = invitationEmail.trim().toLowerCase()
+  const hasLinkedPanel = await staffHasLinkedPanelAccount(
+    admin,
+    resolution.businessId,
+    staffMemberId,
+    emailNorm,
+  )
+
+  if (hasLinkedPanel) {
+    const sync = await syncStaffPanelRoleServer(
+      resolution.businessId,
+      staffMemberId,
+      normalizePanelRole(body.panelMemberRole),
+      emailNorm,
+    )
+    if (!sync.ok) {
+      return NextResponse.json({ ok: false, error: sync.error }, { status: 500 })
+    }
+    return NextResponse.json({
+      ok: true,
+      invitationToken: null,
+      alreadyHasPanelAccess: true,
+      email: { sent: false },
+    })
+  }
+
   const panelOut = await applyStaffPanelAccess(
     admin,
     resolution.businessId,
@@ -105,6 +136,8 @@ export async function POST(req: Request) {
 
   const sendEmail = body.sendEmail !== false
   const language = normalizeLanguage(body.language)
+  const authExists = await inviteeAuthAccountExists(emailNorm)
+  const allowPasswordReset = body.resetPassword === true && !authExists
   let emailResult: {
     sent: boolean
     code?: string
@@ -130,7 +163,7 @@ export async function POST(req: Request) {
         language,
         invitationStatus: "pending",
       },
-      { linkMembership: false, resetPassword: true },
+      { linkMembership: false, resetPassword: allowPasswordReset },
     )
     if (sendOut.ok) {
       emailResult = {

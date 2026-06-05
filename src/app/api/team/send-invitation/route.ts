@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import type { Language } from "@/lib/i18n/dictionaries"
 import { deliverStaffInvitation } from "@/lib/team/deliver-staff-invitation"
+import { inviteeAuthAccountExists } from "@/lib/team/provision-invitee-auth"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { PanelRole } from "@/lib/auth/permissions"
 
@@ -85,6 +86,7 @@ export async function POST(req: Request) {
 
   const businessName = business?.business_name?.trim() || "WizytaOK"
   const language = normalizeLanguage(body.language)
+  const authExists = await inviteeAuthAccountExists(to)
 
   const sendResult = await deliverStaffInvitation(
     {
@@ -98,7 +100,7 @@ export async function POST(req: Request) {
     },
     {
       linkMembership: false,
-      resetPassword: true,
+      resetPassword: !authExists,
     },
   )
 
