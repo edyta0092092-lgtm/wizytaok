@@ -1940,7 +1940,7 @@ Pozdrawiamy,
       panelRoleOwnerHint:
         "Pełny dostęp do ustawień firmy, usług, dostępności, zespołu i wizyt.",
       panelRoleStaffHint:
-        "Plan dnia, wizyty, grafik, statystyki, klienci i wiadomości jak administrator. Brak dostępu do zespołu, dostępności, usług i ustawień firmy.",
+        "Plan dnia, wizyty, grafik, statystyki, klienci oraz historia wysyłek wiadomości. Brak edycji szablonów, zespołu, dostępności, usług i ustawień firmy.",
       panelAccessNone: "Brak dostępu do panelu",
       panelAccessPending: "Zaproszenie oczekujące",
       panelEmailRequired: "Podaj adres e-mail, aby utworzyć zaproszenie do panelu.",
@@ -4543,7 +4543,7 @@ Regards,
       panelRoleOwnerHint:
         "Full access to business settings, services, availability, team and appointments.",
       panelRoleStaffHint:
-        "Day plan, appointments, schedule, statistics, clients and messages like an administrator. No access to team, availability, services or business settings.",
+        "Day plan, appointments, schedule, statistics, clients and message send history. No template editing, team, availability, services or business settings.",
       panelAccessNone: "No panel access",
       panelAccessPending: "Pending invitation",
       panelEmailRequired: "Enter an email address to create a panel invitation.",

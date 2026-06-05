@@ -126,18 +126,18 @@ export function canSendReminders(role: PanelRole | null): boolean {
   return role === "admin" || role === "staff"
 }
 
-/** Konfiguracja szablonów i wysyłek (administrator i obsługa). */
+/** Konfiguracja szablonów i wysyłek (tylko administrator). */
 export function canSendMessages(role: PanelRole | null): boolean {
-  return role === "admin" || role === "staff"
+  return role === "admin"
 }
 
 export function canManageMessageTemplates(role: PanelRole | null): boolean {
-  return role === "admin" || role === "staff"
+  return role === "admin"
 }
 
-/** Dostęp do modułu Wiadomości (administrator i obsługa). */
+/** Pełny moduł Wiadomości ze szablonami (tylko administrator). */
 export function canAccessMessages(role: PanelRole | null): boolean {
-  return role === "admin" || role === "staff"
+  return role === "admin"
 }
 
 export function canViewMessageSendHistory(role: PanelRole | null): boolean {

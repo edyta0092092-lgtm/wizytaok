@@ -32,10 +32,12 @@ function MessagesPageContent() {
     openCreateRef.current = fn
   }, [])
 
-  const canOpenMessages = access.canAccessMessages || access.canViewMessageSendHistory
+  const canOpenMessagesPage =
+    access.canAccessMessages || access.canViewMessageSendHistory
+  const canManageTemplates = access.canManageMessageTemplates
 
   React.useEffect(() => {
-    if (!access.ready || canOpenMessages) return
+    if (!access.ready || canOpenMessagesPage) return
     if (!isSupabaseConfigured()) {
       queueMicrotask(() => {
         setAccessDebug({
@@ -108,10 +110,10 @@ function MessagesPageContent() {
     access.canViewMessageSendHistory,
     access.effectiveRole,
     access.ready,
-    canOpenMessages,
+    canOpenMessagesPage,
   ])
 
-  if (access.ready && !canOpenMessages) {
+  if (access.ready && !canOpenMessagesPage) {
     return (
       <AppShell title={t("navigation.messages")} pageDescription={t("messages.description")}>
         <PageShell>
@@ -129,9 +131,11 @@ function MessagesPageContent() {
   return (
     <AppShell
       title={t("navigation.messages")}
-      pageDescription={t("messages.description")}
+      pageDescription={
+        canManageTemplates ? t("messages.description") : t("messages.staffHistoryIntro")
+      }
       primaryAction={
-        access.canManageMessageTemplates ? (
+        canManageTemplates ? (
           <Button
             type="button"
             size="sm"
@@ -146,17 +150,12 @@ function MessagesPageContent() {
     >
       <PageShell>
         <div data-tour="messages-list" className="flex flex-col gap-6">
-        {canOpenMessages ? (
+        {canManageTemplates ? (
           <>
-            <MessageTemplatesSection
-              onRegisterPrimaryAction={registerOpen}
-              readOnly={!access.canManageMessageTemplates}
-            />
-            <CustomTemplatesSection readOnly={!access.canManageMessageTemplates} />
+            <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} readOnly={false} />
+            <CustomTemplatesSection readOnly={false} />
           </>
-        ) : (
-          <p className="mb-4 text-sm text-muted-foreground">{t("messages.staffHistoryIntro")}</p>
-        )}
+        ) : null}
         <SendingHistorySection />
         </div>
       </PageShell>
