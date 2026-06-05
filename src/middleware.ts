@@ -105,13 +105,25 @@ export async function middleware(request: NextRequest) {
 
   if (isPublicPath(pathname)) {
     if (user && (pathname === "/login" || pathname === "/signup" || pathname === "/signup-staff")) {
+      const staffInvite =
+        user.user_metadata?.staff_invite === true ||
+        user.user_metadata?.staff_invite === "true"
       const isSignupTrial = pathname === "/signup" && request.nextUrl.searchParams.get("startTrial") === "true"
-      const afterLogin = isSignupTrial
-        ? "/start-trial"
-        : safeInternalRedirect(
-            request.nextUrl.searchParams.get("next") ??
-              request.nextUrl.searchParams.get("redirectTo")
-          ) ?? "/dashboard"
+      const nextPath = safeInternalRedirect(
+        request.nextUrl.searchParams.get("next") ??
+          request.nextUrl.searchParams.get("redirectTo"),
+      )
+      let afterLogin = isSignupTrial ? "/start-trial" : (nextPath ?? "/dashboard")
+      if (staffInvite && pathname === "/login") {
+        const access = await resolveBusinessPanelAccess(supabase, user.id, user.email, {
+          staffInvite: true,
+        })
+        if (!access.businessId) {
+          afterLogin = "/settings?setup=business"
+        } else if (!access.hasActiveAccess) {
+          afterLogin = access.canManageBilling ? "/activate-access" : "/subscription-required"
+        }
+      }
       return NextResponse.redirect(new URL(afterLogin, request.url))
     }
     return response

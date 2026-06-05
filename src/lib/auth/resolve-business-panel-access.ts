@@ -171,10 +171,10 @@ export async function resolveBusinessPanelAccess(
 
 export function billingRecoveryRedirectPath(
   access: BusinessPanelAccess,
-  options?: { staffInvite?: boolean },
+  _options?: { staffInvite?: boolean },
 ): string {
   if (!access.businessId) {
-    return options?.staffInvite ? "/dashboard" : "/settings?setup=business"
+    return "/settings?setup=business"
   }
   if (!access.canManageBilling) {
     return "/subscription-required"

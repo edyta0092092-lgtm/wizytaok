@@ -118,7 +118,7 @@ export function LoginForm() {
     }
     setLoading(true)
     try {
-      const { error: signError } = await client.auth.signInWithPassword({
+      const { data: signInData, error: signError } = await client.auth.signInWithPassword({
         email: email.trim(),
         password,
       })
@@ -127,6 +127,15 @@ export function LoginForm() {
           setError(t("auth.emailNotConfirmed"))
           return
         }
+        const msg = signError.message?.toLowerCase() ?? ""
+        if (msg.includes("invalid") || msg.includes("credentials")) {
+          setError(t("auth.authError"))
+        } else {
+          setError(signError.message?.trim() || t("auth.authError"))
+        }
+        return
+      }
+      if (!signInData.session) {
         setError(t("auth.authError"))
         return
       }
@@ -139,11 +148,16 @@ export function LoginForm() {
       }
 
       let linkedBusinessId: string | null = null
+      const linkFetchOpts: RequestInit = {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+      }
+
       if (inviteTokenFromUrl) {
         try {
           const tokenRes = await fetch("/api/public/accept-business-invitation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            ...linkFetchOpts,
             body: JSON.stringify({ token: inviteTokenFromUrl }),
           })
           const tokenJson = (await tokenRes.json().catch(() => null)) as {
@@ -159,7 +173,7 @@ export function LoginForm() {
       }
       if (!linkedBusinessId) {
         try {
-          const linkRes = await fetch("/api/auth/accept-pending-invitations", { method: "POST" })
+          const linkRes = await fetch("/api/auth/accept-pending-invitations", linkFetchOpts)
           const linkJson = (await linkRes.json().catch(() => null)) as {
             ok?: boolean
             business_id?: string | null
@@ -231,31 +245,29 @@ export function LoginForm() {
       const hasStaffAccess = Boolean(memberBusinessId)
       const hasOwnerProfile = Boolean(profile?.id)
 
-      let dest = postLoginPath ?? "/dashboard"
-      if (!postLoginPath) {
-        if (hasStaffAccess) {
-          dest = "/dashboard"
-        } else if (staffInvite && inviteTokenFromUrl) {
-          dest = `/accept-invite/${encodeURIComponent(inviteTokenFromUrl)}`
-        } else if (hasOwnerProfile && !staffInvite) {
-          dest = "/dashboard"
-          if (
-            !isActiveSubscriptionStatus(profile?.subscription_status) &&
-            !isActiveSubscriptionStatus(profile?.stripe_subscription_status)
-          ) {
-            dest = await resolveBillingChoiceRedirect()
-          } else if (shouldStartTrialAfterLogin) {
-            dest = await resolveBillingChoiceRedirect()
-          }
-        } else if (!staffInvite) {
-          dest = "/settings?setup=business"
-        } else {
-          dest = "/login?email=" + encodeURIComponent(email.trim())
+      let dest: string
+      if (hasStaffAccess) {
+        dest = postLoginPath ?? "/dashboard"
+      } else if (staffInvite) {
+        dest = inviteTokenFromUrl
+          ? `/accept-invite/${encodeURIComponent(inviteTokenFromUrl)}`
+          : "/settings?setup=business"
+      } else if (hasOwnerProfile) {
+        dest = postLoginPath ?? "/dashboard"
+        if (
+          !postLoginPath &&
+          !isActiveSubscriptionStatus(profile?.subscription_status) &&
+          !isActiveSubscriptionStatus(profile?.stripe_subscription_status)
+        ) {
+          dest = await resolveBillingChoiceRedirect()
+        } else if (!postLoginPath && shouldStartTrialAfterLogin) {
+          dest = await resolveBillingChoiceRedirect()
         }
+      } else {
+        dest = postLoginPath ?? "/settings?setup=business"
       }
 
-      router.replace(dest)
-      router.refresh()
+      window.location.assign(dest)
     } finally {
       setLoading(false)
     }
