@@ -1,11 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-import { detectAdminBusinessStepReady } from "@/lib/onboarding/fetch-onboarding-progress"
-import { upsertMemberOnboardingRecord } from "@/lib/onboarding/member-onboarding-db"
+import { detectAdminBusinessStepReady } from "@/lib/onboarding/detect-admin-step-ready"
+import {
+  saveMemberOnboardingRecord,
+  type MemberOnboardingRecord,
+} from "@/lib/onboarding/member-onboarding-db"
 import type { OnboardingScope } from "@/lib/onboarding/onboarding-scope"
-import type { OnboardingProgress } from "@/lib/onboarding/fetch-onboarding-progress"
 import { getOnboardingStepIds, type OnboardingStepId } from "@/lib/onboarding/onboarding-steps"
-import { markOnboardingStepComplete } from "@/lib/onboarding/onboarding-storage"
 
 async function detectStaffBusinessStepReady(
   client: SupabaseClient,
@@ -49,41 +50,37 @@ async function isStepDoneInBusiness(
   return detectStaffBusinessStepReady(client, businessId, stepId)
 }
 
-/** Zapisuje w profilu użytkownika kroki już spełnione w firmie (bez auto-nawigacji). */
+/** Jednorazowe zaliczenie wybranych kroków na podstawie danych firmy (zapis do DB). */
 export async function syncOnboardingStepsFromBusiness(
   client: SupabaseClient,
   businessId: string,
   scope: OnboardingScope,
-  progress: OnboardingProgress,
-): Promise<OnboardingProgress> {
-  const ids = getOnboardingStepIds(scope.track === "admin")
-  const next = { ...progress }
+  current: MemberOnboardingRecord,
+  onlyStepIds?: OnboardingStepId[],
+): Promise<MemberOnboardingRecord> {
+  const ids = onlyStepIds ?? getOnboardingStepIds(scope.track === "admin")
   const toPersist: Partial<Record<OnboardingStepId, boolean>> = {}
 
   await Promise.all(
     ids.map(async (id) => {
-      if (next[id]) return
+      if (current.steps[id]) return
       const ready = await isStepDoneInBusiness(client, businessId, scope, id)
       if (!ready) return
-      next[id] = true
       toPersist[id] = true
       if (id === "staff_appointments") {
-        next.staff_first_visit = true
         toPersist.staff_first_visit = true
       }
     }),
   )
 
-  if (Object.keys(toPersist).length === 0) return next
+  if (Object.keys(toPersist).length === 0) return current
 
   try {
-    await upsertMemberOnboardingRecord(client, scope, { steps: toPersist })
-    for (const id of Object.keys(toPersist) as OnboardingStepId[]) {
-      markOnboardingStepComplete(scope, id)
-    }
+    return await saveMemberOnboardingRecord(client, scope, current, { steps: toPersist })
   } catch {
-    /* brak tabeli / offline */
+    return {
+      ...current,
+      steps: { ...current.steps, ...toPersist },
+    }
   }
-
-  return next
 }

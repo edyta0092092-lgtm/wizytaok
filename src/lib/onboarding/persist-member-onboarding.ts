@@ -2,113 +2,159 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 
 import {
   clearMemberOnboardingRecord,
+  emptyMemberOnboardingRecord,
   loadMemberOnboardingRecord,
-  upsertMemberOnboardingRecord,
+  mergeMemberOnboardingRecord,
+  saveMemberOnboardingRecord,
+  type MemberOnboardingRecord,
+  type MemberOnboardingPatch,
 } from "@/lib/onboarding/member-onboarding-db"
+import type { OnboardingStepsMeta } from "@/lib/onboarding/onboarding-state-meta"
 import type { OnboardingScope } from "@/lib/onboarding/onboarding-scope"
 import type { OnboardingStepId } from "@/lib/onboarding/onboarding-steps"
-import {
-  isOnboardingMarkedComplete,
-  isOnboardingStepMarkedComplete,
-  isOnboardingWelcomeDismissed,
-  markOnboardingComplete,
-  markOnboardingStepComplete,
-  markOnboardingWelcomeDismissed,
-  readLocalOnboardingSteps,
-} from "@/lib/onboarding/onboarding-storage"
+
+export type UserOnboardingFlags = {
+  welcomeDismissed: boolean
+  completed: boolean
+  restartPending: boolean
+}
+
+export type PanelOnboardingState = {
+  record: MemberOnboardingRecord
+  slug: string | null
+  bookingPath: string | null
+}
+
+export function recordToFlags(record: MemberOnboardingRecord): UserOnboardingFlags {
+  return {
+    welcomeDismissed: record.welcomeDismissed,
+    completed: record.completed,
+    restartPending: record.meta.restartPending,
+  }
+}
+
+async function fetchBookingMeta(
+  client: SupabaseClient,
+  businessId: string,
+): Promise<{ slug: string | null; bookingPath: string | null }> {
+  const bid = businessId.trim()
+  const { data: bp } = await client
+    .from("business_profiles")
+    .select("slug")
+    .eq("id", bid)
+    .maybeSingle()
+
+  const slug = typeof bp?.slug === "string" ? bp.slug.trim() : ""
+  const origin =
+    typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : ""
+  const bookingPath =
+    slug && origin ? `${origin}/rezerwacje/${encodeURIComponent(slug)}` : null
+
+  return { slug: slug || null, bookingPath }
+}
+
+/** Jedno lekkie odczytanie stanu z bazy (bez synchronizacji kroków z całej firmy). */
+export async function loadPanelOnboardingState(
+  client: SupabaseClient,
+  scope: OnboardingScope,
+  businessId: string,
+): Promise<PanelOnboardingState> {
+  const [record, booking] = await Promise.all([
+    loadMemberOnboardingRecord(client, scope),
+    fetchBookingMeta(client, businessId),
+  ])
+  return { record, ...booking }
+}
+
+export async function persistPanelOnboarding(
+  client: SupabaseClient | null,
+  scope: OnboardingScope,
+  current: MemberOnboardingRecord,
+  patch: MemberOnboardingPatch,
+): Promise<MemberOnboardingRecord> {
+  if (!client) return mergeMemberOnboardingRecord(current, patch)
+  return saveMemberOnboardingRecord(client, scope, current, patch)
+}
 
 export async function persistOnboardingWelcomeDismissed(
   client: SupabaseClient | null,
   scope: OnboardingScope,
-): Promise<void> {
-  markOnboardingWelcomeDismissed(scope)
-  if (!client) return
-  try {
-    await upsertMemberOnboardingRecord(client, scope, { welcomeDismissed: true })
-  } catch {
-    /* offline / brak migracji */
-  }
+  current: MemberOnboardingRecord,
+): Promise<MemberOnboardingRecord> {
+  return persistPanelOnboarding(client, scope, current, { welcomeDismissed: true })
 }
 
 export async function persistOnboardingComplete(
   client: SupabaseClient | null,
   scope: OnboardingScope,
-): Promise<void> {
-  markOnboardingComplete(scope)
-  if (!client) return
-  try {
-    await upsertMemberOnboardingRecord(client, scope, { completed: true })
-  } catch {
-    /* ignore */
-  }
+  current: MemberOnboardingRecord,
+): Promise<MemberOnboardingRecord> {
+  return persistPanelOnboarding(client, scope, current, {
+    completed: true,
+    meta: { restartPending: false },
+  })
 }
 
 export async function persistOnboardingStepComplete(
   client: SupabaseClient | null,
   scope: OnboardingScope,
+  current: MemberOnboardingRecord,
   stepId: OnboardingStepId,
-): Promise<void> {
-  markOnboardingStepComplete(scope, stepId)
-  if (!client) return
-  try {
-    await upsertMemberOnboardingRecord(client, scope, {
-      steps: { [stepId]: true },
-    })
-  } catch {
-    /* ignore */
+): Promise<MemberOnboardingRecord> {
+  return persistPanelOnboarding(client, scope, current, {
+    steps: { [stepId]: true },
+  })
+}
+
+export async function persistOnboardingResumeStep(
+  client: SupabaseClient | null,
+  scope: OnboardingScope,
+  current: MemberOnboardingRecord,
+  stepId: OnboardingStepId | null,
+): Promise<MemberOnboardingRecord> {
+  return persistPanelOnboarding(client, scope, current, {
+    meta: { resumeStepId: stepId },
+  })
+}
+
+export async function persistOnboardingRestartRequest(
+  client: SupabaseClient | null,
+  scope: OnboardingScope,
+  current: MemberOnboardingRecord,
+): Promise<MemberOnboardingRecord> {
+  const cleared = emptyMemberOnboardingRecord()
+  if (!client) {
+    return { ...cleared, meta: { resumeStepId: null, restartPending: true } }
   }
+  return saveMemberOnboardingRecord(client, scope, cleared, {
+    welcomeDismissed: false,
+    completed: false,
+    resetSteps: true,
+    steps: {},
+    meta: { resumeStepId: null, restartPending: true },
+  })
+}
+
+export async function consumeOnboardingRestartPending(
+  client: SupabaseClient | null,
+  scope: OnboardingScope,
+  current: MemberOnboardingRecord,
+): Promise<{ pending: boolean; record: MemberOnboardingRecord }> {
+  if (!current.meta.restartPending) {
+    return { pending: false, record: current }
+  }
+  const next = await persistPanelOnboarding(client, scope, current, {
+    meta: { restartPending: false },
+  })
+  return { pending: true, record: next }
 }
 
 export async function persistOnboardingRestart(
   client: SupabaseClient | null,
   scope: OnboardingScope,
-): Promise<void> {
-  if (!client) return
-  try {
-    await clearMemberOnboardingRecord(client, scope)
-  } catch {
-    /* ignore */
-  }
+): Promise<MemberOnboardingRecord> {
+  if (!client) return emptyMemberOnboardingRecord()
+  return clearMemberOnboardingRecord(client, scope)
 }
 
-export type UserOnboardingFlags = {
-  welcomeDismissed: boolean
-  completed: boolean
-}
-
-export async function loadUserOnboardingFlags(
-  client: SupabaseClient | null,
-  scope: OnboardingScope,
-): Promise<UserOnboardingFlags> {
-  let welcomeDismissed = isOnboardingWelcomeDismissed(scope)
-  let completed = isOnboardingMarkedComplete(scope)
-
-  if (client) {
-    try {
-      const row = await loadMemberOnboardingRecord(client, scope)
-      if (row) {
-        welcomeDismissed = welcomeDismissed || row.welcomeDismissed
-        completed = completed || row.completed
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return { welcomeDismissed, completed }
-}
-
-export function mergeUserOnboardingSteps(
-  scope: OnboardingScope,
-  fromDb: Partial<Record<OnboardingStepId, boolean>>,
-): Partial<Record<OnboardingStepId, boolean>> {
-  const local = readLocalOnboardingSteps(scope)
-  const merged = { ...fromDb }
-  for (const [id, done] of Object.entries(local)) {
-    if (done) merged[id as OnboardingStepId] = true
-  }
-  for (const id of Object.keys(merged) as OnboardingStepId[]) {
-    if (isOnboardingStepMarkedComplete(scope, id)) merged[id] = true
-  }
-  return merged
-}
+export { emptyMemberOnboardingRecord, type MemberOnboardingRecord, type OnboardingStepsMeta }
