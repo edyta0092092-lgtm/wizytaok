@@ -11,7 +11,10 @@ import {
 } from "@/lib/onboarding/member-onboarding-db"
 import type { OnboardingStepsMeta } from "@/lib/onboarding/onboarding-state-meta"
 import type { OnboardingScope } from "@/lib/onboarding/onboarding-scope"
-import type { OnboardingStepId } from "@/lib/onboarding/onboarding-steps"
+import {
+  getOnboardingStepIds,
+  type OnboardingStepId,
+} from "@/lib/onboarding/onboarding-steps"
 
 export type UserOnboardingFlags = {
   welcomeDismissed: boolean
@@ -117,22 +120,45 @@ export async function persistOnboardingResumeStep(
   })
 }
 
+function resetProgressPatch(
+  scope: OnboardingScope,
+  options: { restartPending: boolean },
+): MemberOnboardingPatch {
+  const first = getOnboardingStepIds(scope.track === "admin")[0] ?? null
+  return {
+    welcomeDismissed: false,
+    completed: false,
+    resetSteps: true,
+    steps: {},
+    meta: { resumeStepId: first, restartPending: options.restartPending },
+  }
+}
+
+/** Reset postępu bez otwierania welcome (karta / modal „Rozpocznij od nowa”). */
+export async function persistOnboardingResetProgress(
+  client: SupabaseClient | null,
+  scope: OnboardingScope,
+  current: MemberOnboardingRecord,
+): Promise<MemberOnboardingRecord> {
+  const cleared = emptyMemberOnboardingRecord()
+  const patch = resetProgressPatch(scope, { restartPending: false })
+  if (!client) {
+    return mergeMemberOnboardingRecord(cleared, patch)
+  }
+  return saveMemberOnboardingRecord(client, scope, cleared, patch)
+}
+
 export async function persistOnboardingRestartRequest(
   client: SupabaseClient | null,
   scope: OnboardingScope,
   current: MemberOnboardingRecord,
 ): Promise<MemberOnboardingRecord> {
   const cleared = emptyMemberOnboardingRecord()
+  const patch = resetProgressPatch(scope, { restartPending: true })
   if (!client) {
-    return { ...cleared, meta: { resumeStepId: null, restartPending: true } }
+    return mergeMemberOnboardingRecord(cleared, patch)
   }
-  return saveMemberOnboardingRecord(client, scope, cleared, {
-    welcomeDismissed: false,
-    completed: false,
-    resetSteps: true,
-    steps: {},
-    meta: { resumeStepId: null, restartPending: true },
-  })
+  return saveMemberOnboardingRecord(client, scope, cleared, patch)
 }
 
 export async function consumeOnboardingRestartPending(

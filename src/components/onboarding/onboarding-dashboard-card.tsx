@@ -86,7 +86,7 @@ export function OnboardingDashboardCard() {
               type="button"
               variant="outline"
               className="h-11 flex-1 rounded-xl sm:min-w-[12rem]"
-              onClick={() => startSetupFromBeginning()}
+              onClick={() => void startSetupFromBeginning()}
               disabled={loading}
             >
               {t("onboarding.startFromBeginningCta")}

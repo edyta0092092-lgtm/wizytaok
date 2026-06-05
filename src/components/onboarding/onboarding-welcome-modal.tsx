@@ -102,7 +102,7 @@ export function OnboardingWelcomeModal() {
                 type="button"
                 variant="outline"
                 className="h-11 rounded-xl"
-                onClick={() => startSetupFromBeginning()}
+                onClick={() => void startSetupFromBeginning()}
                 disabled={loading}
               >
                 {t("onboarding.startFromBeginningCta")}

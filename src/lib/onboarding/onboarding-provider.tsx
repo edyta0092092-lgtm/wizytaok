@@ -18,6 +18,7 @@ import {
   consumeOnboardingRestartPending,
   persistOnboardingComplete,
   persistOnboardingResumeStep,
+  persistOnboardingResetProgress,
   persistOnboardingRestartRequest,
   persistOnboardingStepComplete,
   persistOnboardingWelcomeDismissed,
@@ -137,8 +138,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     (record: MemberOnboardingRecord) => {
       recordRef.current = record
       setSnapshot((prev) => {
-        if (!prev) return prev
-        const panel = { record, slug: prev.slug, bookingPath: prev.bookingPath }
+        const panel = {
+          record,
+          slug: prev?.slug ?? null,
+          bookingPath: prev?.bookingPath ?? null,
+        }
         return panelStateToSnapshot(panel, isAdmin)
       })
     },
@@ -546,24 +550,47 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     applyRecord,
   ])
 
-  const startSetupFromBeginning = React.useCallback(() => {
-    const progress =
-      snapshot?.progress ?? (emptyOnboardingProgress(isAdmin) as OnboardingProgressSnapshot["progress"])
-    const first = getOnboardingStepIds(isAdmin)[0]
-    if (first) goToStep(first, progress)
-  }, [snapshot?.progress, isAdmin, goToStep])
-
-  const restartOnboarding = React.useCallback(() => {
-    if (!scope) return
-    const client = getBrowserClient()
-    void persistOnboardingRestartRequest(client, scope, recordRef.current).then((record) => {
-      applyRecord(record)
-      setWelcomeOpen(true)
+  const resetOnboardingProgress = React.useCallback(
+    async (options?: { openWelcome?: boolean }) => {
+      if (!scope) return
+      const client = getBrowserClient()
+      const first = getOnboardingStepIds(isAdmin)[0] ?? null
+      const optimistic = emptyMemberOnboardingRecord()
+      optimistic.meta.resumeStepId = first
+      applyRecord(optimistic)
+      setWelcomeOpen(false)
       setFlowActive(false)
       setActiveStepId(null)
-    })
-    if (pathname !== "/dashboard") router.push("/dashboard")
-  }, [scope, applyRecord, pathname, router])
+      if (scope) businessSyncedKeyRef.current = scopeKey(scope)
+
+      try {
+        const next = options?.openWelcome
+          ? await persistOnboardingRestartRequest(client, scope, recordRef.current)
+          : await persistOnboardingResetProgress(client, scope, recordRef.current)
+        applyRecord(next)
+        if (options?.openWelcome) setWelcomeOpen(true)
+      } catch {
+        /* optimistic UI już pokazuje 0/6 */
+      }
+    },
+    [scope, isAdmin, applyRecord],
+  )
+
+  const startSetupFromBeginning = React.useCallback(() => {
+    void (async () => {
+      await resetOnboardingProgress()
+      const empty = emptyOnboardingProgress(isAdmin) as OnboardingProgressSnapshot["progress"]
+      const first = getOnboardingStepIds(isAdmin)[0]
+      if (first) goToStep(first, empty)
+    })()
+  }, [resetOnboardingProgress, isAdmin, goToStep])
+
+  const restartOnboarding = React.useCallback(() => {
+    void (async () => {
+      await resetOnboardingProgress({ openWelcome: true })
+      if (pathname !== "/dashboard") router.push("/dashboard")
+    })()
+  }, [resetOnboardingProgress, pathname, router])
 
   const setupComplete = Boolean(
     snapshot?.userFlags.completed ||
