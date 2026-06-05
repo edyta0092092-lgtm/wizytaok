@@ -8,7 +8,7 @@ import { getBrowserClient } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export default function KontoWizytyPage() {
-  const { t } = useTranslations()
+  const { t, language } = useTranslations()
   const [userId, setUserId] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -17,7 +17,7 @@ export default function KontoWizytyPage() {
     })
   }, [])
 
-  const { loading, dashboard, cancelBooking } = useClientPortalWorkspace(userId)
+  const { loading, dashboard, cancelBooking, rescheduleBooking } = useClientPortalWorkspace(userId)
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">{t("clientPortal.loading")}</p>
@@ -28,7 +28,8 @@ export default function KontoWizytyPage() {
       <h2 className="text-base font-semibold">{t("clientPortal.myAppointmentsTitle")}</h2>
       <ClientAppointmentsList
         bookings={dashboard?.upcoming ?? []}
-        onCancel={cancelBooking}
+        onCancel={(id) => cancelBooking(id, language)}
+        onReschedule={(id, date, time) => rescheduleBooking(id, date, time, language)}
       />
     </div>
   )

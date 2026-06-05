@@ -2,12 +2,13 @@ import { NextResponse } from "next/server"
 
 import { cancelPublicBookingById } from "@/lib/bookings/cancel-public-booking-server"
 import { requireClientPortalSession } from "@/lib/client-portal/require-client-session-server"
+import { notifyBookingCancelledByClient } from "@/lib/notifications/booking-cancelled-by-client-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-type Body = { bookingId?: string }
+type Body = { bookingId?: string; language?: "pl" | "en" }
 
 export async function POST(req: Request) {
   const auth = await requireClientPortalSession()
@@ -53,6 +54,22 @@ export async function POST(req: Request) {
   const result = await cancelPublicBookingById(admin, bookingId)
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
+  }
+
+  const { data: fullBooking } = await admin.from("bookings").select("*").eq("id", bookingId).maybeSingle()
+  if (fullBooking) {
+    const { data: business } = await admin
+      .from("business_profiles")
+      .select("slug,phone,contact_phone,business_name,business_address")
+      .eq("id", fullBooking.business_id)
+      .maybeSingle()
+    if (business) {
+      await notifyBookingCancelledByClient({
+        booking: fullBooking,
+        business,
+        language: body.language === "en" ? "en" : "pl",
+      })
+    }
   }
 
   return NextResponse.json({ ok: true })

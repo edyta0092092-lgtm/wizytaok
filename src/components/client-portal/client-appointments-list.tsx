@@ -1,8 +1,10 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { toast } from "sonner"
 
+import { PublicReschedulePicker } from "@/components/booking/public-reschedule-picker"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -13,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { clientPortalBookingToPublicBooking } from "@/lib/client-portal/map-booking"
 import type { ClientPortalBooking } from "@/lib/client-portal/types"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -26,22 +29,32 @@ function statusVariant(status: string): "default" | "secondary" | "destructive" 
 export function ClientAppointmentsList({
   bookings,
   onCancel,
-  showRescheduleStub = true,
+  onReschedule,
+  allowActions = true,
 }: {
   bookings: ClientPortalBooking[]
   onCancel: (id: string) => Promise<boolean>
-  showRescheduleStub?: boolean
+  onReschedule?: (id: string, date: string, time: string) => Promise<{ ok: boolean; error?: string }>
+  allowActions?: boolean
 }) {
   const { t } = useTranslations()
   const [detail, setDetail] = React.useState<ClientPortalBooking | null>(null)
   const [reschedule, setReschedule] = React.useState<ClientPortalBooking | null>(null)
   const [busyId, setBusyId] = React.useState<string | null>(null)
+  const [rescheduling, setRescheduling] = React.useState(false)
 
   const statusLabel = (status: string) => {
     const key = `clientPortal.status_${status}` as const
     const translated = t(key)
     return translated === key ? status : translated
   }
+
+  const canManage = (booking: ClientPortalBooking) =>
+    allowActions &&
+    booking.status !== "cancelled" &&
+    booking.status !== "completed" &&
+    booking.status !== "no_show" &&
+    new Date(booking.startsAtIso).getTime() > Date.now()
 
   const handleCancel = async (booking: ClientPortalBooking) => {
     if (!window.confirm(t("clientPortal.cancelConfirm"))) return
@@ -52,6 +65,25 @@ export function ClientAppointmentsList({
       else toast.error(t("clientPortal.cancelError"))
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const handleReschedule = async (date: string, time: string) => {
+    if (!reschedule || !onReschedule) return
+    setRescheduling(true)
+    try {
+      const result = await onReschedule(reschedule.id, date, time)
+      if (result.ok) {
+        toast.success(t("clientPortal.rescheduleSuccess"))
+        setReschedule(null)
+        return
+      }
+      const err = result.error ?? ""
+      if (err === "same_slot") toast.error(t("clientPortal.rescheduleSameSlot"))
+      else if (err === "slot_unavailable") toast.error(t("clientPortal.rescheduleSlotUnavailable"))
+      else toast.error(t("clientPortal.rescheduleError"))
+    } finally {
+      setRescheduling(false)
     }
   }
 
@@ -67,10 +99,7 @@ export function ClientAppointmentsList({
     <>
       <ul className="space-y-3">
         {bookings.map((booking) => {
-          const cancellable =
-            booking.status !== "cancelled" &&
-            booking.status !== "completed" &&
-            new Date(booking.startsAtIso).getTime() > Date.now()
+          const manageable = canManage(booking)
           return (
             <li key={booking.id}>
               <Card className="rounded-2xl border-border/70 shadow-sm">
@@ -95,7 +124,7 @@ export function ClientAppointmentsList({
                     >
                       {t("clientPortal.actionDetails")}
                     </Button>
-                    {showRescheduleStub && cancellable ? (
+                    {manageable && onReschedule && booking.businessSlug && booking.serviceId ? (
                       <Button
                         type="button"
                         size="sm"
@@ -106,7 +135,7 @@ export function ClientAppointmentsList({
                         {t("clientPortal.actionReschedule")}
                       </Button>
                     ) : null}
-                    {cancellable ? (
+                    {manageable ? (
                       <Button
                         type="button"
                         size="sm"
@@ -142,17 +171,36 @@ export function ClientAppointmentsList({
               {detail.staffName ? (
                 <Row label={t("clientPortal.fieldStaff")} value={detail.staffName} />
               ) : null}
+              {detail.confirmationToken ? (
+                <div className="pt-2">
+                  <Button asChild variant="link" className="h-auto p-0 text-primary">
+                    <Link href={`/confirm/${encodeURIComponent(detail.confirmationToken)}`}>
+                      {t("clientPortal.manageVisitLink")}
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
             </dl>
           ) : null}
         </SheetContent>
       </Sheet>
 
       <Sheet open={Boolean(reschedule)} onOpenChange={(open) => !open && setReschedule(null)}>
-        <SheetContent className="rounded-l-2xl sm:max-w-md">
+        <SheetContent className="w-full overflow-y-auto rounded-l-2xl sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>{t("clientPortal.rescheduleTitle")}</SheetTitle>
             <SheetDescription>{t("clientPortal.rescheduleDescription")}</SheetDescription>
           </SheetHeader>
+          {reschedule && reschedule.businessSlug ? (
+            <div className="mt-4">
+              <PublicReschedulePicker
+                booking={clientPortalBookingToPublicBooking(reschedule)}
+                submitting={rescheduling}
+                onCancel={() => setReschedule(null)}
+                onConfirm={(date, time) => void handleReschedule(date, time)}
+              />
+            </div>
+          ) : null}
         </SheetContent>
       </Sheet>
     </>

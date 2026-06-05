@@ -6,7 +6,7 @@ import type { ClientPortalBooking, ClientPortalDashboard } from "@/lib/client-po
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 const BOOKING_SELECT =
-  "id,business_id,service_name,appointment_date,appointment_time,status,staff_name,confirmation_token,client_email"
+  "id,business_id,service_id,service_name,service_duration_minutes,appointment_date,appointment_time,status,staff_id,staff_name,confirmation_token,client_email"
 
 export async function fetchClientBookingsByEmail(
   email: string,

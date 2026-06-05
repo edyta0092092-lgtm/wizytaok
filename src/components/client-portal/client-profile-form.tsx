@@ -68,7 +68,7 @@ export function ClientProfileForm({
             </Button>
           </div>
         </form>
-        <p className="mt-3 text-xs text-muted-foreground">{t("clientPortal.profileFoundationNote")}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{t("clientPortal.profileLocalNote")}</p>
       </CardContent>
     </Card>
   )

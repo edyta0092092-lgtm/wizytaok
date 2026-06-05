@@ -29,7 +29,7 @@ export default function KontoHistoriaPage() {
       <ClientAppointmentsList
         bookings={dashboard?.history ?? []}
         onCancel={async () => false}
-        showRescheduleStub={false}
+        allowActions={false}
       />
     </div>
   )

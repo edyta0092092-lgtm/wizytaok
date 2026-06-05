@@ -3,7 +3,6 @@
 import * as React from "react"
 
 import { ClientPortalDashboardView } from "@/components/client-portal/client-portal-dashboard-view"
-import { Card, CardContent } from "@/components/ui/card"
 import { useClientPortalWorkspace } from "@/lib/client-portal/use-client-portal-workspace"
 import { getBrowserClient } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -32,14 +31,5 @@ export default function KontoDashboardPage() {
     )
   }
 
-  return (
-    <div className="space-y-4">
-      <Card className="rounded-2xl border border-dashed border-border shadow-none">
-        <CardContent className="px-4 py-3 text-xs leading-relaxed text-muted-foreground">
-          {t("clientPortal.foundationNotice")}
-        </CardContent>
-      </Card>
-      <ClientPortalDashboardView dashboard={dashboard} />
-    </div>
-  )
+  return <ClientPortalDashboardView dashboard={dashboard} />
 }

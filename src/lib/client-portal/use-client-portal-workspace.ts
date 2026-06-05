@@ -105,11 +105,11 @@ export function useClientPortalWorkspace(userId: string | null | undefined) {
   )
 
   const cancelBooking = React.useCallback(
-    async (bookingId: string): Promise<boolean> => {
+    async (bookingId: string, language: "pl" | "en" = "pl"): Promise<boolean> => {
       const res = await fetch("/api/client-portal/cancel-booking", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
+        body: JSON.stringify({ bookingId, language }),
       })
       const json = (await res.json()) as { ok?: boolean }
       if (json.ok) {
@@ -117,6 +117,28 @@ export function useClientPortalWorkspace(userId: string | null | undefined) {
         return true
       }
       return false
+    },
+    [load],
+  )
+
+  const rescheduleBooking = React.useCallback(
+    async (
+      bookingId: string,
+      date: string,
+      time: string,
+      language: "pl" | "en" = "pl",
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const res = await fetch("/api/client-portal/reschedule-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, date, time, language }),
+      })
+      const json = (await res.json()) as { ok?: boolean; error?: string }
+      if (json.ok) {
+        await load()
+        return { ok: true }
+      }
+      return { ok: false, error: json.error }
     },
     [load],
   )
@@ -131,6 +153,7 @@ export function useClientPortalWorkspace(userId: string | null | undefined) {
     profile,
     saveProfile,
     cancelBooking,
+    rescheduleBooking,
     reload: load,
     splitFullName,
   }

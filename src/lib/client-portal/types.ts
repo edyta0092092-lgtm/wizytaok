@@ -13,11 +13,14 @@ export type ClientPortalBooking = {
   businessId: string
   businessName: string
   businessSlug: string | null
+  serviceId: string | null
   serviceName: string
+  serviceDurationMinutes: number
   appointmentDate: string
   appointmentTime: string
   startsAtIso: string
   status: ClientBookingStatus
+  staffId: string | null
   staffName: string | null
   confirmationToken: string | null
 }
@@ -43,6 +46,7 @@ export type ClientPortalNotification = {
 
 export type ClientPortalDashboard = {
   nextBooking: ClientPortalBooking | null
+  lastBooking: ClientPortalBooking | null
   visitCount: number
   lastServiceName: string | null
   upcoming: ClientPortalBooking[]
