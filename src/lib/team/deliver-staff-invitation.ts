@@ -46,8 +46,8 @@ export async function deliverStaffInvitation(
     invite: token,
   })
   const loginUrl = `${origin}/login?${loginParams.toString()}`
-  const linkMembership =
-    options.linkMembership ?? (input.invitationStatus === "pending" || !input.invitationStatus)
+  /** Członkostwo tylko po akceptacji linku — nie przy samym wysłaniu e-maila z panelu. */
+  const linkMembership = options.linkMembership === true
   const resetPassword = options.resetPassword ?? true
 
   const provision = await provisionInviteeAuthAccount(email, {

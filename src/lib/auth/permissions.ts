@@ -113,9 +113,9 @@ export function canManageBookings(role: PanelRole | null): boolean {
   return role === "admin" || role === "staff"
 }
 
-/** Trwałe usunięcie wizyty z bazy / lokalnych zapisów — tylko administrator (właściciel liczy się jako admin). */
+/** Trwałe usunięcie wizyty z bazy / lokalnych zapisów (administrator i obsługa). */
 export function canDeleteBookings(role: PanelRole | null): boolean {
-  return role === "admin"
+  return role === "admin" || role === "staff"
 }
 
 export function canManageClients(role: PanelRole | null): boolean {
@@ -126,18 +126,18 @@ export function canSendReminders(role: PanelRole | null): boolean {
   return role === "admin" || role === "staff"
 }
 
-/** Konfiguracja szablonów / wysyłek (tylko administrator). Obsługa ma tylko podgląd historii. */
+/** Konfiguracja szablonów i wysyłek (administrator i obsługa). */
 export function canSendMessages(role: PanelRole | null): boolean {
-  return role === "admin"
+  return role === "admin" || role === "staff"
 }
 
 export function canManageMessageTemplates(role: PanelRole | null): boolean {
-  return role === "admin"
+  return role === "admin" || role === "staff"
 }
 
-/** Dostęp do modułu Wiadomości tylko dla administratora/właściciela. */
+/** Dostęp do modułu Wiadomości (administrator i obsługa). */
 export function canAccessMessages(role: PanelRole | null): boolean {
-  return role === "admin"
+  return role === "admin" || role === "staff"
 }
 
 export function canViewMessageSendHistory(role: PanelRole | null): boolean {

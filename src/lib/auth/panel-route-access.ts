@@ -3,7 +3,6 @@ const STAFF_FORBIDDEN_PREFIXES = [
   "/team",
   "/services",
   "/availability",
-  "/statystyki",
   "/templates",
 ] as const
 

@@ -153,7 +153,6 @@ export default function SchedulePage() {
   const [staffMembers, setStaffMembers] = React.useState<StaffMember[]>([])
   const [loading, setLoading] = React.useState(true)
   const [loadError, setLoadError] = React.useState(false)
-  const [linkedStaffId, setLinkedStaffId] = React.useState<string | null | undefined>(undefined)
   const [personFilter, setPersonFilter] = React.useState("")
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
   const [refreshTick, setRefreshTick] = React.useState(0)
@@ -277,29 +276,6 @@ export default function SchedulePage() {
   }, [formatters])
 
   React.useEffect(() => {
-    const client = getBrowserClient()
-    const businessId = access.businessId
-    if (!client || !isSupabaseConfigured() || !businessId || access.effectiveRole !== "staff") return
-    let cancelled = false
-    void (async () => {
-      const {
-        data: { user },
-      } = await client.auth.getUser()
-      if (!user || cancelled) return
-      const { data } = await client
-        .from("business_members")
-        .select("staff_member_id")
-        .eq("business_id", businessId)
-        .eq("user_id", user.id)
-        .maybeSingle()
-      if (!cancelled) setLinkedStaffId(data?.staff_member_id?.trim() || null)
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [access.businessId, access.effectiveRole])
-
-  React.useEffect(() => {
     const forceReload = () => setRefreshTick((v) => v + 1)
     window.addEventListener("pw-bookings", forceReload)
     window.addEventListener("pw-public-bookings", forceReload)
@@ -388,15 +364,6 @@ export default function SchedulePage() {
     }
   }, [ym, access.ready, access.businessId, mapAppointmentToEntry, refreshTick])
 
-  const visibleStaff = React.useMemo(() => {
-    if (access.effectiveRole !== "staff") return staffMembers
-    if (!linkedStaffId) return []
-    return staffMembers.filter((row) => row.id === linkedStaffId)
-  }, [staffMembers, linkedStaffId, access.effectiveRole])
-
-  const effectivePersonFilter =
-    access.effectiveRole === "staff" && linkedStaffId ? linkedStaffId : personFilter
-
   const staffNameById = React.useMemo(() => {
     const map = new Map<string, string>()
     for (const row of staffMembers) {
@@ -409,8 +376,8 @@ export default function SchedulePage() {
     const out = bookings
       .filter((row) => normalizeStatus(row.status) !== "cancelled")
       .filter((row) => {
-        if (!effectivePersonFilter) return true
-        return (row.staff_id ?? "") === effectivePersonFilter
+        if (!personFilter) return true
+        return (row.staff_id ?? "") === personFilter
       })
     out.sort((a, b) => {
       const byDate = a.appointment_date.localeCompare(b.appointment_date)
@@ -418,7 +385,7 @@ export default function SchedulePage() {
       return compareBookings(a, b)
     })
     return out
-  }, [bookings, effectivePersonFilter])
+  }, [bookings, personFilter])
 
   const bookingsByDate = React.useMemo(() => {
     const map = new Map<string, CalendarEntry[]>()
@@ -443,16 +410,6 @@ export default function SchedulePage() {
 
   const goPrev = () => setYm((p) => (p.month === 1 ? { year: p.year - 1, month: 12 } : { year: p.year, month: p.month - 1 }))
   const goNext = () => setYm((p) => (p.month === 12 ? { year: p.year + 1, month: 1 } : { year: p.year, month: p.month + 1 }))
-
-  if (access.ready && access.effectiveRole === "staff" && linkedStaffId === null && isSupabaseConfigured()) {
-    return (
-      <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
-        <PageShell>
-          <p className="text-sm text-muted-foreground">{t("schedule.accessDeniedStaff")}</p>
-        </PageShell>
-      </AppShell>
-    )
-  }
 
   return (
     <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
@@ -479,10 +436,9 @@ export default function SchedulePage() {
                 className="h-9 min-w-[12rem] rounded-md border border-input bg-background px-2 text-sm"
                 value={personFilter}
                 onChange={(e) => setPersonFilter(e.target.value)}
-                disabled={access.effectiveRole === "staff"}
               >
                 <option value="">Wszystkie osoby</option>
-                {visibleStaff.map((row) => (
+                {staffMembers.map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.name}
                   </option>
@@ -611,7 +567,7 @@ export default function SchedulePage() {
         }
         visitSummary={visitCountLabel(detailRows.length)}
         entries={detailRows}
-        staffMembers={visibleStaff.length > 0 ? visibleStaff : staffMembers}
+        staffMembers={staffMembers}
         staffNameById={staffNameById}
         cancellingId={cancellingId}
         statusMenuOrder={STATUS_MENU_ORDER}

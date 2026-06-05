@@ -32,7 +32,6 @@ import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import {
   addStaffMember,
-  deleteStaffMember,
   getStaffAvailabilityContextForBusiness,
   getStaffMembers,
   getStaffServiceIds,
@@ -1537,15 +1536,32 @@ export default function TeamPage() {
 
   const remove = async (staffId: string) => {
     if (!window.confirm(t("team.deleteConfirm"))) return
-    const client = getBrowserClient()
-    const out = await deleteStaffMember(client, businessProfileId, staffId)
-    if (!out.ok) {
+    try {
+      const res = await fetch("/api/team/remove-staff-member", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffMemberId: staffId }),
+      })
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null
+      if (!res.ok || !json?.ok) {
+        if (json?.error === "cannot_remove_owner") {
+          setNotice(t("team.deleteOwnerBlocked"))
+        } else {
+          setNotice(t("team.deleteError"))
+          if (json?.error?.trim()) {
+            setNoticeDetail(`${t("team.errorDetailsPrefix")} ${json.error.trim()}`)
+          }
+        }
+        return
+      }
+      if (editing?.id === staffId) resetFormToCreate()
+      await load()
+      setNotice(t("team.deleted"))
+      setNoticeDetail(null)
+    } catch {
       setNotice(t("team.deleteError"))
-      return
     }
-    if (editing?.id === staffId) resetFormToCreate()
-    await load()
-    setNotice(t("team.deleted"))
   }
 
   const activateStaff = async (staff: StaffMember) => {
@@ -1755,6 +1771,20 @@ export default function TeamPage() {
         setNotice(t("invitations.invitationCreateError"))
       }
       await load()
+      if (panelRes.ok && panelRes.invitationToken) {
+        const bid = businessProfileId ?? access.businessId
+        const client = getBrowserClient()
+        if (client && bid && isSupabaseConfigured()) {
+          const { data: invRow } = await client
+            .from("business_invitations")
+            .select("id")
+            .eq("business_id", bid)
+            .eq("token", panelRes.invitationToken)
+            .eq("status", "pending")
+            .maybeSingle()
+          if (invRow?.id) setInviteHighlightId(invRow.id as string)
+        }
+      }
     } finally {
       setSaving(false)
     }

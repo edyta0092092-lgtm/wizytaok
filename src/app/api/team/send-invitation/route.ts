@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       invitationStatus: invitation.status,
     },
     {
-      linkMembership: invitation.status === "pending",
+      linkMembership: false,
       resetPassword: true,
     },
   )

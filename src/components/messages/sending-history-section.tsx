@@ -1728,7 +1728,7 @@ export function SendingHistorySection() {
       ) : null}
 
       {access.ready &&
-      access.effectiveRole === "admin" &&
+      access.canAccessMessages &&
       integrationFlags?.enableTestNotifications ? (
         <TestNotificationsPanel
           flags={{ enableTestNotifications: true }}

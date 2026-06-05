@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         language,
         invitationStatus: "pending",
       },
-      { linkMembership: true, resetPassword: true },
+      { linkMembership: false, resetPassword: true },
     )
     if (sendOut.ok) {
       emailResult = {
