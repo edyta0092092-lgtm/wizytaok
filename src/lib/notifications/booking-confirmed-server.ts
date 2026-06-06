@@ -2,6 +2,11 @@ import { sendReminderEmail } from "@/lib/notifications/email"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { sendReminderSms } from "@/lib/notifications/sms"
+import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
 import { dispatchCustomTemplatesForEvent } from "@/lib/notifications/custom-templates-dispatch"
 import { applyTemplateVariables, getTemplateRuntime } from "@/lib/notifications/template-runtime"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
@@ -269,6 +274,21 @@ async function sendBookingConfirmedNotifications(
   let emailStatus = "skipped"
 
   if (wantSms && booking.client_phone?.trim()) {
+    const quotaDecision = await evaluateSmsQuotaForSend(admin, booking.business_id)
+    if (isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+      smsStatus = "skipped"
+      await insertNotificationLog(booking, {
+        channel: "sms",
+        status: "skipped",
+        recipient: booking.client_phone.trim(),
+        subject: null,
+        body: messages.sms,
+        provider: null,
+        provider_message_id: null,
+        error_message: SMS_MONTHLY_LIMIT_REACHED,
+        sent_at: null,
+      })
+    } else {
     const sms = await sendReminderSms({ to: booking.client_phone.trim(), body: messages.sms })
     smsStatus = sms.ok ? "sent" : sms.code
     await insertNotificationLog(booking, {
@@ -282,6 +302,7 @@ async function sendBookingConfirmedNotifications(
       error_message: sms.ok ? null : sms.error ?? sms.code,
       sent_at: nowIso,
     })
+    }
   }
 
   if (wantEmail && booking.client_email?.trim()) {

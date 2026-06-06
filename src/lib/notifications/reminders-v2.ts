@@ -1,6 +1,11 @@
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { sendReminderSms } from "@/lib/notifications/sms"
 import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
+import {
   applyTemplateVariables,
   getTemplateRuntime,
   type NotificationTemplateRuntime,
@@ -389,6 +394,25 @@ async function processSingleReminder(
     if (existingSms?.id) {
       statuses.push("skipped")
     } else {
+    const quotaDecision = await evaluateSmsQuotaForSend(admin, row.business_id)
+    if (isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+      statuses.push("skipped")
+      await insertNotificationLog(admin, {
+        business_id: row.business_id,
+        booking_id: row.id,
+        channel: "sms",
+        type,
+        status: "skipped",
+        recipient: row.client_phone!.trim(),
+        subject: null,
+        body: message.sms,
+        provider: null,
+        provider_message_id: null,
+        error: SMS_MONTHLY_LIMIT_REACHED,
+        sent_at: nowIso,
+        timing_minutes_before: timingMinutesBefore,
+      })
+    } else {
     const res = await sendReminderSms({ to: row.client_phone!.trim(), body: message.sms })
     const status = res.ok ? "sent" : res.code === "not_configured" || res.code === "simulated_dev" ? res.code : "failed"
     statuses.push(status)
@@ -408,6 +432,7 @@ async function processSingleReminder(
       sent_at: nowIso,
       timing_minutes_before: timingMinutesBefore,
     })
+    }
     }
   }
 

@@ -11,6 +11,11 @@ import {
   buildTransactionalEmailText,
 } from "@/lib/notifications/transactional-email-layout"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
 import { queueGoogleCalendarBookingSync } from "@/lib/integrations/google-calendar/sync-booking-server"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
@@ -603,6 +608,17 @@ export async function sendBookingCreatedNotifications(
     if (claim === "skip") {
       smsResult = channelDetail("already_sent", { provider: smsProvider })
     } else {
+      const quotaDecision = await evaluateSmsQuotaForSend(admin, booking.business_id)
+      if (isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+        smsResult = channelDetail("skipped")
+        await persistChannelLog(admin, booking, "sms", phone, {
+          status: "skipped",
+          subject: null,
+          body: messages.sms,
+          error_message: SMS_MONTHLY_LIMIT_REACHED,
+          sent_at: null,
+        })
+      } else {
       try {
         const sent = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
       const logStatus = mapProviderLogStatus(sent.ok, sent.ok ? undefined : sent.code)
@@ -653,6 +669,7 @@ export async function sendBookingCreatedNotifications(
           error_message: errMsg,
           sent_at: null,
         })
+      }
       }
     }
   }

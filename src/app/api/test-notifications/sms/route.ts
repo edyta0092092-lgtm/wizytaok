@@ -3,6 +3,11 @@ import { NextResponse } from "next/server"
 import { resolveAdminBusinessForUser } from "@/lib/auth/resolve-admin-business-server"
 import { readTestIntegrationFlags } from "@/lib/config/test-integration-flags"
 import { sendReminderSms } from "@/lib/notifications/sms"
+import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { TablesInsert } from "@/types/database"
 
@@ -35,12 +40,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "invalid_or_missing_phone" }, { status: 400 })
   }
 
-  const result = await sendReminderSms({ to, body: SMS_BODY })
-
   const admin = getServiceRoleClient()
   if (!admin) {
     return NextResponse.json({ ok: false, error: "service_role_missing" }, { status: 500 })
   }
+
+  const quotaDecision = await evaluateSmsQuotaForSend(admin, resolution.businessId)
+  if (isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+    return NextResponse.json(
+      { ok: false, error: SMS_MONTHLY_LIMIT_REACHED },
+      { status: 422 },
+    )
+  }
+
+  const result = await sendReminderSms({ to, body: SMS_BODY })
 
   const sent = result.ok === true
   const failDetail =

@@ -3,7 +3,11 @@ import { NextResponse } from "next/server"
 import { canManageMessageTemplates, canViewMessageSendHistory } from "@/lib/auth/permissions"
 import { resolveActiveBusinessMemberForUser } from "@/lib/auth/resolve-active-business-member-server"
 import { getSmsBusinessStatus } from "@/lib/notifications/sms-business-status"
-import { getSmsMonthlyLimit, getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
+import {
+  getSmsMonthlyIncludedLimit,
+  getSmsQuotaStatus,
+} from "@/lib/notifications/sms-monthly-limit"
+import { resolveSmsQuotaWarningLevel } from "@/lib/notifications/sms-quota-guard"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 
 export const dynamic = "force-dynamic"
@@ -31,20 +35,21 @@ export async function GET() {
     getSmsBusinessStatus(admin, resolution.businessId),
   ])
 
-  const limit = quota.limit
-  const used = quota.used
-  const remaining = quota.countFailed ? null : Math.max(0, limit - used)
+  const remaining = quota.countFailed ? null : quota.remaining
 
   return NextResponse.json({
     ok: true,
     quota: {
-      used,
-      limit,
+      used: quota.used,
+      limit: quota.limit,
+      includedLimit: quota.includedLimit,
+      bonusLimit: quota.bonusLimit,
       remaining,
       allowed: quota.allowed,
       countFailed: quota.countFailed,
+      warningLevel: resolveSmsQuotaWarningLevel(remaining),
     },
     status,
-    monthlyLimit: getSmsMonthlyLimit(),
+    monthlyLimit: getSmsMonthlyIncludedLimit(),
   })
 }

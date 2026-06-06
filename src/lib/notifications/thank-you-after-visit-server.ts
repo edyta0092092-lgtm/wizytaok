@@ -9,6 +9,11 @@ import {
   getTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
 import { getServiceRoleClient } from "@/lib/supabase/service-role"
 import type { Tables, TablesInsert } from "@/types/database"
@@ -278,6 +283,18 @@ export async function notifyThankYouAfterVisit(args: {
 
   const phone = booking.client_phone?.trim() ?? ""
   if (content.sendSms && phone) {
+    const quotaDecision = await evaluateSmsQuotaForSend(admin, booking.business_id)
+    if (isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+      await persistThankYouChannelLog(admin, booking, "sms", phone, {
+        status: "skipped",
+        subject: null,
+        body: content.smsText,
+        provider: null,
+        provider_message_id: null,
+        error_message: SMS_MONTHLY_LIMIT_REACHED,
+        sent_at: null,
+      })
+    } else {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: content.smsText })
     const status = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
@@ -291,6 +308,7 @@ export async function notifyThankYouAfterVisit(args: {
       sent_at: smsRes.ok ? nowIso : null,
     })
     if (smsRes.ok && !logged) logsOk = false
+    }
   }
 
   const email = booking.client_email?.trim() ?? ""

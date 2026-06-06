@@ -18,7 +18,11 @@ import {
   getTemplateRuntime,
   type NotificationTemplateRuntime,
 } from "@/lib/notifications/template-runtime"
-import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
+import {
+  evaluateSmsQuotaForSend,
+  SMS_MONTHLY_LIMIT_REACHED,
+  SMS_QUOTA_COUNT_FAILED,
+} from "@/lib/notifications/sms-quota-guard"
 import {
   DEFAULT_FIRST_REMINDER_MINUTES,
   DEFAULT_SECOND_REMINDER_MINUTES,
@@ -798,20 +802,15 @@ async function processSmsReminder(
     // miesiącu kalendarzowym Europe/Warsaw). Liczone jest faktyczne wysłanie z OBU
     // źródeł: przypomnień (`appointment_reminders`) i własnych szablonów
     // (`custom_template_sends`). Pendings / processing / failed / skipped NIE wchodzą.
-    const quota = await getSmsQuotaStatus(admin, item.business_id)
-    if (quota.countFailed) {
-      // Nie potrafimy policzyć — bezpieczniej traktować jak błąd techniczny
-      // i pozwolić cronowi spróbować ponownie. Inaczej moglibyśmy nieświadomie
-      // przekroczyć limit firmy.
-      return await recordFailure(admin, item, "sms_quota_count_failed")
-    }
-    const monthlyLimit = quota.limit
-    const used = quota.used
-    if (!quota.allowed) {
+    const quotaDecision = await evaluateSmsQuotaForSend(admin, item.business_id)
+    if (!quotaDecision.allowed) {
+      if (quotaDecision.reason === SMS_QUOTA_COUNT_FAILED) {
+        return await recordFailure(admin, item, SMS_QUOTA_COUNT_FAILED)
+      }
       await markSkipped(
         admin,
         item,
-        "sms_monthly_limit_reached",
+        SMS_MONTHLY_LIMIT_REACHED,
         booking,
         phone,
         resolveReminderTimingMinutes(runtime, item.reminder_kind),
@@ -819,8 +818,8 @@ async function processSmsReminder(
       console.info("[cron/send-reminders] sms_limit_reached", {
         id: item.id,
         business_id: item.business_id,
-        used,
-        limit: monthlyLimit,
+        used: quotaDecision.quota.used,
+        limit: quotaDecision.quota.limit,
       })
       return "skipped"
     }

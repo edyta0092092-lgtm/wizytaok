@@ -5,6 +5,11 @@ import {
 } from "@/lib/notifications/transactional-email-layout"
 import { buildBusinessTemplateVars } from "@/lib/notifications/business-template-vars"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
+import {
+  evaluateSmsQuotaForSend,
+  isSmsMonthlyLimitExhausted,
+  SMS_MONTHLY_LIMIT_REACHED,
+} from "@/lib/notifications/sms-quota-guard"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
 import type { NotificationLogUpdatePatch } from "@/lib/notifications/notification-log-update"
 import { persistTransactionalChannelLog } from "@/lib/notifications/transactional-channel-log"
@@ -201,6 +206,22 @@ export async function sendBookingRescheduledConfirmation(args: {
   let anySent = false
 
   if (phone) {
+    const quotaDecision = admin
+      ? await evaluateSmsQuotaForSend(admin, booking.business_id)
+      : null
+    if (quotaDecision && isSmsMonthlyLimitExhausted(quotaDecision.quota)) {
+      if (admin) {
+        await persistRescheduledChannelLog(admin, booking, logType, "sms", phone, {
+          status: "skipped",
+          subject: null,
+          body: messages.sms,
+          provider: null,
+          provider_message_id: null,
+          error_message: SMS_MONTHLY_LIMIT_REACHED,
+          sent_at: null,
+        })
+      }
+    } else {
     const smsRes = await sendPlainTransactionalSms({ to: phone, body: messages.sms })
     const smsStatus = mapChannelStatus(smsRes.ok, smsRes.ok ? undefined : smsRes.code)
     if (smsRes.ok) anySent = true
@@ -214,6 +235,7 @@ export async function sendBookingRescheduledConfirmation(args: {
         error_message: smsRes.ok ? null : `${smsRes.code}${smsRes.error ? `: ${smsRes.error}` : ""}`,
         sent_at: smsRes.ok ? nowIso : null,
       })
+    }
     }
   }
 

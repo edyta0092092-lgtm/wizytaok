@@ -3,7 +3,11 @@ import { formatPolishAppointmentLabel } from "@/lib/notifications/appointment-re
 import { sendReminderEmail } from "@/lib/notifications/email"
 import { plainTextEmailToHtml } from "@/lib/notifications/plain-text-email-html"
 import { applyTemplateVariables } from "@/lib/notifications/template-runtime"
-import { getSmsQuotaStatus } from "@/lib/notifications/sms-monthly-limit"
+import {
+  evaluateSmsQuotaForSend,
+  SMS_MONTHLY_LIMIT_REACHED,
+  SMS_QUOTA_COUNT_FAILED,
+} from "@/lib/notifications/sms-quota-guard"
 import { sendPlainTransactionalSms } from "@/lib/notifications/transactional-sms"
 import { mirrorEventCustomTemplateToNotificationLog } from "@/lib/notifications/event-notification-log-mirror"
 import { getStaffDisplayName } from "@/lib/staff/staff-display"
@@ -287,25 +291,22 @@ export async function sendCustomTemplateForBookingDedup(
       outcomes.push({ channel, status: "skipped" })
       continue
     }
-    // Wspólny miesięczny limit SMS (przypomnienia + własne szablony).
     if (channel === "sms") {
-      const quota = await getSmsQuotaStatus(admin, booking.business_id)
-      if (quota.countFailed) {
-        // Nie potrafimy policzyć — zwalniamy rekord do ponownej próby w kolejnym przebiegu.
-        await finalizeSend(admin, finalizeKey, {
-          status: "pending",
-          error: "sms_quota_count_failed",
-        })
-        outcomes.push({ channel, status: "skipped", error: "sms_quota_count_failed" })
-        continue
-      }
-      if (!quota.allowed) {
-        await finalizeSend(admin, finalizeKey, {
-          status: "skipped",
-          error: "sms_monthly_limit_reached",
-          ...channelContent(channel, rendered),
-        })
-        outcomes.push({ channel, status: "skipped", error: "sms_monthly_limit_reached" })
+      const quotaDecision = await evaluateSmsQuotaForSend(admin, booking.business_id)
+      if (!quotaDecision.allowed) {
+        if (quotaDecision.reason === SMS_QUOTA_COUNT_FAILED) {
+          await finalizeSend(admin, finalizeKey, {
+            status: "pending",
+            error: SMS_QUOTA_COUNT_FAILED,
+          })
+        } else {
+          await finalizeSend(admin, finalizeKey, {
+            status: "skipped",
+            error: SMS_MONTHLY_LIMIT_REACHED,
+            ...channelContent(channel, rendered),
+          })
+        }
+        outcomes.push({ channel, status: "skipped", error: quotaDecision.reason })
         continue
       }
     }
@@ -351,9 +352,9 @@ export async function sendCustomTemplateManual(
   const outcomes: CustomChannelOutcome[] = []
   for (const { channel, recipient } of channels) {
     if (channel === "sms") {
-      const quota = await getSmsQuotaStatus(admin, booking.business_id)
-      if (quota.countFailed || !quota.allowed) {
-        const reason = quota.countFailed ? "sms_quota_count_failed" : "sms_monthly_limit_reached"
+      const quotaDecision = await evaluateSmsQuotaForSend(admin, booking.business_id)
+      if (!quotaDecision.allowed) {
+        const reason = quotaDecision.reason
         const content = channelContent(channel, rendered)
         await admin.from("custom_template_sends").upsert(
           {
