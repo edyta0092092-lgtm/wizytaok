@@ -549,9 +549,9 @@ export const dictionaries = {
       businessProfileTitle: "Profil firmy",
       saveProfile: "Zapisz profil",
       profileSaved: "Profil został zapisany.",
-      slugTaken: "Ten adres strony rezerwacji jest już zajęty.",
+      slugTaken: "Ten adres jest już zajęty",
       slugRequired: "Adres strony rezerwacji jest wymagany.",
-      slugInvalid: "Adres może zawierać tylko małe litery, cyfry i myślniki.",
+      slugInvalid: "Użyj tylko małych liter, cyfr i myślników",
       taxIdTaken: "Ten NIP jest już przypisany do innego konta w WizytaOK.",
       phoneTaken: "Ten numer telefonu jest już przypisany do innego konta w WizytaOK.",
       emailTaken: "Ten adres e-mail jest już przypisany do innego konta w WizytaOK.",
@@ -2027,11 +2027,11 @@ Pozdrawiamy,
       publicBookingLink: "Link do strony rezerwacji dla klientów",
       openBookingPage: "Otwórz stronę rezerwacji",
       bookingSlugLabel: "Adres strony rezerwacji",
-      bookingSlugPlaceholder: "np. salon-nova",
+      bookingSlugPlaceholder: "salon-anna",
       bookingSlugHint:
         "Tylko małe litery, cyfry i myślniki (min. 3 znaki). Adres musi być unikalny.",
       bookingSlugPreviewLabel: "Pełny link dla klientów",
-      bookingSlugAvailable: "Ten adres jest dostępny.",
+      bookingSlugAvailable: "Adres dostępny",
       bookingSlugChecking: "Sprawdzanie dostępności adresu…",
       bookingSlugCopyLink: "Kopiuj link",
       bookingSlugCopied: "Link skopiowany do schowka.",
@@ -3198,7 +3198,7 @@ Pozdrawiamy,
       hcBookingLinkLead:
         "To adres, który wysyłasz klientom (strona www, Instagram, wizytówka). Bez niego rezerwacje online nie ruszą.",
       hcBookingLinkSteps:
-        "1. Ustawienia → Dane firmy.\n2. Uzupełnij Adres strony rezerwacji (końcówka URL, np. nazwa-firmy).\n3. Zapisz zmiany.\n4. Skopiuj pełny link (format: twoja-domena/rezerwacje/końcówka).\n5. Otwórz w nowej karcie i sprawdź, czy widać usługi i kalendarz.",
+        "1. Ustawienia → Rezerwacje online.\n2. W polu Adres strony rezerwacji wpisz końcówkę linku (np. salon-anna).\n3. Kliknij Zapisz zmiany.\n4. Kliknij Kopiuj link — format: https://wizytaok.pl/rezerwacje/salon-anna.\n5. Otwórz link w nowej karcie i sprawdź usługi oraz kalendarz.",
       hcBookingFlowLead:
         "Strona publiczna nie wymaga konta u klienta. Klient wybiera usługę, osobę (jeśli macie zespół), wolny termin i zostawia kontakt.",
       hcBillingTitle: "Trial i subskrypcja",
@@ -3320,7 +3320,7 @@ Pozdrawiamy,
       modBusinessBullets:
         "- nazwa firmy\n- opcjonalnie NIP firmy\n- e-mail\n- telefon\n- link, który wklejasz klientom (zawsze pod /rezerwacje/...)",
       modBusinessSteps:
-        "1. Wejdź w Ustawienia.\n2. Uzupełnij dane firmy.\n3. Kliknij Zapisz zmiany.\n4. Otwórz adres /rezerwacje/[twoja-końcówka] i sprawdź stronę klienta.",
+        "1. Wejdź w Ustawienia → Rezerwacje online.\n2. Ustaw Adres strony rezerwacji (np. salon-anna).\n3. Kliknij Zapisz zmiany.\n4. Kliknij Kopiuj link i sprawdź stronę pod https://wizytaok.pl/rezerwacje/twoj-adres.",
       modBusinessTip:
         "Adres strony rezerwacji to końcówka linku, pod którym klienci mogą umawiać wizyty.",
       modServicesTitle: "Usługi",
@@ -6703,7 +6703,7 @@ Regards,
       hcBookingLinkLead:
         "The address you share with clients (website, social, card). Online booking will not work without it.",
       hcBookingLinkSteps:
-        "1. Settings → Business details.\n2. Set Booking page address (URL slug).\n3. Save changes.\n4. Copy the full link (your-domain/rezerwacje/slug).\n5. Open in a new tab and verify services and calendar.",
+        "1. Settings → Online booking.\n2. Enter Booking page address (e.g. salon-anna).\n3. Save changes.\n4. Click Copy link — format: https://wizytaok.pl/rezerwacje/salon-anna.\n5. Open the link in a new tab and verify services and calendar.",
       hcBookingFlowLead:
         "The public page needs no client account. They pick service, staff (if you have a team), a free slot and leave contact details.",
       hcBillingTitle: "Trial and subscription",
