@@ -2,14 +2,8 @@ import Link from "next/link"
 
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
-import {
-  TERMS_DRAFT_BADGE,
-  TERMS_DRAFT_VERSION,
-  TERMS_INTRO,
-  TERMS_SECTIONS,
-} from "@/content/legal/terms"
+import { LEGAL_OPERATOR, LEGAL_VERSION_LABEL } from "@/content/legal/operator"
+import { TERMS_INTRO, TERMS_SECTIONS } from "@/content/legal/terms"
 
 export default function TermsPage() {
   return (
@@ -20,22 +14,9 @@ export default function TermsPage() {
         </div>
 
         <header className="space-y-2">
-          <Badge
-            variant="outline"
-            className="rounded-full border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-200"
-          >
-            {TERMS_DRAFT_BADGE}
-          </Badge>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Regulamin serwisu WizytaOK</h1>
-          <p className="text-sm text-muted-foreground">{TERMS_DRAFT_VERSION}</p>
+          <p className="text-sm text-muted-foreground">{LEGAL_VERSION_LABEL}</p>
         </header>
-
-        <div
-          role="status"
-          className="rounded-2xl border border-border/80 bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
-        >
-          {LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}
-        </div>
 
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card/80 p-5 text-sm text-muted-foreground shadow-sm">
           {TERMS_INTRO.map((line) => (
@@ -59,6 +40,9 @@ export default function TermsPage() {
         </div>
 
         <footer className="space-y-4 border-t border-border/80 pt-8">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Operator: {LEGAL_OPERATOR.operatorName} · {LEGAL_OPERATOR.contactEmail} · {LEGAL_OPERATOR.serviceUrl}
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" className="h-10 rounded-xl">
               <Link href="/">Strona główna</Link>
@@ -72,12 +56,6 @@ export default function TermsPage() {
             <Button asChild variant="ghost" className="h-10 rounded-xl">
               <Link href="/developer-contact">Kontakt</Link>
             </Button>
-          </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">{LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-            <Link href="/privacy" className="font-medium text-primary underline-offset-4 hover:underline">
-              Polityka prywatności
-            </Link>
           </div>
         </footer>
       </main>

@@ -2,14 +2,8 @@ import Link from "next/link"
 
 import { Logo } from "@/components/brand/logo"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
-import {
-  PRIVACY_DRAFT_BADGE,
-  PRIVACY_DRAFT_VERSION,
-  PRIVACY_INTRO,
-  PRIVACY_SECTIONS,
-} from "@/content/legal/privacy"
+import { LEGAL_OPERATOR, LEGAL_VERSION_LABEL } from "@/content/legal/operator"
+import { PRIVACY_INTRO, PRIVACY_SECTIONS } from "@/content/legal/privacy"
 
 export default function PrivacyPage() {
   return (
@@ -20,25 +14,11 @@ export default function PrivacyPage() {
         </div>
 
         <header className="space-y-2">
-          <Badge
-            variant="outline"
-            className="rounded-full border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-200"
-          >
-            {PRIVACY_DRAFT_BADGE}
-          </Badge>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Polityka prywatności WizytaOK
           </h1>
-          <p className="text-sm text-muted-foreground">{PRIVACY_DRAFT_VERSION}</p>
+          <p className="text-sm text-muted-foreground">{LEGAL_VERSION_LABEL}</p>
         </header>
-
-        <div
-          role="status"
-          className="rounded-2xl border border-amber-500/35 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-50"
-        >
-          {LEGAL_BETA_OPERATOR_PUBLIC_NOTICE} Przed uruchomieniem komercyjnym zostanie uzupełniona dokumentacja
-          powierzenia przetwarzania danych (DPA) oraz dane Administratora — przy weryfikacji prawnej.
-        </div>
 
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card/80 p-5 text-sm text-muted-foreground shadow-sm">
           {PRIVACY_INTRO.map((line) => (
@@ -65,6 +45,10 @@ export default function PrivacyPage() {
         </div>
 
         <footer className="space-y-4 border-t border-border/80 pt-8">
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Operator: {LEGAL_OPERATOR.operatorName} · {LEGAL_OPERATOR.privacyEmail} ·{" "}
+            {LEGAL_OPERATOR.serviceUrl}
+          </p>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline" className="h-10 rounded-xl">
               <Link href="/">Strona główna</Link>
@@ -76,10 +60,9 @@ export default function PrivacyPage() {
               <Link href="/terms">Regulamin</Link>
             </Button>
             <Button asChild variant="ghost" className="h-10 rounded-xl">
-              <Link href="/developer-contact">Kontakt techniczny</Link>
+              <Link href="/developer-contact">Kontakt</Link>
             </Button>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">{LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}</p>
         </footer>
       </main>
     </div>
