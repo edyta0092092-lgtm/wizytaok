@@ -2457,13 +2457,32 @@ Pozdrawiamy,
       cardDescription:
         "Wizyty z panelu trafiają do wybranego kalendarza Google. Każdy użytkownik łączy własne konto.",
       statusLoading: "Sprawdzanie…",
+      statusNeedsConfig: "Wymaga konfiguracji",
       statusPendingDb: "Oczekuje migracji",
+      statusPendingServiceRole: "Brak service role",
+      statusPendingEncryption: "Brak klucza szyfrowania",
       statusConnected: "Połączono",
       statusDisconnected: "Niepołączono",
       notConfiguredEnv:
         "Brak GOOGLE_CALENDAR_CLIENT_ID / GOOGLE_CALENDAR_CLIENT_SECRET w konfiguracji serwera.",
+      encryptionPending:
+        "Ustaw GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY (min. 32 znaki) w .env.local i zrestartuj serwer dev.",
+      serviceRolePending:
+        "Ustaw SUPABASE_SERVICE_ROLE_KEY w .env.local (Supabase → Settings → API → service_role).",
       persistencePending:
-        "Wymagana migracja bazy (tabela połączeń i pole google_calendar_event_id w wizytach). Po wdrożeniu SQL połączenie będzie dostępne.",
+        "Wymagana migracja bazy (tabela połączeń i pole google_calendar_event_id w wizytach). Uruchom plik supabase/migrations/100_google_calendar_integration.sql w Supabase SQL Editor.",
+      setupTitle: "Konfiguracja serwera",
+      setupStepOAuth:
+        "Google Cloud Console: włącz Calendar API, utwórz OAuth Client (Web), redirect URI: {redirectUri}",
+      setupStepEnv: "Dodaj GOOGLE_CALENDAR_CLIENT_ID i GOOGLE_CALENDAR_CLIENT_SECRET do .env.local / Vercel.",
+      setupStepEncryption: "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY — losowy ciąg min. 32 znaki.",
+      setupStepServiceRole: "SUPABASE_SERVICE_ROLE_KEY — klucz service role z Supabase.",
+      setupStepMigration: "Migracja SQL 100_google_calendar_integration.sql w Supabase.",
+      setupLinkCalendarApi: "Otwórz Calendar API w Google Cloud",
+      setupLinkCredentials: "Otwórz OAuth Credentials",
+      setupLinkSupabaseApi: "Otwórz klucze API Supabase",
+      setupRestartHint:
+        "Po uzupełnieniu .env.local zrestartuj serwer dev. Te same zmienne dodaj w Vercel.",
       syncTitle: "Co jest synchronizowane",
       syncItemCreate: "Nowa wizyta w panelu → wydarzenie w kalendarzu (usługa, klient, godzina, pracownik, link WizytaOK).",
       syncItemUpdate: "Zmiana godziny lub pracownika → aktualizacja wydarzenia w kalendarzu.",
@@ -5877,13 +5896,32 @@ Regards,
       cardDescription:
         "Panel appointments sync to your chosen Google calendar. Each user connects their own account.",
       statusLoading: "Checking…",
+      statusNeedsConfig: "Needs configuration",
       statusPendingDb: "Awaiting migration",
+      statusPendingServiceRole: "Missing service role",
+      statusPendingEncryption: "Missing encryption key",
       statusConnected: "Connected",
       statusDisconnected: "Not connected",
       notConfiguredEnv:
         "Missing GOOGLE_CALENDAR_CLIENT_ID / GOOGLE_CALENDAR_CLIENT_SECRET in server configuration.",
+      encryptionPending:
+        "Set GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY (min. 32 characters) in .env.local and restart the dev server.",
+      serviceRolePending:
+        "Set SUPABASE_SERVICE_ROLE_KEY in .env.local (Supabase → Settings → API → service_role).",
       persistencePending:
-        "Database migration required (connections table and google_calendar_event_id on bookings). After SQL is applied, connection will be available.",
+        "Database migration required (connections table and google_calendar_event_id on bookings). Run supabase/migrations/100_google_calendar_integration.sql in the Supabase SQL Editor.",
+      setupTitle: "Server configuration",
+      setupStepOAuth:
+        "Google Cloud Console: enable Calendar API, create OAuth Client (Web), redirect URI: {redirectUri}",
+      setupStepEnv: "Add GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET to .env.local / Vercel.",
+      setupStepEncryption: "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY — random string, min. 32 characters.",
+      setupStepServiceRole: "SUPABASE_SERVICE_ROLE_KEY — service role key from Supabase.",
+      setupStepMigration: "SQL migration 100_google_calendar_integration.sql in Supabase.",
+      setupLinkCalendarApi: "Open Calendar API in Google Cloud",
+      setupLinkCredentials: "Open OAuth Credentials",
+      setupLinkSupabaseApi: "Open Supabase API keys",
+      setupRestartHint:
+        "After updating .env.local, restart the dev server. Add the same variables in Vercel.",
       syncTitle: "What gets synced",
       syncItemCreate:
         "New panel appointment → calendar event (service, client, time, staff, WizytaOK link).",

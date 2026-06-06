@@ -44,7 +44,7 @@ export default function SettingsIntegrationsPage() {
             </Link>
           </Button>
         </div>
-        <div className="max-w-3xl space-y-6">
+        <div className="space-y-6">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">
               {t("integrationsPage.pageHeading")}

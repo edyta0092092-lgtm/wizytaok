@@ -170,6 +170,20 @@
       transparent 55%
     );
   }
+
+  /* Natywne <select>: spójny color-scheme i czytelne opcje w dark mode (Windows/Chrome). */
+  select {
+    color-scheme: light dark;
+  }
+
+  .dark select {
+    color-scheme: dark;
+  }
+
+  select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
 }
 
 @layer utilities {

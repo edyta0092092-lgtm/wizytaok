@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Calendar, Link2, Unlink } from "lucide-react"
+import { Calendar, Check, Circle, Link2, Unlink } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
@@ -21,6 +21,11 @@ export function GoogleCalendarCard() {
   const [selectedId, setSelectedId] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [busy, setBusy] = React.useState(false)
+
+  const redirectUri =
+    typeof window !== "undefined"
+      ? `${window.location.origin.replace(/\/$/, "")}/api/integrations/google-calendar/callback`
+      : "/api/integrations/google-calendar/callback"
 
   const loadStatus = React.useCallback(async () => {
     setLoading(true)
@@ -124,6 +129,7 @@ export function GoogleCalendarCard() {
   const ready = Boolean(status?.persistenceReady)
   const configured = Boolean(status?.configured)
   const hasCalendar = Boolean(status?.googleCalendarId)
+  const setup = status?.setup
 
   return (
     <Card
@@ -143,20 +149,19 @@ export function GoogleCalendarCard() {
               {t("googleCalendarIntegration.cardDescription")}
             </CardDescription>
           </div>
-          <StatusBadge loading={loading} connected={connected && hasCalendar} ready={ready} t={t} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
-        {!configured ? (
-          <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground">
-            {t("googleCalendarIntegration.notConfiguredEnv")}
-          </p>
-        ) : null}
+        <StatusBadge
+          loading={loading}
+          connected={connected && hasCalendar}
+          ready={ready}
+          setup={setup}
+          t={t}
+        />
 
-        {configured && !ready ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-            {t("googleCalendarIntegration.persistencePending")}
-          </p>
+        {!loading && setup && !ready ? (
+          <SetupChecklist setup={setup} redirectUri={redirectUri} t={t} />
         ) : null}
 
         <div className="rounded-xl bg-muted/30 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
@@ -262,40 +267,161 @@ export function GoogleCalendarCard() {
   )
 }
 
+function SetupChecklist({
+  setup,
+  redirectUri,
+  t,
+}: {
+  setup: NonNullable<GoogleCalendarConnectionStatus["setup"]>
+  redirectUri: string
+  t: (key: string) => string
+}) {
+  const supabaseProjectRef = React.useMemo(() => {
+    const raw = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    const match = raw.match(/https?:\/\/([^.]+)\.supabase\.co/i)
+    return match?.[1] ?? null
+  }, [])
+
+  const links = [
+    {
+      href: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
+      label: t("googleCalendarIntegration.setupLinkCalendarApi"),
+    },
+    {
+      href: "https://console.cloud.google.com/apis/credentials",
+      label: t("googleCalendarIntegration.setupLinkCredentials"),
+    },
+    {
+      href: supabaseProjectRef
+        ? `https://supabase.com/dashboard/project/${supabaseProjectRef}/settings/api`
+        : "https://supabase.com/dashboard/projects",
+      label: t("googleCalendarIntegration.setupLinkSupabaseApi"),
+    },
+  ]
+
+  const steps = [
+    {
+      done: setup.oauthConfigured,
+      label: t("googleCalendarIntegration.setupStepOAuth").replace("{redirectUri}", redirectUri),
+    },
+    {
+      done: setup.oauthConfigured,
+      label: t("googleCalendarIntegration.setupStepEnv"),
+    },
+    {
+      done: setup.encryptionConfigured,
+      label: t("googleCalendarIntegration.setupStepEncryption"),
+    },
+    {
+      done: setup.serviceRoleConfigured,
+      label: t("googleCalendarIntegration.setupStepServiceRole"),
+    },
+    {
+      done: setup.databaseReady,
+      label: t("googleCalendarIntegration.setupStepMigration"),
+    },
+  ]
+
+  const pending = steps.some((step) => !step.done)
+
+  return (
+    <div className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-3">
+      <p className="text-xs font-medium text-foreground">{t("googleCalendarIntegration.setupTitle")}</p>
+      <ul className="mt-2 space-y-2">
+        {steps.map((step, index) => (
+          <li key={index} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+            {step.done ? (
+              <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-600" aria-hidden />
+            ) : (
+              <Circle className="mt-0.5 size-3.5 shrink-0 text-amber-600/80" aria-hidden />
+            )}
+            <span className={step.done ? "text-foreground/80" : undefined}>{step.label}</span>
+          </li>
+        ))}
+      </ul>
+      {pending ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {links.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center rounded-lg border border-border/80 bg-background/80 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+      {pending ? (
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {t("googleCalendarIntegration.setupRestartHint")}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 function StatusBadge({
   loading,
   connected,
   ready,
+  setup,
   t,
 }: {
   loading: boolean
   connected: boolean
   ready: boolean
+  setup: GoogleCalendarConnectionStatus["setup"] | undefined
   t: (key: string) => string
 }) {
   if (loading) {
     return (
-      <Badge variant="secondary" className="shrink-0">
+      <Badge variant="secondary" className="w-fit">
         {t("googleCalendarIntegration.statusLoading")}
       </Badge>
     )
   }
-  if (!ready) {
-    return (
-      <Badge variant="outline" className="shrink-0">
-        {t("googleCalendarIntegration.statusPendingDb")}
-      </Badge>
-    )
+  if (!ready && setup) {
+    if (!setup.oauthConfigured) {
+      return (
+        <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-700 dark:text-amber-300">
+          {t("googleCalendarIntegration.statusNeedsConfig")}
+        </Badge>
+      )
+    }
+    if (!setup.encryptionConfigured) {
+      return (
+        <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-700 dark:text-amber-300">
+          {t("googleCalendarIntegration.statusPendingEncryption")}
+        </Badge>
+      )
+    }
+    if (!setup.serviceRoleConfigured) {
+      return (
+        <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-700 dark:text-amber-300">
+          {t("googleCalendarIntegration.statusPendingServiceRole")}
+        </Badge>
+      )
+    }
+    if (!setup.databaseReady) {
+      return (
+        <Badge variant="outline" className="w-fit">
+          {t("googleCalendarIntegration.statusPendingDb")}
+        </Badge>
+      )
+    }
   }
   if (connected) {
     return (
-      <Badge className="shrink-0 bg-emerald-600/90 text-white hover:bg-emerald-600/90">
+      <Badge className="w-fit bg-emerald-600/90 text-white hover:bg-emerald-600/90">
         {t("googleCalendarIntegration.statusConnected")}
       </Badge>
     )
   }
   return (
-    <Badge variant="secondary" className="shrink-0">
+    <Badge variant="secondary" className="w-fit">
       {t("googleCalendarIntegration.statusDisconnected")}
     </Badge>
   )

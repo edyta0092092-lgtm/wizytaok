@@ -12,9 +12,17 @@ export type GoogleCalendarConnectionRow = {
   updated_at: string
 }
 
+export type GoogleCalendarSetupStatus = {
+  oauthConfigured: boolean
+  encryptionConfigured: boolean
+  serviceRoleConfigured: boolean
+  databaseReady: boolean
+}
+
 export type GoogleCalendarConnectionStatus = {
   configured: boolean
   persistenceReady: boolean
+  setup: GoogleCalendarSetupStatus
   connected: boolean
   googleAccountEmail: string | null
   googleCalendarId: string | null

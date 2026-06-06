@@ -116,11 +116,12 @@ export function WhatsAppIntegrationCard() {
               {t("whatsappIntegration.cardDescription")}
             </CardDescription>
           </div>
-          <StatusBadge connected={connected} t={t} />
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5 pt-4">
+        <StatusBadge connected={connected} t={t} />
+
         <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
           {t("whatsappIntegration.foundationNotice")}
         </p>
@@ -293,13 +294,13 @@ function StatusBadge({
 }) {
   if (connected) {
     return (
-      <Badge variant="default" className="shrink-0 rounded-lg bg-emerald-600 hover:bg-emerald-600">
+      <Badge variant="default" className="w-fit rounded-lg bg-emerald-600 hover:bg-emerald-600">
         {t("whatsappIntegration.statusConnected")}
       </Badge>
     )
   }
   return (
-    <Badge variant="secondary" className="shrink-0 rounded-lg">
+    <Badge variant="secondary" className="w-fit rounded-lg">
       {t("whatsappIntegration.statusDisconnected")}
     </Badge>
   )

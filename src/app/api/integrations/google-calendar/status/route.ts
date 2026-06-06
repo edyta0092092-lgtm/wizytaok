@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server"
 
-import { isGoogleCalendarOAuthConfigured } from "@/lib/integrations/google-calendar/config"
+import {
+  isGoogleCalendarOAuthConfigured,
+  isGoogleCalendarTokenEncryptionConfigured,
+} from "@/lib/integrations/google-calendar/config"
 import { loadActiveConnectionForUser } from "@/lib/integrations/google-calendar/connection-repository"
 import { requireGoogleCalendarMember } from "@/lib/integrations/google-calendar/member-auth"
-import { isGoogleCalendarPersistenceReady } from "@/lib/integrations/google-calendar/persistence-ready"
+import {
+  isGoogleCalendarDatabaseReady,
+  isGoogleCalendarPersistenceReady,
+  isGoogleCalendarServiceRoleConfigured,
+} from "@/lib/integrations/google-calendar/persistence-ready"
 import type { GoogleCalendarConnectionStatus } from "@/lib/integrations/google-calendar/types"
 
 export const dynamic = "force-dynamic"
@@ -15,12 +22,22 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status })
   }
 
-  const configured = isGoogleCalendarOAuthConfigured()
+  const oauthConfigured = isGoogleCalendarOAuthConfigured()
+  const encryptionConfigured = isGoogleCalendarTokenEncryptionConfigured()
+  const serviceRoleConfigured = isGoogleCalendarServiceRoleConfigured()
+  const databaseReady = await isGoogleCalendarDatabaseReady()
+  const configured = oauthConfigured
   const persistenceReady = await isGoogleCalendarPersistenceReady()
 
   let status: GoogleCalendarConnectionStatus = {
     configured,
     persistenceReady,
+    setup: {
+      oauthConfigured,
+      encryptionConfigured,
+      serviceRoleConfigured,
+      databaseReady,
+    },
     connected: false,
     googleAccountEmail: null,
     googleCalendarId: null,

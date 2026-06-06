@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "setup:google-calendar": "node scripts/setup-google-calendar.mjs",
+    "setup:google-calendar:open": "node scripts/setup-google-calendar.mjs --open"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
