@@ -64,8 +64,17 @@ export function GoogleCalendarCard() {
       toast.success(t("googleCalendarIntegration.toastConnected"))
       void loadStatus()
       void loadCalendars()
+    } else if (flag === "access_denied") {
+      toast.error(t("googleCalendarIntegration.toastAccessDenied"), {
+        description: t("googleCalendarIntegration.toastAccessDeniedHint"),
+        duration: 12_000,
+      })
     } else if (flag === "cancelled") {
       toast.message(t("googleCalendarIntegration.toastCancelled"))
+    } else if (flag === "missing_refresh") {
+      toast.error(t("googleCalendarIntegration.toastMissingRefresh"))
+    } else if (flag === "encryption_error") {
+      toast.error(t("googleCalendarIntegration.toastEncryptionError"))
     } else {
       toast.error(t("googleCalendarIntegration.toastError"))
     }
@@ -286,6 +295,10 @@ function SetupChecklist({
     {
       href: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com",
       label: t("googleCalendarIntegration.setupLinkCalendarApi"),
+    },
+    {
+      href: "https://console.cloud.google.com/apis/credentials/consent",
+      label: t("googleCalendarIntegration.setupLinkOAuthConsent"),
     },
     {
       href: "https://console.cloud.google.com/apis/credentials",

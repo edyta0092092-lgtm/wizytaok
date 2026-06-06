@@ -20,7 +20,11 @@ export async function GET(request: Request) {
 
   const oauthError = url.searchParams.get("error")
   if (oauthError) {
-    dest.searchParams.set("google_calendar", "cancelled")
+    if (oauthError === "access_denied") {
+      dest.searchParams.set("google_calendar", "access_denied")
+    } else {
+      dest.searchParams.set("google_calendar", "cancelled")
+    }
     return NextResponse.redirect(dest)
   }
 
