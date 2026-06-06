@@ -42,6 +42,7 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
       "Dane Klientów końcowych (np. imię, nazwisko, telefon, e-mail, notatki, historia wizyt).",
       "Dane wizyt i rezerwacji (np. usługa, termin, status, źródło rezerwacji).",
       "Dane związane z wiadomościami SMS/e-mail (np. statusy wysyłki, harmonogramy, logi techniczne).",
+      "Dane integracji Google Calendar (po dobrowolnym połączeniu konta przez Użytkownika): adres e-mail konta Google, identyfikator wybranego kalendarza, zaszyfrowany token odświeżania OAuth oraz identyfikatory wydarzeń kalendarza powiązanych z wizytami w panelu.",
       "Dane techniczne i bezpieczeństwa (np. logi systemowe, identyfikatory sesji, informacje diagnostyczne).",
       "Dane supportu/live chat (np. treść zgłoszeń, metadane kontaktu).",
     ],
@@ -51,6 +52,7 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
     paragraphs: [
       "Prowadzenie konta i realizacja funkcji aplikacji.",
       "Obsługa rezerwacji, kalendarza, grafiku i komunikacji z Klientami końcowymi.",
+      "Synchronizacja wizyt z kalendarzem Google Użytkownika — wyłącznie po jego wyraźnym połączeniu konta w ustawieniach integracji.",
       "Wysyłka powiadomień i przypomnień SMS/e-mail zgodnie z konfiguracją.",
       "Bezpieczeństwo, zapobieganie nadużyciom oraz utrzymanie stabilności usługi.",
       "Obsługa supportu i kontaktu technicznego.",
@@ -73,6 +75,7 @@ export const PRIVACY_SECTIONS: Array<{ title: string; paragraphs: string[] }> = 
       "Dostawcy hostingu i infrastruktury technicznej.",
       "Supabase (w zakresie hostowania backendu i danych).",
       "Dostawcy SMS i e-mail używani do komunikacji.",
+      "Google LLC (Google Calendar API) — wyłącznie gdy Użytkownik dobrowolnie połączy konto Google w integracji kalendarza; w zakresie tworzenia i aktualizacji wydarzeń powiązanych z wizytami.",
       "Dostawcy narzędzi technicznych, analitycznych i supportowych, jeśli są używani.",
       "Podmioty księgowe i doradcze, jeśli są zaangażowane.",
       "Uprawnione organy publiczne, gdy wynika to z przepisów prawa.",

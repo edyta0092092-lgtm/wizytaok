@@ -189,6 +189,7 @@ export function GoogleCalendarCard() {
 
         {!loading && ready ? (
           <>
+            <ProductionPublishingGuide redirectUri={redirectUri} t={t} />
             {status?.googleAccountEmail ? (
               <p className="text-xs text-muted-foreground">
                 {t("googleCalendarIntegration.accountLabel")}:{" "}
@@ -273,6 +274,89 @@ export function GoogleCalendarCard() {
         ) : null}
       </CardContent>
     </Card>
+  )
+}
+
+function ProductionPublishingGuide({
+  redirectUri,
+  t,
+}: {
+  redirectUri: string
+  t: (key: string) => string
+}) {
+  const appOrigin =
+    typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "https://wizytaok.pl"
+  const productionRedirect =
+    typeof window !== "undefined" && window.location.hostname === "localhost"
+      ? "https://wizytaok.pl/api/integrations/google-calendar/callback"
+      : redirectUri
+
+  const steps = [
+    t("googleCalendarIntegration.productionStep1"),
+    t("googleCalendarIntegration.productionStep2").replace("{redirectUri}", productionRedirect),
+    t("googleCalendarIntegration.productionStep3"),
+    t("googleCalendarIntegration.productionStep4"),
+  ]
+
+  const links = [
+    {
+      href: "https://console.cloud.google.com/apis/credentials/consent",
+      label: t("googleCalendarIntegration.setupLinkOAuthConsent"),
+    },
+    {
+      href: "https://console.cloud.google.com/apis/credentials/consent?tab=verification",
+      label: t("googleCalendarIntegration.setupLinkPublishApp"),
+    },
+    {
+      href: `${appOrigin}/privacy`,
+      label: t("googleCalendarIntegration.setupLinkPrivacyPolicy"),
+    },
+  ]
+
+  const copyScopeJustification = () => {
+    void navigator.clipboard.writeText(t("googleCalendarIntegration.productionScopeJustification"))
+    toast.success(t("googleCalendarIntegration.scopeJustificationCopied"))
+  }
+
+  return (
+    <div className="rounded-xl border border-border/80 bg-muted/20 px-3 py-3">
+      <p className="text-xs font-semibold text-foreground">
+        {t("googleCalendarIntegration.productionTitle")}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+        {t("googleCalendarIntegration.productionLead")}
+      </p>
+      <ol className="mt-3 list-inside list-decimal space-y-2 text-xs leading-relaxed text-muted-foreground">
+        {steps.map((step, index) => (
+          <li key={index}>{step}</li>
+        ))}
+      </ol>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {links.map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center rounded-lg border border-border/80 bg-background/80 px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+          >
+            {link.label}
+          </a>
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 rounded-lg text-xs"
+          onClick={copyScopeJustification}
+        >
+          {t("googleCalendarIntegration.copyScopeJustification")}
+        </Button>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground/90">
+        {t("googleCalendarIntegration.productionInterim")}
+      </p>
+    </div>
   )
 }
 

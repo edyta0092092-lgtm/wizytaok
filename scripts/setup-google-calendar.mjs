@@ -131,6 +131,14 @@ async function main() {
   openUrl(credentialsUrl)
   openUrl(supabaseApiUrl)
 
+  console.log("\n--- Publikacja dla wszystkich użytkowników (Google) ---\n")
+  console.log("1. OAuth consent screen → External, nazwa, logo, e-mail wsparcia")
+  console.log("2. Privacy policy URL: https://wizytaok.pl/privacy")
+  console.log("3. Terms URL: https://wizytaok.pl/terms")
+  console.log("4. Authorized domains: wizytaok.pl (+ vercel.app jeśli używasz)")
+  console.log("5. Publish app → Submit for verification (scope kalendarza)")
+  console.log("6. Po akceptacji Google każdy użytkownik może kliknąć Połącz\n")
+
   if (!oauthOk || !serviceRoleOk) {
     console.log("\nUzupełnij brakujące wartości w .env.local, potem zrestartuj `npm run dev`.")
     console.log("Te same zmienne dodaj w Vercel → Project → Settings → Environment Variables.\n")

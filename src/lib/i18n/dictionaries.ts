@@ -2474,7 +2474,7 @@ Pozdrawiamy,
         "Wymagana migracja bazy (tabela połączeń i pole google_calendar_event_id w wizytach). Uruchom plik supabase/migrations/100_google_calendar_integration.sql w Supabase SQL Editor.",
       setupTitle: "Konfiguracja serwera",
       setupStepOAuth:
-        "Google Cloud Console: włącz Calendar API, utwórz OAuth Client (Web), redirect URI: {redirectUri}. W OAuth consent screen (tryb Testing) dodaj użytkowników testowych — adresy Gmail, które łączą kalendarz.",
+        "Google Cloud Console: włącz Calendar API, utwórz OAuth Client (Web), redirect URI: {redirectUri}",
       setupStepEnv: "Dodaj GOOGLE_CALENDAR_CLIENT_ID i GOOGLE_CALENDAR_CLIENT_SECRET do .env.local / Vercel.",
       setupStepEncryption: "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY — losowy ciąg min. 32 znaki.",
       setupStepServiceRole: "SUPABASE_SERVICE_ROLE_KEY — klucz service role z Supabase.",
@@ -2482,7 +2482,25 @@ Pozdrawiamy,
       setupLinkCalendarApi: "Otwórz Calendar API w Google Cloud",
       setupLinkCredentials: "Otwórz OAuth Credentials",
       setupLinkOAuthConsent: "Otwórz OAuth consent screen",
+      setupLinkPublishApp: "Opublikuj aplikację OAuth",
+      setupLinkPrivacyPolicy: "Polityka prywatności (link do Google)",
       setupLinkSupabaseApi: "Otwórz klucze API Supabase",
+      productionTitle: "Dla wszystkich użytkowników (produkcja Google)",
+      productionLead:
+        "Aby każdy właściciel konta mógł połączyć kalendarz, aplikacja OAuth w Google Cloud musi wyjść z trybu Testing i przejść weryfikację Google. Bez tego Google blokuje logowanie (403 access_denied).",
+      productionStep1:
+        "OAuth consent screen: typ External, uzupełnij nazwę aplikacji, e-mail wsparcia, logo oraz linki do polityki prywatności i regulaminu.",
+      productionStep2:
+        "W Authorized domains dodaj domenę produkcyjną (np. wizytaok.pl) oraz w OAuth Client redirect URI: {redirectUri}",
+      productionStep3:
+        "Opisz scope’y kalendarza w formularzu weryfikacji — WizytaOK tworzy/aktualizuje wydarzenia wizyt wybranego przez użytkownika kalendarza.",
+      productionStep4: "Kliknij Publish app / Prześlij do weryfikacji i poczekaj na akceptację Google (zwykle kilka–kilkanaście dni).",
+      productionInterim:
+        "Tymczasowo (bez weryfikacji): w OAuth consent screen możesz dodać konkretne adresy Gmail w Test users — tylko one będą mogły się połączyć.",
+      productionScopeJustification:
+        "WizytaOK synchronizuje wizyty salonu z kalendarzem Google zalogowanego pracownika. Scope calendar.events służy do tworzenia, aktualizacji i oznaczania anulowanych wydarzeń wizyt. Scope calendar.readonly służy do wyboru kalendarza docelowego. Dane innych użytkowników Google nie są odczytywane.",
+      copyScopeJustification: "Kopiuj uzasadnienie scope’ów",
+      scopeJustificationCopied: "Skopiowano uzasadnienie do schowka.",
       setupRestartHint:
         "Po uzupełnieniu .env.local zrestartuj serwer dev. Te same zmienne dodaj w Vercel.",
       syncTitle: "Co jest synchronizowane",
@@ -2505,9 +2523,9 @@ Pozdrawiamy,
       toastDisconnected: "Rozłączono Google Calendar.",
       toastCancelled: "Anulowano autoryzację Google.",
       toastAccessDenied:
-        "Google zablokowało dostęp — aplikacja OAuth jest w trybie Testing.",
+        "Google zablokowało logowanie — aplikacja OAuth nie jest jeszcze opublikowana dla wszystkich użytkowników.",
       toastAccessDeniedHint:
-        "W Google Cloud → OAuth consent screen dodaj swój adres Gmail do listy Test users (np. edyta0092092@gmail.com), zapisz i spróbuj ponownie. Dla wszystkich użytkowników wymagana jest później weryfikacja aplikacji przez Google.",
+        "W Google Cloud → OAuth consent screen opublikuj aplikację i przejdź weryfikację Google (wymagana przy scope’ach kalendarza). Do czasu akceptacji możesz tymczasowo dodać swój Gmail w Test users.",
       toastMissingRefresh:
         "Google nie zwróciło refresh tokena. Rozłącz konto w Google (Moje konto → Dostęp aplikacji) i połącz ponownie.",
       toastEncryptionError:
@@ -5923,7 +5941,7 @@ Regards,
         "Database migration required (connections table and google_calendar_event_id on bookings). Run supabase/migrations/100_google_calendar_integration.sql in the Supabase SQL Editor.",
       setupTitle: "Server configuration",
       setupStepOAuth:
-        "Google Cloud Console: enable Calendar API, create OAuth Client (Web), redirect URI: {redirectUri}. On the OAuth consent screen (Testing mode), add test users — Gmail addresses that will connect the calendar.",
+        "Google Cloud Console: enable Calendar API, create OAuth Client (Web), redirect URI: {redirectUri}",
       setupStepEnv: "Add GOOGLE_CALENDAR_CLIENT_ID and GOOGLE_CALENDAR_CLIENT_SECRET to .env.local / Vercel.",
       setupStepEncryption: "GOOGLE_CALENDAR_TOKEN_ENCRYPTION_KEY — random string, min. 32 characters.",
       setupStepServiceRole: "SUPABASE_SERVICE_ROLE_KEY — service role key from Supabase.",
@@ -5931,7 +5949,25 @@ Regards,
       setupLinkCalendarApi: "Open Calendar API in Google Cloud",
       setupLinkCredentials: "Open OAuth Credentials",
       setupLinkOAuthConsent: "Open OAuth consent screen",
+      setupLinkPublishApp: "Publish OAuth app",
+      setupLinkPrivacyPolicy: "Privacy policy (link for Google)",
       setupLinkSupabaseApi: "Open Supabase API keys",
+      productionTitle: "For all users (Google production)",
+      productionLead:
+        "Every account owner can connect a calendar only after your Google Cloud OAuth app leaves Testing and passes Google verification. Until then Google returns 403 access_denied.",
+      productionStep1:
+        "OAuth consent screen: External user type, app name, support email, logo, privacy policy and terms URLs.",
+      productionStep2:
+        "Add your production domain (e.g. wizytaok.pl) to Authorized domains and set redirect URI: {redirectUri}",
+      productionStep3:
+        "Explain calendar scopes in the verification form — WizytaOK creates/updates appointment events in the calendar chosen by the user.",
+      productionStep4: "Click Publish app / Submit for verification and wait for Google approval (often days to a few weeks).",
+      productionInterim:
+        "Interim (without verification): add specific Gmail addresses under Test users in the OAuth consent screen — only they can connect.",
+      productionScopeJustification:
+        "WizytaOK syncs salon appointments to the signed-in staff member's Google Calendar. calendar.events creates, updates and cancels appointment events. calendar.readonly lists calendars so the user can pick a target calendar. No other Google users' data is accessed.",
+      copyScopeJustification: "Copy scope justification",
+      scopeJustificationCopied: "Justification copied to clipboard.",
       setupRestartHint:
         "After updating .env.local, restart the dev server. Add the same variables in Vercel.",
       syncTitle: "What gets synced",
@@ -5954,9 +5990,9 @@ Regards,
       toastConnected: "Connected to Google. Choose a target calendar.",
       toastDisconnected: "Google Calendar disconnected.",
       toastCancelled: "Google authorization cancelled.",
-      toastAccessDenied: "Google blocked access — the OAuth app is in Testing mode.",
+      toastAccessDenied: "Google blocked sign-in — the OAuth app is not published for all users yet.",
       toastAccessDeniedHint:
-        "In Google Cloud → OAuth consent screen, add your Gmail to Test users, save, and try again. Public access requires Google app verification later.",
+        "In Google Cloud → OAuth consent screen, publish the app and complete Google verification (required for calendar scopes). Until approval, you can temporarily add your Gmail under Test users.",
       toastMissingRefresh:
         "Google did not return a refresh token. Revoke app access in Google Account settings and connect again.",
       toastEncryptionError:
