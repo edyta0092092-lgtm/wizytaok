@@ -5,17 +5,20 @@ import { Calendar, Check, Circle, Link2, Unlink } from "lucide-react"
 import { useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 
+import { IntegrationComingSoonNotice } from "@/components/integrations/integration-coming-soon-notice"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { NativeSelect } from "@/components/ui/native-select"
+import { INTEGRATIONS_UI } from "@/config/integrations-ui"
 import type { GoogleCalendarConnectionStatus, GoogleCalendarListItem } from "@/lib/integrations/google-calendar/types"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export function GoogleCalendarCard() {
   const { t } = useTranslations()
   const searchParams = useSearchParams()
+  const comingSoon = INTEGRATIONS_UI.googleCalendarComingSoon
   const [status, setStatus] = React.useState<GoogleCalendarConnectionStatus | null>(null)
   const [calendars, setCalendars] = React.useState<GoogleCalendarListItem[]>([])
   const [selectedId, setSelectedId] = React.useState("")
@@ -54,10 +57,12 @@ export function GoogleCalendarCard() {
   }, [selectedId])
 
   React.useEffect(() => {
+    if (comingSoon) return
     void loadStatus()
-  }, [loadStatus])
+  }, [comingSoon, loadStatus])
 
   React.useEffect(() => {
+    if (comingSoon) return
     const flag = searchParams.get("google_calendar")
     if (!flag) return
     if (flag === "connected") {
@@ -78,19 +83,22 @@ export function GoogleCalendarCard() {
     } else {
       toast.error(t("googleCalendarIntegration.toastError"))
     }
-  }, [searchParams, loadCalendars, loadStatus, t])
+  }, [comingSoon, searchParams, loadCalendars, loadStatus, t])
 
   React.useEffect(() => {
+    if (comingSoon) return
     if (status?.connected && status.persistenceReady && !status.googleCalendarId) {
       void loadCalendars()
     }
-  }, [status, loadCalendars])
+  }, [comingSoon, status, loadCalendars])
 
   const connect = () => {
+    if (comingSoon) return
     window.location.href = "/api/integrations/google-calendar/connect"
   }
 
   const disconnect = async () => {
+    if (comingSoon) return
     if (!window.confirm(t("googleCalendarIntegration.disconnectConfirm"))) return
     setBusy(true)
     try {
@@ -110,6 +118,7 @@ export function GoogleCalendarCard() {
   }
 
   const saveCalendar = async () => {
+    if (comingSoon) return
     if (!selectedId.trim()) return
     setBusy(true)
     try {
@@ -161,6 +170,21 @@ export function GoogleCalendarCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4 pt-4">
+        {comingSoon ? (
+          <>
+            <IntegrationComingSoonNotice />
+            <div className="rounded-xl bg-muted/30 px-3 py-3 text-xs leading-relaxed text-muted-foreground">
+              <p className="font-medium text-foreground">{t("googleCalendarIntegration.syncTitle")}</p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>{t("googleCalendarIntegration.syncItemCreate")}</li>
+                <li>{t("googleCalendarIntegration.syncItemUpdate")}</li>
+                <li>{t("googleCalendarIntegration.syncItemCancel")}</li>
+                <li>{t("googleCalendarIntegration.syncItemTerminal")}</li>
+              </ul>
+            </div>
+          </>
+        ) : (
+          <>
         <StatusBadge
           loading={loading}
           connected={connected && hasCalendar}
@@ -272,6 +296,8 @@ export function GoogleCalendarCard() {
             ) : null}
           </>
         ) : null}
+          </>
+        )}
       </CardContent>
     </Card>
   )

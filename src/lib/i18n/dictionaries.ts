@@ -2403,6 +2403,9 @@ Pozdrawiamy,
       pageHeading: "Integracje",
       pageLead: "Skonfiguruj WhatsApp Business i Google Calendar. Wysyłka SMS/e-mail pozostaje bez zmian.",
       backToSettings: "Wróć do ustawień",
+      comingSoonBadge: "Dostępne wkrótce",
+      comingSoonDescription:
+        "Ta funkcja jest obecnie w przygotowaniu i zostanie udostępniona w jednej z najbliższych aktualizacji.",
     },
     whatsappIntegration: {
       cardTitle: "WhatsApp Business",
@@ -5869,6 +5872,9 @@ Regards,
       pageHeading: "Integrations",
       pageLead: "Configure WhatsApp Business and Google Calendar. SMS/email sending is unchanged.",
       backToSettings: "Back to settings",
+      comingSoonBadge: "Coming soon",
+      comingSoonDescription:
+        "This feature is currently in development and will be released in one of the upcoming updates.",
     },
     whatsappIntegration: {
       cardTitle: "WhatsApp Business",

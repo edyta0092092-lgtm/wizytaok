@@ -4,6 +4,7 @@ import * as React from "react"
 import { Link2, MessageCircle, Save, Unlink } from "lucide-react"
 import { toast } from "sonner"
 
+import { IntegrationComingSoonNotice } from "@/components/integrations/integration-coming-soon-notice"
 import { WhatsAppDashboardKpis } from "@/components/integrations/whatsapp-dashboard-kpis"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { INTEGRATIONS_UI } from "@/config/integrations-ui"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import {
   renderWhatsAppTemplate,
@@ -42,6 +44,7 @@ function templateKindLabel(t: (key: string) => string, kind: WhatsAppTemplateKin
 
 export function WhatsAppIntegrationCard() {
   const { t } = useTranslations()
+  const comingSoon = INTEGRATIONS_UI.whatsAppComingSoon
   const { businessId } = useBusinessAccess()
   const {
     config,
@@ -83,6 +86,7 @@ export function WhatsAppIntegrationCard() {
   }
 
   const connect = () => {
+    if (comingSoon) return
     if (!draftPhone.trim()) {
       toast.error(t("whatsappIntegration.phoneRequired"))
       return
@@ -93,6 +97,7 @@ export function WhatsAppIntegrationCard() {
   }
 
   const disconnect = () => {
+    if (comingSoon) return
     if (!window.confirm(t("whatsappIntegration.disconnectConfirm"))) return
     setConnected(false)
     toast.message(t("whatsappIntegration.toastDisconnected"))
@@ -120,6 +125,10 @@ export function WhatsAppIntegrationCard() {
       </CardHeader>
 
       <CardContent className="space-y-5 pt-4">
+        {comingSoon ? (
+          <IntegrationComingSoonNotice />
+        ) : (
+          <>
         <StatusBadge connected={connected} t={t} />
 
         <p className="text-xs leading-relaxed text-muted-foreground">
@@ -159,7 +168,7 @@ export function WhatsAppIntegrationCard() {
           </div>
           <div className="flex flex-wrap gap-2">
             {!connected ? (
-              <Button type="button" className="h-10 rounded-xl" onClick={connect}>
+              <Button type="button" className="h-10 rounded-xl" onClick={connect} disabled={comingSoon}>
                 <Link2 className="mr-1.5 size-4" aria-hidden />
                 {t("whatsappIntegration.connect")}
               </Button>
@@ -169,6 +178,7 @@ export function WhatsAppIntegrationCard() {
                 variant="outline"
                 className="h-10 rounded-xl"
                 onClick={disconnect}
+                disabled={comingSoon}
               >
                 <Unlink className="mr-1.5 size-4" aria-hidden />
                 {t("whatsappIntegration.disconnect")}
@@ -280,6 +290,8 @@ export function WhatsAppIntegrationCard() {
             </div>
           </div>
         </section>
+          </>
+        )}
       </CardContent>
     </Card>
   )

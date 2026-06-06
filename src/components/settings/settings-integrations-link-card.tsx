@@ -3,7 +3,9 @@
 import Link from "next/link"
 import { Calendar, ChevronRight, MessageCircle } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { INTEGRATIONS_UI } from "@/config/integrations-ui"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export function SettingsIntegrationsLinkCard() {
@@ -16,6 +18,7 @@ export function SettingsIntegrationsLinkCard() {
       title: t("settings.integrationsWhatsApp"),
       hint: t("settings.integrationsWhatsAppHint"),
       iconClass: "text-emerald-600",
+      comingSoon: INTEGRATIONS_UI.whatsAppComingSoon,
     },
     {
       href: "/settings/integrations#google-calendar",
@@ -23,6 +26,7 @@ export function SettingsIntegrationsLinkCard() {
       title: t("settings.integrationsGoogleCalendar"),
       hint: t("settings.integrationsGoogleCalendarHint"),
       iconClass: "text-primary",
+      comingSoon: INTEGRATIONS_UI.googleCalendarComingSoon,
     },
   ] as const
 
@@ -35,7 +39,7 @@ export function SettingsIntegrationsLinkCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2 pt-4">
-        {links.map(({ href, icon: Icon, title, hint, iconClass }) => (
+        {links.map(({ href, icon: Icon, title, hint, iconClass, comingSoon }) => (
           <Link
             key={href}
             href={href}
@@ -47,8 +51,20 @@ export function SettingsIntegrationsLinkCard() {
               <Icon className="size-4" aria-hidden />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-medium text-foreground">{title}</span>
-              <span className="block text-xs text-muted-foreground">{hint}</span>
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{title}</span>
+                {comingSoon ? (
+                  <Badge
+                    variant="outline"
+                    className="rounded-md border-primary/30 bg-primary/5 px-1.5 py-0 text-[10px] font-medium text-primary"
+                  >
+                    {t("integrationsPage.comingSoonBadge")}
+                  </Badge>
+                ) : null}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {comingSoon ? t("integrationsPage.comingSoonDescription") : hint}
+              </span>
             </span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </Link>
