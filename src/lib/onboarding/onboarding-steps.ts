@@ -66,7 +66,7 @@ export const ONBOARDING_ADMIN_STEPS: OnboardingStepConfig[] = [
   {
     id: "booking_page",
     path: "/settings",
-    targetSelector: '[data-tour="settings-company"]',
+    targetSelector: '[data-tour="settings-booking-slug"]',
     titleKey: "onboarding.steps.booking_page.title",
     shortKey: "onboarding.steps.booking_page.short",
     hintKey: "onboarding.steps.booking_page.hint",

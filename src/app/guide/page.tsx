@@ -5,6 +5,7 @@ import * as React from "react"
 import { HelpCenterHub } from "@/components/guide/help-center-hub"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { businessBookingPagePath } from "@/lib/business/booking-page-path"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -35,7 +36,7 @@ export default function GuidePage() {
     }
   }, [businessId])
 
-  const bookingPath = bookingSlug ? `/rezerwacje/${bookingSlug}` : "/settings"
+  const bookingPath = businessBookingPagePath(bookingSlug || null)
 
   return (
     <AppShell title={t("guide.helpCenterTitle")} pageDescription={t("guide.helpCenterDescription")}>

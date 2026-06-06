@@ -21,6 +21,7 @@ import {
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
 import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
+import { BookingSlugSettingsFields } from "@/components/settings/booking-slug-settings-fields"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { SettingsIntegrationsLinkCard } from "@/components/settings/settings-integrations-link-card"
 import { TestBillingSettingsCard } from "@/components/settings/test-billing-settings-card"
@@ -166,6 +167,7 @@ export default function SettingsPage() {
     })
   }, [])
   const [form, setForm] = React.useState<SettingsForm>(initialSettingsForm)
+  const [savedPublicSlug, setSavedPublicSlug] = React.useState("")
   const [showSaved, setShowSaved] = React.useState(false)
   const [saveError, setSaveError] = React.useState<string | null>(null)
   const [exportBusy, setExportBusy] = React.useState<"appointments" | "clients" | null>(null)
@@ -309,6 +311,7 @@ export default function SettingsPage() {
                 : null,
             ),
           }))
+          setSavedPublicSlug(typeof data.slug === "string" ? data.slug : "")
         })
     })
     return () => {
@@ -501,6 +504,7 @@ export default function SettingsPage() {
       }
 
       setShowSaved(true)
+      setSavedPublicSlug(form.publicSlug.trim())
     } finally {
       setSaving(false)
     }
@@ -637,21 +641,6 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground">{t("settings.businessAddressHint")}</p>
                     )}
                   </div>
-                  <div className="sm:col-span-2">
-                    <Button type="button" variant="outline" size="sm" asChild>
-                      <Link
-                        href={
-                          form.publicSlug
-                            ? `/rezerwacje?firma=${encodeURIComponent(form.publicSlug)}`
-                            : "/rezerwacje"
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {t("settings.openBookingPage")}
-                      </Link>
-                    </Button>
-                  </div>
                   <InternationalPhoneFieldGroup
                     className="sm:col-span-2"
                     label={t("settings.phoneLabel")}
@@ -737,6 +726,11 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 pt-4">
+                  <BookingSlugSettingsFields
+                    value={form.publicSlug}
+                    savedSlug={savedPublicSlug}
+                    onChange={(publicSlug) => setForm((f) => ({ ...f, publicSlug }))}
+                  />
                   <div className="space-y-1.5 sm:max-w-xs">
                     <Label htmlFor="default-break-minutes">
                       {t("settings.defaultBreakMinutesLabel")}

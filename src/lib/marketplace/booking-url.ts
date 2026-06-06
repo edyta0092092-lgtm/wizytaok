@@ -1,6 +1,7 @@
+import { businessBookingPagePath } from "@/lib/business/booking-page-path"
+
 export function marketplaceBookingUrl(slug: string): string {
-  const normalized = slug.trim().toLowerCase()
-  return `/rezerwacje/${encodeURIComponent(normalized)}`
+  return businessBookingPagePath(slug)
 }
 
 export function marketplaceCompanyProfilePath(slug: string): string {
