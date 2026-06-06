@@ -114,17 +114,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="border-b border-border/90 bg-muted/20">
-        <div className="mx-auto max-w-6xl px-6 py-4">
-          <p
-            role="status"
-            className="text-center text-sm leading-relaxed text-muted-foreground sm:text-left"
-          >
-            {t("marketing.homeBetaNotice")}
-          </p>
-        </div>
-      </div>
-
       <section className="border-y border-border/90 bg-muted/25">
         <div className="mx-auto max-w-6xl px-6 py-14">
           <h2 className="text-2xl font-semibold">{t("marketing.whoForTitle")}</h2>

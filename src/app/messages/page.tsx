@@ -7,6 +7,7 @@ import { Plus } from "lucide-react"
 import { MessageTemplatesSection } from "@/components/messages/message-templates-section"
 import { CustomTemplatesSection } from "@/components/messages/custom-templates-section"
 import { SendingHistorySection } from "@/components/messages/sending-history-section"
+import { SmsQuotaStatusCard } from "@/components/messages/sms-quota-status-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -65,6 +66,7 @@ function MessagesPageContent() {
     >
       <PageShell>
         <div data-tour="messages-list" className="flex flex-col gap-6">
+        <SmsQuotaStatusCard />
         {canManageTemplates ? (
           <>
             <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} readOnly={false} />

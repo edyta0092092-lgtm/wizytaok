@@ -7,7 +7,6 @@ import { toast } from "sonner"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -818,25 +817,14 @@ export default function SettingsPage() {
 
               <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
                 <CardHeader className="border-b border-border/70 py-4">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-sm font-semibold">
-                      {t("settings.legalInfoTitle")}
-                    </CardTitle>
-                    <Badge
-                      variant="outline"
-                      className="rounded-full border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary"
-                    >
-                      {t("settings.betaBadge")}
-                    </Badge>
-                  </div>
+                  <CardTitle className="text-sm font-semibold">
+                    {t("settings.legalInfoTitle")}
+                  </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground">
                     {t("settings.legalInfoDescription")}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-2 pt-4 sm:grid-cols-2 sm:gap-3">
-                  <p className="sm:col-span-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-                    {t("settings.betaNotice")}
-                  </p>
                   <Button
                     asChild
                     variant="outline"

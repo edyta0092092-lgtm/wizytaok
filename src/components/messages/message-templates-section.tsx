@@ -494,7 +494,7 @@ export function MessageTemplatesSection({
 
   return (
     <>
-      <section aria-labelledby="messages-templates-heading" className="min-w-0" data-tour="messages-templates">
+      <section id="message-templates" aria-labelledby="messages-templates-heading" className="min-w-0" data-tour="messages-templates">
         <h2
           id="messages-templates-heading"
           className="mb-3 text-base font-semibold text-foreground"
