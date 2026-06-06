@@ -122,8 +122,8 @@ export function WhatsAppIntegrationCard() {
       <CardContent className="space-y-5 pt-4">
         <StatusBadge connected={connected} t={t} />
 
-        <p className="rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-          {t("whatsappIntegration.foundationNotice")}
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          {t("whatsappIntegration.statusPreviewHint")}
         </p>
 
         <section className="space-y-3">
@@ -292,16 +292,19 @@ function StatusBadge({
   connected: boolean
   t: (key: string) => string
 }) {
-  if (connected) {
-    return (
-      <Badge variant="default" className="w-fit rounded-lg bg-emerald-600 hover:bg-emerald-600">
-        {t("whatsappIntegration.statusConnected")}
-      </Badge>
-    )
-  }
   return (
-    <Badge variant="secondary" className="w-fit rounded-lg">
-      {t("whatsappIntegration.statusDisconnected")}
-    </Badge>
+    <div className="flex flex-wrap items-center gap-2">
+      <Badge
+        variant="outline"
+        className="w-fit rounded-lg border-amber-500/40 text-amber-800 dark:text-amber-200"
+      >
+        {t("whatsappIntegration.statusPreview")}
+      </Badge>
+      {connected ? (
+        <Badge variant="secondary" className="w-fit rounded-lg">
+          {t("whatsappIntegration.statusConfiguredLocally")}
+        </Badge>
+      ) : null}
+    </div>
   )
 }
