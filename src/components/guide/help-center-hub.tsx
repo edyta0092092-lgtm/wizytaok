@@ -124,12 +124,9 @@ export function HelpCenterHub({ t, bookingPath, isAdmin }: HelpCenterHubProps) {
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">
             {t("guide.helpCenterBadge")}
           </p>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {t("guide.helpCenterTitle")}
-            </h1>
-            <p className="max-w-2xl text-sm text-muted-foreground">{t("guide.helpCenterDescription")}</p>
-          </div>
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            {t("guide.helpCenterDescription")}
+          </p>
           <div className="relative max-w-xl">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"

@@ -13,23 +13,7 @@ import { appointmentShowsNeedsActionStatus } from "@/lib/appointments/stats-rule
 import { getAppToday, isSameAppDay } from "@/lib/date/current-date"
 import { bookingMatchesStaffFilter } from "@/lib/staff/staff-display"
 import type { StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
-import { appointmentMatchesSourceFilter, type AppointmentsSourceFilter } from "@/lib/appointments/appointments-source-filter"
 import type { Appointment } from "@/types/domain"
-
-function parseFilterDateStart(isoDate: string): number | null {
-  const key = isoDate.trim().slice(0, 10)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null
-  const [y, m, d] = key.split("-").map(Number)
-  return new Date(y, m - 1, d, 0, 0, 0, 0).getTime()
-}
-
-function parseFilterDateEnd(isoDate: string): number | null {
-  const start = parseFilterDateStart(isoDate)
-  if (start == null) return null
-  const key = isoDate.trim().slice(0, 10)
-  const [y, m, d] = key.split("-").map(Number)
-  return new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
-}
 
 export function useAppointmentsListPresentation(args: {
   appointments: Appointment[]
@@ -39,9 +23,6 @@ export function useAppointmentsListPresentation(args: {
   clientNameFilter: string
   serviceFilter: string
   dayGroupFilter: AppointmentsDayGroupFilter
-  sourceFilter: AppointmentsSourceFilter
-  dateFrom: string
-  dateTo: string
   language: string
 }) {
   const {
@@ -52,9 +33,6 @@ export function useAppointmentsListPresentation(args: {
     clientNameFilter,
     serviceFilter,
     dayGroupFilter,
-    sourceFilter,
-    dateFrom,
-    dateTo,
     language,
   } = args
 
@@ -88,8 +66,6 @@ export function useAppointmentsListPresentation(args: {
   const filtered = React.useMemo(() => {
     const qClient = clientNameFilter.trim().toLowerCase()
     const qService = serviceFilter.trim().toLowerCase()
-    const fromMs = parseFilterDateStart(dateFrom)
-    const toMs = parseFilterDateEnd(dateTo)
     const today = getAppToday()
     let base = appointments
     if (restrictToToday) {
@@ -124,15 +100,6 @@ export function useAppointmentsListPresentation(args: {
           ? true
           : groupAppointmentByDay(a.startsAt, today) === dayGroupFilter,
       )
-      .filter((a) => appointmentMatchesSourceFilter(a, sourceFilter))
-      .filter((a) => {
-        if (fromMs == null && toMs == null) return true
-        const t = new Date(a.startsAt).getTime()
-        if (Number.isNaN(t)) return false
-        if (fromMs != null && t < fromMs) return false
-        if (toMs != null && t > toMs) return false
-        return true
-      })
   }, [
     appointments,
     filter,
@@ -141,9 +108,6 @@ export function useAppointmentsListPresentation(args: {
     clientNameFilter,
     serviceFilter,
     dayGroupFilter,
-    sourceFilter,
-    dateFrom,
-    dateTo,
   ])
 
   const grouped = React.useMemo(() => {

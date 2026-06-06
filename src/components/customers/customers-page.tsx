@@ -9,7 +9,6 @@ import { CustomersKpiGrid } from "@/components/customers/customers-kpi-grid"
 import { CustomersList } from "@/components/customers/customers-list"
 import { CustomersListSkeleton } from "@/components/customers/customers-list-skeleton"
 import { filterCustomerRows } from "@/lib/customers/filter-customers"
-import type { CustomerSegmentFilter } from "@/lib/customers/customer-types"
 import { useCustomersCrm } from "@/lib/customers/use-customers-crm"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -22,11 +21,10 @@ export function CustomersPage() {
   )
 
   const [query, setQuery] = React.useState("")
-  const [segment, setSegment] = React.useState<CustomerSegmentFilter>("all")
 
   const filtered = React.useMemo(
-    () => filterCustomerRows(rows, query, segment),
-    [rows, query, segment],
+    () => filterCustomerRows(rows, query, "all"),
+    [rows, query],
   )
 
   const kpiCopy = React.useMemo(
@@ -45,12 +43,7 @@ export function CustomersPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <CustomersFiltersBar
-            query={query}
-            onQueryChange={setQuery}
-            segment={segment}
-            onSegmentChange={setSegment}
-          />
+          <CustomersFiltersBar query={query} onQueryChange={setQuery} />
         </div>
         <CustomersExportButton rows={filtered} className="shrink-0 self-start" />
       </div>

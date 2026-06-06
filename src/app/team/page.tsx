@@ -2,11 +2,12 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Plus, Search, Trash2, Users } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { AccessDenied } from "@/components/shared/access-denied"
+import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Badge } from "@/components/ui/badge"
 import { AppDatePicker } from "@/components/ui/app-date-picker"
@@ -51,6 +52,7 @@ import {
   splitStoredPhoneIntoParts,
   validateNationalPhoneLength,
 } from "@/lib/validation/international-phone"
+import { cn } from "@/lib/utils"
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 0] as const
 
@@ -89,13 +91,26 @@ type CalendarDayInfo = {
   types: Set<CalendarExceptionType>
 }
 
-type ExceptionPreviewGroup = {
-  type: "time_off_group" | "special_hours"
-  startDate: string
-  endDate: string
-  note: string | null
-  originalItems: StaffAvailabilityExceptionInput[]
-  specialHours?: { startTime: string; endTime: string }
+function formatTeamMemberCount(count: number, language: string, t: (key: string) => string): string {
+  if (language === "en") {
+    return count === 1
+      ? t("team.memberCountOneEn")
+      : t("team.memberCountOtherEn").replace("{count}", String(count))
+  }
+  if (count === 1) return t("team.memberCountOne")
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+    return t("team.memberCountFew").replace("{count}", String(count))
+  }
+  return t("team.memberCountMany").replace("{count}", String(count))
+}
+
+type TeamFieldErrors = {
+  firstName?: string
+  email?: string
+  phone?: string
+  panelRole?: string
 }
 
 function emptyForm(): FormState {
@@ -131,6 +146,14 @@ function splitPersonName(fullName: string): { firstName: string; lastName: strin
 
 function joinPersonName(firstName: string, lastName: string): string {
   return `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ")
+}
+
+function staffInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase()
+  }
+  return (parts[0]?.slice(0, 2) ?? "?").toUpperCase()
 }
 
 function toMinutes(hm: string): number {
@@ -193,6 +216,15 @@ function normalizeExceptionRange(ex: StaffAvailabilityExceptionInput): { from: s
   const to = /^\d{4}-\d{2}-\d{2}$/.test(toRaw) ? toRaw : from
   if (to < from) return null
   return { from, to }
+}
+
+function findExceptionIndexForDate(exceptions: StaffAvailabilityExceptionInput[], date: string): number {
+  for (let i = 0; i < exceptions.length; i++) {
+    const range = normalizeExceptionRange(exceptions[i]!)
+    if (!range) continue
+    if (date >= range.from && date <= range.to) return i
+  }
+  return -1
 }
 
 /** Zmiana „Data od”: domyślnie wyrównaj „Data do” do tej samej wartości (jeden dzień), chyba że użytkownik ma już dłuższy zakres. */
@@ -365,27 +397,6 @@ function getPolishHolidays(year: number): PolishHoliday[] {
   return [...fixed, ...movable]
 }
 
-function groupStaffExceptionsForPreview(exceptions: StaffAvailabilityExceptionInput[]): ExceptionPreviewGroup[] {
-  const expanded = expandStaffExceptionsToDayRows(exceptions)
-  return mergeContiguousStaffExceptionDays(expanded).map((s) => ({
-    type: s.isClosed ? "time_off_group" : "special_hours",
-    startDate: s.startDate,
-    endDate: s.endDate,
-    note: s.reason.length > 0 ? s.reason : null,
-    originalItems: [
-      {
-        exceptionDate: s.startDate,
-        exceptionEndDate: s.endDate,
-        isClosed: s.isClosed,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        reason: s.reason,
-      },
-    ],
-    ...(s.isClosed ? {} : { specialHours: { startTime: s.startTime, endTime: s.endTime } }),
-  }))
-}
-
 function groupExceptionsForEditing(exceptions: StaffAvailabilityExceptionInput[]): StaffAvailabilityExceptionInput[] {
   const expanded = expandStaffExceptionsToDayRows(exceptions)
   return mergeContiguousStaffExceptionDays(expanded).map((s) => ({
@@ -419,6 +430,9 @@ export default function TeamPage() {
   const [staffLoadError, setStaffLoadError] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [noticeDetail, setNoticeDetail] = React.useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = React.useState<TeamFieldErrors>({})
+  const [exceptionFieldErrors, setExceptionFieldErrors] = React.useState<Record<number, string>>({})
+  const [scheduleValidated, setScheduleValidated] = React.useState(false)
   const [editing, setEditing] = React.useState<StaffMember | null>(null)
   const [form, setForm] = React.useState<FormState>(emptyForm)
   const [saving, setSaving] = React.useState(false)
@@ -426,9 +440,8 @@ export default function TeamPage() {
   const [serviceIdsByStaff, setServiceIdsByStaff] = React.useState<Record<string, string[]>>({})
   const [inviteHighlightId, setInviteHighlightId] = React.useState<string | null>(null)
   const [isScheduleEditing, setIsScheduleEditing] = React.useState(false)
-  const [isExceptionsEditing, setIsExceptionsEditing] = React.useState(false)
-  /** Gdy false przy dodawaniu osoby — zwinięty podgląd wyjątków (jak po „Zapisz wyjątek”). */
-  const [isNewStaffExceptionsExpanded, setIsNewStaffExceptionsExpanded] = React.useState(true)
+  const [highlightedExceptionIndex, setHighlightedExceptionIndex] = React.useState<number | null>(null)
+  const exceptionCardRefs = React.useRef<Map<number, HTMLDivElement>>(new Map())
   const [savedScheduleState, setSavedScheduleState] = React.useState<{
     useBusinessHours: boolean
     rules: StaffAvailabilityRuleInput[]
@@ -495,6 +508,12 @@ export default function TeamPage() {
   })
   const [selectedCalendarDate, setSelectedCalendarDate] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    if (highlightedExceptionIndex == null) return
+    const el = exceptionCardRefs.current.get(highlightedExceptionIndex)
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+  }, [highlightedExceptionIndex, form.exceptions.length])
+
   const monthLabelFmt = React.useMemo(
     () =>
       new Intl.DateTimeFormat(language === "en" ? "en-US" : "pl-PL", {
@@ -546,11 +565,6 @@ export default function TeamPage() {
     for (const h of holidays) map.set(h.date, h)
     return map
   }, [calendarMonth])
-
-  const groupedExceptionPreview = React.useMemo(
-    () => groupStaffExceptionsForPreview(form.exceptions),
-    [form.exceptions],
-  )
 
   const refetchStaffMembers = React.useCallback(
     async (client: ReturnType<typeof getBrowserClient>, bid: string | null) => {
@@ -674,8 +688,10 @@ export default function TeamPage() {
     setForm(emptyForm())
     setInviteHighlightId(null)
     setIsScheduleEditing(false)
-    setIsExceptionsEditing(false)
-    setIsNewStaffExceptionsExpanded(true)
+    setHighlightedExceptionIndex(null)
+    setFieldErrors({})
+    setExceptionFieldErrors({})
+    setScheduleValidated(false)
   }
 
   const buildFormFromSavedSnapshot = React.useCallback((): FormState => {
@@ -697,13 +713,12 @@ export default function TeamPage() {
     if (editing?.id) {
       restoreFormFromSavedSnapshot()
       setIsScheduleEditing(false)
-      setIsExceptionsEditing(false)
+      setHighlightedExceptionIndex(null)
     } else {
       restoreFormFromSavedSnapshot()
       setIsScheduleEditing(false)
-      setIsExceptionsEditing(false)
+      setHighlightedExceptionIndex(null)
     }
-    setIsNewStaffExceptionsExpanded(true)
     setNotice(t("team.changesReverted"))
     setNoticeDetail(null)
   }
@@ -717,7 +732,7 @@ export default function TeamPage() {
   const loadStaffMemberIntoForm = async (staff: StaffMember, resetInviteHighlight = true) => {
     if (resetInviteHighlight) setInviteHighlightId(null)
     setIsScheduleEditing(false)
-    setIsExceptionsEditing(false)
+    setHighlightedExceptionIndex(null)
     setEditing(staff)
     const client = getBrowserClient()
     const bid = businessProfileId ?? access.businessId ?? null
@@ -796,7 +811,10 @@ export default function TeamPage() {
     })
     setSavedServiceIds([...serviceIds])
     setIsScheduleEditing(false)
-    setIsExceptionsEditing(false)
+    setHighlightedExceptionIndex(null)
+    setFieldErrors({})
+    setExceptionFieldErrors({})
+    setScheduleValidated(false)
   }
 
   const beginEdit = (staff: StaffMember) => {
@@ -817,34 +835,48 @@ export default function TeamPage() {
   }
 
   const updateRule = (weekday: number, patch: Partial<StaffAvailabilityRuleInput>) => {
+    setScheduleValidated(false)
     setForm((prev) => ({
       ...prev,
       rules: prev.rules.map((r) => (r.weekday === weekday ? { ...r, ...patch } : r)),
     }))
   }
 
-  const addException = () => {
-    const seed =
-      selectedCalendarDate && /^\d{4}-\d{2}-\d{2}$/.test(selectedCalendarDate.trim())
-        ? selectedCalendarDate.trim().slice(0, 10)
-        : ""
-    setForm((prev) => ({
-      ...prev,
-      exceptions: [
-        ...prev.exceptions,
-        {
-          exceptionDate: seed,
-          exceptionEndDate: seed,
-          isClosed: true,
-          startTime: "09:00",
-          endTime: "17:00",
-          reason: "",
-        },
-      ],
-    }))
+  const addException = (seedDate?: string) => {
+    const seedRaw = (seedDate ?? selectedCalendarDate ?? "").trim().slice(0, 10)
+    const seed = /^\d{4}-\d{2}-\d{2}$/.test(seedRaw) ? seedRaw : ""
+    setForm((prev) => {
+      const nextIndex = prev.exceptions.length
+      setHighlightedExceptionIndex(nextIndex)
+      return {
+        ...prev,
+        exceptions: [
+          ...prev.exceptions,
+          {
+            exceptionDate: seed,
+            exceptionEndDate: seed,
+            isClosed: true,
+            startTime: "09:00",
+            endTime: "17:00",
+            reason: "",
+          },
+        ],
+      }
+    })
+    if (seed) {
+      const [y, m] = seed.split("-").map(Number)
+      setCalendarMonth(new Date(y, m - 1, 1))
+      setSelectedCalendarDate(seed)
+    }
   }
 
   const updateException = (index: number, patch: Partial<StaffAvailabilityExceptionInput>) => {
+    setExceptionFieldErrors((prev) => {
+      if (!prev[index]) return prev
+      const next = { ...prev }
+      delete next[index]
+      return next
+    })
     setForm((prev) => ({
       ...prev,
       exceptions: prev.exceptions.map((ex, idx) => (idx === index ? { ...ex, ...patch } : ex)),
@@ -856,37 +888,42 @@ export default function TeamPage() {
       ...prev,
       exceptions: prev.exceptions.filter((_, idx) => idx !== index),
     }))
+    setHighlightedExceptionIndex((prev) => {
+      if (prev == null) return null
+      if (prev === index) return null
+      if (prev > index) return prev - 1
+      return prev
+    })
   }
 
   const validateScheduleExceptionsList = (exceptions: StaffAvailabilityExceptionInput[]): boolean => {
-    for (const ex of exceptions) {
+    const nextErrors: Record<number, string> = {}
+    for (let i = 0; i < exceptions.length; i++) {
+      const ex = exceptions[i]!
       const date = ex.exceptionDate.trim().slice(0, 10)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        setNotice(t("team.exceptionStartDateRequired"))
-        setNoticeDetail(null)
-        return false
+        nextErrors[i] = t("team.exceptionStartDateRequired")
+        break
       }
       const endDate = (ex.exceptionEndDate ?? "").trim().slice(0, 10)
       if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-        setNotice(t("team.exceptionEndDateRequired"))
-        setNoticeDetail(null)
-        return false
+        nextErrors[i] = t("team.exceptionEndDateRequired")
+        break
       }
       if (endDate < date) {
-        setNotice(t("team.exceptionEndBeforeStart"))
-        setNoticeDetail(null)
-        return false
+        nextErrors[i] = t("team.exceptionEndBeforeStart")
+        break
       }
       if (
         !ex.isClosed &&
         (!ex.startTime.trim() || !ex.endTime.trim() || toMinutes(ex.endTime) <= toMinutes(ex.startTime))
       ) {
-        setNotice(language === "en" ? "Enter availability hours." : "Podaj godziny dostępności.")
-        setNoticeDetail(null)
-        return false
+        nextErrors[i] = t("team.validationExceptionHoursRequired")
+        break
       }
     }
-    return true
+    setExceptionFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
   }
 
   const validateForm = (): boolean => {
@@ -894,32 +931,35 @@ export default function TeamPage() {
     const name = joinPersonName(form.firstName, form.lastName)
     const emailTrim = form.email.trim()
     const nationalDigits = form.phoneNational.replace(/\D/g, "")
+    const next: TeamFieldErrors = {}
+
     if (!firstName || !name) {
-      setNotice(language === "en" ? "First name is required." : "Imię jest wymagane.")
-      setNoticeDetail(null)
-      return false
+      next.firstName = t("team.validationFirstNameRequired")
     }
     if (emailTrim && !EMAIL_RE.test(emailTrim)) {
-      setNotice(t("team.validationEmailInvalid"))
-      setNoticeDetail(null)
-      return false
+      next.email = t("team.validationEmailInvalid")
     }
     if (nationalDigits) {
       const v = validateNationalPhoneLength(form.phoneDialCode, form.phoneNational)
       if (!v.ok) {
-        setNotice(t("team.validationPhoneInvalid"))
-        setNoticeDetail(null)
-        return false
+        next.phone = t("team.validationPhoneInvalid")
       }
     }
     if (access.canManageInvitations && !emailTrim) {
-      setNotice(t("team.validationEmailRequiredForInvite"))
-      setNoticeDetail(null)
-      return false
+      next.email = t("team.validationEmailRequiredForInvite")
     }
     if (form.panelMemberRole !== "admin" && form.panelMemberRole !== "staff") {
-      setNotice(t("team.validationPanelRoleRequired"))
+      next.panelRole = t("team.validationPanelRoleRequired")
+    }
+
+    setFieldErrors(next)
+    if (Object.keys(next).length > 0) {
       setNoticeDetail(null)
+      if (next.firstName || next.email || next.phone) {
+        setFormTab("profile")
+      } else if (next.panelRole) {
+        setFormTab("panel")
+      }
       return false
     }
     return true
@@ -927,17 +967,16 @@ export default function TeamPage() {
 
   const validateScheduleRulesForSave = (): boolean => {
     if (form.useBusinessHours) return true
+    setScheduleValidated(true)
     for (const rule of form.rules) {
       if (!rule.isAvailable) continue
       if (!rule.startTime?.trim() || !rule.endTime?.trim()) {
         setFormTab("schedule")
-        setNotice(t("team.fillAvailableDayHours"))
         setNoticeDetail(null)
         return false
       }
       if (!isScheduleTimeRangeValid(rule.startTime, rule.endTime)) {
         setFormTab("schedule")
-        setNotice(t("team.invalidTimeRange"))
         setNoticeDetail(null)
         return false
       }
@@ -945,15 +984,51 @@ export default function TeamPage() {
     return true
   }
 
-  const saveScheduleExceptionsAndCollapse = async () => {
+  const validateScheduleExceptionAt = (index: number): boolean => {
+    const ex = form.exceptions[index]
+    if (!ex) return false
+    const date = ex.exceptionDate.trim().slice(0, 10)
+    let message: string | null = null
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      message = t("team.exceptionStartDateRequired")
+    } else {
+      const endDate = (ex.exceptionEndDate ?? "").trim().slice(0, 10)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        message = t("team.exceptionEndDateRequired")
+      } else if (endDate < date) {
+        message = t("team.exceptionEndBeforeStart")
+      } else if (
+        !ex.isClosed &&
+        (!ex.startTime.trim() || !ex.endTime.trim() || toMinutes(ex.endTime) <= toMinutes(ex.startTime))
+      ) {
+        message = t("team.validationExceptionHoursRequired")
+      }
+    }
+    setExceptionFieldErrors((prev) => {
+      const next = { ...prev }
+      delete next[index]
+      if (message) next[index] = message
+      return next
+    })
+    if (message) {
+      setFormTab("exceptions")
+      return false
+    }
+    return true
+  }
+
+  const saveScheduleExceptions = async () => {
     setNoticeDetail(null)
-    if (!validateScheduleExceptionsList(form.exceptions)) return
+    if (!validateScheduleExceptionsList(form.exceptions)) {
+      setFormTab("exceptions")
+      return
+    }
 
     if (editing && isSupabaseConfigured()) {
       const client = getBrowserClient()
       const bid = businessProfileId ?? access.businessId
       if (!client || !bid) {
-        setNotice(language === "en" ? "Business profile was not found." : "Nie znaleziono profilu firmy.")
+        setNotice(t("team.noBusinessProfile"))
         setNoticeDetail(null)
         return
       }
@@ -982,7 +1057,6 @@ export default function TeamPage() {
         )
         setForm((prev) => ({ ...prev, exceptions: normalizedExceptions }))
         setSavedExceptionsState(normalizedExceptions.map((ex) => ({ ...ex })))
-        setIsExceptionsEditing(false)
         setNotice(t("team.scheduleExceptionsSaved"))
         setNoticeDetail(null)
       } finally {
@@ -992,19 +1066,17 @@ export default function TeamPage() {
     }
 
     setSavedExceptionsState(form.exceptions.map((ex) => ({ ...ex })))
-    if (editing) {
-      setIsExceptionsEditing(false)
-    } else {
-      setIsNewStaffExceptionsExpanded(false)
-    }
     setNotice(t("team.scheduleExceptionsSaved"))
     setNoticeDetail(null)
+    setExceptionFieldErrors({})
   }
 
   const performSave = async () => {
     setNoticeDetail(null)
     if (!validateForm()) return
     if (!validateScheduleRulesForSave()) return
+    setFieldErrors({})
+    setScheduleValidated(false)
     const name = joinPersonName(form.firstName, form.lastName)
     const emailTrim = form.email.trim()
     const phoneForSave = buildStoredInternationalPhone(form.phoneDialCode, form.phoneNational)
@@ -1026,7 +1098,7 @@ export default function TeamPage() {
       const client = getBrowserClient()
       const bid = businessProfileId ?? access.businessId
       if (!bid) {
-        setNotice(language === "en" ? "Business profile was not found." : "Nie znaleziono profilu firmy.")
+        setNotice(t("team.noBusinessProfile"))
         setNoticeDetail(null)
         return
       }
@@ -1034,12 +1106,8 @@ export default function TeamPage() {
         setBusinessProfileId(bid)
       }
       let partialNotices: string[] = []
-      const msgAllSaved =
-        language === "en" ? "Changes were saved." : "Zmiany zostały zapisane."
-      const msgPartialSaved =
-        language === "en"
-          ? "Staff member was saved. Some additional settings need to be saved again."
-          : "Osoba została zapisana. Niektóre dodatkowe ustawienia wymagają ponownego zapisania."
+      const msgAllSaved = t("team.changesSaved")
+      const msgPartialSaved = t("team.partialSaved")
       const panelAccessNoticeForFailure = (
         messageKey?: string,
         detail?: string,
@@ -1496,7 +1564,7 @@ export default function TeamPage() {
       } else {
         setIsScheduleEditing(true)
       }
-      setIsExceptionsEditing(false)
+      setHighlightedExceptionIndex(null)
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown_error"
       setNotice(t("team.saveError"))
@@ -1905,13 +1973,13 @@ export default function TeamPage() {
 
   const livePersonName = joinPersonName(form.firstName, form.lastName)
   const formCardTitle = editing
-    ? `${t("team.edit")}${livePersonName ? ` — ${livePersonName}` : ""}`
-    : `${t("team.addPersonCard")}${livePersonName ? ` — ${livePersonName}` : ""}`
+    ? livePersonName || t("team.edit")
+    : t("team.addPersonCard")
+  const formCardDescription = editing
+    ? t("team.edit")
+    : t("team.emailHelp")
   const submitLabel = editing ? t("team.saveChanges") : t("team.save")
   const showSchedulePreview = Boolean(editing) && !isScheduleEditing
-  const showExceptionsCompact =
-    (Boolean(editing) && !isExceptionsEditing) ||
-    (!editing && !isNewStaffExceptionsExpanded)
   const calendarMonthLabel = monthLabelFmt.format(calendarMonth)
   const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
   const jsWeekday = firstDay.getDay()
@@ -1932,40 +2000,52 @@ export default function TeamPage() {
     <AppShell title={t("navigation.team")} pageDescription={t("team.description")}>
       <PageShell>
         {notice ? (
-          <div className="mb-4 rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm">
+          <div className="mb-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-foreground">
             <p>{notice}</p>
-            {noticeDetail ? <p className="mt-1 text-xs text-muted-foreground">{noticeDetail}</p> : null}
+            {noticeDetail ? <p className="mt-1.5 text-xs text-muted-foreground">{noticeDetail}</p> : null}
           </div>
         ) : null}
 
-        <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)] lg:items-start">
-          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6">
+        <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start">
+          <div className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
             <Card
               data-tour={staffServiceTourNeedsPerson ? "team-staff-service-target" : undefined}
-              className="min-w-0 overflow-hidden rounded-2xl border border-border"
+              className="min-w-0 overflow-hidden rounded-2xl border border-border shadow-sm shadow-slate-900/5"
             >
-              <CardHeader className="space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-lg">{t("navigation.team")}</CardTitle>
+              <CardHeader className="space-y-4 border-b border-border/60 pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                      <Users className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      {t("team.teamMembersTitle")}
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      {loading ? t("team.loading") : formatTeamMemberCount(items.length, language, t)}
+                    </CardDescription>
+                  </div>
                   <Button
                     type="button"
-                    variant="outline"
-                    className="h-9 rounded-xl px-3"
+                    size="sm"
+                    className="h-9 shrink-0 rounded-xl px-3"
                     onClick={() => resetFormToCreate()}
                   >
-                    + {t("team.addPersonCard")}
+                    <Plus className="size-4" aria-hidden />
+                    <span className="hidden sm:inline">{t("team.addPersonCard")}</span>
+                    <span className="sm:hidden">{t("team.add")}</span>
                   </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="team-staff-search" className="text-xs text-muted-foreground">
-                    {language === "en" ? "Search" : "Szukaj"}
-                  </Label>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden
+                  />
                   <Input
                     id="team-staff-search"
                     value={staffQuery}
                     onChange={(e) => setStaffQuery(e.target.value)}
-                    placeholder={language === "en" ? "Name, email, phone..." : "Imię, e-mail, telefon..."}
-                    className="h-10 rounded-xl"
+                    placeholder={t("team.searchPlaceholder")}
+                    className="h-10 rounded-xl pl-9"
+                    aria-label={t("team.searchAriaLabel")}
                   />
                 </div>
                 <Tabs
@@ -1973,89 +2053,124 @@ export default function TeamPage() {
                   onValueChange={(v) => setSidebarTab(v === "invites" ? "invites" : "members")}
                   className="w-full"
                 >
-                  <TabsList className="w-full">
-                    <TabsTrigger value="members" className="flex-1">
+                  <TabsList variant="line" className="h-auto w-full justify-start gap-1 p-0">
+                    <TabsTrigger value="members" className="h-9 flex-1 rounded-lg px-2 text-xs sm:text-sm">
                       {t("team.teamMembersTitle")}
                     </TabsTrigger>
                     {access.ready && access.canManageInvitations ? (
-                      <TabsTrigger value="invites" className="flex-1">
+                      <TabsTrigger value="invites" className="h-9 flex-1 rounded-lg px-2 text-xs sm:text-sm">
                         {t("team.pendingInvitationsTitle")}
+                        {pendingInvites.length > 0 ? (
+                          <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary">
+                            {pendingInvites.length}
+                          </span>
+                        ) : null}
                       </TabsTrigger>
                     ) : null}
                   </TabsList>
                 </Tabs>
               </CardHeader>
-              <CardContent className="min-w-0 space-y-3">
+              <CardContent className="min-w-0 px-3 py-3 sm:px-4">
                 <Tabs value={sidebarTab} className="w-full">
-                  <TabsContent value="members" className="mt-0 space-y-3">
-                    {loading ? <p className="text-sm text-muted-foreground">{t("team.loading")}</p> : null}
-                    {!loading && staffLoadError ? (
-                      <p className="text-sm text-destructive">
-                        {language === "en" ? "Failed to load team members." : "Nie udało się załadować osób."}
-                      </p>
-                    ) : null}
-                    {!loading && !staffLoadError && items.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
-                    ) : null}
-                    {!loading && !staffLoadError && items.length > 0 && filteredStaff.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        {language === "en" ? "No matches." : "Brak wyników."}
-                      </p>
-                    ) : null}
-                    {!loading &&
-                      filteredStaff.map((staff) => {
-                        const svcIds = serviceIdsByStaff[staff.id] ?? []
-                        const svcNames = svcIds
-                          .map((sid) => services.find((s) => s.id === sid)?.name)
-                          .filter(Boolean)
-                          .join(", ")
-                        const staffRoleLabel =
-                          normalizeStaffRole(staff.role) === "admin"
-                            ? t("invitations.adminRoleOption")
-                            : t("invitations.staffRoleOption")
-                        return (
-                          <button
-                            key={staff.id}
-                            type="button"
-                            onClick={() => beginEdit(staff)}
-                            className={`w-full rounded-xl border p-3 text-left text-sm transition ${
-                              editing?.id === staff.id
-                                ? "border-primary/40 bg-[color:var(--nav-active-bg)]"
-                                : "border-border/80 bg-muted/10 hover:bg-muted/20"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <p className="truncate font-semibold text-foreground">{getStaffDisplayName(staff)}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {(staff.email ?? "").trim() || "-"} · {(staff.phone ?? "").trim() || "-"}
-                                </p>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {t("team.panelRole")}: {staffRoleLabel}
-                                </p>
-                                <p className="truncate text-[11px] text-muted-foreground">
-                                  {t("team.servicesShort")}: {svcNames || t("team.noServicesAssigned")}
-                                </p>
+                  <TabsContent value="members" className="mt-0">
+                    <div className="premium-scrollbar max-h-[min(52vh,32rem)] space-y-2 overflow-y-auto pr-0.5">
+                      {loading ? <p className="px-1 py-2 text-sm text-muted-foreground">{t("team.loading")}</p> : null}
+                      {!loading && staffLoadError ? (
+                        <p className="px-1 py-2 text-sm text-destructive">
+                          {t("team.loadMembersError")}
+                        </p>
+                      ) : null}
+                      {!loading && !staffLoadError && items.length === 0 ? (
+                        <p className="px-1 py-6 text-center text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
+                      ) : null}
+                      {!loading && !staffLoadError && items.length > 0 && filteredStaff.length === 0 ? (
+                        <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                          {t("team.noSearchResults")}
+                        </p>
+                      ) : null}
+                      {!loading &&
+                        filteredStaff.map((staff) => {
+                          const svcIds = serviceIdsByStaff[staff.id] ?? []
+                          const svcNames = svcIds
+                            .map((sid) => services.find((s) => s.id === sid)?.name)
+                            .filter(Boolean)
+                            .join(", ")
+                          const staffRoleLabel =
+                            normalizeStaffRole(staff.role) === "admin"
+                              ? t("invitations.adminRoleOption")
+                              : t("invitations.staffRoleOption")
+                          const displayName = getStaffDisplayName(staff)
+                          const isSelected = editing?.id === staff.id
+                          return (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              onClick={() => beginEdit(staff)}
+                              className={`w-full rounded-xl border p-3 text-left text-sm transition-colors ${
+                                isSelected
+                                  ? "border-primary/50 bg-[color:var(--nav-active-bg)] shadow-sm"
+                                  : "border-border/70 bg-card hover:border-border hover:bg-muted/25"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <span
+                                  className={`flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                                    isSelected
+                                      ? "bg-primary/15 text-primary"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                  aria-hidden
+                                >
+                                  {staffInitials(displayName)}
+                                </span>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="truncate font-semibold text-foreground">{displayName}</p>
+                                    <span
+                                      className={semanticStatusBadgeClass(
+                                        staff.isActive ? "success" : "neutral",
+                                        "shrink-0 px-2 py-0.5 text-[11px] font-medium",
+                                      )}
+                                    >
+                                      {staff.isActive ? t("team.active") : t("services.hiddenStatus")}
+                                    </span>
+                                  </div>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {(staff.email ?? "").trim() || "—"}
+                                  </p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {(staff.phone ?? "").trim() || "—"}
+                                  </p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {t("team.panelRole")}:{" "}
+                                    <span className="text-foreground/80">{staffRoleLabel}</span>
+                                  </p>
+                                  <p className="truncate text-xs text-muted-foreground">
+                                    {t("team.servicesShort")}:{" "}
+                                    <span className="text-foreground/80">
+                                      {svcNames || t("team.noServicesAssigned")}
+                                    </span>
+                                  </p>
+                                </div>
                               </div>
-                              <Badge
-                                variant={staff.isActive ? "default" : "secondary"}
-                                className="shrink-0 rounded-lg text-[0.65rem] font-normal"
-                              >
-                                {staff.isActive ? t("team.active") : t("services.hiddenStatus")}
-                              </Badge>
-                            </div>
-                          </button>
-                        )
-                      })}
+                            </button>
+                          )
+                        })}
+                    </div>
                   </TabsContent>
 
                   {access.ready && access.canManageInvitations ? (
-                    <TabsContent value="invites" className="mt-0 space-y-3">
-                      <p className="text-xs text-muted-foreground">{t("invitations.pendingInvitationsEmailHint")}</p>
-                      {pendingInvites.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("team.pendingInvitationsEmpty")}</p>
-                      ) : (
-                        <ul className="space-y-3">
+                    <TabsContent value="invites" className="mt-0">
+                      <div className="premium-scrollbar max-h-[min(52vh,32rem)] space-y-3 overflow-y-auto pr-0.5">
+                        <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                          {t("invitations.pendingInvitationsEmailHint")}
+                        </p>
+                        {pendingInvites.length === 0 ? (
+                          <p className="px-1 py-6 text-center text-sm text-muted-foreground">
+                            {t("team.pendingInvitationsEmpty")}
+                          </p>
+                        ) : (
+                          <ul className="space-y-2">
                           {pendingInvites.map((inv) => {
                             const roleLabel =
                               inv.role === "admin"
@@ -2068,8 +2183,8 @@ export default function TeamPage() {
                                 key={inv.id}
                                 className={`rounded-xl border px-3 py-3 text-sm ${
                                   highlight
-                                    ? "border-primary/40 bg-[color:var(--nav-active-bg)]"
-                                    : "border-border/80 bg-muted/10"
+                                    ? "border-primary/50 bg-[color:var(--nav-active-bg)] shadow-sm"
+                                    : "border-border/70 bg-card"
                                 }`}
                               >
                                 <div className="min-w-0 space-y-1">
@@ -2114,8 +2229,9 @@ export default function TeamPage() {
                               </li>
                             )
                           })}
-                        </ul>
-                      )}
+                          </ul>
+                        )}
+                      </div>
                     </TabsContent>
                   ) : null}
                 </Tabs>
@@ -2125,45 +2241,49 @@ export default function TeamPage() {
 
           <Card
             data-tour="team-person-form"
-            className="min-w-0 overflow-hidden rounded-2xl border border-border"
+            className="min-w-0 overflow-hidden rounded-2xl border border-border shadow-sm shadow-slate-900/5"
           >
-            <CardHeader>
-              <CardTitle className="text-lg">{formCardTitle}</CardTitle>
-              {editing ? (
-                <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                  {!editing.isActive ? (
+            <CardHeader className="space-y-0 border-b border-border/60 pb-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <CardTitle className="text-lg">{formCardTitle}</CardTitle>
+                  <CardDescription>{formCardDescription}</CardDescription>
+                </div>
+                {editing ? (
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {!editing.isActive ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 rounded-xl"
+                        onClick={() => void activateStaff(editing)}
+                      >
+                        {t("team.activate")}
+                      </Button>
+                    ) : null}
                     <Button
                       type="button"
-                      variant="outline"
-                      className="h-9 rounded-xl px-3"
-                      onClick={() => void activateStaff(editing)}
+                      variant="destructive"
+                      size="sm"
+                      className="h-9 rounded-xl"
+                      onClick={() => void remove(editing.id)}
                     >
-                      {t("team.activate")}
+                      <Trash2 className="size-4" aria-hidden />
+                      {t("common.delete")}
                     </Button>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    className="h-9 rounded-xl px-3"
-                    onClick={() => void remove(editing.id)}
-                  >
-                    <Trash2 className="size-4" aria-hidden />
-                    {t("common.delete")}
-                  </Button>
-                </div>
-              ) : null}
-              {!editing ? (
-                <CardDescription className="text-muted-foreground">{t("team.emailHelp")}</CardDescription>
-              ) : null}
+                  </div>
+                ) : null}
+              </div>
             </CardHeader>
-            <CardContent className={`min-w-0 ${editing ? "overflow-visible" : "overflow-x-hidden"}`}>
+            <CardContent className="min-w-0 px-4 py-5 sm:px-6">
               <form
                 id="team-person-form"
                 onSubmit={(e) => {
                   e.preventDefault()
                   void performSave()
                 }}
-                className="space-y-6"
+                className="min-w-0 space-y-6"
               >
                 <Tabs
                   value={formTab}
@@ -2172,47 +2292,73 @@ export default function TeamPage() {
                       v === "panel" || v === "services" || v === "schedule" || v === "exceptions" ? v : "profile"
                     setFormTab(allowed)
                   }}
-                  className="w-full"
+                  className="min-w-0 w-full"
                 >
-                  <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-5">
-                    <TabsTrigger value="profile" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
-                      {t("team.personDetailsSection")}
-                    </TabsTrigger>
-                    {access.canManageInvitations ? (
-                      <TabsTrigger value="panel" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
-                        {t("team.panelAccessSection")}
-                      </TabsTrigger>
-                    ) : null}
-                    <TabsTrigger
-                      value="services"
-                      className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm"
-                      data-tour={
-                        staffServiceTourNeedsServicesTab
-                          ? "team-staff-service-target"
-                          : "team-services-tab"
-                      }
+                  <div className="min-w-0 border-b border-border/70 pb-1">
+                    <TabsList
+                      variant="line"
+                      className="h-auto w-full flex-wrap justify-start gap-x-0.5 gap-y-1 p-0"
                     >
-                      {t("team.servicesForStaff")}
-                    </TabsTrigger>
-                    <TabsTrigger value="schedule" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
-                      {t("team.schedule")}
-                    </TabsTrigger>
-                    <TabsTrigger value="exceptions" className="h-9 whitespace-normal px-2 text-xs leading-tight sm:text-sm">
-                      {t("team.scheduleExceptionsTitle")}
-                    </TabsTrigger>
-                  </TabsList>
+                      <TabsTrigger
+                        value="profile"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                      >
+                        {t("team.personDetailsSection")}
+                      </TabsTrigger>
+                      {access.canManageInvitations ? (
+                        <TabsTrigger
+                          value="panel"
+                          className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                        >
+                          {t("team.panelAccessSection")}
+                        </TabsTrigger>
+                      ) : null}
+                      <TabsTrigger
+                        value="services"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                        data-tour={
+                          staffServiceTourNeedsServicesTab
+                            ? "team-staff-service-target"
+                            : "team-services-tab"
+                        }
+                      >
+                        {t("team.servicesForStaff")}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="schedule"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                      >
+                        {t("team.schedule")}
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="exceptions"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                      >
+                        {t("team.scheduleExceptionsTitle")}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
 
-                  <TabsContent value="profile" className="mt-5 space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                  <TabsContent value="profile" className="mt-6 space-y-4 rounded-2xl border border-border/70 bg-muted/10 p-4 sm:p-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="staff-first-name">{t("team.firstName")}</Label>
                         <Input
                           id="staff-first-name"
                           value={form.firstName}
-                          onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-                          className="h-11 rounded-xl"
+                          onChange={(e) => {
+                            setFieldErrors((prev) => ({ ...prev, firstName: undefined }))
+                            setForm((f) => ({ ...f, firstName: e.target.value }))
+                          }}
+                          className="h-10 rounded-xl"
+                          aria-invalid={Boolean(fieldErrors.firstName)}
                           autoComplete="given-name"
                         />
+                        {fieldErrors.firstName ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors.firstName}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="staff-last-name">{t("team.lastName")}</Label>
@@ -2220,7 +2366,7 @@ export default function TeamPage() {
                           id="staff-last-name"
                           value={form.lastName}
                           onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-                          className="h-11 rounded-xl"
+                          className="h-10 rounded-xl"
                           autoComplete="family-name"
                         />
                       </div>
@@ -2229,26 +2375,48 @@ export default function TeamPage() {
                       label={t("team.phone")}
                       dialCode={form.phoneDialCode}
                       nationalDigits={form.phoneNational}
-                      onDialCodeChange={(v) => setForm((f) => ({ ...f, phoneDialCode: v }))}
-                      onNationalChange={(digits) =>
+                      onDialCodeChange={(v) => {
+                        setFieldErrors((prev) => ({ ...prev, phone: undefined }))
+                        setForm((f) => ({ ...f, phoneDialCode: v }))
+                      }}
+                      onNationalChange={(digits) => {
+                        setFieldErrors((prev) => ({ ...prev, phone: undefined }))
                         setForm((f) => ({ ...f, phoneNational: digits }))
-                      }
+                      }}
                       dialSelectId="staff-phone-dial"
                       nationalInputId="staff-phone"
+                      showInlineError={!fieldErrors.phone}
                     />
+                    {fieldErrors.phone ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {fieldErrors.phone}
+                      </p>
+                    ) : null}
                     <div className="space-y-2">
                       <Label htmlFor="staff-email">{t("team.contactEmail")}</Label>
                       <Input
                         id="staff-email"
                         type="email"
                         value={form.email}
-                        onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                        className="h-11 rounded-xl"
+                        onChange={(e) => {
+                          setFieldErrors((prev) => ({ ...prev, email: undefined }))
+                          setForm((f) => ({ ...f, email: e.target.value }))
+                        }}
+                        className="h-10 rounded-xl"
+                        aria-invalid={Boolean(fieldErrors.email)}
                         autoComplete="email"
                       />
+                      {fieldErrors.email ? (
+                        <p className="text-xs text-destructive" role="alert">
+                          {fieldErrors.email}
+                        </p>
+                      ) : null}
                     </div>
-                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-4 py-3">
-                      <Label htmlFor="staff-active">{t("team.active")}</Label>
+                    <div className="flex items-center justify-between rounded-xl border border-border/70 bg-card px-4 py-3.5">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="staff-active">{t("team.active")}</Label>
+                        <p className="text-xs text-muted-foreground">{t("team.inactiveBookingHint")}</p>
+                      </div>
                       <Switch
                         id="staff-active"
                         checked={form.isActive}
@@ -2265,12 +2433,13 @@ export default function TeamPage() {
                         <Label htmlFor="panel-member-role">{t("team.panelRole")}</Label>
                         <Select
                           value={form.panelMemberRole}
-                          onValueChange={(v) =>
+                          onValueChange={(v) => {
+                            setFieldErrors((prev) => ({ ...prev, panelRole: undefined }))
                             setForm((f) => ({
                               ...f,
                               panelMemberRole: v === "admin" ? "admin" : "staff",
                             }))
-                          }
+                          }}
                         >
                           <SelectTrigger id="panel-member-role" className="h-11 rounded-xl">
                             <SelectValue />
@@ -2280,6 +2449,11 @@ export default function TeamPage() {
                             <SelectItem value="admin">{t("invitations.adminRoleOption")}</SelectItem>
                           </SelectContent>
                         </Select>
+                        {fieldErrors.panelRole ? (
+                          <p className="text-xs text-destructive" role="alert">
+                            {fieldErrors.panelRole}
+                          </p>
+                        ) : null}
                       </div>
                       <div className="rounded-xl border border-border/70 bg-muted/10 p-4">
                         <p className="text-xs leading-relaxed text-muted-foreground">
@@ -2451,9 +2625,17 @@ export default function TeamPage() {
                               <div className="overflow-hidden rounded-xl border border-border/70">
                                 <ul className="divide-y divide-border/70">
                                   {sortRulesByUiWeekdayOrder(form.rules).map((rule) => {
-                                    const rowInvalid =
+                                    const hoursMissing =
                                       rule.isAvailable &&
-                                      !isScheduleTimeRangeValid(rule.startTime, rule.endTime)
+                                      (!rule.startTime?.trim() || !rule.endTime?.trim())
+                                    const rowInvalid =
+                                      scheduleValidated &&
+                                      rule.isAvailable &&
+                                      (hoursMissing ||
+                                        !isScheduleTimeRangeValid(rule.startTime, rule.endTime))
+                                    const rowErrorMessage = hoursMissing
+                                      ? t("team.fillAvailableDayHours")
+                                      : t("team.invalidTimeRange")
                                     return (
                                     <li
                                       key={rule.weekday}
@@ -2511,7 +2693,7 @@ export default function TeamPage() {
                                             />
                                           </div>
                                           {rowInvalid ? (
-                                            <p className="text-xs text-destructive">{t("team.invalidTimeRange")}</p>
+                                            <p className="text-xs text-destructive">{rowErrorMessage}</p>
                                           ) : null}
                                         </div>
                                       ) : (
@@ -2533,392 +2715,360 @@ export default function TeamPage() {
 
                   <TabsContent value="exceptions" className="mt-5">
                     <div className="space-y-5">
-                      <div className="w-full max-w-none min-w-0 space-y-3 overflow-x-hidden rounded-xl border border-border/70 p-4">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-foreground">{t("team.scheduleExceptionsTitle")}</p>
-                          <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsHint")}</p>
+                      <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
+                        <p className="text-sm text-muted-foreground">{t("team.scheduleExceptionsHint")}</p>
+                        <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
+                          <li>{t("team.scheduleExceptionsStep1")}</li>
+                          <li>{t("team.scheduleExceptionsStep2")}</li>
+                          <li>{t("team.scheduleExceptionsStep3")}</li>
+                        </ol>
+                      </div>
+
+                      <div className="mx-auto w-full max-w-[520px] min-w-0 space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3">
+                        <div className="flex items-center justify-between">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 w-8 rounded-lg p-0"
+                            onClick={() =>
+                              setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+                            }
+                            aria-label={t("team.calendarPrevMonth")}
+                          >
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                          <p className="text-sm font-medium capitalize text-foreground">{calendarMonthLabel}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 w-8 rounded-lg p-0"
+                            onClick={() =>
+                              setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+                            }
+                            aria-label={t("team.calendarNextMonth")}
+                          >
+                            <ChevronRight className="size-4" />
+                          </Button>
                         </div>
-                        <div className="space-y-6">
-                          <div className={`min-w-0 ${isExceptionsEditing ? "space-y-3" : ""}`}>
-                            {isExceptionsEditing ? (
-                              <div className="rounded-xl border border-border/70 bg-muted/10 px-4 py-3">
-                                <p className="text-sm font-semibold text-foreground">
-                                  {language === "en" ? "Editing schedule exceptions" : "Edycja wyjątków grafiku"}
-                                </p>
-                              </div>
-                            ) : null}
-                            {showExceptionsCompact ? (
-                              <div className="space-y-3">
-                                {form.exceptions.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">
-                                    {t("team.scheduleExceptionsEmpty")}
-                                  </p>
-                                ) : (
-                                  <div className="space-y-3">
-                                    {groupedExceptionPreview.map((item, idx) => (
-                                      <div
-                                        key={`grp-${idx}-${item.startDate}-${item.endDate}-${item.type}`}
-                                        className="rounded-xl border border-border/70 bg-muted/20 p-3"
-                                      >
-                                        <p className="text-sm font-medium text-foreground">
-                                          {formatExceptionPreviewDate(item.startDate)}
-                                          {item.startDate !== item.endDate
-                                            ? ` - ${formatExceptionPreviewDate(item.endDate)}`
-                                            : ""}
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                          {item.type === "time_off_group"
-                                            ? t("team.exceptionTypeClosed")
-                                            : `${t("team.exceptionTypeSpecialHours")}: ${item.specialHours?.startTime ?? ""}-${item.specialHours?.endTime ?? ""}`}
-                                        </p>
-                                        {(item.note ?? "").trim() ? (
-                                          <p className="mt-1 text-xs text-muted-foreground">
-                                            {t("team.exceptionReasonLabel")}: {item.note}
-                                          </p>
-                                        ) : null}
-                                      </div>
-                                    ))}
-                                  </div>
+                        <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground">
+                          {([1, 2, 3, 4, 5, 6, 0] as const).map((w) => (
+                            <div key={`w-head-${w}`} className="text-center">
+                              {t(weekdayLabelKey(w)).slice(0, 2)}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-1">
+                          {calendarGridDays.map((day) => {
+                            const iso = toIsoDateLocal(day)
+                            const inMonth = day.getMonth() === calendarMonth.getMonth()
+                            const holiday = calendarHolidaysByDay.get(iso)
+                            const ex = calendarExceptionsByDay.get(iso)
+                            const isToday = iso === toIsoDateLocal(new Date())
+                            const isSelected = selectedCalendarDate === iso
+                            const hasDayOff = Boolean(ex?.types.has("day_off"))
+                            const hasSpecialHours = Boolean(ex?.types.has("special_hours"))
+                            return (
+                              <button
+                                key={iso}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCalendarDate(iso)
+                                  const idx = findExceptionIndexForDate(form.exceptions, iso)
+                                  setHighlightedExceptionIndex(idx >= 0 ? idx : null)
+                                  if (
+                                    day.getMonth() !== calendarMonth.getMonth() ||
+                                    day.getFullYear() !== calendarMonth.getFullYear()
+                                  ) {
+                                    setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1))
+                                  }
+                                }}
+                                className={cn(
+                                  "relative min-h-11 rounded-lg border p-1 text-xs transition",
+                                  isSelected
+                                    ? "border-primary bg-[color:var(--nav-active-bg)]"
+                                    : "border-border/70 bg-card",
+                                  !inMonth && "opacity-45",
+                                  isToday && "ring-1 ring-primary/60",
                                 )}
-                                <div className="flex justify-end">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-10 rounded-xl"
-                                    onClick={() => {
-                                      setIsExceptionsEditing(true)
-                                      setIsNewStaffExceptionsExpanded(true)
-                                    }}
-                                  >
-                                    {t("team.editExceptions")}
-                                  </Button>
-                                </div>
-                              </div>
+                                title={
+                                  holiday
+                                    ? language === "en"
+                                      ? holiday.nameEn
+                                      : holiday.namePl
+                                    : undefined
+                                }
+                              >
+                                <span className="block text-left">{day.getDate()}</span>
+                                <span className="mt-1 flex gap-1">
+                                  {holiday ? <span className="size-1.5 rounded-full bg-amber-400" /> : null}
+                                  {hasDayOff ? <span className="size-1.5 rounded-full bg-rose-500" /> : null}
+                                  {hasSpecialHours ? <span className="size-1.5 rounded-full bg-sky-400" /> : null}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="size-2 rounded-full bg-amber-400" />
+                              {t("team.holidayDayType")}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="size-2 rounded-full bg-rose-500" />
+                              {t("team.exceptionTypeClosed")}
+                            </span>
+                            <span className="inline-flex items-center gap-1">
+                              <span className="size-2 rounded-full bg-sky-400" />
+                              {t("team.exceptionTypeSpecialHours")}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">{t("team.calendarHolidayInfoOnly")}</p>
+                        </div>
+                        {selectedCalendarDate ? (
+                          <div className="space-y-3 rounded-xl border border-border/70 bg-card p-3 text-xs">
+                            <p className="font-medium text-foreground">
+                              {formatExceptionPreviewDate(selectedCalendarDate)}
+                            </p>
+                            {selectedDayHoliday ? (
+                              <p className="text-muted-foreground">
+                                {t("team.holidayDayType")}:{" "}
+                                {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
+                              </p>
+                            ) : null}
+                            {selectedDayException ? (
+                              <>
+                                <p className="text-muted-foreground">
+                                  {selectedDayException.types.has("day_off")
+                                    ? t("team.exceptionTypeClosed")
+                                    : t("team.exceptionTypeSpecialHours")}
+                                  {selectedDayException.types.has("special_hours")
+                                    ? ` · ${selectedDayException.exceptions
+                                        .filter((x) => !x.isClosed)
+                                        .map((x) => `${x.startTime}–${x.endTime}`)
+                                        .join(", ")}`
+                                    : null}
+                                </p>
+                                <p className="text-muted-foreground">{t("team.exceptionListedBelow")}</p>
+                              </>
                             ) : (
                               <>
-                                {form.exceptions.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">
-                                    {t("team.scheduleExceptionsEmpty")}
-                                  </p>
-                                ) : (
-                                  <div className="space-y-4">
-                                    {form.exceptions.map((ex, idx) => (
-                                      <div
-                                        key={`${idx}-${ex.exceptionDate}`}
-                                        className="rounded-xl border border-border/70 bg-muted/20 p-4"
-                                      >
-                                        <div className="grid gap-3 md:grid-cols-2">
-                                          <div className="space-y-1.5">
-                                            <Label htmlFor={`staff-ex-date-${idx}`}>
-                                              {t("team.exceptionDateFromLabel")}
-                                            </Label>
-                                            <AppDatePicker
-                                              id={`staff-ex-date-${idx}`}
-                                              value={ex.exceptionDate}
-                                              placeholder={t("team.exceptionDateFromLabel")}
-                                              closeOnSelect
-                                              onChange={(iso) =>
-                                                updateException(idx, patchStaffExceptionOnFromChange(ex, iso))
-                                              }
-                                              className="h-11 rounded-xl"
-                                            />
-                                          </div>
-                                          <div className="space-y-1.5">
-                                            <Label htmlFor={`staff-ex-date-end-${idx}`}>
-                                              {t("team.exceptionDateToLabel")}
-                                            </Label>
-                                            <AppDatePicker
-                                              id={`staff-ex-date-end-${idx}`}
-                                              value={ex.exceptionEndDate ?? ""}
-                                              placeholder={t("team.exceptionDateToLabel")}
-                                              min={
-                                                /^\d{4}-\d{2}-\d{2}$/.test(ex.exceptionDate)
-                                                  ? ex.exceptionDate
-                                                  : undefined
-                                              }
-                                              closeOnSelect
-                                              onChange={(iso) => {
-                                                const from = ex.exceptionDate.trim().slice(0, 10)
-                                                if (/^\d{4}-\d{2}-\d{2}$/.test(from) && iso < from) {
-                                                  setNotice(t("team.exceptionEndBeforeStart"))
-                                                  setNoticeDetail(null)
-                                                  return
-                                                }
-                                                updateException(idx, { exceptionEndDate: iso })
-                                              }}
-                                              className="h-11 rounded-xl"
-                                            />
-                                          </div>
-                                        </div>
-                                        <div className="grid gap-3 md:grid-cols-[minmax(200px,1fr)_minmax(0,1fr)]">
-                                          <div className="min-w-0 space-y-1.5">
-                                            <Label htmlFor={`staff-ex-type-${idx}`}>
-                                              {t("team.exceptionTypeLabel")}
-                                            </Label>
-                                            <Select
-                                              value={ex.isClosed ? "closed" : "hours"}
-                                              onValueChange={(v) =>
-                                                updateException(idx, { isClosed: v === "closed" })
-                                              }
-                                            >
-                                              <SelectTrigger id={`staff-ex-type-${idx}`} className="h-11 rounded-xl">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="closed">{t("team.exceptionTypeClosed")}</SelectItem>
-                                                <SelectItem value="hours">{t("team.exceptionTypeSpecialHours")}</SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-                                        </div>
-                                        {!ex.isClosed ? (
-                                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                            <div className="space-y-1.5">
-                                              <Label htmlFor={`staff-ex-start-${idx}`}>{t("team.timeFrom")}</Label>
-                                              <Input
-                                                id={`staff-ex-start-${idx}`}
-                                                type="time"
-                                                value={ex.startTime}
-                                                onChange={(e) =>
-                                                  updateException(idx, { startTime: e.target.value })
-                                                }
-                                                className="h-11 rounded-xl"
-                                              />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                              <Label htmlFor={`staff-ex-end-${idx}`}>{t("team.timeTo")}</Label>
-                                              <Input
-                                                id={`staff-ex-end-${idx}`}
-                                                type="time"
-                                                value={ex.endTime}
-                                                onChange={(e) =>
-                                                  updateException(idx, { endTime: e.target.value })
-                                                }
-                                                className="h-11 rounded-xl"
-                                              />
-                                            </div>
-                                          </div>
-                                        ) : null}
-                                        <div className="mt-3 space-y-1.5">
-                                          <Label htmlFor={`staff-ex-reason-${idx}`}>
-                                            {t("team.exceptionReasonLabel")}
-                                          </Label>
-                                          <Input
-                                            id={`staff-ex-reason-${idx}`}
-                                            value={ex.reason ?? ""}
-                                            onChange={(e) => updateException(idx, { reason: e.target.value })}
-                                            className="h-11 rounded-xl"
-                                          />
-                                        </div>
-                                        <div className="mt-4 flex flex-wrap justify-end gap-2">
-                                          <Button
-                                            type="button"
-                                            variant="outline"
-                                            className="h-10 rounded-xl"
-                                            disabled={saving}
-                                            onClick={() => removeException(idx)}
-                                          >
-                                            {t("team.deleteException")}
-                                          </Button>
-                                          <Button
-                                            type="button"
-                                            className="h-10 rounded-xl"
-                                            disabled={saving}
-                                            onClick={() => void saveScheduleExceptionsAndCollapse()}
-                                          >
-                                            {t("team.saveException")}
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                <div className="flex flex-wrap items-center justify-end gap-2">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="h-10 rounded-xl"
-                                    onClick={addException}
-                                  >
-                                    {t("team.addException")}
-                                  </Button>
-                                </div>
+                                <p className="text-muted-foreground">{t("team.calendarNoStaffException")}</p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-9 rounded-lg"
+                                  onClick={() => addException(selectedCalendarDate)}
+                                >
+                                  {t("team.addExceptionForDay")}
+                                </Button>
                               </>
                             )}
                           </div>
-                          <div className="mx-auto w-full max-w-[520px] min-w-0 space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3">
-                            <div className="flex items-center justify-between">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="h-8 w-8 rounded-lg p-0"
-                                onClick={() =>
-                                  setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
-                                }
-                                aria-label={language === "en" ? "Previous month" : "Poprzedni miesiąc"}
-                              >
-                                <ChevronLeft className="size-4" />
-                              </Button>
-                              <p className="text-sm font-medium capitalize text-foreground">{calendarMonthLabel}</p>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="h-8 w-8 rounded-lg p-0"
-                                onClick={() =>
-                                  setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
-                                }
-                                aria-label={language === "en" ? "Next month" : "Następny miesiąc"}
-                              >
-                                <ChevronRight className="size-4" />
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-7 gap-1 text-[11px] text-muted-foreground">
-                              {([1, 2, 3, 4, 5, 6, 0] as const).map((w) => (
-                                <div key={`w-head-${w}`} className="text-center">
-                                  {t(weekdayLabelKey(w)).slice(0, 2)}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="grid grid-cols-7 gap-1">
-                              {calendarGridDays.map((day) => {
-                                const iso = toIsoDateLocal(day)
-                                const inMonth = day.getMonth() === calendarMonth.getMonth()
-                                const holiday = calendarHolidaysByDay.get(iso)
-                                const ex = calendarExceptionsByDay.get(iso)
-                                const isToday = iso === toIsoDateLocal(new Date())
-                                const isSelected = selectedCalendarDate === iso
-                                const hasDayOff = Boolean(ex?.types.has("day_off"))
-                                const hasSpecialHours = Boolean(ex?.types.has("special_hours"))
-                                return (
-                                  <button
-                                    key={iso}
-                                    type="button"
-                                    onClick={() => setSelectedCalendarDate(iso)}
-                                    className={`relative min-h-11 rounded-lg border p-1 text-xs transition ${
-                                      isSelected
-                                        ? "border-primary bg-[color:var(--nav-active-bg)]"
-                                        : "border-border/70 bg-card"
-                                    } ${!inMonth ? "opacity-45" : ""} ${isToday ? "ring-1 ring-primary/60" : ""}`}
-                                    title={
-                                      holiday
-                                        ? language === "en"
-                                          ? holiday.nameEn
-                                          : holiday.namePl
-                                        : undefined
-                                    }
-                                  >
-                                    <span className="block text-left">{day.getDate()}</span>
-                                    <span className="mt-1 flex gap-1">
-                                      {holiday ? <span className="size-1.5 rounded-full bg-amber-400" /> : null}
-                                      {hasDayOff ? <span className="size-1.5 rounded-full bg-rose-500" /> : null}
-                                      {hasSpecialHours ? <span className="size-1.5 rounded-full bg-sky-400" /> : null}
-                                    </span>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                            <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                              <span className="inline-flex items-center gap-1">
-                                <span className="size-2 rounded-full bg-amber-400" />
-                                {t("team.holidayDayType")}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <span className="size-2 rounded-full bg-rose-500" />
-                                {t("team.exceptionTypeClosed")}
-                              </span>
-                              <span className="inline-flex items-center gap-1">
-                                <span className="size-2 rounded-full bg-sky-400" />
-                                {t("team.exceptionTypeSpecialHours")}
-                              </span>
-                            </div>
-                            {selectedCalendarDate ? (
-                              <div className="rounded-xl border border-border/70 bg-card p-3 text-xs">
-                                <p className="font-medium text-foreground">
-                                  {language === "en" ? "Date" : "Data"}: {formatExceptionPreviewDate(selectedCalendarDate)}
-                                </p>
-                                {selectedDayException ? (
-                                  <>
-                                    <p className="mt-1 text-muted-foreground">
-                                      {language === "en" ? "Type" : "Typ"}:{" "}
-                                      {selectedDayException.types.has("day_off")
-                                        ? t("team.exceptionTypeClosed")
-                                        : t("team.exceptionTypeSpecialHours")}
-                                    </p>
-                                    {selectedDayException.types.has("special_hours") ? (
-                                      <p className="mt-1 text-muted-foreground">
-                                        {language === "en" ? "Hours" : "Godziny"}:{" "}
-                                        {selectedDayException.exceptions
-                                          .filter((x) => !x.isClosed)
-                                          .map((x) => `${x.startTime}-${x.endTime}`)
-                                          .join(", ")}
-                                      </p>
-                                    ) : null}
-                                    {selectedDayException.exceptions.find((x) => (x.reason ?? "").trim()) ? (
-                                      <p className="mt-1 text-muted-foreground">
-                                        {t("team.exceptionReasonLabel")}:{" "}
-                                        {(selectedDayException.exceptions.find((x) => (x.reason ?? "").trim())?.reason ?? "").trim()}
-                                      </p>
-                                    ) : null}
-                                    {selectedDayHoliday ? (
-                                      <p className="mt-1 text-muted-foreground">
-                                        {t("team.holidayDayType")}:{" "}
-                                        {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
-                                      </p>
-                                    ) : null}
-                                  </>
-                                ) : selectedDayHoliday ? (
-                                  <>
-                                    <p className="mt-1 text-muted-foreground">
-                                      {language === "en" ? "Type" : "Typ"}: {t("team.holidayDayType")}
-                                    </p>
-                                    <p className="mt-1 text-muted-foreground">
-                                      {language === "en" ? "Holiday name" : "Nazwa święta"}:{" "}
-                                      {language === "en" ? selectedDayHoliday.nameEn : selectedDayHoliday.namePl}
-                                    </p>
-                                  </>
-                                ) : (
-                                  <p className="mt-1 text-muted-foreground">
-                                    {language === "en" ? "No holiday or exception on this day." : "Brak święta i wyjątku w tym dniu."}
-                                  </p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-muted-foreground">
-                                {language === "en"
-                                  ? "Select a day to see details."
-                                  : "Kliknij dzień w kalendarzu, aby zobaczyć szczegóły."}
-                              </p>
-                            )}
-                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{t("team.calendarSelectDayHint")}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground">{t("team.exceptionsListTitle")}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-10 rounded-xl"
+                            onClick={() => addException()}
+                          >
+                            {t("team.addException")}
+                          </Button>
                         </div>
+                        {form.exceptions.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsEmpty")}</p>
+                        ) : (
+                          <div className="space-y-4">
+                            {form.exceptions.map((ex, idx) => (
+                              <div
+                                key={`${idx}-${ex.exceptionDate}-${ex.exceptionEndDate ?? ""}`}
+                                ref={(el) => {
+                                  if (el) exceptionCardRefs.current.set(idx, el)
+                                  else exceptionCardRefs.current.delete(idx)
+                                }}
+                                className={cn(
+                                  "rounded-xl border border-border/70 bg-muted/20 p-4 transition",
+                                  highlightedExceptionIndex === idx && "border-primary ring-1 ring-primary/30",
+                                )}
+                              >
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor={`staff-ex-date-${idx}`}>
+                                      {t("team.exceptionDateFromLabel")}
+                                    </Label>
+                                    <AppDatePicker
+                                      id={`staff-ex-date-${idx}`}
+                                      value={ex.exceptionDate}
+                                      placeholder={t("team.exceptionDateFromLabel")}
+                                      closeOnSelect
+                                      onChange={(iso) =>
+                                        updateException(idx, patchStaffExceptionOnFromChange(ex, iso))
+                                      }
+                                      className="h-11 rounded-xl"
+                                    />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor={`staff-ex-date-end-${idx}`}>
+                                      {t("team.exceptionDateToLabel")}
+                                    </Label>
+                                    <AppDatePicker
+                                      id={`staff-ex-date-end-${idx}`}
+                                      value={ex.exceptionEndDate ?? ""}
+                                      placeholder={t("team.exceptionDateToLabel")}
+                                      min={
+                                        /^\d{4}-\d{2}-\d{2}$/.test(ex.exceptionDate)
+                                          ? ex.exceptionDate
+                                          : undefined
+                                      }
+                                      closeOnSelect
+                                      onChange={(iso) => {
+                                        const from = ex.exceptionDate.trim().slice(0, 10)
+                                        if (/^\d{4}-\d{2}-\d{2}$/.test(from) && iso < from) {
+                                          setExceptionFieldErrors((prev) => ({
+                                            ...prev,
+                                            [idx]: t("team.exceptionEndBeforeStart"),
+                                          }))
+                                          return
+                                        }
+                                        updateException(idx, { exceptionEndDate: iso })
+                                      }}
+                                      className="h-11 rounded-xl"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="mt-3 space-y-1.5">
+                                  <Label className="text-xs">{t("team.exceptionTypeLabel")}</Label>
+                                  <div className="grid grid-cols-2 gap-1 rounded-lg border border-border/70 bg-background/80 p-0.5">
+                                    {(
+                                      [
+                                        { value: true, label: t("team.exceptionTypeClosed") },
+                                        { value: false, label: t("team.exceptionTypeSpecialHours") },
+                                      ] as const
+                                    ).map((option) => (
+                                      <button
+                                        key={option.value ? "closed" : "hours"}
+                                        type="button"
+                                        onClick={() => updateException(idx, { isClosed: option.value })}
+                                        className={cn(
+                                          "h-9 rounded-md px-2 text-center text-[11px] font-medium leading-tight transition-colors",
+                                          ex.isClosed === option.value
+                                            ? "bg-primary text-primary-foreground shadow-sm"
+                                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                                        )}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                {!ex.isClosed ? (
+                                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                      <Label htmlFor={`staff-ex-start-${idx}`}>{t("team.timeFrom")}</Label>
+                                      <Input
+                                        id={`staff-ex-start-${idx}`}
+                                        type="time"
+                                        value={ex.startTime}
+                                        onChange={(e) => updateException(idx, { startTime: e.target.value })}
+                                        className="h-11 rounded-xl"
+                                      />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label htmlFor={`staff-ex-end-${idx}`}>{t("team.timeTo")}</Label>
+                                      <Input
+                                        id={`staff-ex-end-${idx}`}
+                                        type="time"
+                                        value={ex.endTime}
+                                        onChange={(e) => updateException(idx, { endTime: e.target.value })}
+                                        className="h-11 rounded-xl"
+                                      />
+                                    </div>
+                                  </div>
+                                ) : null}
+                                <div className="mt-3 space-y-1.5">
+                                  <Label htmlFor={`staff-ex-reason-${idx}`}>
+                                    {t("team.exceptionReasonLabel")}
+                                  </Label>
+                                  <Input
+                                    id={`staff-ex-reason-${idx}`}
+                                    value={ex.reason ?? ""}
+                                    placeholder={t("team.exceptionReasonPlaceholder")}
+                                    onChange={(e) => updateException(idx, { reason: e.target.value })}
+                                    className="h-11 rounded-xl"
+                                  />
+                                </div>
+                                {exceptionFieldErrors[idx] ? (
+                                  <p className="mt-3 text-xs text-destructive" role="alert">
+                                    {exceptionFieldErrors[idx]}
+                                  </p>
+                                ) : null}
+                                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-10 rounded-xl"
+                                    disabled={saving}
+                                    onClick={() => removeException(idx)}
+                                  >
+                                    {t("team.deleteException")}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    className="h-10 rounded-xl"
+                                    disabled={saving}
+                                    onClick={() => {
+                                      if (!validateScheduleExceptionAt(idx)) return
+                                      void saveScheduleExceptions()
+                                    }}
+                                  >
+                                    {t("team.saveException")}
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">{t("team.scheduleExceptionsSaveFooterHint")}</p>
                       </div>
                     </div>
                   </TabsContent>
                 </Tabs>
 
                 {editing ? (
-                  <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/70 pt-4">
+                  <div className="mt-6 flex min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 sm:flex-row sm:items-center sm:justify-end">
                     <Button
                       type="button"
                       variant="outline"
-                      className="h-11 rounded-xl"
+                      className="h-11 w-full shrink-0 rounded-xl sm:w-auto"
                       disabled={saving}
                       onClick={handleGlobalCancelChanges}
                     >
                       {t("team.cancelChanges")}
                     </Button>
-                    <Button type="submit" className="h-11 min-w-[140px] rounded-xl" disabled={saving}>
+                    <Button
+                      type="submit"
+                      className="h-11 w-full shrink-0 rounded-xl sm:w-auto"
+                      disabled={saving}
+                    >
                       {t("team.saveChanges")}
                     </Button>
                   </div>
                 ) : null}
 
                 {!editing ? (
-                  <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:flex-wrap sm:items-center">
+                  <div className="mt-6 flex min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <Button
                       type="button"
-                      variant="outline"
-                      className="h-11 w-full rounded-xl sm:w-auto"
+                      variant="ghost"
+                      className="h-11 w-full shrink-0 rounded-xl text-muted-foreground sm:w-auto"
                       disabled={saving}
                       onClick={() => {
                         setForm(emptyForm())
@@ -2927,7 +3077,11 @@ export default function TeamPage() {
                     >
                       {t("team.clearForm")}
                     </Button>
-                    <Button type="submit" className="h-11 w-full rounded-xl sm:min-w-[160px] sm:flex-1" disabled={saving}>
+                    <Button
+                      type="submit"
+                      className="h-11 w-full max-w-full shrink-0 rounded-xl sm:w-auto"
+                      disabled={saving}
+                    >
                       {submitLabel}
                     </Button>
                   </div>

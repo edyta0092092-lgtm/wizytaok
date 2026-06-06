@@ -1,4 +1,4 @@
-import type { AppointmentStatus } from "@/types/domain"
+import type { AppointmentStatus, ClientAttachment } from "@/types/domain"
 
 /** Segment CRM — automatyczna klasyfikacja klienta. */
 export type CustomerSegment = "new" | "returning" | "loyal" | "lost"
@@ -28,6 +28,8 @@ export type CustomerCrmRow = {
   firstVisitAt: string | null
   segment: CustomerSegment
   visits: CustomerVisitRow[]
+  notes?: string
+  attachments: ClientAttachment[]
 }
 
 export type CustomerKpis = {

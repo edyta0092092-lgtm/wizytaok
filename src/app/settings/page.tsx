@@ -12,8 +12,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { saveBusinessProfileAction } from "@/app/settings/business-profile-actions"
-import { AccountCredentialsPanel } from "@/components/account/account-credentials-panel"
 import { BillingRequiredSettingsBanner } from "@/components/billing/billing-required-settings-banner"
 import { BusinessOAuthSetupPanel } from "@/components/settings/business-oauth-setup-panel"
 import { AccessDenied } from "@/components/shared/access-denied"
@@ -33,7 +39,6 @@ import { markPanelAccessJustActivated } from "@/lib/tour/tour-access-activation"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
 import { loadClientsWorkspace } from "@/lib/clients/clients-store"
-import { bookingSourceCsvLabelKey } from "@/lib/bookings/booking-source"
 import {
   buildAppointmentsCsv,
   buildClientsCsv,
@@ -50,6 +55,14 @@ import {
   splitStoredPhoneIntoParts,
   validateNationalPhoneLength,
 } from "@/lib/validation/international-phone"
+import {
+  DEFAULT_BREAK_MINUTES_NONE_VALUE,
+  formatDefaultBreakMinutesFormValue,
+  formatServiceBreakMinutesOption,
+  normalizeDefaultBreakMinutesFormValue,
+  parseDefaultBreakMinutesFormValue,
+  SERVICE_BREAK_MINUTES_OPTIONS,
+} from "@/lib/services/service-break-options"
 import type { AppointmentStatus } from "@/types/domain"
 
 const SETTINGS_STORAGE_KEY = "pw_settings_form_v2"
@@ -83,7 +96,7 @@ const demoSettings: SettingsForm = {
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "50",
-  defaultBreakMinutes: "",
+  defaultBreakMinutes: DEFAULT_BREAK_MINUTES_NONE_VALUE,
 }
 
 const emptySettings: SettingsForm = {
@@ -99,7 +112,7 @@ const emptySettings: SettingsForm = {
   depositForNewClients: false,
   depositForAllClients: false,
   depositAmount: "",
-  defaultBreakMinutes: "",
+  defaultBreakMinutes: DEFAULT_BREAK_MINUTES_NONE_VALUE,
 }
 
 function initialSettingsForm(): SettingsForm {
@@ -241,6 +254,9 @@ export default function SettingsPage() {
             typeof fromStorage.taxId === "string" ? fromStorage.taxId.replace(/[\s-]/g, "").trim() : ""
           fromStorage.taxIdEntryEnabled = tid.length > 0
         }
+        fromStorage.defaultBreakMinutes = normalizeDefaultBreakMinutesFormValue(
+          fromStorage.defaultBreakMinutes,
+        )
         queueMicrotask(() => {
           setForm((prev) => ({ ...prev, ...fromStorage }))
         })
@@ -288,10 +304,11 @@ export default function SettingsPage() {
             phoneNational: phoneParts.nationalDigits,
             taxId: taxIdFromDb,
             taxIdEntryEnabled: taxIdFromDb.replace(/[\s-]/g, "").trim().length > 0,
-            defaultBreakMinutes:
+            defaultBreakMinutes: formatDefaultBreakMinutesFormValue(
               data.default_break_minutes != null && Number.isFinite(Number(data.default_break_minutes))
-                ? String(Math.max(0, Math.floor(Number(data.default_break_minutes))))
-                : "",
+                ? Number(data.default_break_minutes)
+                : null,
+            ),
           }))
         })
     })
@@ -326,11 +343,8 @@ export default function SettingsPage() {
           service: t("settings.csvColService"),
           status: t("settings.csvColStatus"),
           staff: t("settings.csvStaffCol"),
-          source: t("settings.csvColSource"),
         }
-        const csv = buildAppointmentsCsv(rows, headers, statusLabelLookup, (a) =>
-          t(bookingSourceCsvLabelKey(a.source)), t("team.anyStaff")
-        )
+        const csv = buildAppointmentsCsv(rows, headers, statusLabelLookup, t("team.anyStaff"))
         downloadCsvFile("wizytaok-wizyty.csv", csv)
       } finally {
         setExportBusy(null)
@@ -469,16 +483,10 @@ export default function SettingsPage() {
           return
         }
 
-        const breakRaw = form.defaultBreakMinutes.trim()
-        if (breakRaw !== "" && (!Number.isFinite(Number(breakRaw)) || Number(breakRaw) < 0)) {
-          setSaveError(t("settings.defaultBreakMinutesInvalid"))
-          return
-        }
+        const breakValue = parseDefaultBreakMinutesFormValue(form.defaultBreakMinutes)
         const breakClient = getBrowserClient()
         const breakUser = breakClient ? (await breakClient.auth.getUser()).data.user : null
         if (breakClient && breakUser) {
-          const breakValue =
-            breakRaw === "" ? null : Math.max(0, Math.floor(Number(breakRaw)))
           const { error: breakError } = await breakClient
             .from("business_profiles")
             .update({ default_break_minutes: breakValue })
@@ -545,7 +553,7 @@ export default function SettingsPage() {
           className="h-10 rounded-xl px-4 text-sm"
           disabled={saving || settingsSaveBlocked}
         >
-          {saving ? "..." : t("common.saveChanges")}
+          {saving ? t("common.saving") : t("common.saveChanges")}
         </Button>
       }
     >
@@ -578,14 +586,6 @@ export default function SettingsPage() {
             <Check className="size-4 shrink-0 text-success" aria-hidden />
             {t("settings.savedBanner")}
           </div>
-        ) : null}
-
-        {ready && businessId ? (
-          <AccountCredentialsPanel
-            businessId={businessId}
-            userEmail={userEmail}
-            isOwner={isOwner}
-          />
         ) : null}
 
         <form id="settings-form" onSubmit={(e) => void saveAll(e)} className="space-y-6">
@@ -738,30 +738,33 @@ export default function SettingsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 pt-4">
-                  <div className="space-y-2 sm:max-w-xs">
+                  <div className="space-y-1.5 sm:max-w-xs">
                     <Label htmlFor="default-break-minutes">
                       {t("settings.defaultBreakMinutesLabel")}
                     </Label>
-                    <div className="relative">
-                      <Input
-                        id="default-break-minutes"
-                        type="number"
-                        min={0}
-                        step={1}
-                        placeholder="0"
-                        value={form.defaultBreakMinutes}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, defaultBreakMinutes: e.target.value }))
-                        }
-                        className="h-11 pr-10"
-                      />
-                      <span
-                        className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground"
-                        aria-hidden
-                      >
-                        min
-                      </span>
-                    </div>
+                    <Select
+                      value={form.defaultBreakMinutes}
+                      onValueChange={(value) =>
+                        setForm((f) => ({ ...f, defaultBreakMinutes: value }))
+                      }
+                    >
+                      <SelectTrigger id="default-break-minutes" className="h-11 w-full rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={DEFAULT_BREAK_MINUTES_NONE_VALUE}>
+                          {t("settings.defaultBreakMinutesNone")}
+                        </SelectItem>
+                        {SERVICE_BREAK_MINUTES_OPTIONS.map((minutes) => (
+                          <SelectItem
+                            key={minutes}
+                            value={formatServiceBreakMinutesOption(minutes)}
+                          >
+                            {formatServiceBreakMinutesOption(minutes)} {t("services.min")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-xs text-muted-foreground">
                       {t("settings.defaultBreakMinutesHint")}
                     </p>
@@ -876,7 +879,7 @@ export default function SettingsPage() {
               className="h-10 w-full rounded-xl"
               disabled={saving || settingsSaveBlocked}
             >
-              {saving ? "..." : t("common.saveChanges")}
+              {saving ? t("common.saving") : t("common.saveChanges")}
             </Button>
           </div>
         </form>

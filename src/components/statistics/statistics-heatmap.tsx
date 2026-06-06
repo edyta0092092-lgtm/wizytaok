@@ -77,7 +77,7 @@ export function StatisticsHeatmap({
   }))
 
   return (
-    <Card className="rounded-2xl border-border/60 bg-card shadow-sm shadow-slate-900/[0.04]">
+    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
       <CardHeader className="gap-3 px-5 sm:flex sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base">{title}</CardTitle>

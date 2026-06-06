@@ -17,11 +17,6 @@ import {
   appointmentsDayGroupFilterLabel,
   type AppointmentsDayGroupFilter,
 } from "@/lib/appointments/appointments-grouping"
-import {
-  APPOINTMENTS_SOURCE_FILTERS,
-  appointmentsSourceFilterLabel,
-  type AppointmentsSourceFilter,
-} from "@/lib/appointments/appointments-source-filter"
 import { type StaffAppointmentFilterValue } from "@/lib/staff/staff-display"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
@@ -46,12 +41,6 @@ export type AppointmentsFiltersBarProps = {
   serviceOptions: string[]
   dayGroupFilter: AppointmentsDayGroupFilter
   onDayGroupFilterChange: (next: AppointmentsDayGroupFilter) => void
-  sourceFilter: AppointmentsSourceFilter
-  onSourceFilterChange: (next: AppointmentsSourceFilter) => void
-  dateFrom: string
-  dateTo: string
-  onDateFromChange: (next: string) => void
-  onDateToChange: (next: string) => void
   onClearFilters?: () => void
   hasActiveFilters?: boolean
   toolbarAction?: React.ReactNode
@@ -73,12 +62,6 @@ export function AppointmentsFiltersBar({
   serviceOptions,
   dayGroupFilter,
   onDayGroupFilterChange,
-  sourceFilter,
-  onSourceFilterChange,
-  dateFrom,
-  dateTo,
-  onDateFromChange,
-  onDateToChange,
   onClearFilters,
   hasActiveFilters = false,
   toolbarAction,
@@ -87,7 +70,7 @@ export function AppointmentsFiltersBar({
 
   return (
     <Card className="rounded-2xl border border-border shadow-sm shadow-slate-900/5">
-      <CardHeader className="space-y-1 px-4 pb-2 pt-4 sm:px-5">
+      <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <Filter className="size-4 text-muted-foreground" aria-hidden />
@@ -96,86 +79,8 @@ export function AppointmentsFiltersBar({
           {toolbarAction}
         </div>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5 px-4 pb-5 sm:px-5">
-        <div className="flex min-w-0 flex-wrap gap-2">
-          {APPOINTMENTS_STATUS_FILTERS.map((value) => (
-            <Button
-              key={value}
-              type="button"
-              size="sm"
-              variant={filter === value ? "default" : "outline"}
-              className={cn(
-                "h-9 rounded-full px-4 text-sm",
-                filter === value && "shadow-sm",
-              )}
-              onClick={() => onFilterChange(value)}
-            >
-              {appointmentsStatusFilterLabel(value, t)}
-            </Button>
-          ))}
-        </div>
-
+      <CardContent className="flex flex-col gap-4">
         <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="min-w-0">
-            <label
-              htmlFor="appointments-staff-filter"
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              {t("appointments.staffFilterLabel")}
-            </label>
-            <NativeSelect
-              id="appointments-staff-filter"
-              wrapperClassName="w-full"
-              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
-              disabled={staffLoading || staffLoadError}
-              value={staffFilter}
-              onChange={(e) =>
-                onStaffFilterChange(e.target.value as StaffAppointmentFilterValue)
-              }
-            >
-              <option value="all">{t("appointments.staffFilterAll")}</option>
-              <option value="unassigned">{t("appointments.staffFilterUnassigned")}</option>
-              {staffSelectOptions.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                  {m.role?.trim() ? ` - ${m.role.trim()}` : ""}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div className="min-w-0">
-            <label
-              htmlFor="appointments-date-from"
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              {t("appointments.dateFromLabel")}
-            </label>
-            <Input
-              id="appointments-date-from"
-              type="date"
-              value={dateFrom}
-              onChange={(e) => onDateFromChange(e.target.value)}
-              className="h-9 rounded-xl"
-            />
-          </div>
-          <div className="min-w-0">
-            <label
-              htmlFor="appointments-date-to"
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-            >
-              {t("appointments.dateToLabel")}
-            </label>
-            <Input
-              id="appointments-date-to"
-              type="date"
-              value={dateTo}
-              onChange={(e) => onDateToChange(e.target.value)}
-              className="h-9 rounded-xl"
-            />
-          </div>
-        </div>
-
-        <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="min-w-0">
             <label
               htmlFor="appointments-client-filter"
@@ -213,25 +118,32 @@ export function AppointmentsFiltersBar({
               ))}
             </NativeSelect>
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">
-            {t("appointments.bookingSource.filterLabel")}
-          </p>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            {APPOINTMENTS_SOURCE_FILTERS.map((value) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={sourceFilter === value ? "default" : "outline"}
-                className="h-9 rounded-full px-4 text-sm"
-                onClick={() => onSourceFilterChange(value)}
-              >
-                {appointmentsSourceFilterLabel(value, t)}
-              </Button>
-            ))}
+          <div className="min-w-0">
+            <label
+              htmlFor="appointments-staff-filter"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              {t("appointments.staffFilterLabel")}
+            </label>
+            <NativeSelect
+              id="appointments-staff-filter"
+              wrapperClassName="w-full"
+              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+              disabled={staffLoading || staffLoadError}
+              value={staffFilter}
+              onChange={(e) =>
+                onStaffFilterChange(e.target.value as StaffAppointmentFilterValue)
+              }
+            >
+              <option value="all">{t("appointments.staffFilterAll")}</option>
+              <option value="unassigned">{t("appointments.staffFilterUnassigned")}</option>
+              {staffSelectOptions.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                  {m.role?.trim() ? ` - ${m.role.trim()}` : ""}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
         </div>
 
@@ -270,6 +182,24 @@ export function AppointmentsFiltersBar({
               {t("appointments.clearFiltersAction")}
             </Button>
           ) : null}
+        </div>
+
+        <div className="flex min-w-0 flex-wrap gap-2 border-t border-border/60 pt-4">
+          {APPOINTMENTS_STATUS_FILTERS.map((value) => (
+            <Button
+              key={value}
+              type="button"
+              size="sm"
+              variant={filter === value ? "default" : "outline"}
+              className={cn(
+                "h-9 rounded-full px-4 text-sm",
+                filter === value && "shadow-sm",
+              )}
+              onClick={() => onFilterChange(value)}
+            >
+              {appointmentsStatusFilterLabel(value, t)}
+            </Button>
+          ))}
         </div>
 
         {filter !== "all" ? (

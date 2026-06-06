@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
 import {
   PublicBookingCalendar,
   findFirstSelectableDateKey,
@@ -113,7 +114,6 @@ export default function PublicBookingPage() {
   const [servicesLoadFailed, setServicesLoadFailed] = React.useState(false)
   /** Ustalone po `getActiveServicesForBusinessSlug`; anon nie widzi SELECT na business_profiles bez RPC. */
   const [bookingServicesBusinessFound, setBookingServicesBusinessFound] = React.useState(true)
-  const [servicesLoadDiagnostics, setServicesLoadDiagnostics] = React.useState<string | null>(null)
   const [selectedServiceId, setSelectedServiceId] = React.useState<string | null>(null)
   const [serviceStaff, setServiceStaff] = React.useState<StaffMember[]>([])
   const [selectedStaffId, setSelectedStaffId] = React.useState<string | null>(null)
@@ -210,20 +210,9 @@ export default function PublicBookingPage() {
         const client = getBrowserClient()
         const svcRes = await getActiveServicesForBusinessSlug(client, normalizedSlug)
         if (cancelled) return
-        const { services: active, loadFailed, businessFound, loadDiagnostics, loadSource } = svcRes
+        const { services: active, loadFailed, businessFound } = svcRes
         setServicesLoadFailed(loadFailed)
         setBookingServicesBusinessFound(businessFound)
-        setServicesLoadDiagnostics(
-          process.env.NODE_ENV === "development" && loadFailed ? (loadDiagnostics ?? null) : null
-        )
-        if (process.env.NODE_ENV === "development") {
-          console.info("[book/catalog]", {
-            slug: normalizedSlug,
-            loadSource,
-            count: active.length,
-            loadFailed,
-          })
-        }
         setCatalog(active)
         setSelectedServiceId((prev) => {
           if (prev && active.some((s) => s.id === prev)) return prev
@@ -967,6 +956,12 @@ export default function PublicBookingPage() {
   }
 
   const displayBusinessName = businessTitle ?? BRAND.name
+  const bookingProgressStep = !selectedServiceId ? 1 : !selectedTime ? 2 : 3
+  const bookingSteps = [
+    { id: 1, label: t("bookingPublic.step1") },
+    { id: 2, label: t("bookingPublic.step3") },
+    { id: 3, label: t("bookingPublic.step5") },
+  ] as const
 
   return (
     <main className="min-h-screen bg-background px-4 py-4 sm:px-6 lg:px-8">
@@ -981,6 +976,26 @@ export default function PublicBookingPage() {
           <p className="text-sm text-muted-foreground">
             {t("bookingPublic.pageDescription")}
           </p>
+          <nav
+            aria-label={t("bookingPublic.stepsAriaLabel")}
+            className="flex flex-wrap gap-2 pt-1"
+          >
+            {bookingSteps.map((step) => (
+              <span
+                key={step.id}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-medium",
+                  bookingProgressStep === step.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : bookingProgressStep > step.id
+                      ? "border-border bg-muted/50 text-foreground"
+                      : "border-border text-muted-foreground",
+                )}
+              >
+                {step.id}. {step.label}
+              </span>
+            ))}
+          </nav>
         </header>
 
         <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr]">
@@ -991,14 +1006,7 @@ export default function PublicBookingPage() {
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
                 {servicesLoadFailed ? (
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">{t("bookingPublic.servicesLoadTryLater")}</p>
-                    {servicesLoadDiagnostics ? (
-                      <pre className="overflow-x-auto text-[10px] leading-snug text-muted-foreground/80">
-                        {servicesLoadDiagnostics}
-                      </pre>
-                    ) : null}
-                  </div>
+                  <p className="text-sm text-muted-foreground">{t("bookingPublic.servicesLoadTryLater")}</p>
                 ) : !bookingServicesBusinessFound && normalizedSlug !== DEMO_BOOKING_SLUG ? (
                   <p className="text-sm text-muted-foreground">{t("bookingPublic.bookingPageNotFound")}</p>
                 ) : bookingServicesBusinessFound && catalog.length === 0 ? (
@@ -1136,6 +1144,11 @@ export default function PublicBookingPage() {
                 <CardTitle className="text-base">{t("bookingPublic.yourDetails")}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2.5 pt-0">
+                {error ? (
+                  <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive" role="alert">
+                    {error}
+                  </p>
+                ) : null}
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   {t("bookingPublic.contactRemindersHint")}
                 </p>
@@ -1297,10 +1310,6 @@ export default function PublicBookingPage() {
                       : t("bookingPublic.noSelection")}
                   </span>
                 </p>
-
-                {error ? (
-                  <p className="pt-1 text-xs text-red-600">{error}</p>
-                ) : null}
 
                 <Button
                   className="mt-3 w-full"

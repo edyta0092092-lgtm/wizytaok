@@ -51,13 +51,12 @@ export function StatisticsExportButton({ dataset, range, className }: Statistics
       kpi: {
         visitsToday: t("exports.kpiVisitsToday"),
         visitsThisMonth: t("exports.kpiVisitsThisMonth"),
+        totalVisits: t("exports.kpiTotalVisits"),
+        needsAction: t("exports.kpiNeedsAction"),
         completed: t("exports.kpiCompleted"),
         cancelled: t("exports.kpiCancelled"),
         noShow: t("exports.kpiNoShow"),
         newClients: t("exports.kpiNewClients"),
-        onlineBookings: t("exports.kpiOnlineBookings"),
-        manualBookings: t("exports.kpiManualBookings"),
-        avgDailyVisits: t("exports.kpiAvgDaily"),
       },
       notifications: {
         sms: t("exports.notifSms"),
@@ -66,7 +65,7 @@ export function StatisticsExportButton({ dataset, range, className }: Statistics
         successRate: t("exports.notifSuccessRate"),
       },
       statusNames: {
-        confirmed: t("exports.statusConfirmed"),
+        needs_action: t("exports.statusNeedsAction"),
         completed: t("exports.statusCompleted"),
         cancelled: t("exports.statusCancelled"),
         no_show: t("exports.statusNoShow"),

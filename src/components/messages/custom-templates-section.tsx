@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { Tables } from "@/types/database"
@@ -37,21 +38,6 @@ type CustomForm = {
   offsetUnit: OffsetUnit
   eventKey: EventKey
   status: "active" | "draft"
-}
-
-const EVENT_LABELS: Record<EventKey, string> = {
-  created: "Utworzenie rezerwacji",
-  confirmed: "Potwierdzenie wizyty",
-  cancelled: "Anulowanie wizyty",
-  no_show: "Nieobecność klienta",
-  completed: "Zakończenie wizyty",
-}
-
-const TRIGGER_LABELS: Record<TriggerType, string> = {
-  schedule_before: "Zaplanowane przed wizytą",
-  schedule_after: "Zaplanowane po wizycie",
-  event: "Na zdarzenie / zmianę statusu",
-  manual: "Ręczne (wyślij teraz)",
 }
 
 const UNIT_MINUTES: Record<OffsetUnit, number> = {
@@ -104,28 +90,37 @@ function rowToForm(row: Tables<"custom_templates">): CustomForm {
   }
 }
 
-function friendlySaveError(message: string | null | undefined): string {
+function friendlySaveError(message: string | null | undefined, t: (key: string) => string): string {
   const m = String(message ?? "")
   if (
     /Could not find the table 'public\.custom_templates'/i.test(m) ||
     /relation ["']?custom_templates["']? does not exist/i.test(m) ||
     /schema cache/i.test(m)
   ) {
-    return "Tabela własnych szablonów nie istnieje jeszcze w bazie. Wymagana migracja 060_custom_templates."
+    return t("messages.customTemplates.errors.migrationRequired")
   }
-  return m || "Nie udało się zapisać szablonu."
+  return m || t("messages.customTemplates.errors.saveFailed")
 }
 
-function describeTrigger(row: Tables<"custom_templates">): string {
+function describeTrigger(row: Tables<"custom_templates">, t: (key: string) => string): string {
   const trigger = (row.trigger_type as TriggerType) ?? "manual"
   if (trigger === "event") {
     const key = (row.event_key as EventKey) ?? "completed"
-    return `Zdarzenie: ${EVENT_LABELS[key] ?? key}`
+    const label = t(`messages.customTemplates.events.${key}`)
+    return `${t("messages.customTemplates.eventPrefix")} ${label}`
   }
-  if (trigger === "manual") return TRIGGER_LABELS.manual
+  if (trigger === "manual") return t("messages.customTemplates.triggers.manual")
   const off = splitOffset(row.offset_minutes)
-  const unitLabel = off.unit === "days" ? "dni" : off.unit === "hours" ? "godz." : "min"
-  const direction = trigger === "schedule_before" ? "przed wizytą" : "po wizycie"
+  const unitLabel =
+    off.unit === "days"
+      ? t("messages.customTemplates.unitDays")
+      : off.unit === "hours"
+        ? t("messages.customTemplates.unitHours")
+        : t("messages.customTemplates.unitMinutes")
+  const direction =
+    trigger === "schedule_before"
+      ? t("messages.customTemplates.beforeVisit")
+      : t("messages.customTemplates.afterVisit")
   return `${off.value} ${unitLabel} ${direction}`
 }
 
@@ -134,6 +129,7 @@ export type CustomTemplatesSectionProps = {
 }
 
 export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSectionProps) {
+  const { t } = useTranslations()
   const { ready: accessReady, businessId: accessBusinessId } = useBusinessAccess()
   const [rows, setRows] = React.useState<Tables<"custom_templates">[]>([])
   const [businessId, setBusinessId] = React.useState<string | null>(null)
@@ -218,7 +214,8 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
 
   const handleDelete = (row: Tables<"custom_templates">) => {
     if (readOnly || !businessId) return
-    if (!window.confirm(`Usunąć szablon „${row.name || "bez nazwy"}"?`)) return
+    const name = row.name || t("messages.customTemplates.noName")
+    if (!window.confirm(`${t("messages.customTemplates.deleteConfirmPrefix")} „${name}"?`)) return
     void (async () => {
       const client = getBrowserClient()
       if (!client) return
@@ -236,30 +233,30 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
     if (readOnly || saving) return
     if (!form) return
     if (!businessId) {
-      setSaveError("Brak kontekstu firmy — odśwież stronę i spróbuj ponownie.")
+      setSaveError(t("messages.customTemplates.errors.noBusiness"))
       return
     }
     const f = form
     const name = f.name.trim()
     if (!name) {
-      setSaveError("Podaj nazwę szablonu.")
+      setSaveError(t("messages.customTemplates.errors.nameRequired"))
       return
     }
     if (!f.smsEnabled && !f.emailEnabled) {
-      setSaveError("Włącz przynajmniej jeden kanał (SMS lub e-mail).")
+      setSaveError(t("messages.customTemplates.errors.channelRequired"))
       return
     }
     if (f.smsEnabled && !f.smsContent.trim()) {
-      setSaveError("Uzupełnij treść SMS.")
+      setSaveError(t("messages.customTemplates.errors.smsRequired"))
       return
     }
     if (f.emailEnabled && !f.emailContent.trim()) {
-      setSaveError("Uzupełnij treść e-maila.")
+      setSaveError(t("messages.customTemplates.errors.emailRequired"))
       return
     }
     const isSchedule = f.triggerType === "schedule_before" || f.triggerType === "schedule_after"
     if (isSchedule && (!Number.isFinite(f.offsetValue) || f.offsetValue <= 0)) {
-      setSaveError("Podaj poprawny czas wysyłki (większy od zera).")
+      setSaveError(t("messages.customTemplates.errors.offsetInvalid"))
       return
     }
     const offsetMinutes = isSchedule ? Math.round(f.offsetValue * UNIT_MINUTES[f.offsetUnit]) : null
@@ -283,21 +280,21 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
       try {
         const client = getBrowserClient()
         if (!client || !isSupabaseConfigured()) {
-          setSaveError("Brak połączenia z bazą danych.")
+          setSaveError(t("messages.customTemplates.errors.noDatabase"))
           return
         }
         const res = f.id
           ? await client.from("custom_templates").update(payload as never).eq("id", f.id)
           : await client.from("custom_templates").insert(payload as never)
         if (res.error) {
-          setSaveError(friendlySaveError(res.error.message))
+          setSaveError(friendlySaveError(res.error.message, t))
           return
         }
         await reload(businessId)
         setShowSaved(true)
         setSheetOpen(false)
       } catch (err) {
-        setSaveError(err instanceof Error ? err.message : "Nie udało się zapisać szablonu.")
+        setSaveError(err instanceof Error ? err.message : t("messages.customTemplates.errors.saveFailed"))
       } finally {
         setSaving(false)
       }
@@ -309,12 +306,12 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
       <section aria-labelledby="custom-templates-heading" className="min-w-0">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 id="custom-templates-heading" className="text-base font-semibold text-foreground">
-            Własne szablony
+            {t("messages.customTemplates.sectionTitle")}
           </h2>
           {!readOnly ? (
             <Button type="button" size="sm" className="h-8 gap-1 text-xs" onClick={openCreate}>
               <Plus className="size-3.5" />
-              Nowy szablon
+              {t("messages.customTemplates.newTemplate")}
             </Button>
           ) : null}
         </div>
@@ -325,7 +322,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
             className="mb-3 flex items-center gap-2 rounded-md border border-success/25 bg-success/10 px-3 py-2 text-sm text-[#14532D]"
           >
             <Check className="size-4 shrink-0 text-success" aria-hidden />
-            Zapisano szablon.
+            {t("messages.customTemplates.saved")}
           </div>
         ) : null}
         {loadError ? (
@@ -335,24 +332,28 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
         ) : null}
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">Wczytywanie…</p>
+          <p className="text-sm text-muted-foreground">{t("messages.customTemplates.loading")}</p>
         ) : rows.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-3 py-4 text-sm text-muted-foreground">
-            Nie masz jeszcze własnych szablonów. Utwórz dowolną wiadomość (SMS/e-mail) i wybierz, kiedy ma się wysłać.
+          <p className="rounded-xl border border-border bg-muted/20 px-3 py-4 text-sm text-muted-foreground">
+            {t("messages.customTemplates.empty")}
           </p>
         ) : (
           <div className="mt-2 grid min-w-0 gap-2 md:grid-cols-2">
             {rows.map((row) => (
               <Card key={row.id} className="rounded-xl border border-border bg-card shadow-sm shadow-slate-900/5">
                 <CardHeader className="space-y-1 px-4 py-3">
-                  <CardTitle className="text-[13px] leading-snug">{row.name || "Bez nazwy"}</CardTitle>
+                  <CardTitle className="text-sm leading-snug">{row.name || t("messages.customTemplates.noName")}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-4 pb-3 pt-0">
-                  <p className="text-[11px] text-muted-foreground">
-                    {describeTrigger(row)} · {row.status === "active" ? "włączony" : "wyłączony"}
+                  <p className="text-xs text-muted-foreground">
+                    {describeTrigger(row, t)} ·{" "}
+                    {row.status === "active"
+                      ? t("messages.customTemplates.statusOn")
+                      : t("messages.customTemplates.statusOff")}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    SMS: {row.sms_enabled ? "on" : "off"} · E-mail: {row.email_enabled ? "on" : "off"}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    SMS: {row.sms_enabled ? t("messages.customTemplates.channelOn") : t("messages.customTemplates.channelOff")} · E-mail:{" "}
+                    {row.email_enabled ? t("messages.customTemplates.channelOn") : t("messages.customTemplates.channelOff")}
                   </p>
                   {!readOnly ? (
                     <div className="mt-2 flex items-center gap-2">
@@ -364,7 +365,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                         className="h-8 rounded-lg px-2.5 text-xs"
                       >
                         <Pencil className="size-3" />
-                        Edytuj
+                        {t("messages.customTemplates.edit")}
                       </Button>
                       <Button
                         type="button"
@@ -374,7 +375,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                         className="h-8 rounded-lg px-2.5 text-xs text-destructive hover:text-destructive"
                       >
                         <Trash2 className="size-3" />
-                        Usuń
+                        {t("messages.customTemplates.delete")}
                       </Button>
                     </div>
                   ) : null}
@@ -390,16 +391,18 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4 sm:p-6"
           role="dialog"
           aria-modal="true"
-          aria-label="Własny szablon"
+          aria-label={t("messages.customTemplates.dialogLabel")}
         >
           <div
             ref={dialogRef}
             className="flex max-h-[88vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl"
           >
             <div className="flex items-center justify-between gap-3 border-b border-border/70 px-6 py-5">
-              <h3 className="font-heading text-xl">{form.id ? "Edytuj szablon" : "Nowy szablon"}</h3>
+              <h3 className="font-heading text-xl">
+                {form.id ? t("messages.customTemplates.editTitle") : t("messages.customTemplates.createTitle")}
+              </h3>
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                Zamknij
+                {t("messages.customTemplates.close")}
               </Button>
             </div>
             <form
@@ -414,18 +417,18 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                 ) : null}
 
                 <div className="space-y-2">
-                  <Label className="font-medium">Nazwa szablonu</Label>
+                  <Label className="font-medium">{t("messages.customTemplates.nameLabel")}</Label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm((prev) => (prev ? { ...prev, name: e.target.value } : prev))}
-                    placeholder="np. Podziękowanie po wizycie"
+                    placeholder={t("messages.customTemplates.namePlaceholder")}
                   />
                 </div>
 
                 <div className="space-y-3 rounded-xl border border-border p-3">
-                  <Label className="font-medium">Kiedy wysłać?</Label>
+                  <Label className="font-medium">{t("messages.customTemplates.whenSend")}</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {(Object.keys(TRIGGER_LABELS) as TriggerType[]).map((tt) => (
+                    {(["schedule_before", "schedule_after", "event", "manual"] as TriggerType[]).map((tt) => (
                       <label key={tt} className="flex items-center gap-2 text-sm">
                         <input
                           type="radio"
@@ -433,7 +436,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                           checked={form.triggerType === tt}
                           onChange={() => setForm((prev) => (prev ? { ...prev, triggerType: tt } : prev))}
                         />
-                        {TRIGGER_LABELS[tt]}
+                        {t(`messages.customTemplates.triggers.${tt}`)}
                       </label>
                     ))}
                   </div>
@@ -441,7 +444,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                   {form.triggerType === "schedule_before" || form.triggerType === "schedule_after" ? (
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs">Ile</Label>
+                        <Label className="text-xs">{t("messages.customTemplates.offsetHowMuch")}</Label>
                         <Input
                           type="number"
                           inputMode="numeric"
@@ -456,7 +459,7 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Jednostka</Label>
+                        <Label className="text-xs">{t("messages.customTemplates.offsetUnit")}</Label>
                         <Select
                           value={form.offsetUnit}
                           onValueChange={(v) =>
@@ -467,21 +470,23 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="z-[80]" position="popper">
-                            <SelectItem value="minutes">minut</SelectItem>
-                            <SelectItem value="hours">godzin</SelectItem>
-                            <SelectItem value="days">dni</SelectItem>
+                            <SelectItem value="minutes">{t("messages.customTemplates.unitMinutes")}</SelectItem>
+                            <SelectItem value="hours">{t("messages.customTemplates.unitHours")}</SelectItem>
+                            <SelectItem value="days">{t("messages.customTemplates.unitDays")}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <p className="pb-2 text-xs text-muted-foreground">
-                        {form.triggerType === "schedule_before" ? "przed wizytą" : "po wizycie"}
+                        {form.triggerType === "schedule_before"
+                          ? t("messages.customTemplates.beforeVisit")
+                          : t("messages.customTemplates.afterVisit")}
                       </p>
                     </div>
                   ) : null}
 
                   {form.triggerType === "event" ? (
                     <div className="space-y-1">
-                      <Label className="text-xs">Zdarzenie</Label>
+                      <Label className="text-xs">{t("messages.customTemplates.eventLabel")}</Label>
                       <Select
                         value={form.eventKey}
                         onValueChange={(v) =>
@@ -492,9 +497,9 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="z-[80]" position="popper">
-                          {(Object.keys(EVENT_LABELS) as EventKey[]).map((k) => (
+                          {(["created", "confirmed", "cancelled", "no_show", "completed"] as EventKey[]).map((k) => (
                             <SelectItem key={k} value={k}>
-                              {EVENT_LABELS[k]}
+                              {t(`messages.customTemplates.events.${k}`)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -504,49 +509,49 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
 
                   {form.triggerType === "manual" ? (
                     <p className="text-xs text-muted-foreground">
-                      Wysyłka ręczna z poziomu wizyty (akcja „Wyślij wiadomość”).
+                      {t("messages.customTemplates.manualHint")}
                     </p>
                   ) : null}
                 </div>
 
                 <div className="grid gap-5 lg:grid-cols-2">
                   <div className="space-y-2 rounded-xl border border-border p-3">
-                    <Label className="font-medium">Kanał SMS</Label>
+                    <Label className="font-medium">{t("messages.customTemplates.smsChannel")}</Label>
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={form.smsEnabled}
                         onChange={(e) => setForm((prev) => (prev ? { ...prev, smsEnabled: e.target.checked } : prev))}
                       />
-                      Aktywny
+                      {t("messages.customTemplates.channelActive")}
                     </label>
                     <Textarea
                       rows={10}
                       value={form.smsContent}
                       onChange={(e) => setForm((prev) => (prev ? { ...prev, smsContent: e.target.value } : prev))}
-                      placeholder="Treść SMS"
+                      placeholder={t("messages.customTemplates.smsPlaceholder")}
                     />
                   </div>
                   <div className="space-y-2 rounded-xl border border-border p-3">
-                    <Label className="font-medium">Kanał E-mail</Label>
+                    <Label className="font-medium">{t("messages.customTemplates.emailChannel")}</Label>
                     <label className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={form.emailEnabled}
                         onChange={(e) => setForm((prev) => (prev ? { ...prev, emailEnabled: e.target.checked } : prev))}
                       />
-                      Aktywny
+                      {t("messages.customTemplates.channelActive")}
                     </label>
                     <Input
                       value={form.emailSubject}
                       onChange={(e) => setForm((prev) => (prev ? { ...prev, emailSubject: e.target.value } : prev))}
-                      placeholder="Temat e-maila"
+                      placeholder={t("messages.customTemplates.emailSubjectPlaceholder")}
                     />
                     <Textarea
                       rows={10}
                       value={form.emailContent}
                       onChange={(e) => setForm((prev) => (prev ? { ...prev, emailContent: e.target.value } : prev))}
-                      placeholder="Treść e-maila"
+                      placeholder={t("messages.customTemplates.emailBodyPlaceholder")}
                     />
                   </div>
                 </div>
@@ -559,11 +564,11 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                       setForm((prev) => (prev ? { ...prev, status: e.target.checked ? "active" : "draft" } : prev))
                     }
                   />
-                  Szablon włączony (wysyłka aktywna)
+                  {t("messages.customTemplates.templateEnabled")}
                 </label>
 
                 <div className="text-xs text-muted-foreground">
-                  Dostępne zmienne: {"{{imie}}"}, {"{{data}}"}, {"{{godzina}}"}, {"{{usluga}}"}, {"{{osoba}}"}, {"{{link_rezerwacji}}"}, {"{{link_potwierdzenia}}"}, {"{{link_anulowania}}"}, {"{{telefon_firmy}}"}, {"{{adres_firmy}}"}, {"{{nazwa_firmy}}"}
+                  {t("messages.customTemplates.variablesHint")}
                 </div>
               </div>
               <div className="mt-auto flex flex-col gap-2 border-t border-border/70 bg-muted/20 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
@@ -574,10 +579,10 @@ export function CustomTemplatesSection({ readOnly = false }: CustomTemplatesSect
                 ) : null}
                 <div className="flex items-center justify-end gap-2">
                   <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                    Anuluj
+                    {t("messages.customTemplates.cancel")}
                   </Button>
                   <Button type="submit" disabled={saving}>
-                    {saving ? "Zapisywanie…" : "Zapisz szablon"}
+                    {saving ? t("common.saving") : t("messages.customTemplates.save")}
                   </Button>
                 </div>
               </div>

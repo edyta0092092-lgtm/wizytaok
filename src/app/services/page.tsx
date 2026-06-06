@@ -86,6 +86,11 @@ export default function ServicesPage() {
   const [loadError, setLoadError] = React.useState(false)
   const [businessProfileId, setBusinessProfileId] = React.useState<string | null>(null)
   const [actionNotice, setActionNotice] = React.useState("")
+  const [fieldErrors, setFieldErrors] = React.useState<{
+    name?: string
+    durationMinutes?: string
+    price?: string
+  }>({})
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [form, setForm] = React.useState<ServiceFormState>(emptyForm)
   const [saving, setSaving] = React.useState(false)
@@ -151,27 +156,28 @@ export default function ServicesPage() {
 
     const client = getBrowserClient()
     const name = form.name.trim()
-    if (!name) {
-      setActionNotice(t("services.invalidName"))
-      return
-    }
-
     const durationMinutes = Number(form.durationMinutes)
+    const price = Number(form.price)
+    const nextFieldErrors: typeof fieldErrors = {}
+
+    if (!name) nextFieldErrors.name = t("services.invalidName")
     if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-      setActionNotice(t("services.invalidDuration"))
+      nextFieldErrors.durationMinutes = t("services.invalidDuration")
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      nextFieldErrors.price = t("services.invalidPrice")
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors)
       return
     }
 
+    setFieldErrors({})
     const breakMinutes = parseServiceBreakMinutesFormValue(form.breakMinutes)
 
-    const price = Number(form.price)
-    if (!Number.isFinite(price) || price < 0) {
-      setActionNotice(t("services.invalidPrice"))
-      return
-    }
-
     if (!businessProfileId) {
-      setActionNotice("Nie udało się zapisać usługi. Brak profilu firmy.")
+      setActionNotice(t("services.noBusinessProfile"))
       return
     }
 
@@ -355,8 +361,17 @@ export default function ServicesPage() {
                     required
                     value={form.name}
                     placeholder={t("services.placeholderName")}
-                    onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                    aria-invalid={Boolean(fieldErrors.name)}
+                    onChange={(event) => {
+                      setFieldErrors((prev) => ({ ...prev, name: undefined }))
+                      setForm((prev) => ({ ...prev, name: event.target.value }))
+                    }}
                   />
+                  {fieldErrors.name ? (
+                    <p className="text-xs text-destructive" role="alert">
+                      {fieldErrors.name}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="service-description">{t("services.serviceDescriptionLabel")}</Label>
@@ -379,9 +394,11 @@ export default function ServicesPage() {
                         step={1}
                         placeholder={t("services.placeholderDuration")}
                         value={form.durationMinutes}
-                        onChange={(event) =>
+                        aria-invalid={Boolean(fieldErrors.durationMinutes)}
+                        onChange={(event) => {
+                          setFieldErrors((prev) => ({ ...prev, durationMinutes: undefined }))
                           setForm((prev) => ({ ...prev, durationMinutes: event.target.value }))
-                        }
+                        }}
                         className="pr-10"
                       />
                       <span
@@ -391,6 +408,11 @@ export default function ServicesPage() {
                         {t("services.min")}
                       </span>
                     </div>
+                    {fieldErrors.durationMinutes ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {fieldErrors.durationMinutes}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="service-price">{t("services.priceLabel")}</Label>
@@ -402,7 +424,11 @@ export default function ServicesPage() {
                         step={1}
                         placeholder={t("services.placeholderPrice")}
                         value={form.price}
-                        onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
+                        aria-invalid={Boolean(fieldErrors.price)}
+                        onChange={(event) => {
+                          setFieldErrors((prev) => ({ ...prev, price: undefined }))
+                          setForm((prev) => ({ ...prev, price: event.target.value }))
+                        }}
                         className="pr-10"
                       />
                       <span
@@ -412,6 +438,11 @@ export default function ServicesPage() {
                         {t("services.zł")}
                       </span>
                     </div>
+                    {fieldErrors.price ? (
+                      <p className="text-xs text-destructive" role="alert">
+                        {fieldErrors.price}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="space-y-1.5 sm:max-w-xs">

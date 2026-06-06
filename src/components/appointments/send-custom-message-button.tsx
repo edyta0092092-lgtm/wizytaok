@@ -85,7 +85,7 @@ export function SendCustomMessageButton({ appointmentId }: SendCustomMessageButt
   }
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-1">
       <DropdownMenu
         onOpenChange={(open) => {
           if (open && !loaded) void loadTemplates()
@@ -102,7 +102,7 @@ export function SendCustomMessageButton({ appointmentId }: SendCustomMessageButt
             Wyślij wiadomość
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="start" className="w-64">
           {!loaded ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">Wczytywanie…</div>
           ) : templates.length === 0 ? (

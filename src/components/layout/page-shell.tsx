@@ -23,7 +23,7 @@ export function PageShell({
   return (
     <div
       className={cn(
-        "w-full py-2.5 sm:py-3.5",
+        "w-full py-3 sm:py-4",
         className
       )}
     >

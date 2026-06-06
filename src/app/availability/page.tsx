@@ -271,7 +271,7 @@ export default function AvailabilityPage() {
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <Label htmlFor={`from-${day.id}`} className="sr-only">
+                        <Label htmlFor={`from-${day.id}`} className="text-xs text-muted-foreground">
                           {t("availability.from")}
                         </Label>
                         <Input
@@ -280,11 +280,11 @@ export default function AvailabilityPage() {
                           value={day.startTime}
                           disabled={!day.isOpen || loading || loadError}
                           onChange={(e) => updateDay(day.id, { startTime: e.target.value })}
-                          className="h-11 rounded-xl"
+                          className="h-10 rounded-xl"
                         />
                       </div>
                       <div>
-                        <Label htmlFor={`to-${day.id}`} className="sr-only">
+                        <Label htmlFor={`to-${day.id}`} className="text-xs text-muted-foreground">
                           {t("availability.to")}
                         </Label>
                         <Input
@@ -293,7 +293,7 @@ export default function AvailabilityPage() {
                           value={day.endTime}
                           disabled={!day.isOpen || loading || loadError}
                           onChange={(e) => updateDay(day.id, { endTime: e.target.value })}
-                          className="h-11 rounded-xl"
+                          className="h-10 rounded-xl"
                         />
                       </div>
                     </div>

@@ -41,21 +41,15 @@ export function CustomersExportButton({ rows, className }: CustomersExportButton
       visitCount: t("exports.clientsColVisits"),
       lastVisit: t("exports.clientsColLastVisit"),
       nextVisit: t("exports.clientsColNextVisit"),
-      status: t("exports.clientsColStatus"),
       filenameBase: "wizytaok-klienci",
     }),
-    [t],
-  )
-
-  const segmentLabel = React.useCallback(
-    (segment: CustomerCrmRow["segment"]) => t(`customers.segment.${segment}`),
     [t],
   )
 
   const handleExport = async (format: ExportFormatId) => {
     await new Promise<void>((resolve) => {
       queueMicrotask(() => {
-        exportCustomers(rows, format as CustomersExportFormat, labels, language, segmentLabel)
+        exportCustomers(rows, format as CustomersExportFormat, labels, language)
         resolve()
       })
     })

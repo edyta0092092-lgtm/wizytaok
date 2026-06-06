@@ -298,7 +298,7 @@ export const HELP_CENTER_SECTIONS: HelpCenterSection[] = [
     href: "/availability",
     ctaKey: "guide.navAvailability",
     adminOnly: true,
-    searchTags: ["święta", "urlop", "wyjątek"],
+    searchTags: ["święta", "dzień wolny", "wyjątek"],
     blocks: [
       { type: "lead", key: "guide.hcAvailExLead" },
       { type: "steps", key: "guide.hcAvailExSteps" },

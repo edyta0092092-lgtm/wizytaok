@@ -767,6 +767,108 @@ export interface Database {
         }
         Relationships: []
       }
+      business_referral_codes: {
+        Row: {
+          business_id: string
+          code: string
+          created_at: string
+        }
+        Insert: {
+          business_id: string
+          code: string
+          created_at?: string
+        }
+        Update: {
+          business_id?: string
+          code?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      business_referrals: {
+        Row: {
+          id: string
+          referrer_business_id: string
+          referred_business_id: string
+          referred_user_id: string
+          referral_code: string
+          stage: string
+          registered_at: string
+          trial_activated_at: string | null
+          paying_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          referrer_business_id: string
+          referred_business_id: string
+          referred_user_id: string
+          referral_code: string
+          stage?: string
+          registered_at?: string
+          trial_activated_at?: string | null
+          paying_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          referrer_business_id?: string
+          referred_business_id?: string
+          referred_user_id?: string
+          referral_code?: string
+          stage?: string
+          registered_at?: string
+          trial_activated_at?: string | null
+          paying_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      business_referral_reward_grants: {
+        Row: {
+          id: string
+          referrer_business_id: string
+          tier_code: string
+          required_referrals: number
+          free_months: number
+          status: string
+          eligible_at: string
+          granted_at: string | null
+          granted_by_user_id: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          referrer_business_id: string
+          tier_code: string
+          required_referrals: number
+          free_months: number
+          status?: string
+          eligible_at?: string
+          granted_at?: string | null
+          granted_by_user_id?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          referrer_business_id?: string
+          tier_code?: string
+          required_referrals?: number
+          free_months?: number
+          status?: string
+          eligible_at?: string
+          granted_at?: string | null
+          granted_by_user_id?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       appointment_reminders: {
         Row: {
           id: string

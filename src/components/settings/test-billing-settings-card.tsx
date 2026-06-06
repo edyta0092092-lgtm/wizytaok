@@ -199,7 +199,7 @@ export function TestBillingSettingsCard() {
 
   return (
     <div className="mb-6 space-y-3">
-      <Card className="rounded-2xl border border-dashed border-violet-500/35 bg-violet-50/30 shadow-sm dark:bg-violet-950/20">
+      <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
         <CardHeader className="border-b border-border/70 py-4">
           <CardTitle className="text-sm font-semibold">{t("settings.testBillingTitle")}</CardTitle>
           <CardDescription className="text-xs text-muted-foreground">

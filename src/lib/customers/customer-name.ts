@@ -1,3 +1,7 @@
+export function joinCustomerName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`.trim().replace(/\s+/g, " ")
+}
+
 export function splitCustomerName(fullName: string): { firstName: string; lastName: string } {
   const trimmed = fullName.trim()
   if (!trimmed) return { firstName: "", lastName: "" }

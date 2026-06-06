@@ -1,6 +1,6 @@
 /** Komunikat widoczny publicznie zamiast placeholderów danych operatora (okres testowy). */
 export const LEGAL_BETA_OPERATOR_PUBLIC_NOTICE =
-  "WizytaOK jest obecnie w wersji testowej. Dane formalnego operatora usługi zostaną uzupełnione przed komercyjnym uruchomieniem aplikacji."
+  "WizytaOK jest dostępny w wersji beta. Aktualne dane operatora usługi są publikowane w sekcji kontaktowej."
 
 export const LEGAL_BETA_OPERATOR_PUBLIC_NOTICE_EN =
-  "WizytaOK is currently in beta. Formal operator details will be completed before the application is launched commercially."
+  "WizytaOK is available in beta. Current operator details are published in the contact section."

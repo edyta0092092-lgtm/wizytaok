@@ -110,6 +110,8 @@ export function buildCustomerCrmRow(
     firstVisitAt,
     segment,
     visits,
+    notes: client.notes?.trim() ? client.notes.trim() : undefined,
+    attachments: client.attachments ?? [],
   }
 }
 

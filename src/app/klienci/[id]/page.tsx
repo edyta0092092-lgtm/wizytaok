@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useParams } from "next/navigation"
+import Link from "next/link"
 
 import { CustomerProfileView } from "@/components/customers/customer-profile-view"
 import { CustomersListSkeleton } from "@/components/customers/customers-list-skeleton"
@@ -9,13 +10,14 @@ import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
 import { buildCustomerCrmRows } from "@/lib/customers/build-customer-crm"
+import type { CustomerCrmRow } from "@/lib/customers/customer-types"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
-import { loadClientsWorkspace } from "@/lib/clients/clients-store"
+import { loadClientsWorkspace, type ClientsLoadMode } from "@/lib/clients/clients-store"
 import { getBookingsForBusiness } from "@/lib/bookings/bookings-store"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
-import Link from "next/link"
+import type { Client } from "@/types/domain"
 
 export default function KlienciProfilePage() {
   const params = useParams()
@@ -23,45 +25,61 @@ export default function KlienciProfilePage() {
   const { t } = useTranslations()
   const { ready: accessReady, businessId } = useBusinessAccess()
   const [ready, setReady] = React.useState(false)
-  const [customer, setCustomer] = React.useState<ReturnType<typeof buildCustomerCrmRows>[number] | null>(
-    null,
-  )
+  const [customer, setCustomer] = React.useState<CustomerCrmRow | null>(null)
+  const [clients, setClients] = React.useState<Client[]>([])
+  const [workspace, setWorkspace] = React.useState<{
+    mode: ClientsLoadMode
+    businessProfileId: string | null
+    businessSlug: string | null
+  } | null>(null)
 
-  React.useEffect(() => {
-    if (!accessReady || !businessId || !id) {
-      queueMicrotask(() => {
-        setCustomer(null)
-        setReady(true)
-      })
+  const loadProfile = React.useCallback(async () => {
+    if (!businessId || !id) {
+      setCustomer(null)
+      setClients([])
+      setWorkspace(null)
+      setReady(true)
       return
     }
 
-    let cancelled = false
-    queueMicrotask(() => setReady(false))
-
-    void (async () => {
-      try {
-        const workspace = await loadClientsWorkspace({ businessId })
-        let appointments = await fetchMergedAppointments({ businessId })
-        const sb = getBrowserClient()
-        if (sb && isSupabaseConfigured()) {
-          const fromSb = await getBookingsForBusiness(sb, businessId, workspace.businessSlug ?? "")
-          if (fromSb.length > 0) appointments = fromSb
-        }
-        if (cancelled) return
-        const rows = buildCustomerCrmRows(workspace.clients, appointments)
-        setCustomer(rows.find((r) => r.id === id) ?? null)
-      } catch {
-        if (!cancelled) setCustomer(null)
-      } finally {
-        if (!cancelled) setReady(true)
+    setReady(false)
+    try {
+      const loadedWorkspace = await loadClientsWorkspace({ businessId })
+      let appointments = await fetchMergedAppointments({ businessId })
+      const sb = getBrowserClient()
+      if (sb && isSupabaseConfigured()) {
+        const fromSb = await getBookingsForBusiness(sb, businessId, loadedWorkspace.businessSlug ?? "")
+        if (fromSb.length > 0) appointments = fromSb
       }
-    })()
-
-    return () => {
-      cancelled = true
+      const rows = buildCustomerCrmRows(loadedWorkspace.clients, appointments)
+      setClients(loadedWorkspace.clients)
+      setWorkspace({
+        mode: loadedWorkspace.mode,
+        businessProfileId: loadedWorkspace.businessProfileId,
+        businessSlug: loadedWorkspace.businessSlug,
+      })
+      setCustomer(rows.find((r) => r.id === id) ?? null)
+    } catch {
+      setCustomer(null)
+      setClients([])
+      setWorkspace(null)
+    } finally {
+      setReady(true)
     }
-  }, [accessReady, businessId, id])
+  }, [businessId, id])
+
+  React.useEffect(() => {
+    if (!accessReady) return
+    void loadProfile()
+  }, [accessReady, loadProfile])
+
+  React.useEffect(() => {
+    const onBookings = () => {
+      void loadProfile()
+    }
+    window.addEventListener("pw-bookings", onBookings)
+    return () => window.removeEventListener("pw-bookings", onBookings)
+  }, [loadProfile])
 
   const title = customer?.fullName ?? t("customers.profile.title")
 
@@ -78,7 +96,31 @@ export default function KlienciProfilePage() {
               </Button>
             </div>
           ) : null}
-          {ready && customer ? <CustomerProfileView customer={customer} /> : null}
+          {ready && customer && workspace ? (
+            <CustomerProfileView
+              customer={customer}
+              workspace={workspace}
+              clients={clients}
+              onCustomerUpdated={(updated) => {
+                setCustomer(updated)
+                setClients((prev) =>
+                  prev.map((c) =>
+                    c.id === customer.id || c.id === updated.id
+                      ? {
+                          ...c,
+                          id: updated.id,
+                          fullName: updated.fullName,
+                          phone: updated.phone,
+                          email: updated.email,
+                          notes: updated.notes,
+                          attachments: updated.attachments,
+                        }
+                      : c,
+                  ),
+                )
+              }}
+            />
+          ) : null}
         </div>
       </PageShell>
     </AppShell>

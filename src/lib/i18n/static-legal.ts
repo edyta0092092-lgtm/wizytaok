@@ -96,9 +96,9 @@ export const enTermsPage = {
 } as const
 
 export const plDeveloperPage = {
-  title: "Kontakt do developera",
-  lead: "Dane kontaktowe w sprawie technicznej aplikacji (uzupełnij przed produkcją).",
-  techNote: "Kontakt techniczny w sprawach działania aplikacji.",
+  title: "Kontakt",
+  lead: "Skontaktuj się z zespołem WizytaOK w sprawach aplikacji, wsparcia i współpracy.",
+  techNote: "Odpowiadamy na zgłoszenia techniczne i pytania dotyczące konta.",
   nameLabel: "Nazwa",
   namePlaceholder: "Cronova",
   emailLabel: "E-mail",
@@ -112,15 +112,15 @@ export const plDeveloperPage = {
 } as const
 
 export const enDeveloperPage = {
-  title: "Developer contact",
-  lead: "Fill these placeholders before handing the build to stakeholders.",
-  techNote: "Technical contact for application issues.",
-  nameLabel: "Developer name",
-  namePlaceholder: "[add name]",
+  title: "Contact",
+  lead: "Get in touch with the WizytaOK team for app support, account questions, or partnerships.",
+  techNote: "We handle technical issues and account-related questions.",
+  nameLabel: "Company",
+  namePlaceholder: "Cronova",
   emailLabel: "Email",
-  emailPlaceholder: "[add developer email]",
-  websiteLabel: "Website (optional)",
-  websitePlaceholder: "[optional]",
+  emailPlaceholder: "kontakt@cronova.com.pl",
+  websiteLabel: "Website",
+  websitePlaceholder: "www.cronova.com.pl",
   supportChatTitle: "Support chat",
   supportChatHint: "If you need quick help, open the support chat.",
   supportChatCta: "Open support chat",

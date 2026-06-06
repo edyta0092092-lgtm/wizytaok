@@ -38,7 +38,7 @@ import {
   updateAppointmentStatus,
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
-import { useBusinessBookingPagePath } from "@/lib/business/use-business-booking-page-path"
+import { appointmentsManualCreateHref } from "@/lib/appointments/appointments-manual-create-path"
 import {
   appointmentShowsNeedsActionStatus,
   isPlannedVisitForDashboardStats,
@@ -90,14 +90,14 @@ function TipCard() {
 
   return (
     <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-      <CardHeader className="flex flex-row items-start gap-2 pb-1">
+      <CardHeader className="flex flex-row items-start gap-2">
         <Sparkles
           className="mt-0.5 size-4 shrink-0 text-primary"
           aria-hidden
         />
         <CardTitle className="text-sm font-semibold">{t("dashboard.tip")}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-2 pt-0">
+      <CardContent className="space-y-3">
         <p className="text-sm leading-relaxed text-muted-foreground">
           {t(tipKey)}
         </p>
@@ -105,7 +105,7 @@ function TipCard() {
           type="button"
           variant="ghost"
           size="sm"
-          className="-ml-2 h-8 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
+          className="h-8 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
           onClick={() => setTipIndex((i) => (i + 1) % DASHBOARD_TIP_COUNT)}
         >
           {t("dashboard.tipShowAnother")}
@@ -155,8 +155,6 @@ export default function DashboardPage() {
   }, [])
 
   const statsReady = appointmentsReady && !appointmentsLoadError && !statsLoading && !statsError
-
-  const bookingPagePath = useBusinessBookingPagePath()
 
   const isAuthOrContextError = (message: string): boolean => {
     const text = message.toLowerCase()
@@ -343,9 +341,7 @@ export default function DashboardPage() {
     <AppShell
       title={t("dashboard.title")}
       pageDescription={t("dashboard.pageDescription")}
-      primaryAction={
-        <AddAppointmentHeaderButton href={bookingPagePath} />
-      }
+      primaryAction={<AddAppointmentHeaderButton href={appointmentsManualCreateHref()} />}
     >
       <PageShell>
         {statusNotice ? (
@@ -354,7 +350,7 @@ export default function DashboardPage() {
           </div>
         ) : null}
         <Card className="rounded-2xl border border-border bg-[color:var(--nav-active-bg)] shadow-sm shadow-slate-900/5">
-          <CardContent className="grid gap-4 px-5 py-5 sm:px-6 sm:py-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <CardContent className="grid gap-4 py-5 sm:py-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
             <div className="min-w-0">
               <p className="inline-flex items-center gap-2 rounded-full bg-card/70 px-3 py-1 text-xs font-semibold text-primary">
                 <CalendarDays className="size-4" aria-hidden />
@@ -431,7 +427,7 @@ export default function DashboardPage() {
               data-tour="dashboard-today"
               className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
             >
-              <CardHeader className="pb-0">
+              <CardHeader>
                 <div className="flex items-center gap-2">
                   <ListTodo className="size-4 text-primary" aria-hidden />
                   <CardTitle className="text-sm font-semibold">
@@ -439,15 +435,23 @@ export default function DashboardPage() {
                   </CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="pt-3">
+              <CardContent>
                 <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
                   {!statsReady ? (
                     <li className="px-4 py-5 text-sm text-muted-foreground">
                       {appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")}
                     </li>
                   ) : todaysListSorted.length === 0 ? (
-                    <li className="px-4 py-5 text-sm text-muted-foreground">
-                      {t("dashboard.noAppointmentsTodayShort")}
+                    <li className="px-4 py-8 text-center">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("dashboard.noAppointmentsTodayShort")}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t("dashboard.emptyTodayHint")}
+                      </p>
+                      <Button asChild className="mt-4 h-10 rounded-xl" size="sm">
+                        <Link href={appointmentsManualCreateHref()}>{t("dashboard.emptyTodayCta")}</Link>
+                      </Button>
                     </li>
                   ) : (
                     todaysListSorted.map((row) => {

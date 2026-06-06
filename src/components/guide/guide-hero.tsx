@@ -38,9 +38,7 @@ export function GuideHero({
           {badge}
         </Badge>
         <div className="space-y-3">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            {title}
-          </h1>
+          <p className="text-panel-section text-balance">{title}</p>
           <p className="max-w-2xl text-pretty text-sm leading-relaxed text-muted-foreground sm:text-base">
             {description}
           </p>

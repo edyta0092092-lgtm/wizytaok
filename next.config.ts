@@ -16,6 +16,11 @@ const nextConfig: NextConfig = {
         destination: "/rezerwacje/:slug/success",
         permanent: true,
       },
+      {
+        source: "/rejestracja",
+        destination: "/signup",
+        permanent: false,
+      },
     ]
   },
 }

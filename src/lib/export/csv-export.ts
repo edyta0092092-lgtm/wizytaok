@@ -47,14 +47,12 @@ export type AppointmentCsvHeaders = {
   service: string
   status: string
   staff: string
-  source: string
 }
 
 export function buildAppointmentsCsv(
   rows: Appointment[],
   headers: AppointmentCsvHeaders,
   statusLabel: (s: AppointmentStatus) => string,
-  sourceCellLabel: (a: Appointment) => string,
   anyStaffLabel: string
 ): string {
   const head = csvAppendRow([
@@ -66,12 +64,10 @@ export function buildAppointmentsCsv(
     headers.service,
     headers.status,
     headers.staff,
-    headers.source,
   ])
   const body = rows
     .map((a) => {
       const { dateStr, timeStr } = utcIsoToLocalParts(a.startsAt)
-      const src = sourceCellLabel(a)
       return csvAppendRow([
         dateStr,
         timeStr,
@@ -81,7 +77,6 @@ export function buildAppointmentsCsv(
         a.serviceLabel,
         statusLabel(a.status),
         staffColumnValue(a, anyStaffLabel),
-        src,
       ])
     })
     .join("")

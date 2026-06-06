@@ -40,11 +40,9 @@ export function AppTopbar({
         </Button>
         {title ? (
           <div className="min-w-0 flex-1">
-            <h1 className="text-base font-semibold leading-tight tracking-tight text-foreground sm:text-[1.1rem]">
-              {title}
-            </h1>
+            <h1 className="text-panel-title">{title}</h1>
             {pageDescription ? (
-              <p className="mt-1 max-w-2xl text-xs leading-snug text-muted-foreground sm:text-[0.84rem] sm:leading-normal">
+              <p className="text-panel-caption mt-1 max-w-2xl sm:text-sm sm:leading-normal">
                 {pageDescription}
               </p>
             ) : null}

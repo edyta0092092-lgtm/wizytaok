@@ -21,13 +21,12 @@ export type StatisticsExportCopy = {
   kpi: {
     visitsToday: string
     visitsThisMonth: string
+    totalVisits: string
+    needsAction: string
     completed: string
     cancelled: string
     noShow: string
     newClients: string
-    onlineBookings: string
-    manualBookings: string
-    avgDailyVisits: string
   }
   notifications: {
     sms: string
@@ -56,13 +55,12 @@ function buildReportLines(
     copy.kpiSection,
     `${copy.kpi.visitsToday}: ${k.visitsToday}`,
     `${copy.kpi.visitsThisMonth}: ${k.visitsThisMonth}`,
+    `${copy.kpi.totalVisits}: ${k.totalVisits}`,
+    `${copy.kpi.needsAction}: ${k.needsAction}`,
     `${copy.kpi.completed}: ${k.completed}`,
     `${copy.kpi.cancelled}: ${k.cancelled}`,
     `${copy.kpi.noShow}: ${k.noShow}`,
     `${copy.kpi.newClients}: ${k.newClients}`,
-    `${copy.kpi.onlineBookings}: ${k.onlineBookings}`,
-    `${copy.kpi.manualBookings}: ${k.manualBookings}`,
-    `${copy.kpi.avgDailyVisits}: ${k.avgDailyVisits}`,
     "",
     copy.statusSection,
     ...dataset.statuses.map(

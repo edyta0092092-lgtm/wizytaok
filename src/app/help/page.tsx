@@ -676,21 +676,18 @@ function HelpPageContent() {
   return (
     <AppShell title={t("navigation.help")} pageDescription={t("help.description")}>
       <PageShell>
-        <section className="mb-6 rounded-2xl border border-border bg-card px-4 py-5 shadow-sm shadow-slate-900/5 sm:px-6">
-          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{t("help.title")}</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{t("help.heroDescription")}</p>
-          <div className="mt-4">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/guide">{t("help.openGuide")}</Link>
-            </Button>
-          </div>
-        </section>
-
         <section>
           <Card>
             <CardHeader>
-              <CardTitle>{t("help.supportChatTitle")}</CardTitle>
-              <CardDescription>{t("help.supportChatDescription")}</CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 space-y-1">
+                  <CardTitle>{t("help.supportChatTitle")}</CardTitle>
+                  <CardDescription>{t("help.supportChatDescription")}</CardDescription>
+                </div>
+                <Button asChild variant="outline" size="sm" className="shrink-0">
+                  <Link href="/guide">{t("help.openGuide")}</Link>
+                </Button>
+              </div>
               <p className="text-xs text-muted-foreground">{t("help.realtimeHint")}</p>
             </CardHeader>
             <CardContent className="space-y-4">

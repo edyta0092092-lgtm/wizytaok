@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 import { isValidPublicSlugFormat, normalizePublicSlug } from "@/lib/business/slug"
+import { tryAttachReferralForNewBusiness } from "@/lib/referrals/attach-referral-server"
 import type { Database } from "@/types/database"
 
 type EnsureProfileResult = {
@@ -219,6 +220,17 @@ export async function ensureBusinessProfileFromUserMetadata(
   const inserted = await insertBusinessProfileFromPlan(supabase, user.id, plan, allowFallbackProfile)
   if (inserted.ok) {
     businessProfileCreated = true
+    const { data: createdProfile } = await supabase
+      .from("business_profiles")
+      .select("id")
+      .eq("owner_id", user.id)
+      .maybeSingle()
+    if (createdProfile?.id) {
+      await tryAttachReferralForNewBusiness({
+        user,
+        referredBusinessId: createdProfile.id,
+      })
+    }
   } else {
     console.error("[ensureBusinessProfileFromUserMetadata] insert failed", inserted.message)
   }

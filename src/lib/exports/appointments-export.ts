@@ -5,7 +5,6 @@ import {
   utcIsoToLocalParts,
   type AppointmentCsvHeaders,
 } from "@/lib/export/csv-export"
-import { getBookingSourceLabel } from "@/lib/bookings/booking-source"
 import { downloadCsvTable, downloadExcelTable, type ExportTable } from "@/lib/exports/table-export"
 import { downloadPdfReport } from "@/lib/exports/pdf-simple"
 import type { Language } from "@/lib/i18n/dictionaries"
@@ -40,7 +39,6 @@ function buildAppointmentsTable(
       labels.service,
       labels.staff,
       labels.status,
-      labels.source,
     ],
     rows: rows.map((a) => {
       const { dateStr, timeStr } = utcIsoToLocalParts(a.startsAt)
@@ -53,7 +51,6 @@ function buildAppointmentsTable(
         a.serviceLabel,
         staffColumnValue(a, labels.anyStaff),
         statusLabel(a.status),
-        getBookingSourceLabel(a.source, language),
       ]
     }),
   }

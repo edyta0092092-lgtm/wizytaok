@@ -28,6 +28,10 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 import {
+  persistReferralCodeClient,
+  readReferralCodeClient,
+} from "@/lib/referrals/referral-storage-client"
+import {
   assertPasswordPolicy,
   getPasswordPolicyLiveHint,
   PASSWORD_POLICY_I18N,
@@ -42,6 +46,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
   const searchParams = useSearchParams()
   const { t } = useTranslations()
   const oauthErrorCode = searchParams.get("oauth_error")
+  const referralFromUrl = searchParams.get("ref") ?? searchParams.get("referral")
 
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -62,6 +67,10 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
       setOauthError(oauthErrorCode ? oauthErrorMessageFromCode(oauthErrorCode, t) : null)
     })
   }, [oauthErrorCode, t])
+
+  React.useEffect(() => {
+    persistReferralCodeClient(referralFromUrl)
+  }, [referralFromUrl])
 
   React.useEffect(() => {
     if (!startTrial) return
@@ -109,6 +118,16 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
     }
   }, [startTrial])
 
+  const persistSignupAttribution = React.useCallback(() => {
+    persistTrialIntent()
+    const storedReferral = readReferralCodeClient()
+    if (storedReferral) {
+      persistReferralCodeClient(storedReferral)
+    } else {
+      persistReferralCodeClient(referralFromUrl)
+    }
+  }, [persistTrialIntent, referralFromUrl])
+
   const passwordLiveHint = React.useMemo(() => {
     const v = getPasswordPolicyLiveHint(password)
     return v ? t(PASSWORD_POLICY_I18N[v]) : null
@@ -144,13 +163,18 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
 
     setLoading(true)
     try {
-      persistTrialIntent()
+      persistSignupAttribution()
+      const referralCode = readReferralCodeClient() ?? persistReferralCodeClient(referralFromUrl)
+      const signupMetadata: Record<string, unknown> = {}
+      if (startTrial) signupMetadata.trial_intent = true
+      if (referralCode) signupMetadata.referral_code = referralCode
+
       const { data: authData, error: signErr } = await client.auth.signUp({
         email: email.trim(),
         password,
         options: {
           emailRedirectTo: buildSignupConfirmationRedirectUrl(afterConfirmPath, window.location.origin),
-          data: startTrial ? { trial_intent: true } : undefined,
+          data: Object.keys(signupMetadata).length > 0 ? signupMetadata : undefined,
         },
       })
 
@@ -226,7 +250,7 @@ export function SignupForm({ startTrial = false }: SignupFormProps) {
             <OAuthProviderButtons
               next={startTrial ? "/start-trial" : "/settings?setup=business"}
               trialIntent={startTrial}
-              onBeforeSignIn={persistTrialIntent}
+              onBeforeSignIn={persistSignupAttribution}
               onError={handleOAuthError}
             />
             <form className="space-y-4" onSubmit={onSubmit}>

@@ -1,9 +1,8 @@
 import { LEGAL_BETA_OPERATOR_PUBLIC_NOTICE } from "@/content/legal/beta-notice"
 
-export const TERMS_DRAFT_BADGE =
-  "Dokument roboczy - wymaga uzupełnienia danych operatora przed startem komercyjnym"
+export const TERMS_DRAFT_BADGE = "Wersja beta"
 
-export const TERMS_DRAFT_VERSION = "Wersja robocza — okres testowy."
+export const TERMS_DRAFT_VERSION = "Obowiązuje w okresie wczesnego dostępu."
 
 export const TERMS_INTRO = [
   "Niniejszy Regulamin dotyczy korzystania z aplikacji WizytaOK w modelu usługi cyfrowej (SaaS).",

@@ -132,12 +132,14 @@ function compareBookings(a: CalendarEntry, b: CalendarEntry): number {
   return formatHm(a.appointment_time).localeCompare(formatHm(b.appointment_time))
 }
 
-function visitCountLabel(count: number): string {
-  if (count === 1) return "1 wizyta"
+function visitCountLabel(count: number, t: (key: string) => string): string {
+  if (count === 1) return t("schedule.visitCountOne")
   const mod10 = count % 10
   const mod100 = count % 100
-  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return `${count} wizyty`
-  return `${count} wizyt`
+  if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) {
+    return t("schedule.visitCountFew").replace("{count}", String(count))
+  }
+  return t("schedule.visitCountMany").replace("{count}", String(count))
 }
 
 const STATUS_MENU_ORDER: AppointmentStatus[] = ["confirmed", "no_show", "completed"]
@@ -412,7 +414,7 @@ export default function SchedulePage() {
   const goNext = () => setYm((p) => (p.month === 12 ? { year: p.year + 1, month: 1 } : { year: p.year, month: p.month + 1 }))
 
   return (
-    <AppShell title="Grafik" pageDescription="Rezerwacje w miesiącu">
+    <AppShell title={t("schedule.title")} pageDescription={t("schedule.monthBookingsDescription")}>
       <PageShell>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
@@ -429,7 +431,7 @@ export default function SchedulePage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="flex flex-col gap-1">
               <Label htmlFor="sch-person" className="text-xs text-muted-foreground">
-                Osoba
+                {t("schedule.filterPerson")}
               </Label>
               <select
                 id="sch-person"
@@ -437,7 +439,7 @@ export default function SchedulePage() {
                 value={personFilter}
                 onChange={(e) => setPersonFilter(e.target.value)}
               >
-                <option value="">Wszystkie osoby</option>
+                <option value="">{t("schedule.filterPersonAll")}</option>
                 {staffMembers.map((row) => (
                   <option key={row.id} value={row.id}>
                     {row.name}
@@ -455,9 +457,9 @@ export default function SchedulePage() {
         ) : null}
 
         {loading ? (
-          <p className="text-sm text-muted-foreground">Ładowanie danych...</p>
+          <p className="text-sm text-muted-foreground">{t("schedule.loadingData")}</p>
         ) : loadError ? (
-          <p className="text-sm text-destructive">Nie udało się załadować danych grafiku.</p>
+          <p className="text-sm text-destructive">{t("schedule.loadError")}</p>
         ) : (
           <>
             <div className="mb-1.5 hidden grid-cols-7 gap-1.5 text-center text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid">
@@ -493,7 +495,7 @@ export default function SchedulePage() {
                     className={cn(
                       "flex min-h-[6.75rem] flex-col rounded-xl border p-2 text-left shadow-sm transition-colors",
                       hasVisits
-                        ? "border-yellow-300/90 bg-yellow-50 hover:bg-yellow-100/90 dark:border-yellow-700 dark:bg-yellow-950/50 dark:hover:bg-yellow-950/70"
+                        ? "border-primary/25 bg-primary/5 hover:bg-primary/10 dark:border-primary/30 dark:bg-primary/10"
                         : "border-border/80 bg-card hover:bg-muted/25",
                       isToday && "ring-1 ring-primary/20",
                       isToday && (hasVisits ? "border-primary/35" : "border-primary/40"),
@@ -502,7 +504,7 @@ export default function SchedulePage() {
                     <div className="flex items-start justify-between gap-1.5">
                       <div className="min-w-0">
                         <p className="text-base font-semibold leading-tight text-foreground">{dayNum}</p>
-                        <p className="text-xs text-muted-foreground">{visitCountLabel(rows.length)}</p>
+                        <p className="text-xs text-muted-foreground">{visitCountLabel(rows.length, t)}</p>
                       </div>
                       {holidayLabel ? (
                         <span
@@ -515,7 +517,7 @@ export default function SchedulePage() {
                     </div>
                     <ul className="mt-1.5 space-y-1 overflow-hidden">
                       {preview.length === 0 ? (
-                        <li className="text-xs text-muted-foreground">Brak wizyt</li>
+                        <li className="text-xs text-muted-foreground">{t("schedule.emptyDayCell")}</li>
                       ) : (
                         preview.map((row) => (
                           <li
@@ -538,7 +540,9 @@ export default function SchedulePage() {
                         ))
                       )}
                       {more > 0 ? (
-                        <li className="text-xs font-medium text-primary">+{more} więcej</li>
+                        <li className="text-xs font-medium text-primary">
+                          {t("schedule.moreCount").replace("{count}", String(more))}
+                        </li>
                       ) : null}
                     </ul>
                   </button>
@@ -565,20 +569,20 @@ export default function SchedulePage() {
               )
             : ""
         }
-        visitSummary={visitCountLabel(detailRows.length)}
+        visitSummary={visitCountLabel(detailRows.length, t)}
         entries={detailRows}
         staffMembers={staffMembers}
         staffNameById={staffNameById}
         cancellingId={cancellingId}
         statusMenuOrder={STATUS_MENU_ORDER}
-        visitCountLabel={visitCountLabel}
+        visitCountLabel={(count) => visitCountLabel(count, t)}
         statusLabel={(status) =>
           t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")
         }
         changeStatusLabel={t("appointments.changeStatusAction")}
         cancelLabel={t("appointments.cancelVisit")}
         staffFallbackLabel={t("appointments.staffNotAssignedShort")}
-        emptyLabel="Brak zaplanowanych wizyt"
+        emptyLabel={t("schedule.emptyDayDetail")}
         actionNotice={statusNotice}
         onChangeStatus={changeScheduleBookingStatus}
         onCancelVisit={cancelScheduleVisit}

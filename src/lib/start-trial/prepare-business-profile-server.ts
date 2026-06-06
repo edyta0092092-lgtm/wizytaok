@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js"
 
 import { resolveRegisteredBusinessNipCollision } from "@/lib/business/registered-nip-collision-server"
+import { tryAttachReferralForNewBusiness } from "@/lib/referrals/attach-referral-server"
 import {
   insertBusinessProfileFromPlan,
   planBusinessProfileInsertFromUser,
@@ -517,6 +518,13 @@ export async function prepareBusinessProfileForStartTrial(): Promise<PrepareBusi
   const v = validateRowForCheckout(insertedRow)
   if (!v.ok) {
     return { ok: false, error: v.error }
+  }
+
+  if (created) {
+    await tryAttachReferralForNewBusiness({
+      user,
+      referredBusinessId: insertedRow.id,
+    })
   }
 
   return {

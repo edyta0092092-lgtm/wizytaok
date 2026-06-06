@@ -44,7 +44,6 @@ export function AppointmentsExportButton({ rows, className }: AppointmentsExport
       service: t("settings.csvColService"),
       status: t("settings.csvColStatus"),
       staff: t("settings.csvStaffCol"),
-      source: t("settings.csvColSource"),
       anyStaff: t("appointments.anyStaff"),
       filenameBase: "wizytaok-wizyty",
       pdfTitle: t("exports.appointmentsPdfTitle"),

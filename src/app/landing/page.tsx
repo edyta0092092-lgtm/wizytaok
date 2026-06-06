@@ -28,7 +28,7 @@ export default function WizytaOKLandingPage() {
     {
       icon: CalendarDays,
       title: "Dostępność i dni wolne",
-      text: "Ustawiasz godziny pracy, święta, urlopy, wyjątki i specjalne godziny.",
+      text: "Ustawiasz godziny pracy, święta, dni wolne, wyjątki i specjalne godziny.",
     },
     {
       icon: MessageSquare,
@@ -77,7 +77,7 @@ export default function WizytaOKLandingPage() {
     },
     {
       q: "Czy mogę ustawić dni wolne?",
-      a: "Tak. W kalendarzu wyjątków ustawisz święta, urlopy, dni nieczynne i specjalne godziny pracy.",
+      a: "Tak. W kalendarzu wyjątków ustawisz święta, dni wolne, dni nieczynne i specjalne godziny pracy.",
     },
   ];
 

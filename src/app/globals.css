@@ -207,4 +207,29 @@
   .premium-scrollbar::-webkit-scrollbar-corner {
     background: var(--scrollbar-track);
   }
+
+  /* Typografia panelu — jeden H1 w topbarze, reszta przez tokeny */
+  .text-panel-title {
+    @apply text-lg font-semibold leading-tight tracking-tight text-foreground;
+  }
+  .text-panel-section {
+    @apply text-base font-semibold leading-snug tracking-tight text-foreground;
+  }
+  .text-panel-body {
+    @apply text-sm leading-relaxed text-foreground;
+  }
+  .text-panel-muted {
+    @apply text-sm leading-relaxed text-muted-foreground;
+  }
+  .text-panel-caption {
+    @apply text-xs leading-snug text-muted-foreground;
+  }
+
+  /** Wewnętrzny odstęp sekcji panelu (karty, bloki bez CardHeader). */
+  .panel-inset {
+    @apply px-4 py-4;
+  }
+  .panel-inset-x {
+    @apply px-4;
+  }
 }

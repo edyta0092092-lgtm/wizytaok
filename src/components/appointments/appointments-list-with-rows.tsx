@@ -9,7 +9,6 @@ import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-sta
 import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import type { AppointmentsListFilter } from "@/lib/appointments/appointments-list-filters"
 import type { AppointmentsDayGroupFilter, AppointmentGroupKey } from "@/lib/appointments/appointments-grouping"
-import type { AppointmentsSourceFilter } from "@/lib/appointments/appointments-source-filter"
 import {
   buildAppointmentReminderSections,
   groupAppointmentReminderRowsByBookingId,
@@ -45,7 +44,6 @@ export type AppointmentsListPresentationBundle = {
   staffFilter: StaffAppointmentFilterValue
   listFilter: AppointmentsListFilter
   dayGroupFilter: AppointmentsDayGroupFilter
-  sourceFilter: AppointmentsSourceFilter
   formatWhen: (startsAt: string) => { date: string; time: string }
   reminderPanelLabels: AppointmentReminderPanelLabels
   listUiLanguage: "en" | "pl"
@@ -101,6 +99,7 @@ export type AppointmentsListWithRowsProps = {
   bookingPagePath: string
   hasActiveSecondaryFilters: boolean
   onClearSecondaryFilters: () => void
+  onAddManual: () => void
 }
 
 export function AppointmentsListWithRows({
@@ -111,6 +110,7 @@ export function AppointmentsListWithRows({
   bookingPagePath,
   hasActiveSecondaryFilters,
   onClearSecondaryFilters,
+  onAddManual,
 }: AppointmentsListWithRowsProps) {
   const {
     grouped,
@@ -118,7 +118,6 @@ export function AppointmentsListWithRows({
     staffFilter,
     listFilter,
     dayGroupFilter,
-    sourceFilter,
     formatWhen,
     reminderPanelLabels,
     listUiLanguage,
@@ -237,9 +236,9 @@ export function AppointmentsListWithRows({
         staffFilter={staffFilter}
         listFilter={listFilter}
         dayGroupFilter={dayGroupFilter}
-        sourceFilter={sourceFilter}
         hasActiveFilters={hasActiveSecondaryFilters}
         bookingPagePath={bookingPagePath}
+        onAddManual={onAddManual}
         onClearFilters={onClearSecondaryFilters}
       />
     )

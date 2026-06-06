@@ -40,7 +40,7 @@ export function OnboardingDashboardCard() {
   return (
     <Card className="overflow-hidden rounded-2xl border border-primary/15 bg-card shadow-sm shadow-slate-900/[0.04]">
       <div className="h-1 w-full bg-gradient-to-r from-primary/80 via-primary/50 to-transparent" />
-      <CardContent className="px-5 py-5 sm:px-6 sm:py-6">
+      <CardContent className="py-5 sm:py-6">
         <OnboardingPanel
           t={t}
           title={t(isAdmin ? "onboarding.cardTitle" : "onboarding.staffCardTitle")}

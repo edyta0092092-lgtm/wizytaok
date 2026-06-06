@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { ChevronRight, Mail, Phone } from "lucide-react"
 
-import { CustomerSegmentBadge } from "@/components/customers/customer-segment-badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { formatCustomerDate } from "@/lib/customers/format-customer-datetime"
 import type { CustomerCrmRow } from "@/lib/customers/customer-types"
@@ -23,7 +22,6 @@ export function CustomersList({ rows }: { rows: CustomerCrmRow[] }) {
               <th className="px-4 py-3 font-medium">{t("customers.tableVisits")}</th>
               <th className="px-4 py-3 font-medium">{t("customers.tableLastVisit")}</th>
               <th className="px-4 py-3 font-medium">{t("customers.tableNextVisit")}</th>
-              <th className="px-4 py-3 font-medium">{t("customers.tableSegment")}</th>
               <th className="w-10 px-2 py-3" aria-hidden />
             </tr>
           </thead>
@@ -43,9 +41,6 @@ export function CustomersList({ rows }: { rows: CustomerCrmRow[] }) {
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {row.nextVisitAt ? formatCustomerDate(row.nextVisitAt, language) : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <CustomerSegmentBadge segment={row.segment} />
                 </td>
                 <td className="px-2 py-3">
                   <Link
@@ -67,10 +62,7 @@ export function CustomersList({ rows }: { rows: CustomerCrmRow[] }) {
           <Link key={row.id} href={`/klienci/${encodeURIComponent(row.id)}`} className="block">
             <Card className="rounded-2xl border border-border shadow-sm transition-colors hover:border-primary/30 hover:bg-muted/20">
               <CardContent className="space-y-3 p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-foreground">{row.fullName}</p>
-                  <CustomerSegmentBadge segment={row.segment} />
-                </div>
+                <p className="font-semibold text-foreground">{row.fullName}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   {row.phone ? (
                     <span className="inline-flex items-center gap-1">

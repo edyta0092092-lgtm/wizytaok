@@ -275,10 +275,12 @@ export function AppointmentListRow({
         {row.id.startsWith("sb-") && reminderSections.length === 0 && reminderNoRowsMessage ? (
           <p className="text-xs text-muted-foreground">{reminderNoRowsMessage}</p>
         ) : null}
-        {row.id.startsWith("sb-") && row.status !== "cancelled" ? (
-          <SendCustomMessageButton appointmentId={row.id} />
-        ) : null}
       </div>
+    ) : null
+
+  const messageFooterSlot =
+    row.id.startsWith("sb-") && row.status !== "cancelled" ? (
+      <SendCustomMessageButton appointmentId={row.id} />
     ) : null
 
   return (
@@ -306,6 +308,7 @@ export function AppointmentListRow({
           onDeleteConfirm={onDeleteConfirm}
           isDeletingAppointment={isDeletingAppointment}
           detailsSlot={detailsSlot}
+          footerSlot={messageFooterSlot}
         />
       </div>
 

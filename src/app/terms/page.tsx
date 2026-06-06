@@ -32,10 +32,9 @@ export default function TermsPage() {
 
         <div
           role="status"
-          className="rounded-2xl border border-amber-500/35 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-50"
+          className="rounded-2xl border border-border/80 bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
         >
-          {LEGAL_BETA_OPERATOR_PUBLIC_NOTICE} Niniejszy dokument ma charakter roboczy — przed uruchomieniem
-          komercyjnym zostanie poddana weryfikacji prawnej.
+          {LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}
         </div>
 
         <div className="space-y-3 rounded-2xl border border-border/80 bg-card/80 p-5 text-sm text-muted-foreground shadow-sm">
@@ -71,7 +70,7 @@ export default function TermsPage() {
               <Link href="/privacy">Polityka prywatności</Link>
             </Button>
             <Button asChild variant="ghost" className="h-10 rounded-xl">
-              <Link href="/developer-contact">Kontakt techniczny</Link>
+              <Link href="/developer-contact">Kontakt</Link>
             </Button>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">{LEGAL_BETA_OPERATOR_PUBLIC_NOTICE}</p>

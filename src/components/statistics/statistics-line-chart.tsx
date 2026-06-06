@@ -21,14 +21,14 @@ import { cn } from "@/lib/utils"
 
 export type StatisticsMonthOption = { value: StatisticsRange; label: string }
 
-type SeriesKey = "scheduled" | "completed" | "cancelled" | "noShow"
+type SeriesKey = "needsAction" | "completed" | "cancelled" | "noShow"
 
 const SERIES: Array<{
   key: SeriesKey
   dataKey: SeriesKey
   fill: string
 }> = [
-  { key: "scheduled", dataKey: "scheduled", fill: "#0d9488" },
+  { key: "needsAction", dataKey: "needsAction", fill: "#8b5cf6" },
   { key: "completed", dataKey: "completed", fill: "#10b981" },
   { key: "cancelled", dataKey: "cancelled", fill: "#f59e0b" },
   { key: "noShow", dataKey: "noShow", fill: "#f43f5e" },
@@ -45,7 +45,7 @@ type ChartCopy = {
   title: string
   subtitle: string
   ranges: Record<StatisticsPresetRange, string>
-  series: Record<SeriesKey | "created", string>
+  series: Record<SeriesKey, string>
   total: string
   empty: string
   monthPlaceholder: string
@@ -76,24 +76,18 @@ export function StatisticsLineChart({
 }) {
   const isMonthRange = range.startsWith("month:")
   const isYearRange = range.startsWith("year:")
-  const chartData = points.map((point) => {
-    const scheduled = Math.max(
-      0,
-      point.created - point.completed - point.cancelled - point.noShow,
-    )
-    return {
-      label: point.label,
-      created: point.created,
-      scheduled,
-      completed: point.completed,
-      cancelled: point.cancelled,
-      noShow: point.noShow,
-    }
-  })
+  const chartData = points.map((point) => ({
+    label: point.label,
+    needsAction: point.needsAction,
+    completed: point.completed,
+    cancelled: point.cancelled,
+    noShow: point.noShow,
+    total: point.needsAction + point.completed + point.cancelled + point.noShow,
+  }))
   const tickInterval = xAxisTickInterval(chartData.length)
 
   return (
-    <Card className="rounded-2xl border-border/60 bg-card shadow-sm shadow-slate-900/[0.04]">
+    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
       <CardHeader className="gap-3 px-5 sm:flex sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="text-base">{copy.title}</CardTitle>
@@ -175,6 +169,21 @@ export function StatisticsLineChart({
           </div>
         ) : (
           <div className="rounded-2xl border border-border/70 bg-muted/15 px-2 py-4 sm:px-4">
+            <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1.5 px-1">
+              {SERIES.map((series) => (
+                <span
+                  key={series.key}
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                  <span
+                    className="size-2.5 shrink-0 rounded-sm"
+                    style={{ backgroundColor: series.fill }}
+                    aria-hidden
+                  />
+                  {copy.series[series.key]}
+                </span>
+              ))}
+            </div>
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -225,16 +234,10 @@ export function StatisticsLineChart({
                           <div className="mb-2 flex items-center justify-between gap-4 border-b border-border/60 pb-2">
                             <span className="text-muted-foreground">{copy.total}</span>
                             <span className="font-semibold tabular-nums text-foreground">
-                              {row.created}
+                              {row.total}
                             </span>
                           </div>
                           <ul className="space-y-1">
-                            <li className="flex items-center justify-between gap-4">
-                              <span className="text-muted-foreground">{copy.series.created}</span>
-                              <span className="font-semibold tabular-nums text-foreground">
-                                {row.created}
-                              </span>
-                            </li>
                             {SERIES.map((series) => (
                               <li
                                 key={series.key}
@@ -266,10 +269,8 @@ export function StatisticsLineChart({
                       name={copy.series[series.key]}
                       stackId="visits"
                       fill={series.fill}
-                      radius={
-                        index === SERIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]
-                      }
-                      maxBarSize={36}
+                      maxBarSize={28}
+                      radius={index === SERIES.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                     />
                   ))}
                 </BarChart>
