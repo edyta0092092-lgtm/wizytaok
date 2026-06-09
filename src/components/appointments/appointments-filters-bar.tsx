@@ -93,7 +93,7 @@ export function AppointmentsFiltersBar({
               value={clientNameFilter}
               onChange={(e) => onClientNameFilterChange(e.target.value)}
               placeholder={t("appointments.clientNameFilterPlaceholder")}
-              className="h-9 rounded-xl"
+              className="h-11 touch-manipulation rounded-xl sm:h-9"
             />
           </div>
           <div className="min-w-0">
@@ -108,7 +108,7 @@ export function AppointmentsFiltersBar({
               value={serviceFilter}
               onChange={(e) => onServiceFilterChange(e.target.value)}
               wrapperClassName="w-full"
-              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+              className="h-11 w-full touch-manipulation rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5 sm:h-9"
             >
               <option value="">{t("appointments.serviceFilterAll")}</option>
               {serviceOptions.map((serviceName) => (
@@ -128,7 +128,7 @@ export function AppointmentsFiltersBar({
             <NativeSelect
               id="appointments-staff-filter"
               wrapperClassName="w-full"
-              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+              className="h-11 w-full touch-manipulation rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5 sm:h-9"
               disabled={staffLoading || staffLoadError}
               value={staffFilter}
               onChange={(e) =>
@@ -162,7 +162,7 @@ export function AppointmentsFiltersBar({
                 onDayGroupFilterChange(e.target.value as AppointmentsDayGroupFilter)
               }
               wrapperClassName="w-full"
-              className="h-9 w-full rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5"
+              className="h-11 w-full touch-manipulation rounded-xl border border-border bg-background px-3 text-sm shadow-sm shadow-slate-900/5 sm:h-9"
             >
               {APPOINTMENTS_DAY_GROUP_FILTERS.map((value) => (
                 <option key={value} value={value}>
@@ -176,7 +176,7 @@ export function AppointmentsFiltersBar({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-9 shrink-0 self-start rounded-xl sm:self-end"
+              className="h-11 shrink-0 touch-manipulation self-start rounded-xl sm:h-9 sm:self-end"
               onClick={onClearFilters}
             >
               {t("appointments.clearFiltersAction")}
@@ -192,7 +192,7 @@ export function AppointmentsFiltersBar({
               size="sm"
               variant={filter === value ? "default" : "outline"}
               className={cn(
-                "h-9 rounded-full px-4 text-sm",
+                "h-11 touch-manipulation rounded-full px-4 text-sm sm:h-9",
                 filter === value && "shadow-sm",
               )}
               onClick={() => onFilterChange(value)}

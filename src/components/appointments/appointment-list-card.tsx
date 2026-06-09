@@ -151,7 +151,7 @@ export function AppointmentListCard({
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium"
+                  className="inline-flex h-11 touch-manipulation items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium sm:h-9"
                   onClick={onQuickCancelDismiss}
                   disabled={isCancellingVisit}
                 >
@@ -159,7 +159,7 @@ export function AppointmentListCard({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground"
+                  className="inline-flex h-11 touch-manipulation items-center justify-center rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground sm:h-9"
                   onClick={onQuickCancelConfirm}
                   disabled={isCancellingVisit}
                 >
@@ -182,7 +182,7 @@ export function AppointmentListCard({
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm"
+                  className="inline-flex h-11 touch-manipulation items-center justify-center rounded-xl border border-border bg-background px-4 text-sm sm:h-9"
                   onClick={onDeleteConfirmDismiss}
                   disabled={isDeletingAppointment}
                 >
@@ -190,7 +190,7 @@ export function AppointmentListCard({
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-9 items-center justify-center rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground"
+                  className="inline-flex h-11 touch-manipulation items-center justify-center rounded-xl bg-destructive px-4 text-sm font-medium text-destructive-foreground sm:h-9"
                   onClick={onDeleteConfirm}
                   disabled={isDeletingAppointment}
                 >

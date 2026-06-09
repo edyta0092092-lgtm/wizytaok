@@ -32,7 +32,7 @@ export function AppTopbar({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-9 shrink-0 text-muted-foreground hover:text-foreground lg:hidden"
+          className="size-11 shrink-0 touch-manipulation text-muted-foreground hover:text-foreground lg:hidden lg:size-9"
           onClick={onMenuClick}
           aria-label="Menu"
         >

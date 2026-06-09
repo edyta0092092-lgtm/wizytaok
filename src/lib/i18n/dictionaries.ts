@@ -262,6 +262,17 @@ export const dictionaries = {
       footerPrivacy: "Polityka prywatności",
       footerContact: "Kontakt",
     },
+    pwa: {
+      installTitle: "Zainstaluj WizytaOK na telefonie",
+      installDescription:
+        "Szybszy dostęp do planu dnia, wizyt i grafiku z ekranu głównego.",
+      installButton: "Dodaj do ekranu",
+      installDismiss: "Nie teraz",
+      iosTitle: "Dodaj na iPhone",
+      iosStep1: "W Safari dotknij ikony udostępniania.",
+      iosStep2: "Wybierz „Dodaj do ekranu początkowego”.",
+      bottomNavAria: "Główna nawigacja",
+    },
     roles: {
       administrator: "Administrator",
       staff: "Obsługa",
@@ -3795,6 +3806,17 @@ Pozdrawiamy,
       footerTerms: "Terms",
       footerPrivacy: "Privacy policy",
       footerContact: "Contact",
+    },
+    pwa: {
+      installTitle: "Install WizytaOK on your phone",
+      installDescription:
+        "Quick access to your day plan, appointments and schedule from the home screen.",
+      installButton: "Add to home screen",
+      installDismiss: "Not now",
+      iosTitle: "Add on iPhone",
+      iosStep1: "In Safari, tap the share icon.",
+      iosStep2: 'Choose "Add to Home Screen".',
+      bottomNavAria: "Main navigation",
     },
     roles: {
       administrator: "Administrator",

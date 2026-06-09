@@ -6,6 +6,8 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AppTopbar } from "@/components/layout/app-topbar"
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
+import { PwaInstallBanner } from "@/components/pwa/pwa-install-banner"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useDeferUntilIdle } from "@/lib/react/use-defer-until-idle"
@@ -175,9 +177,13 @@ export function AppShell({
           primaryAction={primaryAction}
           onMenuClick={() => setMobileOpen(true)}
         />
-        <div className="mx-auto w-full max-w-[1320px] flex-1 px-5 pb-10 pt-5 sm:px-6 lg:px-10">
+        <div className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-4 sm:px-6 sm:pt-5 lg:px-10 lg:pb-10">
           {children}
         </div>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col lg:hidden">
+        <PwaInstallBanner />
+        <MobileBottomNav />
       </div>
       <DeferredHelpFloatingWidget />
     </div>

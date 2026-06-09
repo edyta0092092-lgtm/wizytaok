@@ -67,7 +67,7 @@ function MiniStat({
   return (
     <Link
       href={href}
-      className="flex h-full min-h-[5.25rem] flex-col rounded-2xl border border-border bg-card px-3.5 py-3 shadow-sm shadow-slate-900/5 outline-none transition-colors hover:border-primary/40 hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex h-full min-h-[5.75rem] touch-manipulation flex-col rounded-2xl border border-border bg-card px-3.5 py-3.5 shadow-sm shadow-slate-900/5 outline-none transition-colors hover:border-primary/40 hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[5.25rem] sm:py-3"
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -459,7 +459,7 @@ export default function DashboardPage() {
                     const visitLocked = isAppointmentVisitLocked(row.status)
                     const statusOptions = APPOINTMENT_ROW_STATUS_ORDER.filter((s) => s !== row.status)
                     return (
-                      <li key={row.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                      <li key={row.id} className="flex items-start justify-between gap-3 px-4 py-3.5 sm:py-3">
                         <div className="flex min-w-0 gap-3">
                           <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-muted px-3 text-xs font-semibold tabular-nums text-primary">
                             {timeFmt.format(when)}
@@ -489,7 +489,12 @@ export default function DashboardPage() {
                           {!visitLocked && statusOptions.length > 0 ? (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button type="button" variant="outline" size="sm" className="h-8">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-10 min-w-[2.75rem] rounded-xl px-3 text-xs sm:h-8"
+                                >
                                   {t("appointments.changeStatusAction")}
                                 </Button>
                               </DropdownMenuTrigger>

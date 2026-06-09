@@ -418,13 +418,27 @@ export default function SchedulePage() {
       <PageShell>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goPrev}>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-11 touch-manipulation rounded-xl sm:size-9"
+              onClick={goPrev}
+              aria-label={t("schedule.prevMonth")}
+            >
               <ChevronLeft className="size-4" />
             </Button>
             <p className="min-w-[12rem] text-center text-sm font-semibold capitalize">
               {formatters.monthYear.format(new Date(ym.year, ym.month - 1, 1))}
             </p>
-            <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={goNext}>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-11 touch-manipulation rounded-xl sm:size-9"
+              onClick={goNext}
+              aria-label={t("schedule.nextMonth")}
+            >
               <ChevronRight className="size-4" />
             </Button>
           </div>
@@ -435,7 +449,7 @@ export default function SchedulePage() {
               </Label>
               <select
                 id="sch-person"
-                className="h-9 min-w-[12rem] rounded-md border border-input bg-background px-2 text-sm"
+                className="h-11 min-w-[12rem] touch-manipulation rounded-xl border border-input bg-background px-3 text-sm sm:h-9 sm:rounded-md sm:px-2"
                 value={personFilter}
                 onChange={(e) => setPersonFilter(e.target.value)}
               >
@@ -493,7 +507,7 @@ export default function SchedulePage() {
                     key={key}
                     onClick={() => setDetailDate(key)}
                     className={cn(
-                      "flex min-h-[6.75rem] flex-col rounded-xl border p-2 text-left shadow-sm transition-colors",
+                      "flex min-h-[7.25rem] touch-manipulation flex-col rounded-xl border p-3 text-left shadow-sm transition-colors md:min-h-[6.75rem] md:p-2",
                       hasVisits
                         ? "border-primary/25 bg-primary/5 hover:bg-primary/10 dark:border-primary/30 dark:bg-primary/10"
                         : "border-border/80 bg-card hover:bg-muted/25",

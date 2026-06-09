@@ -17,13 +17,13 @@ const actionBarClassName =
   "flex w-full min-w-0 flex-wrap items-stretch gap-2 sm:items-center sm:justify-end"
 
 const outlineActionClassName =
-  "h-9 min-h-9 w-full shrink-0 select-none justify-center rounded-xl whitespace-nowrap active:bg-muted active:text-foreground sm:w-auto"
+  "h-11 min-h-11 w-full shrink-0 touch-manipulation select-none justify-center rounded-xl whitespace-nowrap active:bg-muted active:text-foreground sm:h-9 sm:min-h-9 sm:w-auto"
 
 const cancelActionClassName =
-  "h-9 min-h-9 w-full shrink-0 select-none justify-center rounded-xl whitespace-nowrap border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+  "h-11 min-h-11 w-full shrink-0 touch-manipulation select-none justify-center rounded-xl whitespace-nowrap border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-9 sm:min-h-9 sm:w-auto"
 
 const deleteActionClassName =
-  "h-9 min-h-9 w-full shrink-0 select-none justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive sm:w-auto [&_svg]:size-3.5"
+  "h-11 min-h-11 w-full shrink-0 touch-manipulation select-none justify-center gap-1.5 rounded-xl whitespace-nowrap text-muted-foreground hover:bg-destructive/10 hover:text-destructive active:bg-destructive/10 active:text-destructive sm:h-9 sm:min-h-9 sm:w-auto [&_svg]:size-3.5"
 
 export type AppointmentRowActionsProps = {
   status: AppointmentStatus

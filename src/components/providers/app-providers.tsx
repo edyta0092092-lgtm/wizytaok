@@ -7,6 +7,7 @@ import { BusinessAccessProvider } from "@/lib/auth/business-access-context"
 import { PreferencesProvider } from "@/lib/preferences/preferences-provider"
 import { useDeferUntilIdle } from "@/lib/react/use-defer-until-idle"
 import { OnboardingProvider } from "@/lib/onboarding/onboarding-provider"
+import { PwaServiceWorker } from "@/components/pwa/pwa-service-worker"
 
 const OnboardingWelcomeLazy = dynamic(
   () =>
@@ -40,6 +41,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <PreferencesProvider>
       <BusinessAccessProvider>
         <OnboardingProvider>
+          <PwaServiceWorker />
           {children}
           <DeferredOnboardingUi />
         </OnboardingProvider>

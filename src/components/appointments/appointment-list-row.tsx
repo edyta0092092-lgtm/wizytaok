@@ -242,7 +242,7 @@ export function AppointmentListRow({
         (staffByService[row.serviceId]?.length ?? 0) >= 1 ? (
           <NativeSelect
             wrapperClassName="max-w-full"
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+            className="h-11 touch-manipulation rounded-md border border-border bg-background px-2 text-xs sm:h-8"
             value={row.staffId ?? ""}
             onChange={(e) => onStaffChange(e.target.value)}
             aria-label={t("appointments.manualStaffField")}
@@ -490,7 +490,7 @@ export function AppointmentListRow({
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-2">
-                      <Button asChild type="button" variant="outline" size="sm" className="h-8 rounded-lg">
+                      <Button asChild type="button" variant="outline" size="sm" className="h-11 touch-manipulation rounded-lg sm:h-8">
                         <a href={attachment.dataUrl} download={attachment.name}>
                           {t("appointments.attachmentDownload")}
                         </a>
@@ -499,7 +499,7 @@ export function AppointmentListRow({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        className="h-11 touch-manipulation rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive sm:h-8"
                         onClick={() =>
                           setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))
                         }
@@ -527,7 +527,7 @@ export function AppointmentListRow({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="h-9 rounded-xl"
+                  className="h-11 touch-manipulation rounded-xl sm:h-9"
                   onClick={onCancelVisitConfirm}
                   disabled={isCancellingVisit}
                 >
@@ -537,7 +537,7 @@ export function AppointmentListRow({
                   type="button"
                   size="sm"
                   variant="destructive"
-                  className="h-9 rounded-xl"
+                  className="h-11 touch-manipulation rounded-xl sm:h-9"
                   onClick={onRemoveVisitConfirm}
                   disabled={isCancellingVisit}
                 >
@@ -554,7 +554,7 @@ export function AppointmentListRow({
               type="button"
               variant="destructive"
               size="sm"
-              className="h-9 w-full rounded-xl sm:w-auto"
+              className="h-11 w-full touch-manipulation rounded-xl sm:h-9 sm:w-auto"
               disabled={
                 isCancellingVisit || row.status === "cancelled" || confirmCancelVisitOpen
               }
@@ -567,7 +567,7 @@ export function AppointmentListRow({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="h-9 rounded-xl"
+                className="h-11 touch-manipulation rounded-xl sm:h-9"
                 disabled={isSavingDirectEdit || isCancellingVisit}
                 onClick={onCloseEditPanel}
               >
@@ -577,7 +577,7 @@ export function AppointmentListRow({
                 type="button"
                 variant="default"
                 size="sm"
-                className="h-9 rounded-xl"
+                className="h-11 touch-manipulation rounded-xl sm:h-9"
                 onClick={onSaveEdit}
                 disabled={saveEditDisabled}
               >

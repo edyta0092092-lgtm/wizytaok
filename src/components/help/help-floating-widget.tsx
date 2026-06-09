@@ -14,6 +14,8 @@ const HIDE_PREFIXES = ["/rezerwacje/", "/book/", "/confirm/"]
 const PANEL_PREFIXES = [
   "/dashboard",
   "/appointments",
+  "/schedule",
+  "/statystyki",
   "/services",
   "/team",
   "/availability",
@@ -64,7 +66,7 @@ export function HelpFloatingWidget() {
         title={t("navigation.help")}
         aria-label={t("navigation.help")}
         onClick={openHelp}
-        className="fixed bottom-5 right-5 z-40 inline-flex size-11 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg shadow-slate-900/15 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg shadow-slate-900/15 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:bottom-5 lg:right-5 lg:size-11"
       >
         <HelpCircle className="size-5" aria-hidden />
       </button>
