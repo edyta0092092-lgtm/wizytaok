@@ -75,9 +75,12 @@ export function DashboardTodayList({
               const visitLocked = isAppointmentVisitLocked(row.status)
               const statusOptions = APPOINTMENT_ROW_STATUS_ORDER.filter((s) => s !== row.status)
               return (
-                <li key={row.id} className="flex items-start justify-between gap-3 px-4 py-3.5 sm:py-3">
+                <li
+                  key={row.id}
+                  className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:py-3"
+                >
                   <div className="flex min-w-0 gap-3">
-                    <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-muted px-3 text-xs font-semibold tabular-nums text-primary">
+                    <span className="inline-flex h-8 shrink-0 items-center rounded-full bg-muted px-3 text-xs font-semibold tabular-nums text-primary sm:h-7">
                       {timeFmt.format(when)}
                     </span>
                     <div className="min-w-0">
@@ -89,7 +92,7 @@ export function DashboardTodayList({
                       <AppointmentStaffCaption appointment={row} variant="compact" className="mt-0.5" />
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-start gap-2 pt-0.5">
+                  <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:pt-0.5">
                     <StatusBadge
                       status={row.status}
                       needsAction={appointmentShowsNeedsActionStatus(row, currentTime)}
@@ -101,7 +104,7 @@ export function DashboardTodayList({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-10 min-w-[2.75rem] rounded-xl px-3 text-xs sm:h-8"
+                            className="h-11 min-h-11 flex-1 rounded-xl px-3 text-xs sm:h-8 sm:min-h-0 sm:flex-none"
                           >
                             {t("appointments.changeStatusAction")}
                           </Button>

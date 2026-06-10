@@ -35,8 +35,6 @@ export type CustomerCrmRow = {
 export type CustomerKpis = {
   totalCustomers: number
   newThisMonth: number
-  returning: number
-  lost: number
 }
 
 export type CustomerSegmentFilter = CustomerSegment | "all"

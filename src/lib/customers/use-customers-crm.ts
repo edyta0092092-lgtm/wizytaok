@@ -26,8 +26,6 @@ export function useCustomersCrm(businessId: string | null | undefined): Customer
   const [kpis, setKpis] = React.useState<CustomerKpis>({
     totalCustomers: 0,
     newThisMonth: 0,
-    returning: 0,
-    lost: 0,
   })
   const [reloadToken, setReloadToken] = React.useState(0)
 
@@ -43,7 +41,7 @@ export function useCustomersCrm(businessId: string | null | undefined): Customer
     if (!businessId) {
       queueMicrotask(() => {
         setRows([])
-        setKpis({ totalCustomers: 0, newThisMonth: 0, returning: 0, lost: 0 })
+        setKpis({ totalCustomers: 0, newThisMonth: 0 })
         setReady(true)
         setLoadError(false)
       })
@@ -81,7 +79,7 @@ export function useCustomersCrm(businessId: string | null | undefined): Customer
         if (!cancelled) {
           setLoadError(true)
           setRows([])
-          setKpis({ totalCustomers: 0, newThisMonth: 0, returning: 0, lost: 0 })
+          setKpis({ totalCustomers: 0, newThisMonth: 0 })
         }
       } finally {
         if (!cancelled) setReady(true)

@@ -1,80 +1,80 @@
 "use client"
 
-import Link from "next/link"
-import { AlertTriangle } from "lucide-react"
-
-import { DashboardMobileNextAppointment } from "@/components/dashboard/dashboard-mobile-next-appointment"
-import { DashboardMobileStatTiles } from "@/components/dashboard/dashboard-mobile-stat-tiles"
-import { DashboardMobileUpcomingList } from "@/components/dashboard/dashboard-mobile-upcoming-list"
-import { useDashboardUnreadMessagesCount } from "@/lib/dashboard/use-dashboard-unread-messages-count"
-import { useTranslations } from "@/lib/i18n/use-translations"
-import type { Appointment } from "@/types/domain"
+import { DashboardDayHero } from "@/components/dashboard/dashboard-day-hero"
+import { DashboardDayStatsRow } from "@/components/dashboard/dashboard-day-stats-row"
+import { DashboardTodayList } from "@/components/dashboard/dashboard-today-list"
+import { DashboardTipCard } from "@/components/dashboard/dashboard-tip-card"
+import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
+import type { Language } from "@/lib/i18n/dictionaries"
+import type { Appointment, AppointmentStatus } from "@/types/domain"
 
 type DashboardMobileViewProps = {
-  businessId: string | null | undefined
-  daySummary: string
-  problemsCount: number
+  statsContextState: "login_required" | "no_data" | null
   statsReady: boolean
-  todayCount: number
-  nextAppointment: Appointment | null
+  statsError: string | null
+  visitsTodayCount: number
+  language: Language
+  confirmedToday: number
+  cancelledToday: number
+  completedToday: number
   todaysListSorted: Appointment[]
+  loadError: boolean
   currentTime: Date
   timeFmt: Intl.DateTimeFormat
+  onChangeStatus: (
+    appointmentId: string,
+    currentStatus: AppointmentStatus,
+    nextStatus: AppointmentStatus,
+  ) => void
 }
 
 export function DashboardMobileView({
-  businessId,
-  daySummary,
-  problemsCount,
+  statsContextState,
   statsReady,
-  todayCount,
-  nextAppointment,
+  statsError,
+  visitsTodayCount,
+  language,
+  confirmedToday,
+  cancelledToday,
+  completedToday,
   todaysListSorted,
+  loadError,
   currentTime,
   timeFmt,
+  onChangeStatus,
 }: DashboardMobileViewProps) {
-  const { t } = useTranslations()
-  const { count: unreadMessagesCount, loading: messagesLoading } =
-    useDashboardUnreadMessagesCount(businessId)
-
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{t("navigation.today")}</h1>
-        <p className="text-sm text-muted-foreground">{daySummary}</p>
-      </header>
-
-      {statsReady && problemsCount > 0 ? (
-        <Link
-          href="/appointments?filter=needs_action"
-          className="flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100"
-        >
-          <AlertTriangle className="size-4 shrink-0" aria-hidden />
-          <span>{t("dashboard.daySummaryProblems").replace("{count}", String(problemsCount))}</span>
-        </Link>
-      ) : null}
-
-      <DashboardMobileNextAppointment
-        appointment={nextAppointment}
-        currentTime={currentTime}
-        loading={!statsReady}
-        timeFmt={timeFmt}
+      <DashboardDayHero
+        statsContextState={statsContextState}
+        statsReady={statsReady}
+        statsError={statsError}
+        visitsTodayCount={visitsTodayCount}
+        language={language}
+        layout="stacked"
+        statsSlot={
+          <DashboardDayStatsRow
+            statsContextState={statsContextState}
+            statsReady={statsReady}
+            statsError={statsError}
+            confirmed={confirmedToday}
+            cancelled={cancelledToday}
+            completed={completedToday}
+          />
+        }
       />
 
-      <DashboardMobileStatTiles
-        todayCount={todayCount}
-        unreadMessagesCount={unreadMessagesCount}
-        statsLoading={!statsReady}
-        messagesLoading={messagesLoading}
-      />
-
-      <DashboardMobileUpcomingList
+      <DashboardTodayList
         rows={todaysListSorted}
-        excludeId={nextAppointment?.id}
-        currentTime={currentTime}
         loading={!statsReady}
+        loadError={loadError}
+        currentTime={currentTime}
         timeFmt={timeFmt}
+        onChangeStatus={onChangeStatus}
       />
+
+      <OnboardingDashboardCard />
+      <DashboardTipCard />
     </div>
   )
 }

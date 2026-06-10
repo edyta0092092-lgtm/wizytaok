@@ -66,8 +66,6 @@ export function CustomersPage() {
     () => ({
       total: t("customers.kpi.total"),
       newThisMonth: t("customers.kpi.newThisMonth"),
-      returning: t("customers.kpi.returning"),
-      lost: t("customers.kpi.lost"),
     }),
     [t],
   )
@@ -109,8 +107,15 @@ export function CustomersPage() {
         {listSection}
       </div>
 
-      {/* Mobile: wyszukiwarka (sticky) → lista → KPI */}
+      {/* Mobile: KPI → wyszukiwarka (sticky) → lista */}
       <div className="flex flex-col gap-4 md:hidden">
+        <CustomersKpiGrid
+          kpis={kpis}
+          copy={kpiCopy}
+          className="grid-cols-2 gap-2.5"
+          cardClassName="min-h-[5.5rem] touch-manipulation"
+        />
+
         <div
           className={cn(
             "sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-md",
@@ -121,10 +126,6 @@ export function CustomersPage() {
         </div>
 
         {listSection}
-
-        <div className="border-t border-border/70 pt-1">
-          <CustomersKpiGrid kpis={kpis} copy={kpiCopy} className="grid-cols-2" />
-        </div>
       </div>
     </div>
   )

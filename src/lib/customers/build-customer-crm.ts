@@ -126,12 +126,8 @@ export function buildCustomerKpis(rows: CustomerCrmRow[], now: Date = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
   let newThisMonth = 0
-  let returning = 0
-  let lost = 0
 
   for (const row of rows) {
-    if (row.segment === "returning") returning += 1
-    if (row.segment === "lost") lost += 1
     if (row.firstVisitAt) {
       const first = new Date(row.firstVisitAt)
       if (first >= monthStart && first <= now) newThisMonth += 1
@@ -141,7 +137,5 @@ export function buildCustomerKpis(rows: CustomerCrmRow[], now: Date = new Date()
   return {
     totalCustomers: rows.length,
     newThisMonth,
-    returning,
-    lost,
   }
 }

@@ -121,7 +121,7 @@ export async function getTodayDashboardStats(businessId: string): Promise<TodayD
     ).length
   }
 
-  const requiresActionCount = reminderErrorsCount
+  const requiresActionCount = pendingTodayCount + reminderErrorsCount
 
   return {
     confirmedTodayCount,

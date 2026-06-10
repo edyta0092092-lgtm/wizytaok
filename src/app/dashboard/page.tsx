@@ -1,19 +1,17 @@
 ﻿"use client"
 
 import * as React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, Sparkles } from "lucide-react"
 
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
+import { DashboardDayHero } from "@/components/dashboard/dashboard-day-hero"
+import { DashboardDayStatsRow } from "@/components/dashboard/dashboard-day-stats-row"
 import { DashboardMobileView } from "@/components/dashboard/dashboard-mobile-view"
-import { DashboardSmsAlert } from "@/components/dashboard/dashboard-sms-alert"
+import { DashboardTipCard } from "@/components/dashboard/dashboard-tip-card"
 import { DashboardTodayList } from "@/components/dashboard/dashboard-today-list"
 import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   APPOINTMENTS_PANEL_DISMISSED_EVENT,
   filterDismissedAppointments,
@@ -24,44 +22,14 @@ import {
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
 import { appointmentsManualCreateHref } from "@/lib/appointments/appointments-manual-create-path"
+import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
-import { formatTodayAppointmentsLabel } from "@/lib/dashboard/today-appointments-label"
 import { getAppToday } from "@/lib/date/current-date"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { AppointmentStatus } from "@/types/domain"
-
-const DASHBOARD_TIP_COUNT = 16
-const TERMINAL_STATUSES = new Set<AppointmentStatus>(["cancelled", "completed", "no_show"])
-
-function TipCard() {
-  const { t } = useTranslations()
-  const [tipIndex, setTipIndex] = React.useState(() => new Date().getDate() % DASHBOARD_TIP_COUNT)
-  const tipKey = `dashboard.tipItems.${tipIndex}`
-
-  return (
-    <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-      <CardHeader className="flex flex-row items-start gap-2">
-        <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-        <CardTitle className="text-sm font-semibold">{t("dashboard.tip")}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-sm leading-relaxed text-muted-foreground">{t(tipKey)}</p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 px-2 text-xs font-medium text-muted-foreground hover:text-foreground"
-          onClick={() => setTipIndex((i) => (i + 1) % DASHBOARD_TIP_COUNT)}
-        >
-          {t("dashboard.tipShowAnother")}
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -116,16 +84,20 @@ export default function DashboardPage() {
     )
   }
 
+
   const todaysList = React.useMemo(
     () => getAppointmentsForToday(appointments, appToday),
     [appointments, appToday],
   )
   const plannedToday = React.useMemo(
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a, currentTime)),
-    [currentTime, todaysList],
+    [currentTime, todaysList]
   )
   const todaysListSorted = React.useMemo(
-    () => [...todaysList].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
+    () =>
+      [...todaysList].sort(
+        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      ),
     [todaysList],
   )
   const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
@@ -142,25 +114,10 @@ export default function DashboardPage() {
       reminderErrorsCount: 0,
     }
   }, [plannedToday.length, todaysList])
-
-  const nextAppointment = React.useMemo(() => {
-    const now = currentTime.getTime()
-    const upcoming = todaysListSorted.find(
-      (a) => !TERMINAL_STATUSES.has(a.status) && new Date(a.startsAt).getTime() >= now,
-    )
-    if (upcoming) return upcoming
-    return todaysListSorted.find((a) => !TERMINAL_STATUSES.has(a.status)) ?? null
-  }, [currentTime, todaysListSorted])
-
-  const todayVisitsCount = React.useMemo(
-    () => todaysList.filter((a) => a.status !== "cancelled").length,
-    [todaysList],
-  )
-  const upcomingTodaySorted = React.useMemo(
-    () => todaysListSorted.filter((a) => !TERMINAL_STATUSES.has(a.status)),
-    [todaysListSorted],
-  )
-  const problemsCount = statsReady ? stats.requiresActionCount : 0
+  const visitsTodayComputed = plannedToday.length
+  const confirmedToday = plannedToday.length
+  const cancelledToday = stats.cancelledTodayCount
+  const completedToday = todaysList.filter((a) => a.status === "completed").length
 
   const timeFmt = React.useMemo(
     () =>
@@ -168,7 +125,7 @@ export default function DashboardPage() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-    [language],
+    [language]
   )
 
   React.useEffect(() => {
@@ -285,6 +242,7 @@ export default function DashboardPage() {
     currentStatus: AppointmentStatus,
     nextStatus: AppointmentStatus,
   ) => {
+    if (isAppointmentVisitLocked(currentStatus) || currentStatus === nextStatus) return
     void (async () => {
       const ok = await updateAppointmentStatus(appointmentId, nextStatus, {
         lastUpdatedBy: "business",
@@ -294,16 +252,6 @@ export default function DashboardPage() {
       setStatusNotice(t("appointments.statusUpdated"))
     })()
   }
-
-  const daySummary = (() => {
-    if (statsContextState === "login_required") return t("dashboard.signInToSeePlan")
-    if (statsContextState === "no_data") return t("dashboard.noDataInBrowser")
-    if (!statsReady) {
-      return statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")
-    }
-    if (plannedToday.length === 0) return t("dashboard.noAppointmentsTodayLong")
-    return formatTodayAppointmentsLabel(plannedToday.length, language)
-  })()
 
   return (
     <AppShell
@@ -320,50 +268,58 @@ export default function DashboardPage() {
 
         <div className="lg:hidden">
           <DashboardMobileView
-            businessId={businessId}
-            daySummary={daySummary}
-            problemsCount={problemsCount}
+            statsContextState={statsContextState}
             statsReady={statsReady}
-            todayCount={todayVisitsCount}
-            nextAppointment={nextAppointment}
-            todaysListSorted={upcomingTodaySorted}
+            statsError={statsError}
+            visitsTodayCount={visitsTodayComputed}
+            language={language}
+            confirmedToday={confirmedToday}
+            cancelledToday={cancelledToday}
+            completedToday={completedToday}
+            todaysListSorted={todaysListSorted}
+            loadError={Boolean(appointmentsLoadError)}
             currentTime={currentTime}
             timeFmt={timeFmt}
+            onChangeStatus={changeStatusFromDashboard}
           />
         </div>
 
         <div className="hidden lg:block">
-        <p className="text-sm text-muted-foreground">{daySummary}</p>
+          <DashboardDayHero
+            statsContextState={statsContextState}
+            statsReady={statsReady}
+            statsError={statsError}
+            visitsTodayCount={visitsTodayComputed}
+            language={language}
+            statsSlot={
+              <DashboardDayStatsRow
+                statsContextState={statsContextState}
+                statsReady={statsReady}
+                statsError={statsError}
+                confirmed={confirmedToday}
+                cancelled={cancelledToday}
+                completed={completedToday}
+              />
+            }
+          />
 
-        {statsReady && problemsCount > 0 ? (
-          <Link
-            href="/appointments?filter=needs_action"
-            className="mt-3 flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100"
-          >
-            <AlertTriangle className="size-4 shrink-0" aria-hidden />
-            <span>{t("dashboard.daySummaryProblems").replace("{count}", String(problemsCount))}</span>
-          </Link>
-        ) : null}
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr] lg:items-start">
+            <div className="min-w-0 space-y-6">
+              <DashboardTodayList
+                rows={todaysListSorted}
+                loading={!statsReady}
+                loadError={Boolean(appointmentsLoadError)}
+                currentTime={currentTime}
+                timeFmt={timeFmt}
+                onChangeStatus={changeStatusFromDashboard}
+              />
+            </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-6 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-6">
-          <div className="min-w-0 space-y-4 lg:space-y-5">
-            <DashboardTodayList
-              rows={todaysListSorted}
-              loading={!statsReady}
-              loadError={Boolean(appointmentsLoadError)}
-              currentTime={currentTime}
-              timeFmt={timeFmt}
-              onChangeStatus={changeStatusFromDashboard}
-            />
-
-            <DashboardSmsAlert />
+            <aside className="min-w-0 space-y-6 lg:sticky lg:top-6">
+              <OnboardingDashboardCard />
+              <DashboardTipCard />
+            </aside>
           </div>
-
-          <aside className="hidden min-w-0 space-y-6 lg:sticky lg:top-6 lg:block">
-            <OnboardingDashboardCard />
-            <TipCard />
-          </aside>
-        </div>
         </div>
       </PageShell>
     </AppShell>
