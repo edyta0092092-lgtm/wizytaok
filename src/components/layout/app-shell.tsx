@@ -11,6 +11,7 @@ import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
 import { MobilePanelOverlays } from "@/components/layout/mobile-panel-overlays"
 import { PwaInstallBanner } from "@/components/pwa/pwa-install-banner"
 import { Button } from "@/components/ui/button"
+import { useMobileBottomStackHeight } from "@/lib/mobile/use-mobile-bottom-stack-height"
 import { useDeferUntilIdle } from "@/lib/react/use-defer-until-idle"
 import { cn } from "@/lib/utils"
 
@@ -61,6 +62,8 @@ export function AppShell({
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1"
   })
   const [isResizing, setIsResizing] = React.useState(false)
+  const mobileBottomStackRef = React.useRef<HTMLDivElement>(null)
+  useMobileBottomStackHeight(mobileBottomStackRef)
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
@@ -167,12 +170,15 @@ export function AppShell({
             pageDescription={pageDescription}
             primaryAction={primaryAction}
           />
-          <div className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-4 sm:px-6 sm:pt-5 lg:px-10 lg:pb-10">
+          <div className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-mobile-content pt-4 sm:px-6 sm:pt-5 lg:px-10 lg:pb-10">
             {children}
           </div>
         </div>
       </MobilePanelOverlays>
-      <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col lg:hidden">
+      <div
+        ref={mobileBottomStackRef}
+        className="fixed inset-x-0 bottom-0 z-50 flex flex-col lg:hidden"
+      >
         <PwaInstallBanner />
         <MobileBottomNav />
       </div>

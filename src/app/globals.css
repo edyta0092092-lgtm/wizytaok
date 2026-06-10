@@ -48,6 +48,8 @@
   --color-brand-amber-foreground: var(--brand-amber-foreground);
   --color-nav-active-bg: var(--nav-active-bg);
   --color-accent-soft: var(--accent-soft);
+  --spacing-mobile-bottom-stack: var(--mobile-bottom-stack-height);
+  --spacing-mobile-content-pad-bottom: var(--mobile-content-pad-bottom);
   --radius-sm: calc(var(--radius) * 0.75);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) * 1.25);
@@ -58,6 +60,11 @@
 }
 
 :root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-bottom-nav-height: 3.5rem;
+  --mobile-bottom-stack-height: calc(var(--mobile-bottom-nav-height) + var(--safe-area-bottom));
+  --mobile-content-pad-bottom: calc(var(--mobile-bottom-stack-height) + 1.25rem);
   --background: #f6faf9;
   --nav-active-bg: #d9f3ee;
   --foreground: #0f172a;
@@ -245,5 +252,17 @@
   }
   .panel-inset-x {
     @apply px-4;
+  }
+
+  .pt-safe-top {
+    padding-top: var(--safe-area-top);
+  }
+
+  .pb-mobile-content {
+    padding-bottom: var(--mobile-content-pad-bottom);
+  }
+
+  .pb-mobile-sticky-page {
+    padding-bottom: calc(var(--mobile-bottom-stack-height) + 5.5rem);
   }
 }

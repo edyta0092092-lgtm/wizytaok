@@ -6,13 +6,14 @@ import { FormActions } from "@/components/shared/form-actions"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MobileSheetFooter } from "@/components/mobile/mobile-sheet-footer"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import { Textarea } from "@/components/ui/textarea"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -48,15 +49,18 @@ export function NewClientSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg" showCloseButton>
-        <SheetHeader className="border-b border-border/70 px-6 py-5 text-left">
+      <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-lg" showCloseButton>
+        <SheetHeader className="shrink-0 border-b border-border/70 px-6 py-5 pt-[calc(1.25rem+var(--safe-area-top))] text-left sm:pt-5">
           <SheetTitle>{t("clients.sheetNewTitle")}</SheetTitle>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {t("clients.sheetNewDescription")}
           </p>
         </SheetHeader>
-        <form onSubmit={onSubmit} className="premium-scrollbar flex flex-1 flex-col overflow-y-auto">
-          <div className="flex-1 space-y-4 px-6 py-5 pb-4">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div
+            className="premium-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5"
+            onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="nc-first">{t("appointments.fieldClientFirstName")}</Label>
@@ -113,7 +117,7 @@ export function NewClientSheet({
               </p>
             ) : null}
           </div>
-          <SheetFooter className="border-t border-border/70 px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+          <MobileSheetFooter>
             <FormActions
               submitLabel={t("clients.saveClientSubmit")}
               isSubmitting={isSaving}
@@ -121,7 +125,7 @@ export function NewClientSheet({
               onCancel={() => onOpenChange(false)}
               cancelLabel={t("appointments.closeFormCancel")}
             />
-          </SheetFooter>
+          </MobileSheetFooter>
         </form>
       </SheetContent>
     </Sheet>

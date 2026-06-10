@@ -7,6 +7,7 @@ import { AlertTriangle, Sparkles } from "lucide-react"
 
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
 import { DashboardDayStatsStrip } from "@/components/dashboard/dashboard-day-stats-strip"
+import { DashboardMobileView } from "@/components/dashboard/dashboard-mobile-view"
 import { DashboardNextAppointment } from "@/components/dashboard/dashboard-next-appointment"
 import { DashboardRecentActivity } from "@/components/dashboard/dashboard-recent-activity"
 import { DashboardSmsAlert } from "@/components/dashboard/dashboard-sms-alert"
@@ -159,6 +160,14 @@ export default function DashboardPage() {
 
   const confirmedCount = statsReady ? stats.confirmedTodayCount : fallbackStats.confirmedTodayCount
   const pendingCount = statsReady ? stats.pendingTodayCount : fallbackStats.pendingTodayCount
+  const todayVisitsCount = React.useMemo(
+    () => todaysList.filter((a) => a.status !== "cancelled").length,
+    [todaysList],
+  )
+  const upcomingTodaySorted = React.useMemo(
+    () => todaysListSorted.filter((a) => !TERMINAL_STATUSES.has(a.status)),
+    [todaysListSorted],
+  )
   const problemsCount = statsReady ? stats.requiresActionCount : 0
 
   const timeFmt = React.useMemo(
@@ -317,6 +326,22 @@ export default function DashboardPage() {
           </div>
         ) : null}
 
+        <div className="lg:hidden">
+          <DashboardMobileView
+            businessId={businessId}
+            daySummary={daySummary}
+            problemsCount={problemsCount}
+            statsReady={statsReady}
+            todayCount={todayVisitsCount}
+            pendingCount={pendingCount}
+            nextAppointment={nextAppointment}
+            todaysListSorted={upcomingTodaySorted}
+            currentTime={currentTime}
+            timeFmt={timeFmt}
+          />
+        </div>
+
+        <div className="hidden lg:block">
         <p className="text-sm text-muted-foreground">{daySummary}</p>
 
         {statsReady && problemsCount > 0 ? (
@@ -362,6 +387,7 @@ export default function DashboardPage() {
             <OnboardingDashboardCard />
             <TipCard />
           </aside>
+        </div>
         </div>
       </PageShell>
     </AppShell>

@@ -108,7 +108,7 @@ export function BookingSlugSettingsFields({
           value={value}
           onChange={(e) => onChange(sanitizeSlugInput(e.target.value))}
           placeholder={t("settings.bookingSlugPlaceholder")}
-          className="h-11 rounded-xl font-mono text-sm"
+          className="h-11 rounded-xl font-mono text-base sm:text-sm"
           aria-invalid={availability === "invalid" || availability === "taken"}
         />
         <p className="text-xs text-muted-foreground">{t("settings.bookingSlugHint")}</p>

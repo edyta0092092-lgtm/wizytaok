@@ -25,7 +25,7 @@ export function AppTopbar({
   return (
     <header
       className={cn(
-        "flex min-h-[3.75rem] shrink-0 items-center justify-between gap-4 border-b border-border/90 bg-card/80 px-4 py-3.5 backdrop-blur-md sm:px-6 lg:px-10",
+        "flex min-h-[3.75rem] shrink-0 items-center justify-between gap-4 border-b border-border/90 bg-card/80 px-4 py-3.5 pt-[calc(0.875rem+var(--safe-area-top))] backdrop-blur-md sm:px-6 lg:px-10 lg:pt-3.5",
         className
       )}
     >
@@ -47,7 +47,7 @@ export function AppTopbar({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 touch-manipulation text-muted-foreground hover:text-foreground lg:hidden"
+          className="size-11 touch-manipulation text-muted-foreground hover:text-foreground lg:hidden"
           asChild
         >
           <Link href="/help" aria-label={t("navigation.help")}>

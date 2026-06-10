@@ -48,6 +48,7 @@ export const viewport: Viewport = {
   themeColor: PWA_THEME_COLOR,
   colorScheme: "light",
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 }
 
 export default function RootLayout({

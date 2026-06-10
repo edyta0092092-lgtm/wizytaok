@@ -4,6 +4,9 @@ import * as React from "react"
 import Link from "next/link"
 import { ArrowLeft, Download, FileText, Mail, Pencil, Phone } from "lucide-react"
 
+import { CustomerProfileMobileView } from "@/components/customers/customer-profile-mobile-view"
+import { MobileFixedActionBar } from "@/components/mobile/mobile-fixed-action-bar"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import { CustomerStatsGrid } from "@/components/customers/customer-stats-grid"
 import { CustomerVisitHistory } from "@/components/customers/customer-visit-history"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
@@ -217,8 +220,177 @@ export function CustomerProfileView({
     }
   }
 
+  const editForm = (
+    <form id="customer-profile-edit-form" className="space-y-6" onSubmit={(e) => void submitEdit(e)}>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="customer-firstName">{t("team.firstName")}</Label>
+          <Input
+            id="customer-firstName"
+            autoComplete="given-name"
+            required
+            className="h-11 rounded-xl"
+            value={form.firstName}
+            onChange={(e) => setForm((prev) => ({ ...prev, firstName: e.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="customer-lastName">{t("team.lastName")}</Label>
+          <Input
+            id="customer-lastName"
+            autoComplete="family-name"
+            className="h-11 rounded-xl"
+            value={form.lastName}
+            onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      <InternationalPhoneFieldGroup
+        label={t("customers.fieldPhone")}
+        dialCode={form.phoneDialCode}
+        nationalDigits={form.phoneNational}
+        onDialCodeChange={(v) => setForm((prev) => ({ ...prev, phoneDialCode: v }))}
+        onNationalChange={(digits) => setForm((prev) => ({ ...prev, phoneNational: digits }))}
+        dialSelectId="customer-phone-dial"
+        nationalInputId="customer-phone-national"
+      />
+
+      <div className="space-y-2">
+        <Label htmlFor="customer-email">{t("customers.fieldEmail")}</Label>
+        <Input
+          id="customer-email"
+          type="email"
+          autoComplete="email"
+          className="h-11 rounded-xl"
+          value={form.email}
+          onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="customer-notes">{t("clients.sectionNotesHead")}</Label>
+        <Textarea
+          id="customer-notes"
+          rows={4}
+          value={form.notes}
+          onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+          placeholder={t("clients.notesPlaceholderUi")}
+          className="min-h-[120px] resize-none rounded-xl"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="customer-attachments">{t("clients.sectionAttachmentsHead")}</Label>
+        <Input
+          id="customer-attachments"
+          type="file"
+          accept={CLIENT_ATTACHMENT_ACCEPT}
+          multiple
+          className="h-auto cursor-pointer py-2"
+          onChange={(e) => {
+            void handleAttachmentUpload(e.target.files)
+            e.currentTarget.value = ""
+          }}
+        />
+        <p className="text-xs text-muted-foreground">{t("clients.attachmentHelp")}</p>
+        {attachments.length > 0 ? (
+          <ul className="space-y-2">
+            {attachments.map((attachment) => (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 px-3 py-2 text-sm"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-foreground">{attachment.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatClientAttachmentSize(attachment.size)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 shrink-0 touch-manipulation rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive lg:h-8"
+                  onClick={() => removeAttachment(attachment.id)}
+                >
+                  {t("common.delete")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+
+      {fieldError ? (
+        <p className="text-sm text-destructive" role="alert">
+          {fieldError}
+        </p>
+      ) : null}
+
+    </form>
+  )
+
+  if (editing) {
+    return (
+      <>
+        <div
+          className="flex flex-col gap-4 pb-mobile-sticky-page lg:pb-8"
+          onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}
+        >
+          <Button variant="ghost" size="sm" className="h-11 w-fit touch-manipulation rounded-xl lg:h-9" asChild>
+            <Link href="/klienci">
+              <ArrowLeft className="mr-1.5 size-4" aria-hidden />
+              {t("customers.profile.backToList")}
+            </Link>
+          </Button>
+          {savedBanner ? (
+            <p className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-foreground">
+              {t("clients.updatedBanner")}
+            </p>
+          ) : null}
+          <h1 className="text-xl font-semibold">{t("clients.editClient")}</h1>
+          <Card className="hidden rounded-2xl border border-border shadow-sm shadow-slate-900/5 lg:block">
+            <CardContent className="pt-6">
+              {editForm}
+              <FormActions
+                cancelLabel={t("messages.cancel")}
+                submitLabel={t("common.saveChanges")}
+                onCancel={cancelEdit}
+                isSubmitting={saving}
+                submitForm="customer-profile-edit-form"
+                submitType="submit"
+              />
+            </CardContent>
+          </Card>
+          <div className="lg:hidden">{editForm}</div>
+        </div>
+        <MobileFixedActionBar className="lg:hidden">
+          <FormActions
+            cancelLabel={t("messages.cancel")}
+            submitLabel={t("common.saveChanges")}
+            onCancel={cancelEdit}
+            isSubmitting={saving}
+            submitForm="customer-profile-edit-form"
+            submitType="submit"
+          />
+        </MobileFixedActionBar>
+      </>
+    )
+  }
+
   return (
-    <div className="flex flex-col gap-6">
+    <>
+      <div className="lg:hidden">
+        {savedBanner ? (
+          <p className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-2 text-sm text-foreground">
+            {t("clients.updatedBanner")}
+          </p>
+        ) : null}
+        <CustomerProfileMobileView customer={customer} onEdit={startEdit} />
+      </div>
+
+      <div className="hidden flex-col gap-6 lg:flex">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" className="h-9 w-fit rounded-xl" asChild>
           <Link href="/klienci">
@@ -226,12 +398,10 @@ export function CustomerProfileView({
             {t("customers.profile.backToList")}
           </Link>
         </Button>
-        {!editing ? (
-          <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl" onClick={startEdit}>
-            <Pencil className="mr-1.5 size-4" aria-hidden />
-            {t("clients.editClient")}
-          </Button>
-        ) : null}
+        <Button type="button" variant="outline" size="sm" className="h-9 rounded-xl" onClick={startEdit}>
+          <Pencil className="mr-1.5 size-4" aria-hidden />
+          {t("clients.editClient")}
+        </Button>
       </div>
 
       {savedBanner ? (
@@ -243,129 +413,11 @@ export function CustomerProfileView({
       <Card className="rounded-2xl border border-border shadow-sm shadow-slate-900/5">
         <CardHeader className="space-y-3">
           <div>
-            <CardTitle className="text-xl">{editing ? t("clients.editClient") : customer.fullName}</CardTitle>
+            <CardTitle className="text-xl">{customer.fullName}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">{t("customers.profile.contactTitle")}</p>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {editing ? (
-            <form id="customer-profile-edit-form" className="space-y-6" onSubmit={(e) => void submitEdit(e)}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="customer-firstName">{t("team.firstName")}</Label>
-                  <Input
-                    id="customer-firstName"
-                    autoComplete="given-name"
-                    required
-                    className="h-11 rounded-xl"
-                    value={form.firstName}
-                    onChange={(e) => setForm((prev) => ({ ...prev, firstName: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="customer-lastName">{t("team.lastName")}</Label>
-                  <Input
-                    id="customer-lastName"
-                    autoComplete="family-name"
-                    className="h-11 rounded-xl"
-                    value={form.lastName}
-                    onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value }))}
-                  />
-                </div>
-              </div>
-
-              <InternationalPhoneFieldGroup
-                label={t("customers.fieldPhone")}
-                dialCode={form.phoneDialCode}
-                nationalDigits={form.phoneNational}
-                onDialCodeChange={(v) => setForm((prev) => ({ ...prev, phoneDialCode: v }))}
-                onNationalChange={(digits) => setForm((prev) => ({ ...prev, phoneNational: digits }))}
-                dialSelectId="customer-phone-dial"
-                nationalInputId="customer-phone-national"
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="customer-email">{t("customers.fieldEmail")}</Label>
-                <Input
-                  id="customer-email"
-                  type="email"
-                  autoComplete="email"
-                  className="h-11 rounded-xl"
-                  value={form.email}
-                  onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="customer-notes">{t("clients.sectionNotesHead")}</Label>
-                <Textarea
-                  id="customer-notes"
-                  rows={4}
-                  value={form.notes}
-                  onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder={t("clients.notesPlaceholderUi")}
-                  className="min-h-[120px] resize-none rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="customer-attachments">{t("clients.sectionAttachmentsHead")}</Label>
-                <Input
-                  id="customer-attachments"
-                  type="file"
-                  accept={CLIENT_ATTACHMENT_ACCEPT}
-                  multiple
-                  className="h-auto cursor-pointer py-2"
-                  onChange={(e) => {
-                    void handleAttachmentUpload(e.target.files)
-                    e.currentTarget.value = ""
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">{t("clients.attachmentHelp")}</p>
-                {attachments.length > 0 ? (
-                  <ul className="space-y-2">
-                    {attachments.map((attachment) => (
-                      <li
-                        key={attachment.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/15 px-3 py-2 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">{attachment.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatClientAttachmentSize(attachment.size)}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 shrink-0 rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => removeAttachment(attachment.id)}
-                        >
-                          {t("common.delete")}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </div>
-
-              {fieldError ? (
-                <p className="text-sm text-destructive" role="alert">
-                  {fieldError}
-                </p>
-              ) : null}
-
-              <FormActions
-                cancelLabel={t("messages.cancel")}
-                submitLabel={t("common.saveChanges")}
-                onCancel={cancelEdit}
-                isSubmitting={saving}
-                submitForm="customer-profile-edit-form"
-                submitType="submit"
-              />
-            </form>
-          ) : (
             <>
               <dl className="grid gap-3 sm:grid-cols-2">
                 <div className="flex items-start gap-2 text-sm">
@@ -444,7 +496,6 @@ export function CustomerProfileView({
                 )}
               </section>
             </>
-          )}
         </CardContent>
       </Card>
 
@@ -456,6 +507,7 @@ export function CustomerProfileView({
       <section className="space-y-3">
         <CustomerVisitHistory visits={customer.visits} />
       </section>
-    </div>
+      </div>
+    </>
   )
 }

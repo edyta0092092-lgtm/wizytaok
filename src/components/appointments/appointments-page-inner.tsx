@@ -32,6 +32,7 @@ import { useAppointmentsDeleteFlow } from "@/lib/appointments/use-appointments-d
 import { useAppointmentsPageListController } from "@/lib/appointments/use-appointments-page-list-controller"
 import { appointmentsUiLanguage } from "@/lib/appointments/appointments-ui-language"
 import type { AppointmentsDayGroupFilter } from "@/lib/appointments/appointments-grouping"
+import type { AppointmentsMobilePeriodFilter } from "@/lib/appointments/appointments-mobile-period"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
@@ -65,6 +66,7 @@ export function AppointmentsPageInner() {
   const [clientNameFilter, setClientNameFilter] = React.useState("")
   const [serviceFilter, setServiceFilter] = React.useState("")
   const [dayGroupFilter, setDayGroupFilter] = React.useState<AppointmentsDayGroupFilter>("all")
+  const [mobilePeriod, setMobilePeriod] = React.useState<AppointmentsMobilePeriodFilter>("today")
 
   const clearSecondaryFilters = React.useCallback(() => {
     setClientNameFilter("")
@@ -92,6 +94,16 @@ export function AppointmentsPageInner() {
     clientNameFilter,
     serviceFilter,
     dayGroupFilter,
+    language,
+  })
+  const mobilePresentation = useAppointmentsListPresentation({
+    appointments,
+    filter,
+    staffFilter,
+    restrictToToday,
+    clientNameFilter: "",
+    serviceFilter: "",
+    dayGroupFilter: "all",
     language,
   })
 
@@ -261,6 +273,20 @@ export function AppointmentsPageInner() {
             hasActiveSecondaryFilters,
             onClearSecondaryFilters: clearSecondaryFilters,
             onAddManual: manualSheet.openCreate,
+          }}
+          mobileList={{
+            ...appointmentsListBundles,
+            presentation: {
+              ...appointmentsListBundles.presentation,
+              grouped: mobilePresentation.grouped,
+              formatWhen: mobilePresentation.formatWhen,
+            },
+            bookingPagePath,
+            hasActiveSecondaryFilters: false,
+            onClearSecondaryFilters: clearSecondaryFilters,
+            onAddManual: manualSheet.openCreate,
+            mobilePeriod,
+            onMobilePeriodChange: setMobilePeriod,
           }}
           isLoading={accessReady && !appointmentsReady}
         />

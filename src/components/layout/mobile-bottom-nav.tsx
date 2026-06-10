@@ -27,8 +27,9 @@ export function MobileBottomNav() {
             <li key={item.href} className="min-w-0">
               <Link
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-[3.25rem] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[0.6rem] font-medium leading-tight transition-colors sm:px-1 sm:text-[0.65rem]",
+                  "flex min-h-11 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[0.625rem] font-medium leading-tight transition-colors sm:px-1.5 sm:text-xs",
                   active
                     ? "text-teal-700 dark:text-teal-200"
                     : "text-muted-foreground hover:text-foreground"

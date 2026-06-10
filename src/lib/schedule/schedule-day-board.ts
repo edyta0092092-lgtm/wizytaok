@@ -44,6 +44,24 @@ export function buildHalfHourSlotLabels(): string[] {
   return labels
 }
 
+/** Etykiety pełnych godzin (08:00, 09:00, …) — widok mobilny. */
+export function buildHourSlotLabels(): string[] {
+  const labels: string[] = []
+  for (let h = SCHEDULE_BOARD_DAY_START_HOUR; h <= SCHEDULE_BOARD_DAY_END_HOUR; h += 1) {
+    labels.push(formatHmFromMinutes(h * 60))
+  }
+  return labels
+}
+
+export function scheduleBoardGridHeightPxForZoom(zoom = 1): number {
+  const { span } = getScheduleBoardRangeMinutes()
+  return Math.round(span * SCHEDULE_BOARD_PX_PER_MINUTE * zoom)
+}
+
+export function scheduleBoardPxPerMinuteForZoom(zoom = 1): number {
+  return SCHEDULE_BOARD_PX_PER_MINUTE * zoom
+}
+
 export function staffInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return "?"

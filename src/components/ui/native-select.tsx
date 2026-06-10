@@ -26,7 +26,7 @@ export function NativeSelect({
     <div className={cn("relative flex w-full max-w-full items-center", wrapperClassName)}>
       <select
         className={cn(
-          "h-10 w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-input bg-card px-3 py-2 pr-9 text-sm text-foreground transition-colors outline-none scheme-light-dark focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/30 disabled:opacity-60 dark:bg-input/20 dark:scheme-dark dark:hover:bg-input/35 dark:disabled:bg-input/60 [&>option]:bg-popover [&>option]:text-popover-foreground",
+          "h-11 w-full min-w-0 cursor-pointer appearance-none rounded-xl border border-input bg-card px-3 py-2 pr-9 text-base text-foreground transition-colors outline-none scheme-light-dark focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/30 disabled:opacity-60 sm:h-10 sm:text-sm dark:bg-input/20 dark:scheme-dark dark:hover:bg-input/35 dark:disabled:bg-input/60 [&>option]:bg-popover [&>option]:text-popover-foreground",
           className
         )}
         {...props}

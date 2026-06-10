@@ -8,13 +8,14 @@ import { InternationalPhoneFieldGroup } from "@/components/forms/international-p
 import { AppDatePicker } from "@/components/ui/app-date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MobileSheetFooter } from "@/components/mobile/mobile-sheet-footer"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import { Textarea } from "@/components/ui/textarea"
 import type { ManualAppointment } from "@/lib/appointments/manual-appointments"
 import { MANUAL_BOOKING_ANY_STAFF } from "@/lib/bookings/manual-booking-staff"
@@ -73,12 +74,15 @@ export function ManualAppointmentSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col sm:max-w-lg" showCloseButton>
-        <SheetHeader className="border-b border-border/70 px-6 py-5 text-left">
+      <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-lg" showCloseButton>
+        <SheetHeader className="shrink-0 border-b border-border/70 px-6 py-5 pt-[calc(1.25rem+var(--safe-area-top))] text-left sm:pt-5">
           <SheetTitle>{t("common.addAppointment")}</SheetTitle>
         </SheetHeader>
-        <form onSubmit={onSubmit} className="premium-scrollbar flex flex-1 flex-col overflow-y-auto">
-          <div className="flex-1 space-y-4 px-6 py-5 pb-4">
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div
+            className="premium-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5"
+            onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}
+          >
             <p className="text-xs leading-relaxed text-muted-foreground">
               {t("appointments.manualContactHint")}
             </p>
@@ -150,7 +154,7 @@ export function ManualAppointmentSheet({
               <select
                 id="ma-service"
                 required
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="h-11 w-full touch-manipulation rounded-xl border border-input bg-background px-3 text-base sm:h-10 sm:text-sm"
                 value={form.serviceId}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, serviceId: e.target.value, manualStaffId: "" }))
@@ -179,7 +183,7 @@ export function ManualAppointmentSheet({
               ) : availableStaffForSlot.length > 1 ? (
                 <select
                   id="ma-staff"
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-11 w-full touch-manipulation rounded-xl border border-input bg-background px-3 text-base sm:h-10 sm:text-sm"
                   value={form.manualStaffId}
                   onChange={(e) => setForm((f) => ({ ...f, manualStaffId: e.target.value }))}
                 >
@@ -245,7 +249,7 @@ export function ManualAppointmentSheet({
               <Label htmlFor="ma-status">{t("appointments.fieldStatus")}</Label>
               <select
                 id="ma-status"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="h-11 w-full touch-manipulation rounded-xl border border-input bg-background px-3 text-base sm:h-10 sm:text-sm"
                 value={form.status}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -268,7 +272,7 @@ export function ManualAppointmentSheet({
               />
             </div>
           </div>
-          <SheetFooter className="mt-3 shrink-0 border-t border-border/70 bg-background px-6 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <MobileSheetFooter>
             <FormActions
               cancelLabel={t("messages.cancel")}
               submitLabel={t("appointments.saveAppointment")}
@@ -277,7 +281,7 @@ export function ManualAppointmentSheet({
               submitDisabled={!canSubmitManualAppointment}
               onCancel={() => onOpenChange(false)}
             />
-          </SheetFooter>
+          </MobileSheetFooter>
         </form>
       </SheetContent>
     </Sheet>

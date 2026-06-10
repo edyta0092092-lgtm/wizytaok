@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { DayScheduleModal } from "@/components/schedule/day-schedule-modal"
+import { ScheduleMobileView } from "@/components/schedule/schedule-mobile-view"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { cancelAppointmentFromRemove } from "@/lib/appointments/cancel-appointment-from-remove"
@@ -157,6 +158,10 @@ export default function SchedulePage() {
   const [loadError, setLoadError] = React.useState(false)
   const [personFilter, setPersonFilter] = React.useState("")
   const [detailDate, setDetailDate] = React.useState<string | null>(null)
+  const [mobileDate, setMobileDate] = React.useState(() => {
+    const n = new Date()
+    return dateKey(n.getFullYear(), n.getMonth() + 1, n.getDate())
+  })
   const [refreshTick, setRefreshTick] = React.useState(0)
   const [statusNotice, setStatusNotice] = React.useState("")
   const [cancellingId, setCancellingId] = React.useState<string | null>(null)
@@ -405,6 +410,17 @@ export default function SchedulePage() {
     [detailDate, bookingsByDate],
   )
 
+  const mobileRows = React.useMemo(
+    () => bookingsByDate.get(mobileDate) ?? [],
+    [bookingsByDate, mobileDate],
+  )
+
+  React.useEffect(() => {
+    const year = Number(mobileDate.slice(0, 4))
+    const month = Number(mobileDate.slice(5, 7))
+    setYm((prev) => (prev.year === year && prev.month === month ? prev : { year, month }))
+  }, [mobileDate])
+
   React.useEffect(() => {
     if (!detailDate || process.env.NODE_ENV !== "development") return
     console.info("[schedule.day.bookings]", { date: detailDate, bookings: detailRows })
@@ -416,6 +432,42 @@ export default function SchedulePage() {
   return (
     <AppShell title={t("schedule.title")} pageDescription={t("schedule.monthBookingsDescription")}>
       <PageShell>
+        <div className="lg:hidden">
+          <ScheduleMobileView
+            selectedDate={mobileDate}
+            todayKey={todayKey}
+            onSelectedDateChange={setMobileDate}
+            dayTitle={formatters.dayLong.format(
+              new Date(
+                Number(mobileDate.slice(0, 4)),
+                Number(mobileDate.slice(5, 7)) - 1,
+                Number(mobileDate.slice(8, 10)),
+              ),
+            )}
+            visitSummary={visitCountLabel(mobileRows.length, t)}
+            entries={mobileRows}
+            staffMembers={staffMembers}
+            personFilter={personFilter}
+            onPersonFilterChange={setPersonFilter}
+            loading={loading}
+            loadError={loadError}
+            statusNotice={statusNotice}
+            cancellingId={cancellingId}
+            statusMenuOrder={STATUS_MENU_ORDER}
+            visitCountLabel={(count) => visitCountLabel(count, t)}
+            statusLabel={(status) =>
+              t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")
+            }
+            changeStatusLabel={t("appointments.changeStatusAction")}
+            cancelLabel={t("appointments.cancelVisit")}
+            staffFallbackLabel={t("appointments.staffNotAssignedShort")}
+            emptyLabel={t("schedule.emptyDayDetail")}
+            onChangeStatus={changeScheduleBookingStatus}
+            onCancelVisit={cancelScheduleVisit}
+          />
+        </div>
+
+        <div className="hidden lg:block">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -565,6 +617,7 @@ export default function SchedulePage() {
             </div>
           </>
         )}
+        </div>
       </PageShell>
 
       <DayScheduleModal

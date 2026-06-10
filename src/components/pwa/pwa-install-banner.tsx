@@ -41,6 +41,11 @@ export function PwaInstallBanner({ className }: PwaInstallBannerProps) {
 
   React.useEffect(() => {
     if (typeof window === "undefined") return
+    window.dispatchEvent(new Event("pw-layout-change"))
+  }, [visible])
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
     if (isStandaloneDisplay()) return
     try {
       if (window.localStorage.getItem(DISMISS_KEY) === "1") return
@@ -125,7 +130,7 @@ export function PwaInstallBanner({ className }: PwaInstallBannerProps) {
             <Button
               type="button"
               size="sm"
-              className="mt-2.5 h-10 rounded-xl px-4 text-xs font-semibold sm:text-sm"
+              className="mt-2.5 h-11 min-h-11 touch-manipulation rounded-xl px-4 text-xs font-semibold sm:text-sm"
               onClick={() => void onInstall()}
             >
               {t("pwa.installButton")}
@@ -136,7 +141,7 @@ export function PwaInstallBanner({ className }: PwaInstallBannerProps) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0 rounded-xl text-muted-foreground"
+          className="size-11 shrink-0 touch-manipulation rounded-xl text-muted-foreground"
           onClick={dismiss}
           aria-label={t("pwa.installDismiss")}
         >

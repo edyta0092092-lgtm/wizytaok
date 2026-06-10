@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import { CalendarPlus, Plus, UserPlus } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -16,19 +17,21 @@ import { useIsMobilePanel } from "@/lib/react/use-is-mobile-panel"
 import { useTranslations } from "@/lib/i18n/use-translations"
 
 export function MobileActionFab() {
+  const pathname = usePathname()
   const isMobile = useIsMobilePanel()
   const actions = useMobilePanelActions()
   const { canManageClients } = useBusinessAccess()
   const { t } = useTranslations()
   const [open, setOpen] = React.useState(false)
 
-  if (!isMobile || !actions) return null
+  if (!isMobile || !actions || pathname === "/schedule") return null
 
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-end px-4 lg:hidden"
       style={{
-        bottom: "calc(5.25rem + env(safe-area-inset-bottom, 0px))",
+        bottom:
+          "calc(var(--mobile-bottom-stack-height, calc(3.5rem + env(safe-area-inset-bottom, 0px))) + 0.75rem)",
       }}
     >
       <DropdownMenu open={open} onOpenChange={setOpen}>
