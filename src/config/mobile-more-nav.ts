@@ -32,7 +32,7 @@ export const mobileMoreNavItems: MobileMoreNavItem[] = [
   {
     href: "/team",
     icon: BriefcaseBusiness,
-    labelKey: "more.team",
+    labelKey: "navigation.team",
     visible: (access) => access.canManageTeam,
   },
   {

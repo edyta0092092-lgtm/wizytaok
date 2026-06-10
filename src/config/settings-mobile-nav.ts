@@ -40,7 +40,7 @@ export const settingsMobileNavItems: SettingsMobileNavItem[] = [
   {
     href: "/team",
     icon: BriefcaseBusiness,
-    labelKey: "settings.mobileSectionTeam",
+    labelKey: "navigation.team",
     visible: (access) => access.canManageTeam,
   },
   {

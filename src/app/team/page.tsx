@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Copy, Plus, Search, Trash2, Users } from "lu
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { MobileFixedActionBar } from "@/components/mobile/mobile-fixed-action-bar"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
 import { InternationalPhoneFieldGroup } from "@/components/forms/international-phone-field-group"
@@ -28,6 +29,7 @@ import type { PanelRole } from "@/lib/auth/permissions"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useOnboarding } from "@/lib/onboarding/onboarding-provider"
 import { syncBusinessMemberRoleForStaff } from "@/lib/team/apply-staff-panel-access"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { getLocalServices, getServices } from "@/lib/services/services-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -465,12 +467,37 @@ export default function TeamPage() {
     "profile" | "panel" | "services" | "schedule" | "exceptions"
   >("profile")
   const [staffQuery, setStaffQuery] = React.useState("")
+  const [mobileFormOpen, setMobileFormOpen] = React.useState(false)
   const isStaffServiceOnboarding = flowActive && activeStepId === "staff_service"
   const staffServiceTourNeedsPerson = isStaffServiceOnboarding && !editing
   const staffServiceTourNeedsServicesTab =
     isStaffServiceOnboarding && Boolean(editing) && formTab !== "services"
   const staffServiceTourNeedsServiceChoice =
     isStaffServiceOnboarding && Boolean(editing) && formTab === "services"
+
+  const formTabOptions = React.useMemo(() => {
+    const options: Array<{
+      value: "profile" | "panel" | "services" | "schedule" | "exceptions"
+      labelKey: string
+    }> = [{ value: "profile", labelKey: "team.mobileFormTabProfile" }]
+    if (access.canManageInvitations) {
+      options.push({ value: "panel", labelKey: "team.mobileFormTabPanel" })
+    }
+    options.push(
+      { value: "services", labelKey: "team.mobileFormTabServices" },
+      { value: "schedule", labelKey: "team.mobileFormTabSchedule" },
+      { value: "exceptions", labelKey: "team.mobileFormTabExceptions" },
+    )
+    return options
+  }, [access.canManageInvitations])
+
+  const setFormTabSafe = (value: string) => {
+    const allowed =
+      value === "panel" || value === "services" || value === "schedule" || value === "exceptions"
+        ? value
+        : "profile"
+    setFormTab(allowed)
+  }
 
   const dateTimeFmt = React.useMemo(
     () =>
@@ -683,6 +710,15 @@ export default function TeamPage() {
     return () => window.clearTimeout(tid)
   }, [inviteHighlightId])
 
+  const closeMobileForm = () => {
+    setMobileFormOpen(false)
+    if (!editing) {
+      setForm(emptyForm())
+      setFieldErrors({})
+      setExceptionFieldErrors({})
+    }
+  }
+
   const resetFormToCreate = () => {
     setEditing(null)
     setForm(emptyForm())
@@ -692,6 +728,8 @@ export default function TeamPage() {
     setFieldErrors({})
     setExceptionFieldErrors({})
     setScheduleValidated(false)
+    setFormTab("profile")
+    setMobileFormOpen(true)
   }
 
   const buildFormFromSavedSnapshot = React.useCallback((): FormState => {
@@ -821,6 +859,7 @@ export default function TeamPage() {
     if (isStaffServiceOnboarding) {
       setFormTab("profile")
     }
+    setMobileFormOpen(true)
     void loadStaffMemberIntoForm(staff, true)
   }
 
@@ -2007,7 +2046,12 @@ export default function TeamPage() {
         ) : null}
 
         <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(300px,380px)_minmax(0,1fr)] xl:items-start">
-          <div className="flex min-w-0 flex-col gap-5 xl:sticky xl:top-6">
+          <div
+            className={cn(
+              "flex min-w-0 flex-col gap-5 xl:sticky xl:top-6",
+              mobileFormOpen && "hidden xl:flex",
+            )}
+          >
             <Card
               data-tour={staffServiceTourNeedsPerson ? "team-staff-service-target" : undefined}
               className="min-w-0 overflow-hidden rounded-2xl border border-border shadow-sm shadow-slate-900/5"
@@ -2026,7 +2070,7 @@ export default function TeamPage() {
                   <Button
                     type="button"
                     size="sm"
-                    className="h-9 shrink-0 rounded-xl px-3"
+                    className="h-11 shrink-0 touch-manipulation rounded-xl px-3 xl:h-9"
                     onClick={() => resetFormToCreate()}
                   >
                     <Plus className="size-4" aria-hidden />
@@ -2044,7 +2088,7 @@ export default function TeamPage() {
                     value={staffQuery}
                     onChange={(e) => setStaffQuery(e.target.value)}
                     placeholder={t("team.searchPlaceholder")}
-                    className="h-10 rounded-xl pl-9"
+                    className="h-11 touch-manipulation rounded-xl pl-9 xl:h-10"
                     aria-label={t("team.searchAriaLabel")}
                   />
                 </div>
@@ -2054,11 +2098,17 @@ export default function TeamPage() {
                   className="w-full"
                 >
                   <TabsList variant="line" className="h-auto w-full justify-start gap-1 p-0">
-                    <TabsTrigger value="members" className="h-9 flex-1 rounded-lg px-2 text-xs sm:text-sm">
+                    <TabsTrigger
+                      value="members"
+                      className="h-11 min-h-11 flex-1 touch-manipulation rounded-lg px-2 text-xs sm:text-sm xl:h-9 xl:min-h-0"
+                    >
                       {t("team.teamMembersTitle")}
                     </TabsTrigger>
                     {access.ready && access.canManageInvitations ? (
-                      <TabsTrigger value="invites" className="h-9 flex-1 rounded-lg px-2 text-xs sm:text-sm">
+                      <TabsTrigger
+                        value="invites"
+                        className="h-11 min-h-11 flex-1 touch-manipulation rounded-lg px-2 text-xs sm:text-sm xl:h-9 xl:min-h-0"
+                      >
                         {t("team.pendingInvitationsTitle")}
                         {pendingInvites.length > 0 ? (
                           <span className="ml-1.5 inline-flex min-w-5 items-center justify-center rounded-full bg-primary/15 px-1.5 text-[10px] font-semibold text-primary">
@@ -2073,7 +2123,7 @@ export default function TeamPage() {
               <CardContent className="min-w-0 px-3 py-3 sm:px-4">
                 <Tabs value={sidebarTab} className="w-full">
                   <TabsContent value="members" className="mt-0">
-                    <div className="premium-scrollbar max-h-[min(52vh,32rem)] space-y-2 overflow-y-auto pr-0.5">
+                    <div className="premium-scrollbar space-y-2 xl:max-h-[min(52vh,32rem)] xl:overflow-y-auto xl:pr-0.5">
                       {loading ? <p className="px-1 py-2 text-sm text-muted-foreground">{t("team.loading")}</p> : null}
                       {!loading && staffLoadError ? (
                         <p className="px-1 py-2 text-sm text-destructive">
@@ -2081,7 +2131,17 @@ export default function TeamPage() {
                         </p>
                       ) : null}
                       {!loading && !staffLoadError && items.length === 0 ? (
-                        <p className="px-1 py-6 text-center text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
+                        <div className="px-1 py-6 text-center">
+                          <p className="text-sm text-muted-foreground">{t("team.teamMembersEmpty")}</p>
+                          <Button
+                            type="button"
+                            className="mt-4 h-11 touch-manipulation rounded-xl xl:hidden"
+                            onClick={() => resetFormToCreate()}
+                          >
+                            <Plus className="size-4" aria-hidden />
+                            {t("team.addPersonCard")}
+                          </Button>
+                        </div>
                       ) : null}
                       {!loading && !staffLoadError && items.length > 0 && filteredStaff.length === 0 ? (
                         <p className="px-1 py-6 text-center text-sm text-muted-foreground">
@@ -2106,13 +2166,13 @@ export default function TeamPage() {
                               key={staff.id}
                               type="button"
                               onClick={() => beginEdit(staff)}
-                              className={`w-full rounded-xl border p-3 text-left text-sm transition-colors ${
+                              className={`w-full touch-manipulation rounded-xl border p-3.5 text-left text-sm transition-colors xl:p-3 ${
                                 isSelected
                                   ? "border-primary/50 bg-[color:var(--nav-active-bg)] shadow-sm"
                                   : "border-border/70 bg-card hover:border-border hover:bg-muted/25"
                               }`}
                             >
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-center gap-3">
                                 <span
                                   className={`flex size-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                                     isSelected
@@ -2123,7 +2183,7 @@ export default function TeamPage() {
                                 >
                                   {staffInitials(displayName)}
                                 </span>
-                                <div className="min-w-0 flex-1 space-y-1">
+                                <div className="min-w-0 flex-1 space-y-0.5">
                                   <div className="flex items-start justify-between gap-2">
                                     <p className="truncate font-semibold text-foreground">{displayName}</p>
                                     <span
@@ -2135,23 +2195,31 @@ export default function TeamPage() {
                                       {staff.isActive ? t("team.active") : t("services.hiddenStatus")}
                                     </span>
                                   </div>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                  <p className="truncate text-xs text-muted-foreground xl:hidden">
+                                    {staffRoleLabel}
+                                    {svcNames ? ` · ${svcNames}` : ` · ${t("team.noServicesAssigned")}`}
+                                  </p>
+                                  <p className="hidden truncate text-xs text-muted-foreground xl:block">
                                     {(staff.email ?? "").trim() || "—"}
                                   </p>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                  <p className="hidden truncate text-xs text-muted-foreground xl:block">
                                     {(staff.phone ?? "").trim() || "—"}
                                   </p>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                  <p className="hidden truncate text-xs text-muted-foreground xl:block">
                                     {t("team.panelRole")}:{" "}
                                     <span className="text-foreground/80">{staffRoleLabel}</span>
                                   </p>
-                                  <p className="truncate text-xs text-muted-foreground">
+                                  <p className="hidden truncate text-xs text-muted-foreground xl:block">
                                     {t("team.servicesShort")}:{" "}
                                     <span className="text-foreground/80">
                                       {svcNames || t("team.noServicesAssigned")}
                                     </span>
                                   </p>
                                 </div>
+                                <ChevronRight
+                                  className="size-4 shrink-0 text-muted-foreground xl:hidden"
+                                  aria-hidden
+                                />
                               </div>
                             </button>
                           )
@@ -2161,7 +2229,7 @@ export default function TeamPage() {
 
                   {access.ready && access.canManageInvitations ? (
                     <TabsContent value="invites" className="mt-0">
-                      <div className="premium-scrollbar max-h-[min(52vh,32rem)] space-y-3 overflow-y-auto pr-0.5">
+                      <div className="premium-scrollbar space-y-3 xl:max-h-[min(52vh,32rem)] xl:overflow-y-auto xl:pr-0.5">
                         <p className="px-1 text-xs leading-relaxed text-muted-foreground">
                           {t("invitations.pendingInvitationsEmailHint")}
                         </p>
@@ -2239,6 +2307,24 @@ export default function TeamPage() {
             </Card>
           </div>
 
+          <div
+            className={cn(
+              "min-w-0",
+              !mobileFormOpen && "hidden xl:block",
+              mobileFormOpen && "pb-mobile-sticky-page",
+            )}
+            onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}
+          >
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="mb-3 h-11 w-fit touch-manipulation rounded-xl xl:hidden"
+            onClick={closeMobileForm}
+          >
+            <ChevronLeft className="mr-1 size-4" aria-hidden />
+            {t("team.mobileBackToList")}
+          </Button>
           <Card
             data-tour="team-person-form"
             className="min-w-0 overflow-hidden rounded-2xl border border-border shadow-sm shadow-slate-900/5"
@@ -2285,37 +2371,47 @@ export default function TeamPage() {
                 }}
                 className="min-w-0 space-y-6"
               >
-                <Tabs
-                  value={formTab}
-                  onValueChange={(v) => {
-                    const allowed =
-                      v === "panel" || v === "services" || v === "schedule" || v === "exceptions" ? v : "profile"
-                    setFormTab(allowed)
-                  }}
-                  className="min-w-0 w-full"
-                >
-                  <div className="min-w-0 border-b border-border/70 pb-1">
+                <Tabs value={formTab} onValueChange={setFormTabSafe} className="min-w-0 w-full">
+                  <div className="min-w-0 pb-3 xl:hidden">
+                    <Label htmlFor="team-form-section-mobile" className="sr-only">
+                      {t("team.mobileFormSectionLabel")}
+                    </Label>
+                    <Select value={formTab} onValueChange={setFormTabSafe}>
+                      <SelectTrigger
+                        id="team-form-section-mobile"
+                        className="h-11 w-full touch-manipulation rounded-xl"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formTabOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(option.labelKey)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="hidden min-w-0 border-b border-border/70 pb-1 xl:block">
                     <TabsList
                       variant="line"
                       className="h-auto w-full flex-wrap justify-start gap-x-0.5 gap-y-1 p-0"
                     >
                       <TabsTrigger
                         value="profile"
-                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-3 text-sm"
                       >
                         {t("team.personDetailsSection")}
                       </TabsTrigger>
                       {access.canManageInvitations ? (
-                        <TabsTrigger
-                          value="panel"
-                          className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
-                        >
+                        <TabsTrigger value="panel" className="h-9 max-w-full shrink-0 rounded-lg px-3 text-sm">
                           {t("team.panelAccessSection")}
                         </TabsTrigger>
                       ) : null}
                       <TabsTrigger
                         value="services"
-                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
+                        className="h-9 max-w-full shrink-0 rounded-lg px-3 text-sm"
                         data-tour={
                           staffServiceTourNeedsServicesTab
                             ? "team-staff-service-target"
@@ -2324,16 +2420,10 @@ export default function TeamPage() {
                       >
                         {t("team.servicesForStaff")}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="schedule"
-                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
-                      >
+                      <TabsTrigger value="schedule" className="h-9 max-w-full shrink-0 rounded-lg px-3 text-sm">
                         {t("team.schedule")}
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="exceptions"
-                        className="h-9 max-w-full shrink-0 rounded-lg px-2 text-xs focus-visible:ring-inset sm:px-3 sm:text-sm"
-                      >
+                      <TabsTrigger value="exceptions" className="h-9 max-w-full shrink-0 rounded-lg px-3 text-sm">
                         {t("team.scheduleExceptionsTitle")}
                       </TabsTrigger>
                     </TabsList>
@@ -3043,7 +3133,7 @@ export default function TeamPage() {
                 </Tabs>
 
                 {editing ? (
-                  <div className="mt-6 flex min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                  <div className="mt-6 hidden min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 xl:flex xl:flex-row xl:items-center xl:justify-end">
                     <Button
                       type="button"
                       variant="outline"
@@ -3064,7 +3154,7 @@ export default function TeamPage() {
                 ) : null}
 
                 {!editing ? (
-                  <div className="mt-6 flex min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="mt-6 hidden min-w-0 flex-col-reverse gap-3 border-t border-border/70 bg-muted/15 pt-4 xl:flex xl:flex-row xl:items-center xl:justify-between xl:gap-4">
                     <Button
                       type="button"
                       variant="ghost"
@@ -3089,6 +3179,56 @@ export default function TeamPage() {
               </form>
             </CardContent>
           </Card>
+
+          {mobileFormOpen ? (
+            <MobileFixedActionBar>
+              {editing ? (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="submit"
+                    form="team-person-form"
+                    className="h-11 w-full touch-manipulation rounded-xl"
+                    disabled={saving}
+                  >
+                    {saving ? t("common.saving") : t("team.saveChanges")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full touch-manipulation rounded-xl"
+                    disabled={saving}
+                    onClick={handleGlobalCancelChanges}
+                  >
+                    {t("team.cancelChanges")}
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="submit"
+                    form="team-person-form"
+                    className="h-11 w-full touch-manipulation rounded-xl"
+                    disabled={saving}
+                  >
+                    {saving ? t("common.saving") : submitLabel}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-11 w-full touch-manipulation rounded-xl text-muted-foreground"
+                    disabled={saving}
+                    onClick={() => {
+                      setForm(emptyForm())
+                      setNotice(null)
+                    }}
+                  >
+                    {t("team.clearForm")}
+                  </Button>
+                </div>
+              )}
+            </MobileFixedActionBar>
+          ) : null}
+          </div>
         </div>
       </PageShell>
     </AppShell>
