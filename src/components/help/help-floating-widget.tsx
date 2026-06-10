@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { HelpCircle, LifeBuoy, MessageCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ const HIDE_PREFIXES = ["/rezerwacje/", "/book/", "/confirm/"]
 const PANEL_PREFIXES = [
   "/dashboard",
   "/appointments",
+  "/more",
   "/schedule",
   "/statystyki",
   "/services",
@@ -30,7 +31,6 @@ const PANEL_PREFIXES = [
 export function HelpFloatingWidget() {
   const { t } = useTranslations()
   const pathname = usePathname()
-  const router = useRouter()
   const [open, setOpen] = React.useState(false)
   const [isMobile, setIsMobile] = React.useState(false)
 
@@ -51,11 +51,9 @@ export function HelpFloatingWidget() {
 
   if (shouldHide) return null
 
+  if (isMobile) return null
+
   const openHelp = () => {
-    if (isMobile) {
-      router.push("/help")
-      return
-    }
     setOpen(true)
   }
 
@@ -66,7 +64,7 @@ export function HelpFloatingWidget() {
         title={t("navigation.help")}
         aria-label={t("navigation.help")}
         onClick={openHelp}
-        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] right-4 z-40 inline-flex size-12 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg shadow-slate-900/15 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:bottom-5 lg:right-5 lg:size-11"
+        className="fixed bottom-5 right-5 z-40 hidden size-11 items-center justify-center rounded-full border border-border bg-card text-foreground shadow-lg shadow-slate-900/15 transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:inline-flex"
       >
         <HelpCircle className="size-5" aria-hidden />
       </button>

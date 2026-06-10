@@ -57,12 +57,19 @@ export function CustomersList({ rows }: { rows: CustomerCrmRow[] }) {
         </table>
       </div>
 
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-2.5 md:hidden">
         {rows.map((row) => (
-          <Link key={row.id} href={`/klienci/${encodeURIComponent(row.id)}`} className="block">
+          <Link
+            key={row.id}
+            href={`/klienci/${encodeURIComponent(row.id)}`}
+            className="block touch-manipulation active:opacity-90"
+          >
             <Card className="rounded-2xl border border-border shadow-sm transition-colors hover:border-primary/30 hover:bg-muted/20">
-              <CardContent className="space-y-3 p-4">
-                <p className="font-semibold text-foreground">{row.fullName}</p>
+              <CardContent className="space-y-3 p-4 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-base font-semibold leading-snug text-foreground">{row.fullName}</p>
+                  <ChevronRight className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   {row.phone ? (
                     <span className="inline-flex items-center gap-1">

@@ -3,32 +3,19 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  BadgeCheck,
-  Ban,
-  CheckCircle2,
-  CalendarDays,
-  ListTodo,
-  Sparkles,
-} from "lucide-react"
+import { AlertTriangle, Sparkles } from "lucide-react"
 
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
+import { DashboardDayStatsStrip } from "@/components/dashboard/dashboard-day-stats-strip"
+import { DashboardNextAppointment } from "@/components/dashboard/dashboard-next-appointment"
+import { DashboardRecentActivity } from "@/components/dashboard/dashboard-recent-activity"
+import { DashboardSmsAlert } from "@/components/dashboard/dashboard-sms-alert"
+import { DashboardTodayList } from "@/components/dashboard/dashboard-today-list"
 import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
-import { AppointmentStaffCaption } from "@/components/shared/appointment-staff-caption"
-import { BookingSourceBadge } from "@/components/shared/booking-source-badge"
-import { StatusBadge } from "@/components/shared/status-badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { APPOINTMENT_ROW_STATUS_ORDER } from "@/lib/appointments/appointment-status-order"
-import { isAppointmentVisitLocked } from "@/lib/appointments/appointment-visit-lock"
 import {
   APPOINTMENTS_PANEL_DISMISSED_EVENT,
   filterDismissedAppointments,
@@ -39,10 +26,7 @@ import {
   useAppointmentsStore,
 } from "@/lib/appointments/appointments-store"
 import { appointmentsManualCreateHref } from "@/lib/appointments/appointments-manual-create-path"
-import {
-  appointmentShowsNeedsActionStatus,
-  isPlannedVisitForDashboardStats,
-} from "@/lib/appointments/stats-rules"
+import { isPlannedVisitForDashboardStats } from "@/lib/appointments/stats-rules"
 import { getTodayDashboardStats, type TodayDashboardStats } from "@/lib/dashboard/today-dashboard-stats"
 import { formatTodayAppointmentsLabel } from "@/lib/dashboard/today-appointments-label"
 import { getAppToday } from "@/lib/date/current-date"
@@ -52,55 +36,21 @@ import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { AppointmentStatus } from "@/types/domain"
 
 const DASHBOARD_TIP_COUNT = 16
-
-function MiniStat({
-  label,
-  value,
-  icon: Icon,
-  href,
-}: {
-  label: string
-  value: number
-  icon: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>
-  href: string
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex h-full min-h-[5.75rem] touch-manipulation flex-col rounded-2xl border border-border bg-card px-3.5 py-3.5 shadow-sm shadow-slate-900/5 outline-none transition-colors hover:border-primary/40 hover:bg-muted/25 focus-visible:ring-2 focus-visible:ring-ring sm:min-h-[5.25rem] sm:py-3"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-2xl bg-muted text-primary">
-          <Icon className="size-4" aria-hidden />
-        </span>
-      </div>
-      <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">{value}</p>
-    </Link>
-  )
-}
+const TERMINAL_STATUSES = new Set<AppointmentStatus>(["cancelled", "completed", "no_show"])
 
 function TipCard() {
   const { t } = useTranslations()
-  const [tipIndex, setTipIndex] = React.useState(
-    () => new Date().getDate() % DASHBOARD_TIP_COUNT
-  )
-
+  const [tipIndex, setTipIndex] = React.useState(() => new Date().getDate() % DASHBOARD_TIP_COUNT)
   const tipKey = `dashboard.tipItems.${tipIndex}`
 
   return (
     <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
       <CardHeader className="flex flex-row items-start gap-2">
-        <Sparkles
-          className="mt-0.5 size-4 shrink-0 text-primary"
-          aria-hidden
-        />
+        <Sparkles className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
         <CardTitle className="text-sm font-semibold">{t("dashboard.tip")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          {t(tipKey)}
-        </p>
+        <p className="text-sm leading-relaxed text-muted-foreground">{t(tipKey)}</p>
         <Button
           type="button"
           variant="ghost"
@@ -168,40 +118,48 @@ export default function DashboardPage() {
     )
   }
 
-
   const todaysList = React.useMemo(
     () => getAppointmentsForToday(appointments, appToday),
     [appointments, appToday],
   )
   const plannedToday = React.useMemo(
     () => todaysList.filter((a) => isPlannedVisitForDashboardStats(a, currentTime)),
-    [currentTime, todaysList]
+    [currentTime, todaysList],
   )
   const todaysListSorted = React.useMemo(
-    () =>
-      [...todaysList].sort(
-        (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
-      ),
+    () => [...todaysList].sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()),
     [todaysList],
   )
   const fallbackStats = React.useMemo<TodayDashboardStats>(() => {
     const confirmedTodayCount = plannedToday.length
     const cancelledTodayCount = todaysList.filter((a) => a.status === "cancelled").length
     const completedTodayCount = todaysList.filter((a) => a.status === "completed").length
+    const pendingTodayCount = todaysList.filter(
+      (a) => a.status === "pending" || a.status === "booked",
+    ).length
     return {
       todayAppointmentsCount: confirmedTodayCount,
       confirmedTodayCount,
       cancelledTodayCount,
       completedTodayCount,
-      pendingTodayCount: 0,
+      pendingTodayCount,
       requiresActionCount: 0,
       reminderErrorsCount: 0,
     }
   }, [plannedToday.length, todaysList])
-  const visitsTodayComputed = plannedToday.length
-  const confirmedToday = plannedToday.length
-  const cancelledToday = stats.cancelledTodayCount
-  const completedToday = todaysList.filter((a) => a.status === "completed").length
+
+  const nextAppointment = React.useMemo(() => {
+    const now = currentTime.getTime()
+    const upcoming = todaysListSorted.find(
+      (a) => !TERMINAL_STATUSES.has(a.status) && new Date(a.startsAt).getTime() >= now,
+    )
+    if (upcoming) return upcoming
+    return todaysListSorted.find((a) => !TERMINAL_STATUSES.has(a.status)) ?? null
+  }, [currentTime, todaysListSorted])
+
+  const confirmedCount = statsReady ? stats.confirmedTodayCount : fallbackStats.confirmedTodayCount
+  const pendingCount = statsReady ? stats.pendingTodayCount : fallbackStats.pendingTodayCount
+  const problemsCount = statsReady ? stats.requiresActionCount : 0
 
   const timeFmt = React.useMemo(
     () =>
@@ -209,7 +167,7 @@ export default function DashboardPage() {
         hour: "2-digit",
         minute: "2-digit",
       }),
-    [language]
+    [language],
   )
 
   React.useEffect(() => {
@@ -326,7 +284,6 @@ export default function DashboardPage() {
     currentStatus: AppointmentStatus,
     nextStatus: AppointmentStatus,
   ) => {
-    if (isAppointmentVisitLocked(currentStatus) || currentStatus === nextStatus) return
     void (async () => {
       const ok = await updateAppointmentStatus(appointmentId, nextStatus, {
         lastUpdatedBy: "business",
@@ -336,6 +293,16 @@ export default function DashboardPage() {
       setStatusNotice(t("appointments.statusUpdated"))
     })()
   }
+
+  const daySummary = (() => {
+    if (statsContextState === "login_required") return t("dashboard.signInToSeePlan")
+    if (statsContextState === "no_data") return t("dashboard.noDataInBrowser")
+    if (!statsReady) {
+      return statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")
+    }
+    if (plannedToday.length === 0) return t("dashboard.noAppointmentsTodayLong")
+    return formatTodayAppointmentsLabel(plannedToday.length, language)
+  })()
 
   return (
     <AppShell
@@ -349,180 +316,49 @@ export default function DashboardPage() {
             {statusNotice}
           </div>
         ) : null}
-        <Card className="rounded-2xl border border-border bg-[color:var(--nav-active-bg)] shadow-sm shadow-slate-900/5">
-          <CardContent className="grid gap-4 py-5 sm:py-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-            <div className="min-w-0">
-              <p className="inline-flex items-center gap-2 rounded-full bg-card/70 px-3 py-1 text-xs font-semibold text-primary">
-                <CalendarDays className="size-4" aria-hidden />
-                {t("dashboard.heroTitle")}
-              </p>
-              <h2 className="mt-3 text-xl font-semibold leading-tight text-foreground sm:text-2xl">
-                {statsContextState === "login_required" ? (
-                  <span className="text-muted-foreground">{t("dashboard.signInToSeePlan")}</span>
-                ) : statsContextState === "no_data" ? (
-                  <span className="text-muted-foreground">{t("dashboard.noDataInBrowser")}</span>
-                ) : !statsReady ? (
-                  statsError ? (
-                    <span className="text-destructive">{t("dashboard.summaryLoadFailed")}</span>
-                  ) : (
-                    <span className="text-muted-foreground">{t("dashboard.statsLoading")}</span>
-                  )
-                ) : visitsTodayComputed === 0 ? (
-                  t("dashboard.noAppointmentsTodayLong")
-                ) : (
-                  formatTodayAppointmentsLabel(visitsTodayComputed, language)
-                )}
-              </h2>
-              {statsContextState || !statsReady || statsError ? (
-                <p className="mt-1.5 text-sm text-muted-foreground">
-                  {statsContextState
-                    ? null
-                    : statsError
-                      ? t("dashboard.summaryLoadFailed")
-                      : t("dashboard.statsLoading")}
-                </p>
-              ) : null}
-            </div>
-            <div className="grid min-h-[5.25rem] grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-              {statsContextState ? (
-                <div className="sm:col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
-                  {statsContextState === "login_required"
-                    ? t("dashboard.signInToSeePlan")
-                    : t("dashboard.noDataInBrowser")}
-                </div>
-              ) : !statsReady ? (
-                <div className="sm:col-span-3 flex items-center rounded-2xl border border-border bg-muted/25 px-3 py-3 text-sm text-muted-foreground">
-                  {statsError ? t("dashboard.summaryLoadFailed") : t("dashboard.statsLoading")}
-                </div>
-              ) : (
-                <>
-                  <MiniStat
-                    label={t("dashboard.confirmed")}
-                    value={confirmedToday}
-                    icon={CheckCircle2}
-                    href="/appointments?status=confirmed&date=today"
-                  />
-                  <MiniStat
-                    label={t("dashboard.cancelled")}
-                    value={cancelledToday}
-                    icon={Ban}
-                    href="/appointments?status=cancelled&date=today"
-                  />
-                  <MiniStat
-                    label={t("dashboard.completed")}
-                    value={completedToday}
-                    icon={BadgeCheck}
-                    href="/appointments?status=completed&date=today"
-                  />
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr] lg:items-start">
-          <div className="min-w-0 space-y-6">
+        <p className="text-sm text-muted-foreground">{daySummary}</p>
 
-            <Card
-              data-tour="dashboard-today"
-              className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5"
-            >
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <ListTodo className="size-4 text-primary" aria-hidden />
-                  <CardTitle className="text-sm font-semibold">
-                    {t("dashboard.todaysAppointments")}
-                  </CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
-                  {!statsReady ? (
-                    <li className="px-4 py-5 text-sm text-muted-foreground">
-                      {appointmentsLoadError ? t("dashboard.statsLoadError") : t("dashboard.statsLoading")}
-                    </li>
-                  ) : todaysListSorted.length === 0 ? (
-                    <li className="px-4 py-8 text-center">
-                      <p className="text-sm font-medium text-foreground">
-                        {t("dashboard.noAppointmentsTodayShort")}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {t("dashboard.emptyTodayHint")}
-                      </p>
-                      <Button asChild className="mt-4 h-10 rounded-xl" size="sm">
-                        <Link href={appointmentsManualCreateHref()}>{t("dashboard.emptyTodayCta")}</Link>
-                      </Button>
-                    </li>
-                  ) : (
-                    todaysListSorted.map((row) => {
-                    const when = new Date(row.startsAt)
-                    const visitLocked = isAppointmentVisitLocked(row.status)
-                    const statusOptions = APPOINTMENT_ROW_STATUS_ORDER.filter((s) => s !== row.status)
-                    return (
-                      <li key={row.id} className="flex items-start justify-between gap-3 px-4 py-3.5 sm:py-3">
-                        <div className="flex min-w-0 gap-3">
-                          <span className="inline-flex h-7 shrink-0 items-center rounded-full bg-muted px-3 text-xs font-semibold tabular-nums text-primary">
-                            {timeFmt.format(when)}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <p className="font-semibold text-foreground">
-                                {row.clientName}
-                              </p>
-                              <BookingSourceBadge source={row.source} variant="short" />
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              {row.serviceLabel}
-                            </p>
-                            <AppointmentStaffCaption
-                              appointment={row}
-                              variant="compact"
-                              className="mt-0.5"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-start gap-2 pt-0.5">
-                          <StatusBadge
-                            status={row.status}
-                            needsAction={appointmentShowsNeedsActionStatus(row, currentTime)}
-                          />
-                          {!visitLocked && statusOptions.length > 0 ? (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-10 min-w-[2.75rem] rounded-xl px-3 text-xs sm:h-8"
-                                >
-                                  {t("appointments.changeStatusAction")}
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56">
-                                {statusOptions.map((status) => (
-                                  <DropdownMenuItem
-                                    key={status}
-                                    onClick={() =>
-                                      changeStatusFromDashboard(row.id, row.status, status)
-                                    }
-                                  >
-                                    {t(`labels.appointmentStatus.${status}` as "labels.appointmentStatus.booked")}
-                                  </DropdownMenuItem>
-                                ))}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          ) : null}
-                        </div>
-                      </li>
-                    )
-                    })
-                  )}
-                </ul>
-              </CardContent>
-            </Card>
+        {statsReady && problemsCount > 0 ? (
+          <Link
+            href="/appointments?filter=needs_action"
+            className="mt-3 flex min-h-11 touch-manipulation items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-100"
+          >
+            <AlertTriangle className="size-4 shrink-0" aria-hidden />
+            <span>{t("dashboard.daySummaryProblems").replace("{count}", String(problemsCount))}</span>
+          </Link>
+        ) : null}
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-6 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-6">
+          <div className="min-w-0 space-y-4 lg:space-y-5">
+            <DashboardNextAppointment
+              appointment={nextAppointment}
+              currentTime={currentTime}
+              loading={!statsReady}
+              timeFmt={timeFmt}
+            />
+
+            <DashboardTodayList
+              rows={todaysListSorted}
+              loading={!statsReady}
+              loadError={Boolean(appointmentsLoadError)}
+              currentTime={currentTime}
+              timeFmt={timeFmt}
+              onChangeStatus={changeStatusFromDashboard}
+            />
+
+            <DashboardDayStatsStrip
+              confirmed={confirmedCount}
+              pending={pendingCount}
+              loading={!statsReady}
+            />
+
+            <DashboardSmsAlert />
+
+            <DashboardRecentActivity businessId={businessId} appointments={appointments} />
           </div>
 
-          <aside className="min-w-0 space-y-6 lg:sticky lg:top-6">
+          <aside className="hidden min-w-0 space-y-6 lg:sticky lg:top-6 lg:block">
             <OnboardingDashboardCard />
             <TipCard />
           </aside>

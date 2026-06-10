@@ -5,6 +5,7 @@ import * as React from "react"
 import { buildCustomerCrmRows, buildCustomerKpis } from "@/lib/customers/build-customer-crm"
 import type { CustomerCrmRow, CustomerKpis } from "@/lib/customers/customer-types"
 import { fetchMergedAppointments } from "@/lib/appointments/appointments-store"
+import { CLIENTS_CHANGED_EVENT } from "@/lib/clients/persist-new-client"
 import { loadClientsWorkspace } from "@/lib/clients/clients-store"
 import { getBookingsForBusiness } from "@/lib/bookings/bookings-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -31,6 +32,12 @@ export function useCustomersCrm(businessId: string | null | undefined): Customer
   const [reloadToken, setReloadToken] = React.useState(0)
 
   const reload = React.useCallback(() => setReloadToken((n) => n + 1), [])
+
+  React.useEffect(() => {
+    const onClientsChanged = () => reload()
+    window.addEventListener(CLIENTS_CHANGED_EVENT, onClientsChanged)
+    return () => window.removeEventListener(CLIENTS_CHANGED_EVENT, onClientsChanged)
+  }, [reload])
 
   React.useEffect(() => {
     if (!businessId) {

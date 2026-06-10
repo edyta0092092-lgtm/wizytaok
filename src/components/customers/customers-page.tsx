@@ -9,9 +9,41 @@ import { CustomersKpiGrid } from "@/components/customers/customers-kpi-grid"
 import { CustomersList } from "@/components/customers/customers-list"
 import { CustomersListSkeleton } from "@/components/customers/customers-list-skeleton"
 import { filterCustomerRows } from "@/lib/customers/filter-customers"
+import type { CustomerCrmRow } from "@/lib/customers/customer-types"
 import { useCustomersCrm } from "@/lib/customers/use-customers-crm"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
+import { cn } from "@/lib/utils"
+
+function CustomersListSection({
+  ready,
+  loadError,
+  filtered,
+  totalRows,
+  t,
+}: {
+  ready: boolean
+  loadError: boolean
+  filtered: CustomerCrmRow[]
+  totalRows: number
+  t: (key: string) => string
+}) {
+  if (!ready) return <CustomersListSkeleton />
+
+  if (loadError) {
+    return (
+      <p className="text-sm text-destructive" role="alert">
+        {t("customers.loadError")}
+      </p>
+    )
+  }
+
+  if (filtered.length === 0) {
+    return <CustomersEmptyState filtered={totalRows > 0} />
+  }
+
+  return <CustomersList rows={filtered} />
+}
 
 export function CustomersPage() {
   const { t } = useTranslations()
@@ -21,11 +53,14 @@ export function CustomersPage() {
   )
 
   const [query, setQuery] = React.useState("")
+  const deferredQuery = React.useDeferredValue(query)
 
   const filtered = React.useMemo(
-    () => filterCustomerRows(rows, query, "all"),
-    [rows, query],
+    () => filterCustomerRows(rows, deferredQuery, "all"),
+    [rows, deferredQuery],
   )
+
+  const isSearchPending = query !== deferredQuery
 
   const kpiCopy = React.useMemo(
     () => ({
@@ -37,30 +72,60 @@ export function CustomersPage() {
     [t],
   )
 
-  return (
-    <div className="flex flex-col gap-6">
-      <CustomersKpiGrid kpis={kpis} copy={kpiCopy} />
+  const searchToolbar = (
+    <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <div className="min-w-0 flex-1">
+        <CustomersFiltersBar
+          query={query}
+          onQueryChange={setQuery}
+          isPending={isSearchPending}
+        />
+      </div>
+      <CustomersExportButton
+        rows={filtered}
+        className="h-11 shrink-0 touch-manipulation gap-1.5 rounded-xl px-3 text-sm md:h-9"
+      />
+    </div>
+  )
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <CustomersFiltersBar query={query} onQueryChange={setQuery} />
+  const listSection = (
+    <CustomersListSection
+      ready={ready}
+      loadError={loadError}
+      filtered={filtered}
+      totalRows={rows.length}
+      t={t}
+    />
+  )
+
+  return (
+    <div className="flex flex-col">
+      {/* Desktop: KPI → wyszukiwarka → lista (bez zmian) */}
+      <div className="hidden flex-col gap-6 md:flex">
+        <CustomersKpiGrid kpis={kpis} copy={kpiCopy} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {searchToolbar}
         </div>
-        <CustomersExportButton rows={filtered} className="shrink-0 self-start" />
+        {listSection}
       </div>
 
-      {!ready ? <CustomersListSkeleton /> : null}
+      {/* Mobile: wyszukiwarka (sticky) → lista → KPI */}
+      <div className="flex flex-col gap-4 md:hidden">
+        <div
+          className={cn(
+            "sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 py-3 backdrop-blur-md",
+            "supports-[backdrop-filter]:bg-background/80",
+          )}
+        >
+          {searchToolbar}
+        </div>
 
-      {ready && loadError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {t("customers.loadError")}
-        </p>
-      ) : null}
+        {listSection}
 
-      {ready && !loadError && filtered.length === 0 ? (
-        <CustomersEmptyState filtered={rows.length > 0} />
-      ) : null}
-
-      {ready && !loadError && filtered.length > 0 ? <CustomersList rows={filtered} /> : null}
+        <div className="border-t border-border/70 pt-1">
+          <CustomersKpiGrid kpis={kpis} copy={kpiCopy} className="grid-cols-2" />
+        </div>
+      </div>
     </div>
   )
 }

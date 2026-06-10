@@ -6,10 +6,11 @@ import { PanelLeftClose, PanelLeftOpen } from "lucide-react"
 
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { AppTopbar } from "@/components/layout/app-topbar"
+import { MobileActionFab } from "@/components/layout/mobile-action-fab"
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav"
+import { MobilePanelOverlays } from "@/components/layout/mobile-panel-overlays"
 import { PwaInstallBanner } from "@/components/pwa/pwa-install-banner"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { useDeferUntilIdle } from "@/lib/react/use-defer-until-idle"
 import { cn } from "@/lib/utils"
 
@@ -49,7 +50,6 @@ export function AppShell({
   const SIDEBAR_WIDTH_KEY = "pw_sidebar_width_v1"
   const SIDEBAR_COLLAPSED_KEY = "pw_sidebar_collapsed_v1"
 
-  const [mobileOpen, setMobileOpen] = React.useState(false)
   const [sidebarWidth, setSidebarWidth] = React.useState(() => {
     if (typeof window === "undefined") return SIDEBAR_DEFAULT
     const stored = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY))
@@ -160,31 +160,23 @@ export function AppShell({
         </div>
       ) : null}
 
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent
-          side="left"
-          className="premium-scrollbar w-[min(100%,18rem)] border-border bg-[var(--sidebar)] p-0 sm:max-w-xs"
-          showCloseButton
-        >
-          <AppSidebar onNavigate={() => setMobileOpen(false)} />
-        </SheetContent>
-      </Sheet>
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppTopbar
-          title={title}
-          pageDescription={pageDescription}
-          primaryAction={primaryAction}
-          onMenuClick={() => setMobileOpen(true)}
-        />
-        <div className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-4 sm:px-6 sm:pt-5 lg:px-10 lg:pb-10">
-          {children}
+      <MobilePanelOverlays className="flex min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <AppTopbar
+            title={title}
+            pageDescription={pageDescription}
+            primaryAction={primaryAction}
+          />
+          <div className="mx-auto w-full max-w-[1320px] flex-1 px-4 pb-[calc(5rem+env(safe-area-inset-bottom,0px))] pt-4 sm:px-6 sm:pt-5 lg:px-10 lg:pb-10">
+            {children}
+          </div>
         </div>
-      </div>
+      </MobilePanelOverlays>
       <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col lg:hidden">
         <PwaInstallBanner />
         <MobileBottomNav />
       </div>
+      <MobileActionFab />
       <DeferredHelpFloatingWidget />
     </div>
   )

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 
 import { mobileBottomNavItems } from "@/config/mobile-bottom-nav"
+import { isMobileBottomNavActive } from "@/lib/navigation/mobile-nav-active"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 
@@ -17,11 +18,9 @@ export function MobileBottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       aria-label={t("pwa.bottomNavAria")}
     >
-      <ul className="mx-auto grid max-w-lg grid-cols-4 gap-0 px-1 pt-1">
+      <ul className="mx-auto grid max-w-lg grid-cols-5 gap-0 px-0.5 pt-1">
         {mobileBottomNavItems.map((item) => {
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href))
+          const active = isMobileBottomNavActive(pathname ?? "", item.href)
           const Icon = item.icon
           const label = t(item.labelKey)
           return (
@@ -29,7 +28,7 @@ export function MobileBottomNav() {
               <Link
                 href={item.href}
                 className={cn(
-                  "flex min-h-[3.25rem] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[0.65rem] font-medium leading-tight transition-colors sm:text-[0.7rem]",
+                  "flex min-h-[3.25rem] touch-manipulation flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[0.6rem] font-medium leading-tight transition-colors sm:px-1 sm:text-[0.65rem]",
                   active
                     ? "text-teal-700 dark:text-teal-200"
                     : "text-muted-foreground hover:text-foreground"

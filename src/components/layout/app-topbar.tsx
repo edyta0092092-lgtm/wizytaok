@@ -1,15 +1,16 @@
 "use client"
 
-import { Menu } from "lucide-react"
+import Link from "next/link"
+import { HelpCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { useTranslations } from "@/lib/i18n/use-translations"
 import { cn } from "@/lib/utils"
 
 type AppTopbarProps = {
   title?: string
   pageDescription?: string
   primaryAction?: React.ReactNode
-  onMenuClick?: () => void
   className?: string
 }
 
@@ -17,9 +18,10 @@ export function AppTopbar({
   title,
   pageDescription,
   primaryAction,
-  onMenuClick,
   className,
 }: AppTopbarProps) {
+  const { t } = useTranslations()
+
   return (
     <header
       className={cn(
@@ -28,16 +30,6 @@ export function AppTopbar({
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-11 shrink-0 touch-manipulation text-muted-foreground hover:text-foreground lg:hidden lg:size-9"
-          onClick={onMenuClick}
-          aria-label="Menu"
-        >
-          <Menu className="size-[1.125rem]" />
-        </Button>
         {title ? (
           <div className="min-w-0 flex-1">
             <h1 className="text-panel-title">{title}</h1>
@@ -50,9 +42,20 @@ export function AppTopbar({
         ) : null}
       </div>
 
-      {primaryAction ? (
-        <div className="flex shrink-0 items-center gap-2">{primaryAction}</div>
-      ) : null}
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-10 touch-manipulation text-muted-foreground hover:text-foreground lg:hidden"
+          asChild
+        >
+          <Link href="/help" aria-label={t("navigation.help")}>
+            <HelpCircle className="size-5" aria-hidden />
+          </Link>
+        </Button>
+        {primaryAction ? primaryAction : null}
+      </div>
     </header>
   )
 }

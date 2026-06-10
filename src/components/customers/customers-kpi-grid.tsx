@@ -5,6 +5,7 @@ import { RefreshCw, UserMinus, UserPlus, Users } from "lucide-react"
 
 import { KpiCard } from "@/components/shared/kpi-card"
 import type { CustomerKpis } from "@/lib/customers/customer-types"
+import { cn } from "@/lib/utils"
 
 export type CustomersKpiCopy = {
   total: string
@@ -13,7 +14,15 @@ export type CustomersKpiCopy = {
   lost: string
 }
 
-export function CustomersKpiGrid({ kpis, copy }: { kpis: CustomerKpis; copy: CustomersKpiCopy }) {
+export function CustomersKpiGrid({
+  kpis,
+  copy,
+  className,
+}: {
+  kpis: CustomerKpis
+  copy: CustomersKpiCopy
+  className?: string
+}) {
   const cards: Array<{ label: string; value: string; icon: LucideIcon }> = [
     { label: copy.total, value: String(kpis.totalCustomers), icon: Users },
     { label: copy.newThisMonth, value: String(kpis.newThisMonth), icon: UserPlus },
@@ -22,7 +31,7 @@ export function CustomersKpiGrid({ kpis, copy }: { kpis: CustomerKpis; copy: Cus
   ]
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={cn("grid gap-3 sm:grid-cols-2 xl:grid-cols-4", className)}>
       {cards.map((card) => (
         <KpiCard key={card.label} {...card} />
       ))}
