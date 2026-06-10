@@ -16,7 +16,6 @@ type DashboardMobileViewProps = {
   problemsCount: number
   statsReady: boolean
   todayCount: number
-  pendingCount: number
   nextAppointment: Appointment | null
   todaysListSorted: Appointment[]
   currentTime: Date
@@ -29,7 +28,6 @@ export function DashboardMobileView({
   problemsCount,
   statsReady,
   todayCount,
-  pendingCount,
   nextAppointment,
   todaysListSorted,
   currentTime,
@@ -65,7 +63,6 @@ export function DashboardMobileView({
 
       <DashboardMobileStatTiles
         todayCount={todayCount}
-        pendingCount={pendingCount}
         unreadMessagesCount={unreadMessagesCount}
         statsLoading={!statsReady}
         messagesLoading={messagesLoading}

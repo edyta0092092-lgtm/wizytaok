@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation"
 import { AlertTriangle, Sparkles } from "lucide-react"
 
 import { AddAppointmentHeaderButton } from "@/components/appointments/add-appointment-header-button"
-import { DashboardDayStatsStrip } from "@/components/dashboard/dashboard-day-stats-strip"
 import { DashboardMobileView } from "@/components/dashboard/dashboard-mobile-view"
-import { DashboardNextAppointment } from "@/components/dashboard/dashboard-next-appointment"
-import { DashboardRecentActivity } from "@/components/dashboard/dashboard-recent-activity"
 import { DashboardSmsAlert } from "@/components/dashboard/dashboard-sms-alert"
 import { DashboardTodayList } from "@/components/dashboard/dashboard-today-list"
 import { OnboardingDashboardCard } from "@/components/onboarding/onboarding-dashboard-card"
@@ -135,15 +132,12 @@ export default function DashboardPage() {
     const confirmedTodayCount = plannedToday.length
     const cancelledTodayCount = todaysList.filter((a) => a.status === "cancelled").length
     const completedTodayCount = todaysList.filter((a) => a.status === "completed").length
-    const pendingTodayCount = todaysList.filter(
-      (a) => a.status === "pending" || a.status === "booked",
-    ).length
     return {
       todayAppointmentsCount: confirmedTodayCount,
       confirmedTodayCount,
       cancelledTodayCount,
       completedTodayCount,
-      pendingTodayCount,
+      pendingTodayCount: 0,
       requiresActionCount: 0,
       reminderErrorsCount: 0,
     }
@@ -158,8 +152,6 @@ export default function DashboardPage() {
     return todaysListSorted.find((a) => !TERMINAL_STATUSES.has(a.status)) ?? null
   }, [currentTime, todaysListSorted])
 
-  const confirmedCount = statsReady ? stats.confirmedTodayCount : fallbackStats.confirmedTodayCount
-  const pendingCount = statsReady ? stats.pendingTodayCount : fallbackStats.pendingTodayCount
   const todayVisitsCount = React.useMemo(
     () => todaysList.filter((a) => a.status !== "cancelled").length,
     [todaysList],
@@ -333,7 +325,6 @@ export default function DashboardPage() {
             problemsCount={problemsCount}
             statsReady={statsReady}
             todayCount={todayVisitsCount}
-            pendingCount={pendingCount}
             nextAppointment={nextAppointment}
             todaysListSorted={upcomingTodaySorted}
             currentTime={currentTime}
@@ -356,13 +347,6 @@ export default function DashboardPage() {
 
         <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-6 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-6">
           <div className="min-w-0 space-y-4 lg:space-y-5">
-            <DashboardNextAppointment
-              appointment={nextAppointment}
-              currentTime={currentTime}
-              loading={!statsReady}
-              timeFmt={timeFmt}
-            />
-
             <DashboardTodayList
               rows={todaysListSorted}
               loading={!statsReady}
@@ -372,15 +356,7 @@ export default function DashboardPage() {
               onChangeStatus={changeStatusFromDashboard}
             />
 
-            <DashboardDayStatsStrip
-              confirmed={confirmedCount}
-              pending={pendingCount}
-              loading={!statsReady}
-            />
-
             <DashboardSmsAlert />
-
-            <DashboardRecentActivity businessId={businessId} appointments={appointments} />
           </div>
 
           <aside className="hidden min-w-0 space-y-6 lg:sticky lg:top-6 lg:block">

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { CalendarDays, Hourglass, Mail, MessageSquare } from "lucide-react"
+import { CalendarDays, Mail, MessageSquare } from "lucide-react"
 
 import { useDashboardSmsQuota } from "@/lib/dashboard/use-dashboard-sms-quota"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils"
 
 type DashboardMobileStatTilesProps = {
   todayCount: number
-  pendingCount: number
   unreadMessagesCount: number
   statsLoading?: boolean
   messagesLoading?: boolean
@@ -57,7 +56,6 @@ function StatTile({
 
 export function DashboardMobileStatTiles({
   todayCount,
-  pendingCount,
   unreadMessagesCount,
   statsLoading,
   messagesLoading,
@@ -76,20 +74,12 @@ export function DashboardMobileStatTiles({
     sms.warningLevel === "warning_20"
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="grid grid-cols-3 gap-2.5">
       <StatTile
         href="/appointments?date=today"
         label={t("dashboard.mobileStatTodayVisits")}
         value={String(todayCount)}
         icon={CalendarDays}
-        loading={statsLoading}
-      />
-      <StatTile
-        href="/appointments?status=pending&date=today"
-        label={t("dashboard.mobileStatPending")}
-        value={String(pendingCount)}
-        icon={Hourglass}
-        accent={pendingCount > 0}
         loading={statsLoading}
       />
       <StatTile
