@@ -64,7 +64,7 @@ export function DashboardDayHero({
       <CardContent
         className={
           layout === "split"
-            ? "grid gap-4 py-5 sm:py-6 lg:grid-cols-[1.2fr_0.8fr] lg:items-center"
+            ? "grid gap-4 py-5 sm:py-6 lg:grid-cols-[1fr_minmax(18rem,0.95fr)] lg:items-center"
             : "flex flex-col gap-4 py-5"
         }
       >
@@ -76,9 +76,7 @@ export function DashboardDayHero({
           <h2 className="mt-3 text-xl font-semibold leading-tight text-foreground sm:text-2xl">{title}</h2>
           {subtitle}
         </div>
-        <div className={layout === "split" ? "grid min-h-[5.25rem] grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3" : ""}>
-          {statsSlot}
-        </div>
+        <div className="min-w-0 w-full">{statsSlot}</div>
       </CardContent>
     </Card>
   )

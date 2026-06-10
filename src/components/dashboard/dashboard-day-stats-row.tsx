@@ -49,7 +49,7 @@ export function DashboardDayStatsRow({
   }
 
   return (
-    <div className={`grid grid-cols-3 gap-2 ${className ?? ""}`}>
+    <div className={`grid w-full min-w-0 grid-cols-3 gap-2 sm:gap-3 ${className ?? ""}`}>
       <DashboardDayStatTile
         label={t("dashboard.confirmed")}
         value={confirmed}
