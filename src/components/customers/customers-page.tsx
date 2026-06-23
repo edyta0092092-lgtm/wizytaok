@@ -81,7 +81,7 @@ export function CustomersPage() {
       </div>
       <CustomersExportButton
         rows={filtered}
-        className="h-11 shrink-0 touch-manipulation gap-1.5 rounded-xl px-3 text-sm md:h-9"
+        className="h-11 shrink-0 touch-manipulation gap-1.5 rounded-xl px-3 text-sm lg:h-9"
       />
     </div>
   )
@@ -99,7 +99,7 @@ export function CustomersPage() {
   return (
     <div className="flex flex-col">
       {/* Desktop: KPI → wyszukiwarka → lista (bez zmian) */}
-      <div className="hidden flex-col gap-6 md:flex">
+      <div className="hidden flex-col gap-6 lg:flex">
         <CustomersKpiGrid kpis={kpis} copy={kpiCopy} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           {searchToolbar}
@@ -108,7 +108,7 @@ export function CustomersPage() {
       </div>
 
       {/* Mobile: KPI → wyszukiwarka (sticky) → lista */}
-      <div className="flex flex-col gap-4 md:hidden">
+      <div className="flex flex-col gap-4 lg:hidden">
         <CustomersKpiGrid
           kpis={kpis}
           copy={kpiCopy}

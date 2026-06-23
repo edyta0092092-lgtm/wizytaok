@@ -250,9 +250,9 @@ export function StatisticsDashboard() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-        <div className="relative px-5 py-6 sm:px-7 sm:py-8">
+        <div className="relative px-4 py-4 sm:px-7 sm:py-8">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-primary/10 to-transparent" />
           <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="max-w-2xl">

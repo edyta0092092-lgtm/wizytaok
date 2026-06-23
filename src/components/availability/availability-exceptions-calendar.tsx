@@ -502,7 +502,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-8 shrink-0 rounded-lg"
+                className="size-11 shrink-0 touch-manipulation rounded-xl lg:size-8 lg:rounded-lg"
                 aria-label={t("availability.prevMonth")}
                 onClick={() => {
                   const [ny, nm] = shiftMonth(viewYear, viewMonth, -1)
@@ -519,7 +519,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                 type="button"
                 variant="outline"
                 size="icon"
-                className="size-8 shrink-0 rounded-lg"
+                className="size-11 shrink-0 touch-manipulation rounded-xl lg:size-8 lg:rounded-lg"
                 aria-label={t("availability.nextMonth")}
                 onClick={() => {
                   const [ny, nm] = shiftMonth(viewYear, viewMonth, 1)
@@ -758,7 +758,7 @@ export function AvailabilityExceptionsCalendar({ businessProfileId, weeklyDays, 
                         type="button"
                         onClick={() => setMode(m)}
                         className={cn(
-                          "h-9 rounded-md text-center text-[11px] font-medium leading-tight transition-colors",
+                          "h-11 touch-manipulation rounded-md text-center text-xs font-medium leading-tight transition-colors lg:h-9 lg:text-[11px]",
                           mode === m
                             ? "bg-primary text-primary-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

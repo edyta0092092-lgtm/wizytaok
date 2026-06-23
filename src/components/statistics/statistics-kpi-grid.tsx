@@ -83,7 +83,7 @@ export function StatisticsKpiGrid({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {copy.groupAllTime}
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-3 xl:grid-cols-5">
           {allTimeCards.map((card) => (
             <KpiCard key={card.label} {...card} />
           ))}
@@ -93,7 +93,7 @@ export function StatisticsKpiGrid({
         <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {copy.groupThisMonth}
         </h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-3">
           {monthCards.map((card) => (
             <KpiCard key={card.label} {...card} />
           ))}

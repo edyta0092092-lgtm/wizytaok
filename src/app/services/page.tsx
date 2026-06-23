@@ -1,10 +1,11 @@
 ﻿"use client"
 
 import * as React from "react"
-import { ClipboardList, Clock, Pencil, Trash2 } from "lucide-react"
+import { ClipboardList, ChevronLeft, ChevronRight, Clock, Pencil, Plus, Trash2 } from "lucide-react"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
+import { MobileFixedActionBar } from "@/components/mobile/mobile-fixed-action-bar"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { EmptyState } from "@/components/shared/empty-state"
 import { semanticStatusBadgeClass } from "@/components/shared/status-tone"
@@ -28,6 +29,7 @@ import {
 } from "@/lib/services/service-break-options"
 import { Textarea } from "@/components/ui/textarea"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import { useTranslations } from "@/lib/i18n/use-translations"
 import {
   addService,
@@ -97,6 +99,23 @@ export default function ServicesPage() {
   const [hoursOpen, setHoursOpen] = React.useState(false)
   const [hoursService, setHoursService] = React.useState<Service | null>(null)
   const [confirmDeleteServiceId, setConfirmDeleteServiceId] = React.useState<string | null>(null)
+  const [mobileFormOpen, setMobileFormOpen] = React.useState(false)
+
+  const closeMobileForm = () => {
+    setMobileFormOpen(false)
+    if (!editingId) {
+      setForm(emptyForm())
+      setFieldErrors({})
+    }
+  }
+
+  const openCreateForm = () => {
+    setEditingId(null)
+    setForm(emptyForm())
+    setConfirmDeleteServiceId(null)
+    setFieldErrors({})
+    setMobileFormOpen(true)
+  }
 
   const refreshServices = React.useCallback(async () => {
     if (!access.ready) return
@@ -239,6 +258,7 @@ export default function ServicesPage() {
       await refreshServices()
       setEditingId(null)
       setForm(emptyForm())
+      setMobileFormOpen(false)
     } finally {
       setSaving(false)
     }
@@ -248,11 +268,13 @@ export default function ServicesPage() {
     setEditingId(service.id)
     setForm(formFromService(service))
     setConfirmDeleteServiceId(null)
+    setMobileFormOpen(true)
   }
 
   const cancelEditing = () => {
     setEditingId(null)
     setForm(emptyForm())
+    setMobileFormOpen(false)
   }
 
   const removeServiceItem = async (serviceId: string) => {
@@ -315,7 +337,7 @@ export default function ServicesPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={cn("grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3", mobileFormOpen && "hidden lg:grid")}>
           <Card>
             <CardContent className="px-4 py-3.5">
               <p className="text-xs text-muted-foreground">{t("services.allTitle")}</p>
@@ -346,14 +368,30 @@ export default function ServicesPage() {
           </Card>
         </div>
 
-        <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_1.3fr]">
+        <div
+          className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_1.3fr]"
+          onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}
+        >
+          <div className={cn(mobileFormOpen ? "pb-mobile-sticky-page lg:pb-0" : "hidden lg:block")}>
+            {mobileFormOpen ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="mb-3 h-11 w-fit touch-manipulation rounded-xl lg:hidden"
+                onClick={closeMobileForm}
+              >
+                <ChevronLeft className="mr-1 size-4" aria-hidden />
+                {t("services.mobileBackToList")}
+              </Button>
+            ) : null}
           <Card data-tour="services-form">
             <CardHeader>
               <CardTitle>{editingId ? t("services.editServiceTitle") : t("services.addServiceTitle")}</CardTitle>
               <CardDescription>{t("services.formDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={(event) => void saveService(event)} className="space-y-4">
+              <form id="service-form" onSubmit={(event) => void saveService(event)} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="service-name">{t("services.serviceNameLabel")}</Label>
                   <Input
@@ -478,7 +516,7 @@ export default function ServicesPage() {
                     />
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="hidden flex-wrap gap-2 lg:flex">
                   <Button type="submit" disabled={saving}>
                     {editingId ? t("services.saveChanges") : t("services.saveService")}
                   </Button>
@@ -491,10 +529,49 @@ export default function ServicesPage() {
               </form>
             </CardContent>
           </Card>
+          {mobileFormOpen ? (
+            <MobileFixedActionBar>
+              <div className="flex flex-col gap-2">
+                <Button
+                  type="submit"
+                  form="service-form"
+                  className="h-11 w-full touch-manipulation rounded-xl"
+                  disabled={saving}
+                >
+                  {saving
+                    ? t("common.saving")
+                    : editingId
+                      ? t("services.saveChanges")
+                      : t("services.saveService")}
+                </Button>
+                {editingId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 w-full touch-manipulation rounded-xl"
+                    disabled={saving}
+                    onClick={cancelEditing}
+                  >
+                    {t("services.cancelEditing")}
+                  </Button>
+                ) : null}
+              </div>
+            </MobileFixedActionBar>
+          ) : null}
+          </div>
 
-          <Card>
-            <CardHeader>
+          <Card className={cn(mobileFormOpen && "hidden lg:block")}>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
               <CardTitle>{t("services.serviceListTitle")}</CardTitle>
+              <Button
+                type="button"
+                size="sm"
+                className="h-11 shrink-0 touch-manipulation rounded-xl lg:hidden"
+                onClick={openCreateForm}
+              >
+                <Plus className="size-4" aria-hidden />
+                {t("services.addServiceTitle")}
+              </Button>
             </CardHeader>
             <CardContent>
               {!loading && !loadError && services.length === 0 ? (
@@ -504,17 +581,36 @@ export default function ServicesPage() {
                   title={t("services.emptyStateTitle")}
                   description={t("services.emptyStateDescription")}
                   actionLabel={t("services.addServiceTitle")}
-                  onAction={() => {
-                    const el = document.getElementById("service-name")
-                    el?.scrollIntoView({ behavior: "smooth", block: "center" })
-                    window.setTimeout(() => el?.focus(), 300)
-                  }}
+                  onAction={openCreateForm}
                 />
               ) : null}
 
               <ul className="space-y-2.5">
                 {services.map((service) => (
                   <li key={service.id} className="rounded-xl border border-border/80 bg-card p-3">
+                    <button
+                      type="button"
+                      className="flex w-full touch-manipulation items-center gap-3 text-left lg:hidden"
+                      onClick={() => startEditing(service)}
+                    >
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-semibold text-foreground">{service.name}</p>
+                        <span
+                          className={cn(
+                            "inline-flex w-fit",
+                            semanticStatusBadgeClass(statusTone(service.isActive), undefined),
+                          )}
+                        >
+                          {service.isActive ? t("services.activeStatus") : t("services.hiddenStatus")}
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {service.durationMinutes} {t("services.min")} · {service.price} {t("services.zł")}
+                        </p>
+                      </div>
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    </button>
+
+                    <div className="hidden lg:block">
                     <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
                       <div className="min-w-0 space-y-1">
                         <p className="text-sm font-semibold text-foreground">{service.name}</p>
@@ -565,6 +661,7 @@ export default function ServicesPage() {
                           {t("services.delete")}
                         </Button>
                       </div>
+                    </div>
                     </div>
 
                     {confirmDeleteServiceId === service.id ? (

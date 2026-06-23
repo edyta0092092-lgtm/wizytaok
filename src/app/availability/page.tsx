@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { AvailabilityExceptionsCalendar } from "@/components/availability/availability-exceptions-calendar"
+import { MobileFixedActionBar } from "@/components/mobile/mobile-fixed-action-bar"
 import { AccessDenied } from "@/components/shared/access-denied"
 import { useBusinessAccess } from "@/lib/auth/business-access-context"
 import { useTranslations } from "@/lib/i18n/use-translations"
@@ -19,6 +20,7 @@ import {
   saveAvailabilityRules,
 } from "@/lib/availability/availability-store"
 import { getBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { scrollFocusedFieldIntoView } from "@/lib/mobile/scroll-focused-field-into-view"
 import type { AvailabilityDay } from "@/types/domain"
 
 function toMinutes(time: string): number {
@@ -152,7 +154,7 @@ export default function AvailabilityPage() {
         <Button
           type="button"
           size="sm"
-          className="h-9 text-sm"
+          className="hidden h-9 text-sm lg:inline-flex"
           onClick={saveAvailability}
           disabled={loading || loadError || saving}
           data-tour="availability-save"
@@ -161,7 +163,8 @@ export default function AvailabilityPage() {
         </Button>
       }
     >
-      <PageShell>
+      <PageShell className="pb-mobile-sticky-page lg:pb-0">
+        <div onFocusCapture={(e) => scrollFocusedFieldIntoView(e.target)}>
         {loading ? (
           <p className="mb-4 text-sm text-muted-foreground" role="status">
             {t("availability.loadingAvailability")}
@@ -193,9 +196,9 @@ export default function AvailabilityPage() {
           </div>
         ) : null}
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-3 py-2.5">
+        <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-2">
+          <Card className="min-h-[4.5rem] rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:min-h-0">
+            <CardContent className="flex h-full flex-col justify-center px-3 py-3 lg:py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.workingDays")}
               </p>
@@ -205,8 +208,8 @@ export default function AvailabilityPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-3 py-2.5">
+          <Card className="min-h-[4.5rem] rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:min-h-0">
+            <CardContent className="flex h-full flex-col justify-center px-3 py-3 lg:py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.weeklyHours")}
               </p>
@@ -216,8 +219,8 @@ export default function AvailabilityPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-3 py-2.5">
+          <Card className="min-h-[4.5rem] rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:min-h-0">
+            <CardContent className="flex h-full flex-col justify-center px-3 py-3 lg:py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.earliest")}
               </p>
@@ -227,8 +230,8 @@ export default function AvailabilityPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5">
-            <CardContent className="px-3 py-2.5">
+          <Card className="min-h-[4.5rem] rounded-2xl border border-border bg-card shadow-sm shadow-slate-900/5 lg:min-h-0">
+            <CardContent className="flex h-full flex-col justify-center px-3 py-3 lg:py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
                 {t("availability.latest")}
               </p>
@@ -246,21 +249,69 @@ export default function AvailabilityPage() {
               {t("availability.workingHours")}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-3" data-tour="availability-list">
-            <ul className="flex min-w-0 flex-col gap-2">
+          <CardContent className="px-4 py-4 lg:px-6 lg:pt-3" data-tour="availability-list">
+            <ul className="flex min-w-0 flex-col gap-3 lg:gap-2">
               {days.map((day) => (
                 <li key={day.id} className="min-w-0">
-                  <div className="grid gap-2 rounded-2xl border border-border bg-muted/20 px-3 py-2.5 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
+                  {/* Mobile */}
+                  <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 lg:hidden">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-base font-semibold text-foreground">{weekdayLabel(day.label)}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {day.isOpen ? t("availability.open") : t("availability.closed")}
+                        </p>
+                      </div>
+                      <Switch
+                        checked={day.isOpen}
+                        onCheckedChange={(checked) => updateDay(day.id, { isOpen: Boolean(checked) })}
+                        disabled={loading || loadError}
+                        aria-label={`${weekdayLabel(day.label)} — ${day.isOpen ? t("availability.open") : t("availability.closed")}`}
+                        className="shrink-0 touch-manipulation"
+                      />
+                    </div>
+                    {day.isOpen ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="min-w-0">
+                          <Label htmlFor={`from-${day.id}-mobile`} className="text-xs font-medium text-muted-foreground">
+                            {t("availability.from")}
+                          </Label>
+                          <Input
+                            id={`from-${day.id}-mobile`}
+                            type="time"
+                            value={day.startTime}
+                            disabled={loading || loadError}
+                            onChange={(e) => updateDay(day.id, { startTime: e.target.value })}
+                            className="mt-1.5 h-11 w-full touch-manipulation rounded-xl text-base"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <Label htmlFor={`to-${day.id}-mobile`} className="text-xs font-medium text-muted-foreground">
+                            {t("availability.to")}
+                          </Label>
+                          <Input
+                            id={`to-${day.id}-mobile`}
+                            type="time"
+                            value={day.endTime}
+                            disabled={loading || loadError}
+                            onChange={(e) => updateDay(day.id, { endTime: e.target.value })}
+                            className="mt-1.5 h-11 w-full touch-manipulation rounded-xl text-base"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{t("availability.closed")}</p>
+                    )}
+                  </div>
+
+                  {/* Desktop */}
+                  <div className="hidden gap-2 rounded-2xl border border-border bg-muted/20 px-3 py-2.5 lg:grid lg:grid-cols-[1fr_auto_1fr_auto] lg:items-center">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-foreground">
                         {weekdayLabel(day.label)}
                       </p>
                     </div>
-
-                    <div className="flex items-center justify-between gap-2 md:justify-start">
-                      <span className="text-xs text-muted-foreground md:hidden">
-                        {day.isOpen ? t("availability.open") : t("availability.closed")}
-                      </span>
+                    <div className="flex items-center justify-start gap-2">
                       <Switch
                         checked={day.isOpen}
                         onCheckedChange={(checked) => updateDay(day.id, { isOpen: Boolean(checked) })}
@@ -268,7 +319,6 @@ export default function AvailabilityPage() {
                         aria-label={day.isOpen ? t("availability.open") : t("availability.closed")}
                       />
                     </div>
-
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label htmlFor={`from-${day.id}`} className="text-xs text-muted-foreground">
@@ -297,8 +347,7 @@ export default function AvailabilityPage() {
                         />
                       </div>
                     </div>
-
-                    <div className="hidden items-center justify-end gap-2 text-xs text-muted-foreground md:flex">
+                    <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
                       <Clock className="size-3.5" aria-hidden />
                       {day.isOpen ? `${day.startTime} - ${day.endTime}` : t("availability.closed")}
                     </div>
@@ -315,6 +364,18 @@ export default function AvailabilityPage() {
           language={language}
           t={t}
         />
+
+        <MobileFixedActionBar className="lg:hidden">
+          <Button
+            type="button"
+            className="h-11 w-full touch-manipulation rounded-xl"
+            onClick={saveAvailability}
+            disabled={loading || loadError || saving}
+          >
+            {saving ? t("common.saving") : t("availability.saveButton")}
+          </Button>
+        </MobileFixedActionBar>
+        </div>
       </PageShell>
     </AppShell>
   )

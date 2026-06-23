@@ -76,8 +76,8 @@ export function ScheduleMobileView({
   const isToday = selectedDate === todayKey
 
   return (
-    <div className="flex min-h-0 flex-col gap-3 pb-24">
-      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm shadow-slate-900/5">
+    <div className="flex min-h-0 flex-col gap-3">
+      <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-3 shadow-sm shadow-slate-900/5">
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -90,7 +90,7 @@ export function ScheduleMobileView({
             <ChevronLeft className="size-4" />
           </Button>
           <div className="min-w-0 flex-1 text-center">
-            <p className="truncate text-sm font-semibold capitalize text-foreground">{dayTitle}</p>
+            <p className="text-sm font-semibold capitalize leading-snug text-foreground">{dayTitle}</p>
             <p className="text-xs text-muted-foreground">{visitSummary}</p>
           </div>
           <Button
@@ -105,18 +105,18 @@ export function ScheduleMobileView({
           </Button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"
             variant={isToday ? "default" : "outline"}
             size="sm"
-            className="h-10 flex-1 touch-manipulation rounded-xl"
+            className="h-11 w-full touch-manipulation rounded-xl"
             onClick={() => onSelectedDateChange(todayKey)}
           >
             {t("schedule.today")}
           </Button>
           {staffMembers.length > 0 ? (
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <Label htmlFor="schedule-mobile-person" className="sr-only">
                 {t("schedule.filterPerson")}
               </Label>

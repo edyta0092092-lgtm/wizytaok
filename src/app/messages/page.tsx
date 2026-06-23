@@ -8,6 +8,10 @@ import { MessageTemplatesSection } from "@/components/messages/message-templates
 import { CustomTemplatesSection } from "@/components/messages/custom-templates-section"
 import { SendingHistorySection } from "@/components/messages/sending-history-section"
 import { SmsQuotaStatusCard } from "@/components/messages/sms-quota-status-card"
+import {
+  MessagesMobileSectionNav,
+  type MessagesMobileSection,
+} from "@/components/messages/messages-mobile-section-nav"
 import { AppShell } from "@/components/layout/app-shell"
 import { PageShell } from "@/components/layout/page-shell"
 import { Button } from "@/components/ui/button"
@@ -33,6 +37,13 @@ function MessagesPageContent() {
   const canOpenMessagesPage =
     access.canAccessMessages || access.canViewMessageSendHistory
   const canManageTemplates = access.canManageMessageTemplates
+  const [mobileSection, setMobileSection] = React.useState<MessagesMobileSection>("quota")
+
+  React.useEffect(() => {
+    if (!canManageTemplates && (mobileSection === "templates" || mobileSection === "custom")) {
+      setMobileSection("history")
+    }
+  }, [canManageTemplates, mobileSection])
 
   if (access.ready && !canOpenMessagesPage) {
     return (
@@ -66,14 +77,33 @@ function MessagesPageContent() {
     >
       <PageShell>
         <div data-tour="messages-list" className="flex flex-col gap-6">
-        <SmsQuotaStatusCard />
-        {canManageTemplates ? (
-          <>
-            <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} readOnly={false} />
-            <CustomTemplatesSection readOnly={false} />
-          </>
-        ) : null}
-        <SendingHistorySection />
+          <MessagesMobileSectionNav
+            value={mobileSection}
+            onChange={setMobileSection}
+            showTemplates={canManageTemplates}
+          />
+
+          <div className="lg:hidden">
+            {mobileSection === "quota" ? <SmsQuotaStatusCard /> : null}
+            {canManageTemplates && mobileSection === "templates" ? (
+              <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} readOnly={false} />
+            ) : null}
+            {canManageTemplates && mobileSection === "custom" ? (
+              <CustomTemplatesSection readOnly={false} />
+            ) : null}
+            {mobileSection === "history" ? <SendingHistorySection /> : null}
+          </div>
+
+          <div className="hidden flex-col gap-6 lg:flex">
+            <SmsQuotaStatusCard />
+            {canManageTemplates ? (
+              <>
+                <MessageTemplatesSection onRegisterPrimaryAction={registerOpen} readOnly={false} />
+                <CustomTemplatesSection readOnly={false} />
+              </>
+            ) : null}
+            <SendingHistorySection />
+          </div>
         </div>
       </PageShell>
     </AppShell>
